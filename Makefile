@@ -1,5 +1,5 @@
 VENV ?= .venv
-PYTHON ?= python3
+PYTHON ?= python3.13
 ACTIVATE = . $(VENV)/bin/activate
 
 .PHONY: setup deps-up deps-down api worker test
@@ -23,4 +23,3 @@ worker:
 
 test:
 	$(ACTIVATE) && pytest
-

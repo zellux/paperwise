@@ -33,6 +33,7 @@ make worker
 ## Local Development Commands
 
 - `make setup` - create local virtualenv and install all dependencies.
+- `make setup PYTHON=python3.13` - explicitly use Python 3.13 if needed.
 - `make deps-up` - start local dependency services (Redis).
 - `make deps-down` - stop local dependency services.
 - `make api` - run FastAPI from local virtualenv.
