@@ -9,16 +9,19 @@ from pydantic import BaseModel
 from zapis.api.dependencies import (
     document_repository_dependency,
     ingestion_dispatcher_dependency,
+    llm_provider_dependency,
     storage_dependency,
 )
 from zapis.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
+    LLMProvider,
     StorageProvider,
 )
 from zapis.application.services.documents import CreateDocumentCommand, create_document, get_document
+from zapis.application.services.llm_parsing import parse_with_llm
 from zapis.application.services.parsing import parse_document_blob
-from zapis.domain.models import Document, ParseResult
+from zapis.domain.models import Document, LLMParseResult, ParseResult
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -51,6 +54,25 @@ class ParseResultResponse(BaseModel):
     created_at: datetime
 
 
+class LLMParseResultResponse(BaseModel):
+    document_id: str
+    suggested_title: str
+    document_date: str | None
+    correspondent: str
+    document_type: str
+    tags: list[str]
+    created_correspondent: bool
+    created_document_type: bool
+    created_tags: list[str]
+    created_at: datetime
+
+
+class TaxonomyResponse(BaseModel):
+    correspondents: list[str]
+    document_types: list[str]
+    tags: list[str]
+
+
 def _to_response(document: Document) -> DocumentResponse:
     return DocumentResponse(
         id=document.id,
@@ -73,6 +95,21 @@ def _to_parse_response(result: ParseResult) -> ParseResultResponse:
         size_bytes=result.size_bytes,
         page_count=result.page_count,
         text_preview=result.text_preview,
+        created_at=result.created_at,
+    )
+
+
+def _to_llm_parse_response(result: LLMParseResult) -> LLMParseResultResponse:
+    return LLMParseResultResponse(
+        document_id=result.document_id,
+        suggested_title=result.suggested_title,
+        document_date=result.document_date,
+        correspondent=result.correspondent,
+        document_type=result.document_type,
+        tags=result.tags,
+        created_correspondent=result.created_correspondent,
+        created_document_type=result.created_document_type,
+        created_tags=result.created_tags,
         created_at=result.created_at,
     )
 
@@ -160,3 +197,54 @@ def get_parse_document_endpoint(
             detail="Parse result not found",
         )
     return _to_parse_response(result)
+
+
+@router.post("/{document_id}/llm-parse", response_model=LLMParseResultResponse)
+def llm_parse_document_endpoint(
+    document_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    llm_provider: LLMProvider = Depends(llm_provider_dependency),
+) -> LLMParseResultResponse:
+    document = get_document(document_id=document_id, repository=repository)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    parse_result = repository.get_parse_result(document_id)
+    if parse_result is None:
+        parse_result = parse_document_blob(document_id=document.id, blob_uri=document.blob_uri)
+        repository.save_parse_result(parse_result)
+
+    result = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=llm_provider,
+    )
+    return _to_llm_parse_response(result)
+
+
+@router.get("/{document_id}/llm-parse", response_model=LLMParseResultResponse)
+def get_llm_parse_document_endpoint(
+    document_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> LLMParseResultResponse:
+    result = repository.get_llm_parse_result(document_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="LLM parse result not found",
+        )
+    return _to_llm_parse_response(result)
+
+
+@router.get("/metadata/taxonomy", response_model=TaxonomyResponse)
+def get_taxonomy_endpoint(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> TaxonomyResponse:
+    return TaxonomyResponse(
+        correspondents=repository.list_correspondents(),
+        document_types=repository.list_document_types(),
+        tags=repository.list_tags(),
+    )

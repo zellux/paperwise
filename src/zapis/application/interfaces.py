@@ -1,6 +1,6 @@
-from typing import Protocol
+from typing import Any, Protocol
 
-from zapis.domain.models import Document, ParseResult
+from zapis.domain.models import Document, LLMParseResult, ParseResult
 
 
 class OCRProvider(Protocol):
@@ -14,8 +14,16 @@ class EmbeddingProvider(Protocol):
 
 
 class LLMProvider(Protocol):
-    def generate(self, prompt: str) -> str:
-        """Generate an answer from prompt context."""
+    def suggest_metadata(
+        self,
+        *,
+        filename: str,
+        text_preview: str,
+        existing_correspondents: list[str],
+        existing_document_types: list[str],
+        existing_tags: list[str],
+    ) -> dict[str, Any]:
+        """Suggest document metadata fields from parsed text and taxonomy context."""
 
 
 class SearchProvider(Protocol):
@@ -40,6 +48,30 @@ class DocumentRepository(Protocol):
 
     def get_parse_result(self, document_id: str) -> ParseResult | None:
         """Load parse output by document ID."""
+
+    def save_llm_parse_result(self, result: LLMParseResult) -> None:
+        """Persist LLM metadata parse output for a document."""
+
+    def get_llm_parse_result(self, document_id: str) -> LLMParseResult | None:
+        """Load LLM metadata parse output for a document."""
+
+    def list_correspondents(self) -> list[str]:
+        """Return known correspondent names."""
+
+    def list_document_types(self) -> list[str]:
+        """Return known document type names."""
+
+    def list_tags(self) -> list[str]:
+        """Return known tag names."""
+
+    def add_correspondent(self, name: str) -> None:
+        """Add a correspondent if missing."""
+
+    def add_document_type(self, name: str) -> None:
+        """Add a document type if missing."""
+
+    def add_tags(self, names: list[str]) -> None:
+        """Add tag names if missing."""
 
 
 class IngestionDispatcher(Protocol):

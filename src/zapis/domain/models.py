@@ -32,3 +32,17 @@ class ParseResult:
     page_count: int
     text_preview: str
     created_at: datetime
+
+
+@dataclass(slots=True)
+class LLMParseResult:
+    document_id: str
+    suggested_title: str
+    document_date: str | None
+    correspondent: str
+    document_type: str
+    tags: list[str]
+    created_correspondent: bool
+    created_document_type: bool
+    created_tags: list[str]
+    created_at: datetime
