@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from zapis.domain.models import Document
+from zapis.domain.models import Document, ParseResult
 
 
 class OCRProvider(Protocol):
@@ -34,6 +34,12 @@ class DocumentRepository(Protocol):
 
     def get(self, document_id: str) -> Document | None:
         """Load a document by ID."""
+
+    def save_parse_result(self, result: ParseResult) -> None:
+        """Persist parse output for a document."""
+
+    def get_parse_result(self, document_id: str) -> ParseResult | None:
+        """Load parse output by document ID."""
 
 
 class IngestionDispatcher(Protocol):

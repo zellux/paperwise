@@ -1,5 +1,6 @@
 from celery.utils.log import get_task_logger
 
+from zapis.application.services.parsing import parse_document_blob
 from zapis.workers.celery_app import celery_app
 
 logger = get_task_logger(__name__)
@@ -39,26 +40,18 @@ def parse_document_task(
     filename: str,
     content_type: str,
 ) -> dict[str, str | int]:
-    # Placeholder parser: verifies stored content is readable and identifies PDF signature.
-    from pathlib import Path
-    from urllib.parse import unquote, urlparse
-
-    parsed = urlparse(blob_uri)
-    path = Path(unquote(parsed.path))
-    raw = path.read_bytes()
-    is_pdf = raw.startswith(b"%PDF")
+    parsed = parse_document_blob(document_id=document_id, blob_uri=blob_uri)
     logger.info(
-        "parsed document_id=%s filename=%s bytes=%d pdf=%s content_type=%s",
+        "parsed document_id=%s filename=%s bytes=%d pages=%d content_type=%s",
         document_id,
         filename,
-        len(raw),
-        is_pdf,
+        parsed.size_bytes,
+        parsed.page_count,
         content_type,
     )
     return {
         "document_id": document_id,
-        "bytes": len(raw),
-        "parser": "stub",
-        "status": "parsed",
+        "bytes": parsed.size_bytes,
+        "parser": parsed.parser,
+        "status": parsed.status,
     }
-    return document_id

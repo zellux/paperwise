@@ -21,3 +21,14 @@ class Document:
     size_bytes: int
     status: DocumentStatus
     created_at: datetime
+
+
+@dataclass(slots=True)
+class ParseResult:
+    document_id: str
+    parser: str
+    status: str
+    size_bytes: int
+    page_count: int
+    text_preview: str
+    created_at: datetime

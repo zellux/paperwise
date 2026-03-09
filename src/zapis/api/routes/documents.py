@@ -17,7 +17,8 @@ from zapis.application.interfaces import (
     StorageProvider,
 )
 from zapis.application.services.documents import CreateDocumentCommand, create_document, get_document
-from zapis.domain.models import Document
+from zapis.application.services.parsing import parse_document_blob
+from zapis.domain.models import Document, ParseResult
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -40,6 +41,16 @@ class DocumentResponse(BaseModel):
     created_at: datetime
 
 
+class ParseResultResponse(BaseModel):
+    document_id: str
+    parser: str
+    status: str
+    size_bytes: int
+    page_count: int
+    text_preview: str
+    created_at: datetime
+
+
 def _to_response(document: Document) -> DocumentResponse:
     return DocumentResponse(
         id=document.id,
@@ -51,6 +62,18 @@ def _to_response(document: Document) -> DocumentResponse:
         size_bytes=document.size_bytes,
         status=document.status.value,
         created_at=document.created_at,
+    )
+
+
+def _to_parse_response(result: ParseResult) -> ParseResultResponse:
+    return ParseResultResponse(
+        document_id=result.document_id,
+        parser=result.parser,
+        status=result.status,
+        size_bytes=result.size_bytes,
+        page_count=result.page_count,
+        text_preview=result.text_preview,
+        created_at=result.created_at,
     )
 
 
@@ -107,3 +130,33 @@ def get_document_endpoint(
             detail="Document not found",
         )
     return _to_response(document)
+
+
+@router.post("/{document_id}/parse", response_model=ParseResultResponse)
+def parse_document_endpoint(
+    document_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> ParseResultResponse:
+    document = get_document(document_id=document_id, repository=repository)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    result = parse_document_blob(document_id=document.id, blob_uri=document.blob_uri)
+    repository.save_parse_result(result)
+    return _to_parse_response(result)
+
+
+@router.get("/{document_id}/parse", response_model=ParseResultResponse)
+def get_parse_document_endpoint(
+    document_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> ParseResultResponse:
+    result = repository.get_parse_result(document_id)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Parse result not found",
+        )
+    return _to_parse_response(result)
