@@ -7,11 +7,11 @@ from zapis.infrastructure.dispatchers.celery_ingestion_dispatcher import (
 
 def test_celery_ingestion_dispatcher_enqueues_and_returns_job_id(monkeypatch) -> None:
     class FakeTask:
-        called_with: str | None = None
+        called_with: dict | None = None
 
         @classmethod
-        def delay(cls, document_id: str):
-            cls.called_with = document_id
+        def delay(cls, **kwargs):
+            cls.called_with = kwargs
             return SimpleNamespace(id="celery-job-1")
 
     monkeypatch.setattr(
@@ -20,8 +20,17 @@ def test_celery_ingestion_dispatcher_enqueues_and_returns_job_id(monkeypatch) ->
     )
 
     dispatcher = CeleryIngestionDispatcher()
-    job_id = dispatcher.enqueue("doc-1")
+    job_id = dispatcher.enqueue(
+        document_id="doc-1",
+        blob_uri="file:///tmp/doc-1.pdf",
+        filename="doc-1.pdf",
+        content_type="application/pdf",
+    )
 
     assert job_id == "celery-job-1"
-    assert FakeTask.called_with == "doc-1"
-
+    assert FakeTask.called_with == {
+        "document_id": "doc-1",
+        "blob_uri": "file:///tmp/doc-1.pdf",
+        "filename": "doc-1.pdf",
+        "content_type": "application/pdf",
+    }
