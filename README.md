@@ -8,6 +8,7 @@ AI-native document management platform (Python-first).
 - `src/zapis/workers` - Celery app and async/background tasks.
 - `src/zapis/domain` - core domain models and invariants.
 - `src/zapis/application` - use cases and provider interfaces.
+- `src/zapis/adapters` - provider implementations (LLM, OCR, search, storage).
 - `src/zapis/infrastructure` - config and external integrations.
 - `src/zapis/events` - internal event contracts.
 - `tests` - unit and integration tests.
@@ -22,4 +23,3 @@ source .venv/bin/activate
 pip install -e .[dev]
 uvicorn zapis.api.main:app --reload
 ```
-
