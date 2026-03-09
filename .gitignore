@@ -14,7 +14,6 @@ venv/
 .env
 .env.*
 !.env.example
-!.env.local.template
 
 # Tooling
 dist/
