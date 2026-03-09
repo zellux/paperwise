@@ -214,36 +214,41 @@ input[type="file"] {
   word-break: break-word;
 }
 
-.docs-list {
-  display: grid;
-  gap: 8px;
-  max-height: 320px;
-  overflow: auto;
-}
-
-.doc-item {
+.docs-table-wrap {
   border: 1px solid rgba(0, 0, 0, 0.12);
-  background: rgba(255, 255, 255, 0.86);
-  border-radius: 10px;
-  padding: 10px;
-  display: grid;
-  gap: 6px;
+  border-radius: 12px;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.82);
+  margin-bottom: 10px;
 }
 
-.doc-item button {
-  justify-self: start;
+.docs-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 980px;
 }
 
-.doc-meta {
-  color: var(--ink-soft);
-  font-size: 0.8rem;
-  font-family: var(--mono);
+.docs-table th,
+.docs-table td {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 9px 10px;
+  text-align: left;
+  vertical-align: top;
+  font-size: 0.82rem;
 }
 
-.doc-detail {
-  color: #1e2b20;
-  font-size: 0.83rem;
-  line-height: 1.35;
+.docs-table th {
+  position: sticky;
+  top: 0;
+  background: rgba(20, 115, 82, 0.09);
+  color: #163625;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
+.docs-table tbody tr:hover {
+  background: rgba(20, 115, 82, 0.06);
 }
 
 @keyframes rise-in {

@@ -37,7 +37,27 @@
           <div class="actions">
             <button id="refreshDocsBtn" class="btn" type="button">Refresh List</button>
           </div>
-          <div id="docsList" class="docs-list">No documents loaded.</div>
+          <div class="docs-table-wrap">
+            <table class="docs-table">
+              <thead>
+                <tr>
+                  <th>Filename</th>
+                  <th>Suggested Title</th>
+                  <th>Type</th>
+                  <th>Correspondent</th>
+                  <th>Tags</th>
+                  <th>Date</th>
+                  <th>Status</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="docsTableBody">
+                <tr>
+                  <td colspan="8">No documents loaded.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
           <form id="docLookupForm" class="inline-form">
             <input
               id="docIdInput"

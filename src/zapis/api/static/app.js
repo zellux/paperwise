@@ -12,7 +12,7 @@ const docOutput = document.getElementById("docOutput");
 const parseOutput = document.getElementById("parseOutput");
 const llmOutput = document.getElementById("llmOutput");
 const activityOutput = document.getElementById("activityOutput");
-const docsList = document.getElementById("docsList");
+const docsTableBody = document.getElementById("docsTableBody");
 const navLinks = [...document.querySelectorAll(".nav-link")];
 
 let currentDocumentId = "";
@@ -40,27 +40,43 @@ async function loadDocument(documentId) {
 
 function renderDocsList(documents) {
   if (!documents.length) {
-    docsList.textContent = "No documents found.";
+    docsTableBody.innerHTML = '<tr><td colspan="8">No documents found.</td></tr>';
     return;
   }
-  docsList.innerHTML = "";
+  docsTableBody.innerHTML = "";
   for (const doc of documents) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "doc-item";
-    const title = document.createElement("strong");
-    title.textContent = doc.filename;
-    const meta = document.createElement("div");
-    meta.className = "doc-meta";
-    meta.textContent = `${doc.id} • ${doc.status} • ${new Date(doc.created_at).toLocaleString()}`;
-    const detail = document.createElement("div");
-    detail.className = "doc-detail";
+    const row = document.createElement("tr");
+    const filenameCell = document.createElement("td");
+    filenameCell.textContent = doc.filename;
+
+    let suggestedTitle = "-";
+    let documentType = "-";
+    let correspondent = "-";
+    let tags = "-";
+    let documentDate = "-";
     if (doc.llm_metadata) {
       const m = doc.llm_metadata;
-      const tags = Array.isArray(m.tags) && m.tags.length ? m.tags.join(", ") : "-";
-      detail.textContent = `Title: ${m.suggested_title} | Date: ${m.document_date || "-"} | Type: ${m.document_type} | Correspondent: ${m.correspondent} | Tags: ${tags}`;
-    } else {
-      detail.textContent = "Metadata: not enriched yet";
+      suggestedTitle = m.suggested_title || "-";
+      documentType = m.document_type || "-";
+      correspondent = m.correspondent || "-";
+      tags = Array.isArray(m.tags) && m.tags.length ? m.tags.join(", ") : "-";
+      documentDate = m.document_date || "-";
     }
+
+    const titleCell = document.createElement("td");
+    titleCell.textContent = suggestedTitle;
+    const typeCell = document.createElement("td");
+    typeCell.textContent = documentType;
+    const correspondentCell = document.createElement("td");
+    correspondentCell.textContent = correspondent;
+    const tagsCell = document.createElement("td");
+    tagsCell.textContent = tags;
+    const dateCell = document.createElement("td");
+    dateCell.textContent = documentDate;
+    const statusCell = document.createElement("td");
+    statusCell.textContent = doc.status;
+
+    const actionCell = document.createElement("td");
     const button = document.createElement("button");
     button.className = "btn";
     button.type = "button";
@@ -72,11 +88,17 @@ function renderDocsList(documents) {
         logActivity(error.message);
       }
     });
-    wrapper.appendChild(title);
-    wrapper.appendChild(meta);
-    wrapper.appendChild(detail);
-    wrapper.appendChild(button);
-    docsList.appendChild(wrapper);
+    actionCell.appendChild(button);
+
+    row.appendChild(filenameCell);
+    row.appendChild(titleCell);
+    row.appendChild(typeCell);
+    row.appendChild(correspondentCell);
+    row.appendChild(tagsCell);
+    row.appendChild(dateCell);
+    row.appendChild(statusCell);
+    row.appendChild(actionCell);
+    docsTableBody.appendChild(row);
   }
 }
 
