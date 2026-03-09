@@ -1,5 +1,7 @@
 from typing import Protocol
 
+from zapis.domain.models import Document
+
 
 class OCRProvider(Protocol):
     def extract_text(self, uri: str) -> str:
@@ -24,3 +26,16 @@ class SearchProvider(Protocol):
 class StorageProvider(Protocol):
     def put(self, key: str, data: bytes, content_type: str) -> str:
         """Store a binary artifact and return its canonical URI."""
+
+
+class DocumentRepository(Protocol):
+    def save(self, document: Document) -> None:
+        """Persist a document aggregate."""
+
+    def get(self, document_id: str) -> Document | None:
+        """Load a document by ID."""
+
+
+class IngestionDispatcher(Protocol):
+    def enqueue(self, document_id: str) -> str:
+        """Dispatch ingestion work and return a job identifier."""
