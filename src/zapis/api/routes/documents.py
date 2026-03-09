@@ -1,22 +1,25 @@
 from datetime import datetime
+from hashlib import sha256
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
 from zapis.api.dependencies import (
     document_repository_dependency,
     ingestion_dispatcher_dependency,
+    storage_dependency,
 )
-from zapis.application.interfaces import DocumentRepository, IngestionDispatcher
+from zapis.application.interfaces import (
+    DocumentRepository,
+    IngestionDispatcher,
+    StorageProvider,
+)
 from zapis.application.services.documents import CreateDocumentCommand, create_document, get_document
 from zapis.domain.models import Document
 
 router = APIRouter(prefix="/documents", tags=["documents"])
-
-
-class CreateDocumentRequest(BaseModel):
-    filename: str
-    owner_id: str
 
 
 class CreateDocumentResponse(BaseModel):
@@ -29,6 +32,10 @@ class DocumentResponse(BaseModel):
     id: str
     filename: str
     owner_id: str
+    blob_uri: str
+    checksum_sha256: str
+    content_type: str
+    size_bytes: int
     status: str
     created_at: datetime
 
@@ -38,6 +45,10 @@ def _to_response(document: Document) -> DocumentResponse:
         id=document.id,
         filename=document.filename,
         owner_id=document.owner_id,
+        blob_uri=document.blob_uri,
+        checksum_sha256=document.checksum_sha256,
+        content_type=document.content_type,
+        size_bytes=document.size_bytes,
         status=document.status.value,
         created_at=document.created_at,
     )
@@ -49,14 +60,30 @@ def _to_response(document: Document) -> DocumentResponse:
     response_model=CreateDocumentResponse,
 )
 def create_document_endpoint(
-    payload: CreateDocumentRequest,
+    owner_id: str = Form(...),
+    file: UploadFile = File(...),
     repository: DocumentRepository = Depends(document_repository_dependency),
     dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
+    storage: StorageProvider = Depends(storage_dependency),
 ) -> CreateDocumentResponse:
+    filename = file.filename or "uploaded-document"
+    content = file.file.read()
+    checksum = sha256(content).hexdigest()
+    storage_key = f"documents/{uuid4()}-{Path(filename).name}"
+    blob_uri = storage.put(
+        key=storage_key,
+        data=content,
+        content_type=file.content_type or "application/octet-stream",
+    )
+
     document, job_id = create_document(
         CreateDocumentCommand(
-            filename=payload.filename,
-            owner_id=payload.owner_id,
+            filename=filename,
+            owner_id=owner_id,
+            blob_uri=blob_uri,
+            checksum_sha256=checksum,
+            content_type=file.content_type or "application/octet-stream",
+            size_bytes=len(content),
         ),
         repository=repository,
         dispatcher=dispatcher,
@@ -80,4 +107,3 @@ def get_document_endpoint(
             detail="Document not found",
         )
     return _to_response(document)
-

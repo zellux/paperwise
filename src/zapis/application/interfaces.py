@@ -37,5 +37,11 @@ class DocumentRepository(Protocol):
 
 
 class IngestionDispatcher(Protocol):
-    def enqueue(self, document_id: str) -> str:
+    def enqueue(
+        self,
+        document_id: str,
+        blob_uri: str,
+        filename: str,
+        content_type: str,
+    ) -> str:
         """Dispatch ingestion work and return a job identifier."""

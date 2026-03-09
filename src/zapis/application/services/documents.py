@@ -10,6 +10,10 @@ from zapis.domain.models import Document
 class CreateDocumentCommand:
     filename: str
     owner_id: str
+    blob_uri: str
+    checksum_sha256: str
+    content_type: str
+    size_bytes: int
 
 
 def create_document(
@@ -24,14 +28,22 @@ def create_document(
         data=CreateDocumentInput(
             filename=command.filename,
             owner_id=command.owner_id,
+            blob_uri=command.blob_uri,
+            checksum_sha256=command.checksum_sha256,
+            content_type=command.content_type,
+            size_bytes=command.size_bytes,
         ),
     )
     repository.save(document)
-    job_id = dispatcher.enqueue(document.id)
+    job_id = dispatcher.enqueue(
+        document_id=document.id,
+        blob_uri=document.blob_uri,
+        filename=document.filename,
+        content_type=document.content_type,
+    )
     return document, job_id
 
 
 def get_document(document_id: str, repository: DocumentRepository) -> Document | None:
     """Fetch a document aggregate by ID."""
     return repository.get(document_id)
-
