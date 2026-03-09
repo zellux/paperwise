@@ -23,3 +23,6 @@ coverage.xml
 
 # Editor temp files
 *.swp
+
+# Local test documents
+local/
