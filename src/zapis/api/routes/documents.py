@@ -44,6 +44,18 @@ class DocumentResponse(BaseModel):
     created_at: datetime
 
 
+class DocumentListMetadata(BaseModel):
+    suggested_title: str
+    document_date: str | None
+    correspondent: str
+    document_type: str
+    tags: list[str]
+
+
+class DocumentListItemResponse(DocumentResponse):
+    llm_metadata: DocumentListMetadata | None = None
+
+
 class ParseResultResponse(BaseModel):
     document_id: str
     parser: str
@@ -84,6 +96,33 @@ def _to_response(document: Document) -> DocumentResponse:
         size_bytes=document.size_bytes,
         status=document.status.value,
         created_at=document.created_at,
+    )
+
+
+def _to_list_item_response(
+    document: Document,
+    llm_result: LLMParseResult | None,
+) -> DocumentListItemResponse:
+    metadata = None
+    if llm_result is not None:
+        metadata = DocumentListMetadata(
+            suggested_title=llm_result.suggested_title,
+            document_date=llm_result.document_date,
+            correspondent=llm_result.correspondent,
+            document_type=llm_result.document_type,
+            tags=llm_result.tags,
+        )
+    return DocumentListItemResponse(
+        id=document.id,
+        filename=document.filename,
+        owner_id=document.owner_id,
+        blob_uri=document.blob_uri,
+        checksum_sha256=document.checksum_sha256,
+        content_type=document.content_type,
+        size_bytes=document.size_bytes,
+        status=document.status.value,
+        created_at=document.created_at,
+        llm_metadata=metadata,
     )
 
 
@@ -155,13 +194,19 @@ def create_document_endpoint(
     )
 
 
-@router.get("", response_model=list[DocumentResponse])
+@router.get("", response_model=list[DocumentListItemResponse])
 def list_documents_endpoint(
     limit: int = 100,
     repository: DocumentRepository = Depends(document_repository_dependency),
-) -> list[DocumentResponse]:
+) -> list[DocumentListItemResponse]:
     documents = repository.list_documents(limit=limit)
-    return [_to_response(document) for document in documents]
+    return [
+        _to_list_item_response(
+            document=document,
+            llm_result=repository.get_llm_parse_result(document.id),
+        )
+        for document in documents
+    ]
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)

@@ -52,6 +52,15 @@ function renderDocsList(documents) {
     const meta = document.createElement("div");
     meta.className = "doc-meta";
     meta.textContent = `${doc.id} • ${doc.status} • ${new Date(doc.created_at).toLocaleString()}`;
+    const detail = document.createElement("div");
+    detail.className = "doc-detail";
+    if (doc.llm_metadata) {
+      const m = doc.llm_metadata;
+      const tags = Array.isArray(m.tags) && m.tags.length ? m.tags.join(", ") : "-";
+      detail.textContent = `Title: ${m.suggested_title} | Date: ${m.document_date || "-"} | Type: ${m.document_type} | Correspondent: ${m.correspondent} | Tags: ${tags}`;
+    } else {
+      detail.textContent = "Metadata: not enriched yet";
+    }
     const button = document.createElement("button");
     button.className = "btn";
     button.type = "button";
@@ -65,6 +74,7 @@ function renderDocsList(documents) {
     });
     wrapper.appendChild(title);
     wrapper.appendChild(meta);
+    wrapper.appendChild(detail);
     wrapper.appendChild(button);
     docsList.appendChild(wrapper);
   }

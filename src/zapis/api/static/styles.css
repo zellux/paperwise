@@ -240,6 +240,12 @@ input[type="file"] {
   font-family: var(--mono);
 }
 
+.doc-detail {
+  color: #1e2b20;
+  font-size: 0.83rem;
+  line-height: 1.35;
+}
+
 @keyframes rise-in {
   from {
     opacity: 0;
@@ -264,4 +270,3 @@ input[type="file"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-

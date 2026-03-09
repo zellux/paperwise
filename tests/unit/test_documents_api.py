@@ -130,6 +130,42 @@ def test_list_documents() -> None:
         payload = list_response.json()
         assert len(payload) >= 2
         assert payload[0]["filename"] in {"a.pdf", "b.pdf"}
+        assert "llm_metadata" in payload[0]
+        assert payload[0]["llm_metadata"] is None
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_list_documents_includes_llm_metadata_when_available() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            data={"owner_id": "user-list-llm"},
+            files={"file": ("credit.pdf", b"%PDF-1.7\nexperian", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        doc_id = create_response.json()["id"]
+        llm_response = client.post(f"/documents/{doc_id}/llm-parse")
+        assert llm_response.status_code == 200
+
+        list_response = client.get("/documents")
+        assert list_response.status_code == 200
+        payload = list_response.json()
+        target = next((item for item in payload if item["id"] == doc_id), None)
+        assert target is not None
+        assert target["llm_metadata"] is not None
+        assert target["llm_metadata"]["document_type"].lower() == "credit report"
+        assert "identity" in target["llm_metadata"]["tags"]
     finally:
         app.dependency_overrides.clear()
 
