@@ -24,5 +24,8 @@ coverage.xml
 # Editor temp files
 *.swp
 
+# macOS metadata
+.DS_Store
+
 # Local test documents
 local/
