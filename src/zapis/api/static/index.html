@@ -32,7 +32,7 @@
       </aside>
 
       <section class="content-pane">
-        <article id="section-docs" class="panel panel-section">
+        <article id="section-docs" class="panel panel-section view">
           <h2>Documents</h2>
           <div class="actions">
             <button id="refreshDocsBtn" class="btn" type="button">Refresh List</button>
@@ -71,7 +71,7 @@
           <pre id="docOutput" class="output">No document loaded yet.</pre>
         </article>
 
-        <article id="section-upload" class="panel panel-section">
+        <article id="section-upload" class="panel panel-section view view-hidden">
           <h2>Upload Document</h2>
           <form id="uploadForm" class="stack">
             <label class="label" for="ownerId">Owner ID</label>
@@ -84,7 +84,7 @@
           </form>
         </article>
 
-        <article id="section-parse" class="panel panel-section">
+        <article id="section-parse" class="panel panel-section view view-hidden">
           <h2>Parse</h2>
           <div class="actions">
             <button id="parseNowBtn" class="btn btn-primary" type="button">Parse Now</button>
@@ -93,7 +93,7 @@
           <pre id="parseOutput" class="output">No parse result yet.</pre>
         </article>
 
-        <article id="section-llm" class="panel panel-section">
+        <article id="section-llm" class="panel panel-section view view-hidden">
           <h2>LLM Parse</h2>
           <div class="actions">
             <button id="llmParseBtn" class="btn btn-primary" type="button">Run LLM Parse</button>
@@ -103,7 +103,7 @@
           <pre id="llmOutput" class="output">No LLM result yet.</pre>
         </article>
 
-        <article id="section-activity" class="panel panel-section">
+        <article id="section-activity" class="panel panel-section view view-hidden">
           <h2>Activity</h2>
           <pre id="activityOutput" class="output">Ready.</pre>
         </article>

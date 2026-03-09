@@ -14,6 +14,7 @@ const llmOutput = document.getElementById("llmOutput");
 const activityOutput = document.getElementById("activityOutput");
 const docsTableBody = document.getElementById("docsTableBody");
 const navLinks = [...document.querySelectorAll(".nav-link")];
+const views = [...document.querySelectorAll(".view")];
 
 let currentDocumentId = "";
 
@@ -105,6 +106,12 @@ function renderDocsList(documents) {
 function setActiveNav(targetId) {
   for (const link of navLinks) {
     link.classList.toggle("active", link.dataset.target === targetId);
+  }
+}
+
+function setActiveView(targetId) {
+  for (const view of views) {
+    view.classList.toggle("view-hidden", view.id !== targetId);
   }
 }
 
@@ -254,10 +261,12 @@ for (const link of navLinks) {
     if (!target) {
       return;
     }
-    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    setActiveView(targetId);
     setActiveNav(targetId);
   });
 }
+
+setActiveView("section-docs");
 
 loadDocumentsList().catch((error) => {
   logActivity(`Initial document list failed: ${error.message}`);

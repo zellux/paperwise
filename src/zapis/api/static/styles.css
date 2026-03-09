@@ -134,6 +134,10 @@ h1 {
   gap: 12px;
 }
 
+.view-hidden {
+  display: none;
+}
+
 .panel {
   padding: 16px;
 }
