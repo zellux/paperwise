@@ -135,6 +135,10 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.panel-list {
+  grid-column: 1 / -1;
+}
+
 .stack {
   display: grid;
   gap: 8px;
@@ -200,6 +204,32 @@ input[type="file"] {
   font-size: 0.78rem;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.docs-list {
+  display: grid;
+  gap: 8px;
+  max-height: 280px;
+  overflow: auto;
+}
+
+.doc-item {
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: rgba(255, 255, 255, 0.86);
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.doc-item button {
+  justify-self: start;
+}
+
+.doc-meta {
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  font-family: var(--mono);
 }
 
 @keyframes rise-in {

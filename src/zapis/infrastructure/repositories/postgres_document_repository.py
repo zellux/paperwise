@@ -54,6 +54,26 @@ class PostgresDocumentRepository(DocumentRepository):
                 created_at=row.created_at,
             )
 
+    def list_documents(self, limit: int = 100) -> list[Document]:
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(DocumentRow).order_by(DocumentRow.created_at.desc()).limit(limit)
+            ).all()
+            return [
+                Document(
+                    id=row.id,
+                    filename=row.filename,
+                    owner_id=row.owner_id,
+                    blob_uri=row.blob_uri,
+                    checksum_sha256=row.checksum_sha256,
+                    content_type=row.content_type,
+                    size_bytes=row.size_bytes,
+                    status=DocumentStatus(row.status),
+                    created_at=row.created_at,
+                )
+                for row in rows
+            ]
+
     def save_parse_result(self, result: ParseResult) -> None:
         with self._session_factory() as session:
             row = session.get(ParseResultRow, result.document_id)
@@ -160,4 +180,3 @@ class PostgresDocumentRepository(DocumentRepository):
                 if session.get(TagRow, name) is None:
                     session.add(TagRow(name=name))
             session.commit()
-

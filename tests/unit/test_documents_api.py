@@ -106,6 +106,34 @@ def test_get_document_not_found() -> None:
         app.dependency_overrides.clear()
 
 
+def test_list_documents() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        for name in ("a.pdf", "b.pdf"):
+            create_response = client.post(
+                "/documents",
+                data={"owner_id": "user-list"},
+                files={"file": (name, b"%PDF-1.4\nx", "application/pdf")},
+            )
+            assert create_response.status_code == 201
+
+        list_response = client.get("/documents")
+        assert list_response.status_code == 200
+        payload = list_response.json()
+        assert len(payload) >= 2
+        assert payload[0]["filename"] in {"a.pdf", "b.pdf"}
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_parse_document_roundtrip() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()

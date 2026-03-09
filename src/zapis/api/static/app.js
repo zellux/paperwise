@@ -5,12 +5,14 @@ const parseFetchBtn = document.getElementById("parseFetchBtn");
 const llmParseBtn = document.getElementById("llmParseBtn");
 const llmFetchBtn = document.getElementById("llmFetchBtn");
 const taxonomyBtn = document.getElementById("taxonomyBtn");
+const refreshDocsBtn = document.getElementById("refreshDocsBtn");
 
 const docIdInput = document.getElementById("docIdInput");
 const docOutput = document.getElementById("docOutput");
 const parseOutput = document.getElementById("parseOutput");
 const llmOutput = document.getElementById("llmOutput");
 const activityOutput = document.getElementById("activityOutput");
+const docsList = document.getElementById("docsList");
 
 let currentDocumentId = "";
 
@@ -33,6 +35,49 @@ async function loadDocument(documentId) {
   currentDocumentId = documentId;
   docIdInput.value = documentId;
   logActivity(`Loaded document ${documentId}`);
+}
+
+function renderDocsList(documents) {
+  if (!documents.length) {
+    docsList.textContent = "No documents found.";
+    return;
+  }
+  docsList.innerHTML = "";
+  for (const doc of documents) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "doc-item";
+    const title = document.createElement("strong");
+    title.textContent = doc.filename;
+    const meta = document.createElement("div");
+    meta.className = "doc-meta";
+    meta.textContent = `${doc.id} • ${doc.status} • ${new Date(doc.created_at).toLocaleString()}`;
+    const button = document.createElement("button");
+    button.className = "btn";
+    button.type = "button";
+    button.textContent = "Open";
+    button.addEventListener("click", async () => {
+      try {
+        await loadDocument(doc.id);
+      } catch (error) {
+        logActivity(error.message);
+      }
+    });
+    wrapper.appendChild(title);
+    wrapper.appendChild(meta);
+    wrapper.appendChild(button);
+    docsList.appendChild(wrapper);
+  }
+}
+
+async function loadDocumentsList() {
+  const response = await fetch("/documents?limit=200");
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Document list failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+  renderDocsList(payload);
+  logActivity(`Loaded ${payload.length} document(s)`);
 }
 
 uploadForm.addEventListener("submit", async (event) => {
@@ -60,6 +105,7 @@ uploadForm.addEventListener("submit", async (event) => {
 
   logActivity(`Uploaded ${file.name} => document ${payload.id}`);
   await loadDocument(payload.id);
+  await loadDocumentsList();
   parseOutput.textContent = "No parse result yet.";
 });
 
@@ -156,4 +202,12 @@ taxonomyBtn.addEventListener("click", async () => {
   }
   llmOutput.textContent = pretty(payload);
   logActivity("Loaded current taxonomy");
+});
+
+refreshDocsBtn.addEventListener("click", async () => {
+  await loadDocumentsList();
+});
+
+loadDocumentsList().catch((error) => {
+  logActivity(`Initial document list failed: ${error.message}`);
 });

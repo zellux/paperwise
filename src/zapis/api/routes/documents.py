@@ -155,6 +155,15 @@ def create_document_endpoint(
     )
 
 
+@router.get("", response_model=list[DocumentResponse])
+def list_documents_endpoint(
+    limit: int = 100,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> list[DocumentResponse]:
+    documents = repository.list_documents(limit=limit)
+    return [_to_response(document) for document in documents]
+
+
 @router.get("/{document_id}", response_model=DocumentResponse)
 def get_document_endpoint(
     document_id: str,
