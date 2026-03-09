@@ -41,14 +41,12 @@ async function loadDocument(documentId) {
 
 function renderDocsList(documents) {
   if (!documents.length) {
-    docsTableBody.innerHTML = '<tr><td colspan="8">No documents found.</td></tr>';
+    docsTableBody.innerHTML = '<tr><td colspan="7">No documents found.</td></tr>';
     return;
   }
   docsTableBody.innerHTML = "";
   for (const doc of documents) {
     const row = document.createElement("tr");
-    const filenameCell = document.createElement("td");
-    filenameCell.textContent = doc.filename;
 
     let suggestedTitle = "-";
     let documentType = "-";
@@ -91,7 +89,6 @@ function renderDocsList(documents) {
     });
     actionCell.appendChild(button);
 
-    row.appendChild(filenameCell);
     row.appendChild(titleCell);
     row.appendChild(typeCell);
     row.appendChild(correspondentCell);

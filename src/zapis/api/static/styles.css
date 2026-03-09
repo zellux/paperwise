@@ -229,7 +229,7 @@ input[type="file"] {
 .docs-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 980px;
+  min-width: 860px;
 }
 
 .docs-table th,
