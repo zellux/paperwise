@@ -30,6 +30,8 @@ In another shell:
 make worker
 ```
 
+Open [http://localhost:8000](http://localhost:8000) for the initial web UI.
+
 ## Local Development Commands
 
 - `make setup` - create local virtualenv and install all dependencies.

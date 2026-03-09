@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>zapis | AI-Native Documents</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="bg-orb bg-orb-a"></div>
+    <div class="bg-orb bg-orb-b"></div>
+    <div class="bg-grid"></div>
+
+    <main class="layout">
+      <header class="hero">
+        <p class="eyebrow">zapis / initial ui</p>
+        <h1>One place to upload, parse, and inspect your documents.</h1>
+        <p class="subhead">
+          This first version is wired to the live API: upload a PDF, trigger parse,
+          and inspect the extracted metadata.
+        </p>
+      </header>
+
+      <section class="panel panel-upload">
+        <h2>Upload Document</h2>
+        <form id="uploadForm" class="stack">
+          <label class="label" for="ownerId">Owner ID</label>
+          <input id="ownerId" name="ownerId" type="text" value="local-user" required />
+
+          <label class="label" for="fileInput">PDF file</label>
+          <input id="fileInput" name="fileInput" type="file" accept="application/pdf" required />
+
+          <button type="submit" class="btn btn-primary">Upload</button>
+        </form>
+      </section>
+
+      <section class="panel panel-doc">
+        <h2>Document</h2>
+        <form id="docLookupForm" class="inline-form">
+          <input
+            id="docIdInput"
+            name="docIdInput"
+            type="text"
+            placeholder="Paste document ID"
+            required
+          />
+          <button type="submit" class="btn">Load</button>
+        </form>
+        <pre id="docOutput" class="output">No document loaded yet.</pre>
+      </section>
+
+      <section class="panel panel-parse">
+        <h2>Parse</h2>
+        <div class="actions">
+          <button id="parseNowBtn" class="btn btn-primary" type="button">Parse Now</button>
+          <button id="parseFetchBtn" class="btn" type="button">Fetch Parse Result</button>
+        </div>
+        <pre id="parseOutput" class="output">No parse result yet.</pre>
+      </section>
+
+      <section class="panel panel-log">
+        <h2>Activity</h2>
+        <pre id="activityOutput" class="output">Ready.</pre>
+      </section>
+    </main>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
+
