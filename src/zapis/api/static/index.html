@@ -17,74 +17,76 @@
     <div class="bg-orb bg-orb-b"></div>
     <div class="bg-grid"></div>
 
-    <main class="layout">
-      <header class="hero">
-        <p class="eyebrow">zapis / initial ui</p>
-        <h1>One place to upload, parse, and inspect your documents.</h1>
-        <p class="subhead">
-          This first version is wired to the live API: upload a PDF, trigger parse,
-          and inspect the extracted metadata.
-        </p>
-      </header>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <p class="eyebrow">zapis / control</p>
+        <h1>Document Ops</h1>
+        <p class="subhead">Two-pane workspace for ingest, review, parse, and metadata ops.</p>
+        <nav class="nav">
+          <button class="nav-link active" data-target="section-docs" type="button">Documents</button>
+          <button class="nav-link" data-target="section-upload" type="button">Upload</button>
+          <button class="nav-link" data-target="section-parse" type="button">Parse</button>
+          <button class="nav-link" data-target="section-llm" type="button">LLM Parse</button>
+          <button class="nav-link" data-target="section-activity" type="button">Activity</button>
+        </nav>
+      </aside>
 
-      <section class="panel panel-upload">
-        <h2>Upload Document</h2>
-        <form id="uploadForm" class="stack">
-          <label class="label" for="ownerId">Owner ID</label>
-          <input id="ownerId" name="ownerId" type="text" value="local-user" required />
+      <section class="content-pane">
+        <article id="section-docs" class="panel panel-section">
+          <h2>Documents</h2>
+          <div class="actions">
+            <button id="refreshDocsBtn" class="btn" type="button">Refresh List</button>
+          </div>
+          <div id="docsList" class="docs-list">No documents loaded.</div>
+          <form id="docLookupForm" class="inline-form">
+            <input
+              id="docIdInput"
+              name="docIdInput"
+              type="text"
+              placeholder="Paste document ID"
+              required
+            />
+            <button type="submit" class="btn">Load</button>
+          </form>
+          <pre id="docOutput" class="output">No document loaded yet.</pre>
+        </article>
 
-          <label class="label" for="fileInput">PDF file</label>
-          <input id="fileInput" name="fileInput" type="file" accept="application/pdf" required />
+        <article id="section-upload" class="panel panel-section">
+          <h2>Upload Document</h2>
+          <form id="uploadForm" class="stack">
+            <label class="label" for="ownerId">Owner ID</label>
+            <input id="ownerId" name="ownerId" type="text" value="local-user" required />
 
-          <button type="submit" class="btn btn-primary">Upload</button>
-        </form>
-      </section>
+            <label class="label" for="fileInput">PDF file</label>
+            <input id="fileInput" name="fileInput" type="file" accept="application/pdf" required />
 
-      <section class="panel panel-doc">
-        <h2>Document</h2>
-        <form id="docLookupForm" class="inline-form">
-          <input
-            id="docIdInput"
-            name="docIdInput"
-            type="text"
-            placeholder="Paste document ID"
-            required
-          />
-          <button type="submit" class="btn">Load</button>
-        </form>
-        <pre id="docOutput" class="output">No document loaded yet.</pre>
-      </section>
+            <button type="submit" class="btn btn-primary">Upload</button>
+          </form>
+        </article>
 
-      <section class="panel panel-list">
-        <h2>Documents</h2>
-        <div class="actions">
-          <button id="refreshDocsBtn" class="btn" type="button">Refresh List</button>
-        </div>
-        <div id="docsList" class="docs-list">No documents loaded.</div>
-      </section>
+        <article id="section-parse" class="panel panel-section">
+          <h2>Parse</h2>
+          <div class="actions">
+            <button id="parseNowBtn" class="btn btn-primary" type="button">Parse Now</button>
+            <button id="parseFetchBtn" class="btn" type="button">Fetch Parse Result</button>
+          </div>
+          <pre id="parseOutput" class="output">No parse result yet.</pre>
+        </article>
 
-      <section class="panel panel-parse">
-        <h2>Parse</h2>
-        <div class="actions">
-          <button id="parseNowBtn" class="btn btn-primary" type="button">Parse Now</button>
-          <button id="parseFetchBtn" class="btn" type="button">Fetch Parse Result</button>
-        </div>
-        <pre id="parseOutput" class="output">No parse result yet.</pre>
-      </section>
+        <article id="section-llm" class="panel panel-section">
+          <h2>LLM Parse</h2>
+          <div class="actions">
+            <button id="llmParseBtn" class="btn btn-primary" type="button">Run LLM Parse</button>
+            <button id="llmFetchBtn" class="btn" type="button">Fetch LLM Result</button>
+            <button id="taxonomyBtn" class="btn" type="button">Load Taxonomy</button>
+          </div>
+          <pre id="llmOutput" class="output">No LLM result yet.</pre>
+        </article>
 
-      <section class="panel panel-log">
-        <h2>Activity</h2>
-        <pre id="activityOutput" class="output">Ready.</pre>
-      </section>
-
-      <section class="panel panel-llm">
-        <h2>LLM Parse</h2>
-        <div class="actions">
-          <button id="llmParseBtn" class="btn btn-primary" type="button">Run LLM Parse</button>
-          <button id="llmFetchBtn" class="btn" type="button">Fetch LLM Result</button>
-          <button id="taxonomyBtn" class="btn" type="button">Load Taxonomy</button>
-        </div>
-        <pre id="llmOutput" class="output">No LLM result yet.</pre>
+        <article id="section-activity" class="panel panel-section">
+          <h2>Activity</h2>
+          <pre id="activityOutput" class="output">Ready.</pre>
+        </article>
       </section>
     </main>
 

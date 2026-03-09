@@ -13,6 +13,7 @@ const parseOutput = document.getElementById("parseOutput");
 const llmOutput = document.getElementById("llmOutput");
 const activityOutput = document.getElementById("activityOutput");
 const docsList = document.getElementById("docsList");
+const navLinks = [...document.querySelectorAll(".nav-link")];
 
 let currentDocumentId = "";
 
@@ -66,6 +67,12 @@ function renderDocsList(documents) {
     wrapper.appendChild(meta);
     wrapper.appendChild(button);
     docsList.appendChild(wrapper);
+  }
+}
+
+function setActiveNav(targetId) {
+  for (const link of navLinks) {
+    link.classList.toggle("active", link.dataset.target === targetId);
   }
 }
 
@@ -207,6 +214,18 @@ taxonomyBtn.addEventListener("click", async () => {
 refreshDocsBtn.addEventListener("click", async () => {
   await loadDocumentsList();
 });
+
+for (const link of navLinks) {
+  link.addEventListener("click", () => {
+    const targetId = link.dataset.target;
+    const target = document.getElementById(targetId);
+    if (!target) {
+      return;
+    }
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    setActiveNav(targetId);
+  });
+}
 
 loadDocumentsList().catch((error) => {
   logActivity(`Initial document list failed: ${error.message}`);
