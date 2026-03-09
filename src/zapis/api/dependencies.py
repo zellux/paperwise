@@ -8,6 +8,7 @@ from zapis.infrastructure.config import Settings, get_settings
 from zapis.infrastructure.dispatchers.celery_ingestion_dispatcher import (
     CeleryIngestionDispatcher,
 )
+from zapis.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 from zapis.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
 from zapis.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
@@ -16,12 +17,21 @@ from zapis.infrastructure.storage.local_storage import LocalStorageAdapter
 
 _document_repository: DocumentRepository = InMemoryDocumentRepository()
 _ingestion_dispatcher: IngestionDispatcher = CeleryIngestionDispatcher()
-_storage: StorageProvider = LocalStorageAdapter(get_settings().object_store_root)
-_llm_provider: LLMProvider = SimpleLLMProvider()
+_settings = get_settings()
+_storage: StorageProvider = LocalStorageAdapter(_settings.object_store_root)
+_llm_provider: LLMProvider
+if _settings.openai_api_key:
+    _llm_provider = OpenAILLMProvider(
+        api_key=_settings.openai_api_key,
+        model=_settings.openai_model,
+        base_url=_settings.openai_base_url,
+    )
+else:
+    _llm_provider = SimpleLLMProvider()
 
 
 def settings_dependency() -> Settings:
-    return get_settings()
+    return _settings
 
 
 def document_repository_dependency() -> DocumentRepository:

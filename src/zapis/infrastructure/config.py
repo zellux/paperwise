@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     api_port: int = 8000
     redis_url: str = "redis://localhost:6379/0"
     object_store_root: str = "local/object-store"
+    openai_api_key: str | None = None
+    openai_model: str = "gpt-4.1-mini"
+    openai_base_url: str = "https://api.openai.com/v1"
 
 
 @lru_cache
