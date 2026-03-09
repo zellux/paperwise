@@ -2,7 +2,7 @@ VENV ?= .venv
 PYTHON ?= python3.13
 ACTIVATE = . $(VENV)/bin/activate
 
-.PHONY: setup deps-up deps-down api worker test
+.PHONY: setup deps-up deps-down api worker test smoke-llm
 
 setup:
 	$(PYTHON) -m venv $(VENV)
@@ -23,3 +23,6 @@ worker:
 
 test:
 	$(ACTIVATE) && pytest
+
+smoke-llm:
+	$(ACTIVATE) && python scripts/smoke_llm.py
