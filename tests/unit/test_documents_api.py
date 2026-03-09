@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from zapis.api.dependencies import (
     document_repository_dependency,
     ingestion_dispatcher_dependency,
+    llm_provider_dependency,
     storage_dependency,
 )
 from zapis.api.main import app
@@ -27,6 +28,30 @@ class FakeDispatcher:
     ) -> str:
         self.enqueued.append(document_id)
         return "job-test-1"
+
+
+class FakeLLMProvider:
+    def suggest_metadata(
+        self,
+        *,
+        filename: str,
+        text_preview: str,
+        existing_correspondents: list[str],
+        existing_document_types: list[str],
+        existing_tags: list[str],
+    ) -> dict:
+        del filename
+        del text_preview
+        del existing_correspondents
+        del existing_document_types
+        del existing_tags
+        return {
+            "suggested_title": "Experian Credit Report",
+            "document_date": "2026-03-01",
+            "correspondent": "experian.",
+            "document_type": "Credit report",
+            "tags": ["credit", "identity", "Identity"],
+        }
 
 
 def test_create_and_get_document() -> None:
@@ -122,5 +147,66 @@ def test_get_parse_result_not_found() -> None:
         response = client.get("/documents/missing-doc/parse")
         assert response.status_code == 404
         assert response.json()["detail"] == "Parse result not found"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    repository.add_correspondent("Experian")
+    repository.add_document_type("Credit Report")
+    repository.add_tags(["credit"])
+
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            data={"owner_id": "user-llm"},
+            files={"file": ("credit.pdf", b"%PDF-1.7\nexperian", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        doc_id = create_response.json()["id"]
+
+        llm_response = client.post(f"/documents/{doc_id}/llm-parse")
+        assert llm_response.status_code == 200
+        payload = llm_response.json()
+        assert payload["correspondent"] == "Experian"
+        assert payload["document_type"] == "Credit Report"
+        assert payload["tags"] == ["credit", "identity"]
+        assert payload["created_correspondent"] is False
+        assert payload["created_document_type"] is False
+        assert payload["created_tags"] == ["identity"]
+
+        fetch_response = client.get(f"/documents/{doc_id}/llm-parse")
+        assert fetch_response.status_code == 200
+        assert fetch_response.json()["document_id"] == doc_id
+
+        taxonomy_response = client.get("/documents/metadata/taxonomy")
+        assert taxonomy_response.status_code == 200
+        taxonomy = taxonomy_response.json()
+        assert "Experian" in taxonomy["correspondents"]
+        assert "Credit Report" in taxonomy["document_types"]
+        assert "identity" in taxonomy["tags"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_llm_parse_result_not_found() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        response = client.get("/documents/missing-doc/llm-parse")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "LLM parse result not found"
     finally:
         app.dependency_overrides.clear()

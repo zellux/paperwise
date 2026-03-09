@@ -2,10 +2,14 @@ const uploadForm = document.getElementById("uploadForm");
 const docLookupForm = document.getElementById("docLookupForm");
 const parseNowBtn = document.getElementById("parseNowBtn");
 const parseFetchBtn = document.getElementById("parseFetchBtn");
+const llmParseBtn = document.getElementById("llmParseBtn");
+const llmFetchBtn = document.getElementById("llmFetchBtn");
+const taxonomyBtn = document.getElementById("taxonomyBtn");
 
 const docIdInput = document.getElementById("docIdInput");
 const docOutput = document.getElementById("docOutput");
 const parseOutput = document.getElementById("parseOutput");
+const llmOutput = document.getElementById("llmOutput");
 const activityOutput = document.getElementById("activityOutput");
 
 let currentDocumentId = "";
@@ -110,3 +114,46 @@ parseFetchBtn.addEventListener("click", async () => {
   logActivity(`Fetched parse result for ${documentId}`);
 });
 
+llmParseBtn.addEventListener("click", async () => {
+  const documentId = docIdInput.value.trim() || currentDocumentId;
+  if (!documentId) {
+    logActivity("LLM parse blocked: load or upload a document first.");
+    return;
+  }
+
+  const response = await fetch(`/documents/${documentId}/llm-parse`, { method: "POST" });
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`LLM parse failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+  llmOutput.textContent = pretty(payload);
+  logActivity(`LLM parse completed for ${documentId}`);
+});
+
+llmFetchBtn.addEventListener("click", async () => {
+  const documentId = docIdInput.value.trim() || currentDocumentId;
+  if (!documentId) {
+    logActivity("LLM fetch blocked: load or upload a document first.");
+    return;
+  }
+  const response = await fetch(`/documents/${documentId}/llm-parse`);
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`LLM fetch failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+  llmOutput.textContent = pretty(payload);
+  logActivity(`Fetched LLM parse result for ${documentId}`);
+});
+
+taxonomyBtn.addEventListener("click", async () => {
+  const response = await fetch("/documents/metadata/taxonomy");
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Taxonomy load failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+  llmOutput.textContent = pretty(payload);
+  logActivity("Loaded current taxonomy");
+});

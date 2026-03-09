@@ -131,6 +131,10 @@ h1 {
   grid-column: 8 / -1;
 }
 
+.panel-llm {
+  grid-column: 1 / -1;
+}
+
 .stack {
   display: grid;
   gap: 8px;
@@ -217,4 +221,3 @@ input[type="file"] {
     grid-column: 1 / -1;
   }
 }
-
