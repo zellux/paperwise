@@ -18,8 +18,23 @@ AI-native document management platform (Python-first).
 ## Quickstart (local)
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .[dev]
-uvicorn zapis.api.main:app --reload
+cp .env.example .env.local
+make setup
+make deps-up
+make api
 ```
+
+In another shell:
+
+```bash
+make worker
+```
+
+## Local Development Commands
+
+- `make setup` - create local virtualenv and install all dependencies.
+- `make deps-up` - start local dependency services (Redis).
+- `make deps-down` - stop local dependency services.
+- `make api` - run FastAPI from local virtualenv.
+- `make worker` - run Celery worker from local virtualenv.
+- `make test` - run tests.
