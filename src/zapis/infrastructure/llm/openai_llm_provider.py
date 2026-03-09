@@ -48,7 +48,8 @@ class OpenAILLMProvider(LLMProvider):
             "existing_tags": existing_tags,
             "guidance": (
                 "Prefer existing taxonomy names when appropriate. "
-                "Only propose new names when no existing option is a good match."
+                "Only propose new names when no existing option is a good match. "
+                "Prefer Title Case for new document_type and tag names."
             ),
         }
 
@@ -80,4 +81,3 @@ class OpenAILLMProvider(LLMProvider):
             "document_type": str(parsed.get("document_type") or "General Document"),
             "tags": [str(tag) for tag in tags if str(tag).strip()],
         }
-

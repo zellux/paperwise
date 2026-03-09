@@ -168,7 +168,7 @@ def test_list_documents_includes_llm_metadata_when_available() -> None:
         assert target is not None
         assert target["llm_metadata"] is not None
         assert target["llm_metadata"]["document_type"].lower() == "credit report"
-        assert "identity" in target["llm_metadata"]["tags"]
+        assert "Identity" in target["llm_metadata"]["tags"]
     finally:
         app.dependency_overrides.clear()
 
@@ -251,10 +251,10 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         payload = llm_response.json()
         assert payload["correspondent"] == "Experian"
         assert payload["document_type"] == "Credit Report"
-        assert payload["tags"] == ["credit", "identity"]
+        assert payload["tags"] == ["Credit", "Identity"]
         assert payload["created_correspondent"] is False
         assert payload["created_document_type"] is False
-        assert payload["created_tags"] == ["identity"]
+        assert payload["created_tags"] == ["Identity"]
 
         get_response = client.get(f"/documents/{doc_id}")
         assert get_response.status_code == 200
@@ -269,7 +269,7 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         taxonomy = taxonomy_response.json()
         assert "Experian" in taxonomy["correspondents"]
         assert "Credit Report" in taxonomy["document_types"]
-        assert "identity" in taxonomy["tags"]
+        assert "Identity" in taxonomy["tags"]
     finally:
         app.dependency_overrides.clear()
 

@@ -10,6 +10,11 @@ def _normalize_name(value: str) -> str:
     return " ".join(cleaned.split())
 
 
+def _to_title_case(value: str) -> str:
+    cleaned = " ".join(value.strip().split())
+    return cleaned.title()
+
+
 def _resolve_name(candidate: str, existing: list[str]) -> tuple[str, bool]:
     normalized_candidate = _normalize_name(candidate)
     if not normalized_candidate:
@@ -28,7 +33,7 @@ def _resolve_name(candidate: str, existing: list[str]) -> tuple[str, bool]:
 
     if best_score >= 0.9:
         return best_name, False
-    return candidate.strip(), True
+    return _to_title_case(candidate), True
 
 
 def _resolve_tags(candidates: list[str], existing: list[str]) -> tuple[list[str], list[str]]:
@@ -38,6 +43,7 @@ def _resolve_tags(candidates: list[str], existing: list[str]) -> tuple[list[str]
 
     for tag in candidates:
         resolved_tag, is_new = _resolve_name(tag, existing + resolved)
+        resolved_tag = _to_title_case(resolved_tag)
         norm = _normalize_name(resolved_tag)
         if not norm or norm in seen:
             continue
@@ -106,4 +112,3 @@ def parse_with_llm(
     )
     repository.save_llm_parse_result(result)
     return result
-
