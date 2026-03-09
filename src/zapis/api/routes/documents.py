@@ -21,7 +21,7 @@ from zapis.application.interfaces import (
 from zapis.application.services.documents import CreateDocumentCommand, create_document, get_document
 from zapis.application.services.llm_parsing import parse_with_llm
 from zapis.application.services.parsing import parse_document_blob
-from zapis.domain.models import Document, LLMParseResult, ParseResult
+from zapis.domain.models import Document, DocumentStatus, LLMParseResult, ParseResult
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 
@@ -153,6 +153,19 @@ def _to_llm_parse_response(result: LLMParseResult) -> LLMParseResultResponse:
     )
 
 
+def _set_document_status(
+    *,
+    document: Document,
+    repository: DocumentRepository,
+    status_value: DocumentStatus,
+) -> Document:
+    if document.status == status_value:
+        return document
+    document.status = status_value
+    repository.save(document)
+    return document
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
@@ -234,8 +247,27 @@ def parse_document_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
         )
-    result = parse_document_blob(document_id=document.id, blob_uri=document.blob_uri)
-    repository.save_parse_result(result)
+    _set_document_status(
+        document=document,
+        repository=repository,
+        status_value=DocumentStatus.PARSING,
+    )
+    try:
+        result = parse_document_blob(document_id=document.id, blob_uri=document.blob_uri)
+        repository.save_parse_result(result)
+    except Exception:
+        _set_document_status(
+            document=document,
+            repository=repository,
+            status_value=DocumentStatus.FAILED,
+        )
+        raise
+
+    _set_document_status(
+        document=document,
+        repository=repository,
+        status_value=DocumentStatus.PARSED,
+    )
     return _to_parse_response(result)
 
 
@@ -265,16 +297,45 @@ def llm_parse_document_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Document not found",
         )
-    parse_result = repository.get_parse_result(document_id)
-    if parse_result is None:
-        parse_result = parse_document_blob(document_id=document.id, blob_uri=document.blob_uri)
-        repository.save_parse_result(parse_result)
+    try:
+        parse_result = repository.get_parse_result(document_id)
+        if parse_result is None:
+            _set_document_status(
+                document=document,
+                repository=repository,
+                status_value=DocumentStatus.PARSING,
+            )
+            parse_result = parse_document_blob(document_id=document.id, blob_uri=document.blob_uri)
+            repository.save_parse_result(parse_result)
+            _set_document_status(
+                document=document,
+                repository=repository,
+                status_value=DocumentStatus.PARSED,
+            )
 
-    result = parse_with_llm(
+        _set_document_status(
+            document=document,
+            repository=repository,
+            status_value=DocumentStatus.ENRICHING,
+        )
+        result = parse_with_llm(
+            document=document,
+            parse_result=parse_result,
+            repository=repository,
+            llm_provider=llm_provider,
+        )
+    except Exception:
+        _set_document_status(
+            document=document,
+            repository=repository,
+            status_value=DocumentStatus.FAILED,
+        )
+        raise
+
+    _set_document_status(
         document=document,
-        parse_result=parse_result,
         repository=repository,
-        llm_provider=llm_provider,
+        status_value=DocumentStatus.READY,
     )
     return _to_llm_parse_response(result)
 

@@ -22,6 +22,16 @@ function pretty(data) {
   return JSON.stringify(data, null, 2);
 }
 
+function formatStatus(value) {
+  if (!value) {
+    return "-";
+  }
+  return value
+    .split("_")
+    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
+    .join(" ");
+}
+
 function logActivity(message) {
   const now = new Date().toLocaleTimeString();
   activityOutput.textContent = `[${now}] ${message}\n${activityOutput.textContent}`;
@@ -73,7 +83,7 @@ function renderDocsList(documents) {
     const dateCell = document.createElement("td");
     dateCell.textContent = documentDate;
     const statusCell = document.createElement("td");
-    statusCell.textContent = doc.status;
+    statusCell.textContent = formatStatus(doc.status);
 
     const actionCell = document.createElement("td");
     const button = document.createElement("button");

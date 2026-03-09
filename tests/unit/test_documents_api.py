@@ -157,6 +157,9 @@ def test_list_documents_includes_llm_metadata_when_available() -> None:
         doc_id = create_response.json()["id"]
         llm_response = client.post(f"/documents/{doc_id}/llm-parse")
         assert llm_response.status_code == 200
+        get_response = client.get(f"/documents/{doc_id}")
+        assert get_response.status_code == 200
+        assert get_response.json()["status"] == "ready"
 
         list_response = client.get("/documents")
         assert list_response.status_code == 200
@@ -194,6 +197,10 @@ def test_parse_document_roundtrip() -> None:
         assert parse_response.json()["document_id"] == doc_id
         assert parse_response.json()["status"] == "parsed"
         assert parse_response.json()["page_count"] >= 1
+
+        get_response = client.get(f"/documents/{doc_id}")
+        assert get_response.status_code == 200
+        assert get_response.json()["status"] == "parsed"
 
         get_parse_response = client.get(f"/documents/{doc_id}/parse")
         assert get_parse_response.status_code == 200
@@ -248,6 +255,10 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         assert payload["created_correspondent"] is False
         assert payload["created_document_type"] is False
         assert payload["created_tags"] == ["identity"]
+
+        get_response = client.get(f"/documents/{doc_id}")
+        assert get_response.status_code == 200
+        assert get_response.json()["status"] == "ready"
 
         fetch_response = client.get(f"/documents/{doc_id}/llm-parse")
         assert fetch_response.status_code == 200

@@ -5,9 +5,12 @@ from enum import StrEnum
 
 class DocumentStatus(StrEnum):
     RECEIVED = "received"
-    PROCESSING = "processing"
+    PARSING = "parsing"
+    PARSED = "parsed"
+    ENRICHING = "enriching"
     READY = "ready"
     FAILED = "failed"
+    PROCESSING = "processing"
 
 
 @dataclass(slots=True)
