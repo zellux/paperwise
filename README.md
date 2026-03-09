@@ -48,8 +48,26 @@ If `ZAPIS_OPENAI_API_KEY` is unset, the app uses the built-in local fallback pro
 
 - `make setup` - create local virtualenv and install all dependencies.
 - `make setup PYTHON=python3.13` - explicitly use Python 3.13 if needed.
-- `make deps-up` - start local dependency services (Redis).
+- `make deps-up` - start local dependency services (Redis + Postgres).
 - `make deps-down` - stop local dependency services.
 - `make api` - run FastAPI from local virtualenv.
 - `make worker` - run Celery worker from local virtualenv.
 - `make test` - run tests.
+- `make smoke-llm` - upload a sample PDF to a running API and run `llm-parse`.
+
+## Repository Backend
+
+By default, local config uses in-memory storage:
+
+```bash
+ZAPIS_REPOSITORY_BACKEND=memory
+```
+
+To persist data in Postgres:
+
+```bash
+ZAPIS_REPOSITORY_BACKEND=postgres
+ZAPIS_POSTGRES_URL=postgresql+psycopg://zapis:zapis@localhost:5432/zapis
+```
+
+Then run `make deps-up` and restart `make api`.
