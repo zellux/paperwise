@@ -13,11 +13,18 @@ from zapis.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
 from zapis.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
+from zapis.infrastructure.repositories.postgres_document_repository import (
+    PostgresDocumentRepository,
+)
 from zapis.infrastructure.storage.local_storage import LocalStorageAdapter
 
-_document_repository: DocumentRepository = InMemoryDocumentRepository()
 _ingestion_dispatcher: IngestionDispatcher = CeleryIngestionDispatcher()
 _settings = get_settings()
+_document_repository: DocumentRepository
+if _settings.repository_backend.lower() == "postgres":
+    _document_repository = PostgresDocumentRepository(_settings.postgres_url)
+else:
+    _document_repository = InMemoryDocumentRepository()
 _storage: StorageProvider = LocalStorageAdapter(_settings.object_store_root)
 _llm_provider: LLMProvider
 if _settings.openai_api_key:

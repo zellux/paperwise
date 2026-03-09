@@ -14,6 +14,8 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     redis_url: str = "redis://localhost:6379/0"
+    repository_backend: str = "memory"
+    postgres_url: str = "postgresql+psycopg://zapis:zapis@localhost:5432/zapis"
     object_store_root: str = "local/object-store"
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
