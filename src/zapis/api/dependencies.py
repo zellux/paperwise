@@ -8,8 +8,8 @@ from zapis.infrastructure.config import Settings, get_settings
 from zapis.infrastructure.dispatchers.celery_ingestion_dispatcher import (
     CeleryIngestionDispatcher,
 )
+from zapis.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 from zapis.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
-from zapis.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
 from zapis.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -34,7 +34,7 @@ if _settings.openai_api_key:
         base_url=_settings.openai_base_url,
     )
 else:
-    _llm_provider = SimpleLLMProvider()
+    _llm_provider = MissingOpenAIProvider()
 
 
 def settings_dependency() -> Settings:
@@ -55,3 +55,4 @@ def storage_dependency() -> StorageProvider:
 
 def llm_provider_dependency() -> LLMProvider:
     return _llm_provider
+

@@ -32,9 +32,9 @@ make worker
 
 Open [http://localhost:8000](http://localhost:8000) for the initial web UI.
 
-### Optional: OpenAI metadata parsing
+### OpenAI metadata parsing
 
-Set these in `.env.local` to use OpenAI for `llm-parse`:
+Set these in `.env.local` for `llm-parse`:
 
 ```bash
 ZAPIS_OPENAI_API_KEY=your_key_here
@@ -42,7 +42,7 @@ ZAPIS_OPENAI_MODEL=gpt-4.1-mini
 ZAPIS_OPENAI_BASE_URL=https://api.openai.com/v1
 ```
 
-If `ZAPIS_OPENAI_API_KEY` is unset, the app uses the built-in local fallback provider.
+If `ZAPIS_OPENAI_API_KEY` is unset, `llm-parse` is disabled.
 
 ## Local Development Commands
 
