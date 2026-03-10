@@ -173,6 +173,63 @@ def test_list_documents_includes_llm_metadata_when_available() -> None:
         app.dependency_overrides.clear()
 
 
+def test_list_documents_supports_metadata_filters() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
+
+    try:
+        client = TestClient(app)
+        ready_response = client.post(
+            "/documents",
+            data={"owner_id": "user-filter"},
+            files={"file": ("credit.pdf", b"%PDF-1.7\nexperian", "application/pdf")},
+        )
+        assert ready_response.status_code == 201
+        ready_id = ready_response.json()["id"]
+        llm_response = client.post(f"/documents/{ready_id}/llm-parse")
+        assert llm_response.status_code == 200
+
+        pending_response = client.post(
+            "/documents",
+            data={"owner_id": "user-filter"},
+            files={"file": ("pending.pdf", b"%PDF-1.4\npending", "application/pdf")},
+        )
+        assert pending_response.status_code == 201
+        pending_id = pending_response.json()["id"]
+
+        by_tag = client.get("/documents?tag=identity")
+        assert by_tag.status_code == 200
+        by_tag_ids = {item["id"] for item in by_tag.json()}
+        assert ready_id in by_tag_ids
+        assert pending_id not in by_tag_ids
+
+        by_correspondent = client.get("/documents?correspondent=experian")
+        assert by_correspondent.status_code == 200
+        by_correspondent_ids = {item["id"] for item in by_correspondent.json()}
+        assert ready_id in by_correspondent_ids
+        assert pending_id not in by_correspondent_ids
+
+        by_type = client.get("/documents?document_type=credit%20report")
+        assert by_type.status_code == 200
+        by_type_ids = {item["id"] for item in by_type.json()}
+        assert ready_id in by_type_ids
+        assert pending_id not in by_type_ids
+
+        by_status = client.get("/documents?status=received")
+        assert by_status.status_code == 200
+        by_status_ids = {item["id"] for item in by_status.json()}
+        assert pending_id in by_status_ids
+        assert ready_id not in by_status_ids
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_list_pending_documents_excludes_ready() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()

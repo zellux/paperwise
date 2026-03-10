@@ -1,6 +1,8 @@
 const uploadForm = document.getElementById("uploadForm");
 const documentMetaForm = document.getElementById("documentMetaForm");
 const backToDocsBtn = document.getElementById("backToDocsBtn");
+const docsFilterForm = document.getElementById("docsFilterForm");
+const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 
 const metaTitleInput = document.getElementById("metaTitle");
 const metaDateInput = document.getElementById("metaDate");
@@ -8,6 +10,10 @@ const metaCorrespondentInput = document.getElementById("metaCorrespondent");
 const metaTypeInput = document.getElementById("metaType");
 const metaTagsInput = document.getElementById("metaTags");
 const documentSummary = document.getElementById("documentSummary");
+const filterTag = document.getElementById("filterTag");
+const filterCorrespondent = document.getElementById("filterCorrespondent");
+const filterType = document.getElementById("filterType");
+const filterStatus = document.getElementById("filterStatus");
 
 const activityOutput = document.getElementById("activityOutput");
 const docsTableBody = document.getElementById("docsTableBody");
@@ -17,6 +23,12 @@ const navLinks = [...document.querySelectorAll(".nav-link")];
 const views = [...document.querySelectorAll(".view")];
 
 let currentDocumentId = "";
+const docsFilters = {
+  tag: "",
+  correspondent: "",
+  document_type: "",
+  status: "",
+};
 
 function formatStatus(value) {
   if (!value) {
@@ -50,6 +62,22 @@ function splitTags(value) {
     .split(",")
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
+}
+
+function setSelectOptions(selectEl, values, placeholderLabel) {
+  const previous = selectEl.value;
+  selectEl.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = placeholderLabel;
+  selectEl.appendChild(placeholder);
+  for (const value of values) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = value;
+    selectEl.appendChild(option);
+  }
+  selectEl.value = values.includes(previous) ? previous : "";
 }
 
 function getSuggestedTitle(doc) {
@@ -201,7 +229,21 @@ function renderPendingList(documents) {
 }
 
 async function loadDocumentsList() {
-  const response = await fetch("/documents?limit=200");
+  const query = new URLSearchParams({ limit: "200" });
+  if (docsFilters.tag) {
+    query.set("tag", docsFilters.tag);
+  }
+  if (docsFilters.correspondent) {
+    query.set("correspondent", docsFilters.correspondent);
+  }
+  if (docsFilters.document_type) {
+    query.set("document_type", docsFilters.document_type);
+  }
+  if (docsFilters.status) {
+    query.set("status", docsFilters.status);
+  }
+
+  const response = await fetch(`/documents?${query.toString()}`);
   const payload = await response.json();
   if (!response.ok) {
     logActivity(`Document list failed: ${payload.detail || response.statusText}`);
@@ -231,6 +273,18 @@ async function loadTagStats() {
   }
   renderTagsList(payload);
   logActivity(`Loaded ${payload.length} tag(s)`);
+}
+
+async function loadFilterOptions() {
+  const response = await fetch("/documents/metadata/taxonomy");
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Filter options load failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+  setSelectOptions(filterTag, payload.tags || [], "All Tags");
+  setSelectOptions(filterCorrespondent, payload.correspondents || [], "All Correspondents");
+  setSelectOptions(filterType, payload.document_types || [], "All Types");
 }
 
 async function openDocumentView(documentId) {
@@ -284,6 +338,7 @@ uploadForm.addEventListener("submit", async (event) => {
   await loadDocumentsList();
   await loadPendingDocuments();
   await loadTagStats();
+  await loadFilterOptions();
   await openDocumentView(payload.id);
   logActivity("Automatic analysis queued (parse + LLM enrichment).");
 });
@@ -317,11 +372,33 @@ documentMetaForm.addEventListener("submit", async (event) => {
   await loadDocumentsList();
   await loadPendingDocuments();
   await loadTagStats();
+  await loadFilterOptions();
 });
 
 backToDocsBtn.addEventListener("click", () => {
   setActiveView("section-docs");
   setActiveNav("section-docs");
+});
+
+docsFilterForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  docsFilters.tag = filterTag.value;
+  docsFilters.correspondent = filterCorrespondent.value;
+  docsFilters.document_type = filterType.value;
+  docsFilters.status = filterStatus.value;
+  await loadDocumentsList();
+});
+
+clearFiltersBtn.addEventListener("click", async () => {
+  docsFilters.tag = "";
+  docsFilters.correspondent = "";
+  docsFilters.document_type = "";
+  docsFilters.status = "";
+  filterTag.value = "";
+  filterCorrespondent.value = "";
+  filterType.value = "";
+  filterStatus.value = "";
+  await loadDocumentsList();
 });
 
 for (const link of navLinks) {
@@ -334,6 +411,7 @@ for (const link of navLinks) {
     setActiveView(targetId);
     setActiveNav(targetId);
     if (targetId === "section-docs") {
+      await loadFilterOptions();
       await loadDocumentsList();
       return;
     }
@@ -353,6 +431,10 @@ for (const link of navLinks) {
 
 setActiveView("section-docs");
 setActiveNav("section-docs");
+
+loadFilterOptions().catch((error) => {
+  logActivity(`Initial filter options failed: ${error.message}`);
+});
 
 loadDocumentsList().catch((error) => {
   logActivity(`Initial document list failed: ${error.message}`);

@@ -216,6 +216,27 @@ input[type="file"] {
   margin-bottom: 10px;
 }
 
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.filters-grid select {
+  width: 100%;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 10px 11px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  font-family: var(--sans);
+}
+
+.filters-grid .actions {
+  margin: 0;
+}
+
 .output {
   margin: 0;
   padding: 12px;
@@ -296,5 +317,9 @@ input[type="file"] {
 
   .nav {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .filters-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -305,16 +305,41 @@ def create_document_endpoint(
 @router.get("", response_model=list[DocumentListItemResponse])
 def list_documents_endpoint(
     limit: int = 100,
+    tag: str | None = None,
+    correspondent: str | None = None,
+    document_type: str | None = None,
+    status: str | None = None,
     repository: DocumentRepository = Depends(document_repository_dependency),
 ) -> list[DocumentListItemResponse]:
     documents = repository.list_documents(limit=limit)
-    return [
-        _to_list_item_response(
-            document=document,
-            llm_result=repository.get_llm_parse_result(document.id),
+    normalized_tag = _normalize_name(tag or "")
+    normalized_correspondent = _normalize_name(correspondent or "")
+    normalized_document_type = _normalize_name(document_type or "")
+    normalized_status = _normalize_name(status or "")
+
+    results: list[DocumentListItemResponse] = []
+    for document in documents:
+        llm_result = repository.get_llm_parse_result(document.id)
+        if normalized_status and _normalize_name(document.status.value) != normalized_status:
+            continue
+        if normalized_tag:
+            if llm_result is None or normalized_tag not in {
+                _normalize_name(item) for item in llm_result.tags
+            }:
+                continue
+        if normalized_correspondent:
+            if llm_result is None or _normalize_name(llm_result.correspondent) != normalized_correspondent:
+                continue
+        if normalized_document_type:
+            if llm_result is None or _normalize_name(llm_result.document_type) != normalized_document_type:
+                continue
+        results.append(
+            _to_list_item_response(
+                document=document,
+                llm_result=llm_result,
+            )
         )
-        for document in documents
-    ]
+    return results
 
 
 @router.get("/pending", response_model=list[DocumentListItemResponse])
