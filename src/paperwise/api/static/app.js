@@ -13,6 +13,7 @@ const registerForm = document.getElementById("registerForm");
 const authMessage = document.getElementById("authMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const sessionUserLabel = document.getElementById("sessionUserLabel");
+const themeSelect = document.getElementById("themeSelect");
 const fileInput = document.getElementById("fileInput");
 const uploadDropzone = document.getElementById("uploadDropzone");
 const uploadSelectionLabel = document.getElementById("uploadSelectionLabel");
@@ -83,6 +84,8 @@ let currentDocumentId = "";
 let authToken = window.localStorage.getItem("paperwise.auth.token") || "";
 let currentUser = null;
 let userPreferenceSaveTimer = null;
+const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember"];
+let currentTheme = "atlas";
 let docsFilters = {
   tag: [],
   correspondent: [],
@@ -120,6 +123,24 @@ function hasExplicitNavigationState() {
   return path !== "/" && path !== "/ui/documents";
 }
 
+function normalizeThemeName(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (SUPPORTED_THEMES.includes(normalized)) {
+    return normalized;
+  }
+  return "atlas";
+}
+
+function applyTheme(themeName) {
+  currentTheme = normalizeThemeName(themeName);
+  const classNames = SUPPORTED_THEMES.map((name) => `theme-${name}`);
+  document.body.classList.remove(...classNames);
+  document.body.classList.add(`theme-${currentTheme}`);
+  if (themeSelect && themeSelect.value !== currentTheme) {
+    themeSelect.value = currentTheme;
+  }
+}
+
 async function loadUserPreferences() {
   if (!authToken || !currentUser) {
     return {};
@@ -146,6 +167,7 @@ async function saveUserPreferences() {
     preferences: {
       docs_filters: sanitizeDocsFilters(docsFilters),
       last_view: currentViewId,
+      ui_theme: currentTheme,
     },
   };
   try {
@@ -189,15 +211,18 @@ function applyUserPreferences(preferences) {
   ) {
     currentViewId = preferences.last_view;
   }
+  if (typeof preferences.ui_theme === "string") {
+    applyTheme(preferences.ui_theme);
+  }
 }
 
 async function hydrateUserPreferencesForSession() {
+  const preferences = await loadUserPreferences();
+  applyUserPreferences(preferences);
   if (hasExplicitNavigationState()) {
     readFiltersFromUrl();
     return;
   }
-  const preferences = await loadUserPreferences();
-  applyUserPreferences(preferences);
   syncUrlFromFilters();
 }
 
@@ -456,6 +481,7 @@ function renderSessionState() {
 
 function clearSession() {
   persistSession("", null);
+  applyTheme("atlas");
   docsFilters = sanitizeDocsFilters({
     tag: [],
     correspondent: [],
@@ -1402,6 +1428,11 @@ signOutBtn?.addEventListener("click", () => {
   setAuthMessage("Signed out.");
 });
 
+themeSelect?.addEventListener("change", () => {
+  applyTheme(themeSelect.value);
+  scheduleUserPreferenceSave();
+});
+
 uploadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -1707,6 +1738,8 @@ async function initializeApp() {
     }
   }
 }
+
+applyTheme(currentTheme);
 
 initializeApp().catch((error) => {
   setAuthMessage(error.message || "Failed to initialize app.", true);

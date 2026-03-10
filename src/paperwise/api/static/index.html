@@ -14,7 +14,7 @@
     />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body>
+  <body class="theme-atlas">
     <div class="bg-orb bg-orb-a"></div>
     <div class="bg-orb bg-orb-b"></div>
     <div class="bg-grid"></div>
@@ -70,6 +70,15 @@
           </div>
         </div>
         <div class="topbar-actions">
+          <label class="theme-picker" for="themeSelect">
+            <span class="theme-picker-label">Theme</span>
+            <select id="themeSelect" name="themeSelect" class="theme-select">
+              <option value="atlas">Atlas</option>
+              <option value="ledger">Ledger</option>
+              <option value="moss">Moss</option>
+              <option value="ember">Ember</option>
+            </select>
+          </label>
           <span id="sessionUserLabel" class="profile-label">Not signed in</span>
           <button id="signOutBtn" type="button" class="btn btn-muted">Log Out</button>
         </div>

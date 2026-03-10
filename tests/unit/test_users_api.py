@@ -138,6 +138,7 @@ def test_user_preferences_round_trip() -> None:
             json={
                 "preferences": {
                     "last_view": "section-tags",
+                    "ui_theme": "ledger",
                     "docs_filters": {
                         "tag": ["Credit"],
                         "correspondent": [],
@@ -149,10 +150,12 @@ def test_user_preferences_round_trip() -> None:
         )
         assert put_response.status_code == 200
         assert put_response.json()["preferences"]["last_view"] == "section-tags"
+        assert put_response.json()["preferences"]["ui_theme"] == "ledger"
 
         get_saved = client.get("/users/me/preferences", headers=headers)
         assert get_saved.status_code == 200
         assert get_saved.json()["preferences"]["last_view"] == "section-tags"
+        assert get_saved.json()["preferences"]["ui_theme"] == "ledger"
         assert get_saved.json()["preferences"]["docs_filters"]["tag"] == ["Credit"]
     finally:
         app.dependency_overrides.clear()
