@@ -31,7 +31,16 @@ def _normalize_name(value: str) -> str:
 
 def _to_title_case(value: str) -> str:
     cleaned = " ".join(value.strip().split())
-    return cleaned.title()
+    if not cleaned:
+        return cleaned
+    words: list[str] = []
+    for word in cleaned.split(" "):
+        letters = "".join(ch for ch in word if ch.isalpha())
+        if len(letters) >= 2 and letters.isupper():
+            words.append(word)
+            continue
+        words.append(word[:1].upper() + word[1:].lower() if word else word)
+    return " ".join(words)
 
 
 def _coerce_document_status(value: str) -> DocumentStatus:

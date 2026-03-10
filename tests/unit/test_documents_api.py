@@ -574,3 +574,40 @@ def test_get_document_history_not_found() -> None:
         assert response.json()["detail"] == "Document not found"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_metadata_update_preserves_acronyms_in_correspondent_and_tags() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            data={"owner_id": "user-case"},
+            files={"file": ("letters.pdf", b"%PDF-1.7\nletters", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        doc_id = create_response.json()["id"]
+
+        update_response = client.patch(
+            f"/documents/{doc_id}/metadata",
+            json={
+                "suggested_title": "Case Check",
+                "document_date": "2026-03-08",
+                "correspondent": "PPMG Pediatrics",
+                "document_type": "general document",
+                "tags": ["PPMG", "abc store"],
+            },
+        )
+        assert update_response.status_code == 200
+        payload = update_response.json()
+        assert payload["correspondent"] == "PPMG Pediatrics"
+        assert payload["tags"] == ["PPMG", "Abc Store"]
+    finally:
+        app.dependency_overrides.clear()
