@@ -178,6 +178,7 @@ def _render_pdf_pages_to_data_urls(
     *,
     blob_path,
     max_pages: int = 3,
+    dpi: int = 100,
 ) -> list[str]:
     pdftoppm = shutil.which("pdftoppm")
     if pdftoppm is None:
@@ -192,6 +193,10 @@ def _render_pdf_pages_to_data_urls(
                 "1",
                 "-l",
                 str(max(1, max_pages)),
+                "-rx",
+                str(max(72, dpi)),
+                "-ry",
+                str(max(72, dpi)),
                 "-png",
                 str(blob_path),
                 out_prefix,
