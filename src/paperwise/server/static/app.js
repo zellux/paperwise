@@ -172,6 +172,7 @@ let docsFilters = {
 let docsPage = 1;
 let docsPageSize = 20;
 let docsTotalCount = 0;
+let docsListRequestSeq = 0;
 
 function normalizePageSize(value) {
   const size = Number(value);
@@ -1800,6 +1801,7 @@ function getVisiblePendingRowCount() {
 }
 
 async function loadDocumentsList() {
+  const requestSeq = ++docsListRequestSeq;
   const query = new URLSearchParams({
     limit: String(docsPageSize),
     offset: String((docsPage - 1) * docsPageSize),
@@ -1820,28 +1822,57 @@ async function loadDocumentsList() {
     query.append("status", value);
   }
 
-  const [listResponse, countResponse] = await Promise.all([
-    apiFetch(`/documents?${query.toString()}`),
-    apiFetch(`/documents/count?${query.toString()}`),
-  ]);
+  const listResponse = await apiFetch(`/documents?${query.toString()}`);
+  if (requestSeq !== docsListRequestSeq) {
+    return;
+  }
   const payload = await listResponse.json();
-  const countPayload = await countResponse.json();
+  if (requestSeq !== docsListRequestSeq) {
+    return;
+  }
   if (!listResponse.ok) {
     logActivity(`Document list failed: ${payload.detail || listResponse.statusText}`);
     return;
   }
+  renderDocsList(payload);
+  refreshFilterOptionsFromDocuments(payload);
+  renderPaginationControls(payload.length, { hasExactTotal: false });
+
+  const countResponse = await apiFetch(`/documents/count?${query.toString()}`);
+  if (requestSeq !== docsListRequestSeq) {
+    return;
+  }
+  const countPayload = await countResponse.json();
+  if (requestSeq !== docsListRequestSeq) {
+    return;
+  }
   if (!countResponse.ok) {
+    renderPaginationControls(payload.length, { hasExactTotal: false });
     logActivity(`Document count failed: ${countPayload.detail || countResponse.statusText}`);
     return;
   }
   docsTotalCount = Number(countPayload.total || 0);
-  renderDocsList(payload);
-  refreshFilterOptionsFromDocuments(payload);
-  renderPaginationControls(payload.length);
+  renderPaginationControls(payload.length, { hasExactTotal: true });
   logActivity(`Loaded ${payload.length} document(s) of ${docsTotalCount} total`);
 }
 
-function renderPaginationControls(currentCount) {
+function renderPaginationControls(currentCount, options = {}) {
+  const hasExactTotal = options.hasExactTotal !== false;
+  if (!hasExactTotal) {
+    if (docsTotalLabel) {
+      docsTotalLabel.textContent = "Total documents: loading...";
+    }
+    if (pageIndicator) {
+      pageIndicator.textContent = `Page ${docsPage} / ...`;
+    }
+    if (pagePrevBtn) {
+      pagePrevBtn.disabled = docsPage <= 1;
+    }
+    if (pageNextBtn) {
+      pageNextBtn.disabled = currentCount < docsPageSize;
+    }
+    return;
+  }
   const totalPages = Math.max(1, Math.ceil(docsTotalCount / docsPageSize));
   if (docsPage > totalPages) {
     docsPage = totalPages;
