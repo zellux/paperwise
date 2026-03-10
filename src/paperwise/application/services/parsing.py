@@ -281,32 +281,6 @@ def parse_document_blob(
         extract_images_method = (
             getattr(llm_provider, "extract_ocr_text_from_images", None) if llm_provider is not None else None
         )
-        if (
-            not ocr_auto_switch
-            and is_pdf
-            and callable(extract_images_method)
-        ):
-            logger.info("Rendering PDF pages for vision OCR: %s", blob_path)
-            image_data_urls = _render_pdf_pages_to_data_urls(blob_path=blob_path, max_pages=3)
-            logger.info(
-                "Rendered %d PDF page image(s) for vision OCR: %s",
-                len(image_data_urls),
-                blob_path,
-            )
-            try:
-                ocr_text = extract_images_method(
-                    filename=blob_path.name,
-                    image_data_urls=image_data_urls,
-                )
-                if not isinstance(ocr_text, str) or not ocr_text.strip():
-                    raise RuntimeError("LLM OCR failed: provider returned empty OCR text.")
-                text_preview = ocr_text.strip()
-            except Exception as exc:
-                if "timed out" in str(exc).lower():
-                    # Keep pipeline moving when vision OCR times out on large/complex PDFs.
-                    logger.warning("Vision OCR timed out for %s; using extracted text fallback.", blob_path)
-                else:
-                    raise RuntimeError(f"LLM OCR failed: {exc}") from exc
         if ocr_auto_switch:
             try:
                 local_ocr_text = _extract_with_local_tesseract(
@@ -327,8 +301,32 @@ def parse_document_blob(
                     text_preview=_strip_nul(local_ocr_text),
                     created_at=datetime.now(UTC),
                 )
+        used_image_ocr = False
+        if is_pdf and callable(extract_images_method):
+            logger.info("Rendering PDF pages for vision OCR: %s", blob_path)
+            image_data_urls = _render_pdf_pages_to_data_urls(blob_path=blob_path, max_pages=3)
+            logger.info(
+                "Rendered %d PDF page image(s) for vision OCR: %s",
+                len(image_data_urls),
+                blob_path,
+            )
+            try:
+                ocr_text = extract_images_method(
+                    filename=blob_path.name,
+                    image_data_urls=image_data_urls,
+                )
+                if not isinstance(ocr_text, str) or not ocr_text.strip():
+                    raise RuntimeError("LLM OCR failed: provider returned empty OCR text.")
+                text_preview = ocr_text.strip()
+                used_image_ocr = True
+            except Exception as exc:
+                if "timed out" in str(exc).lower():
+                    # Keep pipeline moving when vision OCR times out on large/complex PDFs.
+                    logger.warning("Vision OCR timed out for %s; using extracted text fallback.", blob_path)
+                else:
+                    raise RuntimeError(f"LLM OCR failed: {exc}") from exc
         extract_method = getattr(llm_provider, "extract_ocr_text", None) if llm_provider is not None else None
-        if callable(extract_method) and not (not ocr_auto_switch and is_pdf and callable(extract_images_method)):
+        if callable(extract_method) and not used_image_ocr:
             if not text_preview.strip():
                 raise RuntimeError(
                     "No readable text was extracted from this file before OCR. "

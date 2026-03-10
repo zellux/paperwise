@@ -152,6 +152,11 @@ def test_parse_document_blob_auto_switch_uses_llm_for_low_quality_text(tmp_path,
     llm = RecordingOCRLLM("LLM OCR output used")
 
     monkeypatch.setattr(parsing_module, "_extract_with_local_tesseract", lambda **kwargs: "tiny")
+    monkeypatch.setattr(
+        parsing_module,
+        "_render_pdf_pages_to_data_urls",
+        lambda **kwargs: ["data:image/png;base64,abc"],
+    )
 
     result = parse_document_blob(
         document_id="doc-1",
@@ -161,7 +166,8 @@ def test_parse_document_blob_auto_switch_uses_llm_for_low_quality_text(tmp_path,
         ocr_auto_switch=True,
     )
 
-    assert llm.calls == 1
+    assert llm.image_calls == 1
+    assert llm.calls == 0
     assert result.parser == "stub-llm-ocr"
     assert result.text_preview == "LLM OCR output used"
 
