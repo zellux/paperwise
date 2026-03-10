@@ -302,12 +302,15 @@ function setSelectedValues(selectEl, values) {
   }
 }
 
-function summarizeSelectedValues(selectedValues) {
+function summarizeSelectedValues(selectedValues, selectEl) {
   if (!selectedValues.length) {
     return "Any";
   }
+  const displayValues = selectedValues.map((value) =>
+    selectEl === filterStatus ? formatStatus(value) : value
+  );
   if (selectedValues.length === 1) {
-    return selectedValues[0];
+    return displayValues[0];
   }
   return `${selectedValues.length} selected`;
 }
@@ -404,7 +407,7 @@ function renderFilterDropdown(selectEl) {
     return;
   }
   const selectedValues = getSelectedValues(selectEl);
-  state.value.textContent = summarizeSelectedValues(selectedValues);
+  state.value.textContent = summarizeSelectedValues(selectedValues, selectEl);
   renderFilterDropdownOptions(selectEl);
 }
 
