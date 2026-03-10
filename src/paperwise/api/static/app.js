@@ -1160,25 +1160,28 @@ function renderTagsList(tagStats) {
     const actionCell = document.createElement("td");
     actionCell.setAttribute("data-label", "Action");
 
-    const viewBtn = document.createElement("button");
-    viewBtn.className = "btn";
-    viewBtn.type = "button";
-    viewBtn.textContent = "View Docs";
-    viewBtn.addEventListener("click", async () => {
-      docsFilters.tag = [stat.tag];
-      docsFilters.correspondent = [];
-      docsFilters.document_type = [];
-      docsFilters.status = [];
-      docsPage = 1;
-      applyFiltersToControls();
-      setActiveView("section-docs");
-      setActiveNav("section-docs");
-      syncUrlFromFilters();
-      await loadDocumentsList();
-      logActivity(`Filtered documents by tag: ${stat.tag}`);
-    });
-
-    actionCell.appendChild(viewBtn);
+    const actionsWrap = document.createElement("div");
+    actionsWrap.className = "table-actions";
+    actionsWrap.appendChild(
+      createIconActionButton({
+        icon: "eye",
+        label: `View documents for tag ${stat.tag}`,
+        onClick: async () => {
+          docsFilters.tag = [stat.tag];
+          docsFilters.correspondent = [];
+          docsFilters.document_type = [];
+          docsFilters.status = [];
+          docsPage = 1;
+          applyFiltersToControls();
+          setActiveView("section-docs");
+          setActiveNav("section-docs");
+          syncUrlFromFilters();
+          await loadDocumentsList();
+          logActivity(`Filtered documents by tag: ${stat.tag}`);
+        },
+      })
+    );
+    actionCell.appendChild(actionsWrap);
     row.appendChild(tagCell);
     row.appendChild(countCell);
     row.appendChild(actionCell);
@@ -1203,25 +1206,28 @@ function renderDocumentTypesList(typeStats) {
     const actionCell = document.createElement("td");
     actionCell.setAttribute("data-label", "Action");
 
-    const viewBtn = document.createElement("button");
-    viewBtn.className = "btn";
-    viewBtn.type = "button";
-    viewBtn.textContent = "View Docs";
-    viewBtn.addEventListener("click", async () => {
-      docsFilters.tag = [];
-      docsFilters.correspondent = [];
-      docsFilters.document_type = [stat.document_type];
-      docsFilters.status = [];
-      docsPage = 1;
-      applyFiltersToControls();
-      setActiveView("section-docs");
-      setActiveNav("section-docs");
-      syncUrlFromFilters();
-      await loadDocumentsList();
-      logActivity(`Filtered documents by type: ${stat.document_type}`);
-    });
-
-    actionCell.appendChild(viewBtn);
+    const actionsWrap = document.createElement("div");
+    actionsWrap.className = "table-actions";
+    actionsWrap.appendChild(
+      createIconActionButton({
+        icon: "eye",
+        label: `View documents for type ${stat.document_type}`,
+        onClick: async () => {
+          docsFilters.tag = [];
+          docsFilters.correspondent = [];
+          docsFilters.document_type = [stat.document_type];
+          docsFilters.status = [];
+          docsPage = 1;
+          applyFiltersToControls();
+          setActiveView("section-docs");
+          setActiveNav("section-docs");
+          syncUrlFromFilters();
+          await loadDocumentsList();
+          logActivity(`Filtered documents by type: ${stat.document_type}`);
+        },
+      })
+    );
+    actionCell.appendChild(actionsWrap);
     row.appendChild(typeCell);
     row.appendChild(countCell);
     row.appendChild(actionCell);
