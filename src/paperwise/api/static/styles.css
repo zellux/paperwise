@@ -1020,7 +1020,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-bottom: 1px solid var(--stroke-soft);
   padding: 9px 10px;
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
   font-size: 0.82rem;
 }
 
