@@ -1,14 +1,15 @@
 :root {
-  --bg-main: #f3f0e8;
-  --bg-panel: rgba(255, 255, 255, 0.76);
-  --stroke: rgba(0, 0, 0, 0.18);
-  --ink: #132015;
-  --ink-soft: #334035;
-  --accent: #147352;
+  --bg-main: #f4f1e8;
+  --bg-panel: rgba(255, 255, 255, 0.8);
+  --stroke: rgba(21, 33, 27, 0.16);
+  --ink: #15211b;
+  --ink-soft: #4b5a4f;
+  --accent: #146f52;
   --accent-2: #bf5e25;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
-  --sans: "Space Grotesk", "Avenir Next", "Segoe UI", sans-serif;
-  --shadow: 0 16px 36px rgba(20, 34, 24, 0.13);
+  --sans: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+  --serif: "Newsreader", Georgia, serif;
+  --shadow: 0 14px 30px rgba(20, 38, 30, 0.11);
 }
 
 * {
@@ -20,7 +21,7 @@ body {
   margin: 0;
   min-height: 100%;
   color: var(--ink);
-  background: linear-gradient(145deg, #f4f2e8, #e9efe6 45%, #f5ece3);
+  background: linear-gradient(145deg, #f4f1e8, #ebf2ea 45%, #f5ece6);
   font-family: var(--sans);
 }
 
@@ -74,7 +75,7 @@ body {
   background: var(--bg-panel);
   border: 1px solid var(--stroke);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(6px);
+  backdrop-filter: blur(8px);
   border-radius: 16px;
 }
 
@@ -96,8 +97,9 @@ body {
 
 h1 {
   margin: 0;
-  font-size: 1.55rem;
-  line-height: 1.1;
+  font-family: var(--serif);
+  font-size: 1.65rem;
+  line-height: 1.05;
 }
 
 .subhead {
@@ -114,7 +116,7 @@ h1 {
 .nav-link {
   text-align: left;
   border: 1px solid rgba(0, 0, 0, 0.14);
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.85);
   color: var(--ink);
   border-radius: 10px;
   padding: 10px 12px;
@@ -124,9 +126,9 @@ h1 {
 }
 
 .nav-link.active {
-  background: linear-gradient(135deg, var(--accent), #0b8d60);
-  color: #f5fff9;
-  border-color: rgba(0, 0, 0, 0.08);
+  background: rgba(20, 111, 82, 0.14);
+  color: #114d39;
+  border-color: transparent;
 }
 
 .content-pane {
@@ -144,9 +146,9 @@ h1 {
 
 .panel h2 {
   margin: 0 0 12px;
-  font-size: 1rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  font-size: 1.1rem;
+  font-family: var(--serif);
+  letter-spacing: 0.01em;
 }
 
 .stack {
@@ -193,7 +195,7 @@ input[type="file"] {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), #0b8d60);
+  background: linear-gradient(135deg, var(--accent), #118260);
   color: #f5fff9;
   border-color: rgba(0, 0, 0, 0.1);
 }
@@ -201,7 +203,7 @@ input[type="file"] {
 .link-button {
   border: 0;
   background: transparent;
-  color: #0b6e4f;
+  color: #0d6b4e;
   cursor: pointer;
   font: inherit;
   padding: 0;
@@ -285,15 +287,15 @@ input[type="file"] {
 .docs-table th {
   position: sticky;
   top: 0;
-  background: rgba(20, 115, 82, 0.09);
-  color: #163625;
+  background: rgba(20, 111, 82, 0.1);
+  color: #184031;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   font-size: 0.72rem;
 }
 
 .docs-table tbody tr:hover {
-  background: rgba(20, 115, 82, 0.06);
+  background: rgba(20, 111, 82, 0.055);
 }
 
 @keyframes rise-in {
