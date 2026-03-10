@@ -11,7 +11,15 @@ const metaDateInput = document.getElementById("metaDate");
 const metaCorrespondentInput = document.getElementById("metaCorrespondent");
 const metaTypeInput = document.getElementById("metaType");
 const metaTagsInput = document.getElementById("metaTags");
-const documentSummary = document.getElementById("documentSummary");
+const detailDocId = document.getElementById("detailDocId");
+const detailOwnerId = document.getElementById("detailOwnerId");
+const detailFilename = document.getElementById("detailFilename");
+const detailStatus = document.getElementById("detailStatus");
+const detailCreatedAt = document.getElementById("detailCreatedAt");
+const detailContentType = document.getElementById("detailContentType");
+const detailSizeBytes = document.getElementById("detailSizeBytes");
+const detailChecksum = document.getElementById("detailChecksum");
+const detailBlobUri = document.getElementById("detailBlobUri");
 const filterTag = document.getElementById("filterTag");
 const filterCorrespondent = document.getElementById("filterCorrespondent");
 const filterType = document.getElementById("filterType");
@@ -71,6 +79,22 @@ function formatStatus(value) {
     .split("_")
     .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
     .join(" ");
+}
+
+function formatBytes(value) {
+  const bytes = Number(value || 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+  const kb = bytes / 1024;
+  if (kb < 1024) {
+    return `${kb.toFixed(1)} KB`;
+  }
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
 }
 
 function logActivity(message) {
@@ -694,8 +718,17 @@ async function openDocumentView(documentId) {
   metaCorrespondentInput.value = metadata?.correspondent || "";
   metaTypeInput.value = metadata?.document_type || "";
   metaTagsInput.value = metadata?.tags?.join(", ") || "";
-
-  documentSummary.textContent = `ID: ${doc.id} | File: ${doc.filename} | Status: ${formatStatus(doc.status)} | Created: ${new Date(doc.created_at).toLocaleString()}`;
+  detailDocId.textContent = doc.id || "-";
+  detailOwnerId.textContent = doc.owner_id || "-";
+  detailFilename.textContent = doc.filename || "-";
+  detailStatus.textContent = formatStatus(doc.status);
+  detailCreatedAt.textContent = doc.created_at
+    ? new Date(doc.created_at).toLocaleString()
+    : "-";
+  detailContentType.textContent = doc.content_type || "-";
+  detailSizeBytes.textContent = `${formatBytes(doc.size_bytes)} (${doc.size_bytes || 0} bytes)`;
+  detailChecksum.textContent = doc.checksum_sha256 || "-";
+  detailBlobUri.textContent = doc.blob_uri || "-";
 
   setActiveView("section-document");
   setActiveNav("section-document");

@@ -236,6 +236,55 @@ input[type="file"] {
   margin-bottom: 10px;
 }
 
+.document-detail-card {
+  border: 1px solid var(--stroke-soft);
+  border-radius: 12px;
+  background: rgba(248, 250, 248, 0.92);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.document-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.document-detail-item {
+  display: grid;
+  gap: 3px;
+}
+
+.document-detail-item-full {
+  margin-top: 2px;
+}
+
+.document-detail-label {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.document-detail-value {
+  color: var(--ink);
+  font-size: 0.88rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.document-detail-path {
+  display: block;
+  border: 1px solid var(--stroke-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  white-space: pre-wrap;
+}
+
 .filters-toolbar {
   display: flex;
   flex-wrap: wrap;

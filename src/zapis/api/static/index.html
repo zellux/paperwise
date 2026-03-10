@@ -110,7 +110,46 @@
 
         <article id="section-document" class="panel panel-section view view-hidden">
           <h2>Document</h2>
-          <p id="documentSummary" class="subhead">No document selected.</p>
+          <div class="document-detail-card">
+            <div class="document-detail-grid">
+              <div class="document-detail-item">
+                <span class="document-detail-label">Document ID</span>
+                <code id="detailDocId" class="document-detail-value">-</code>
+              </div>
+              <div class="document-detail-item">
+                <span class="document-detail-label">Owner</span>
+                <span id="detailOwnerId" class="document-detail-value">-</span>
+              </div>
+              <div class="document-detail-item">
+                <span class="document-detail-label">File Name</span>
+                <span id="detailFilename" class="document-detail-value">-</span>
+              </div>
+              <div class="document-detail-item">
+                <span class="document-detail-label">Status</span>
+                <span id="detailStatus" class="document-detail-value">-</span>
+              </div>
+              <div class="document-detail-item">
+                <span class="document-detail-label">Created</span>
+                <span id="detailCreatedAt" class="document-detail-value">-</span>
+              </div>
+              <div class="document-detail-item">
+                <span class="document-detail-label">Content Type</span>
+                <span id="detailContentType" class="document-detail-value">-</span>
+              </div>
+              <div class="document-detail-item">
+                <span class="document-detail-label">Size</span>
+                <span id="detailSizeBytes" class="document-detail-value">-</span>
+              </div>
+              <div class="document-detail-item">
+                <span class="document-detail-label">Checksum (SHA256)</span>
+                <code id="detailChecksum" class="document-detail-value">-</code>
+              </div>
+            </div>
+            <div class="document-detail-item document-detail-item-full">
+              <span class="document-detail-label">File Path</span>
+              <code id="detailBlobUri" class="document-detail-value document-detail-path">-</code>
+            </div>
+          </div>
           <form id="documentMetaForm" class="stack">
             <label class="label" for="metaTitle">Title</label>
             <input id="metaTitle" name="metaTitle" type="text" required />
