@@ -297,9 +297,24 @@ h1 {
 }
 
 .nav-link-settings {
-  margin-top: 8px;
-  padding-top: 14px;
-  border-top: 1px solid var(--stroke-soft);
+  position: relative;
+  margin-top: 18px;
+}
+
+.nav-link-settings::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -10px;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--accent) 55%, transparent),
+    color-mix(in srgb, var(--stroke) 85%, transparent)
+  );
+  opacity: 0.95;
 }
 
 .content-pane {
