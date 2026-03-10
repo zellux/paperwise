@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Paperwise Support | FAQ</title>
+    <meta name="description" content="Common questions and troubleshooting tips for Paperwise." />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="site-shell topbar-inner">
+        <a class="brand" href="./index.html" aria-label="Paperwise home">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span>PAPERWISE</span>
+        </a>
+        <nav class="nav" aria-label="Main">
+          <a class="nav-link" href="./index.html">Home</a>
+          <a class="nav-link nav-link-primary" href="/ui/documents">Open App</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="site-shell" style="padding-top: 44px; padding-bottom: 44px;">
+      <section class="section-card">
+        <h1 style="font-size: clamp(1.8rem, 4vw, 2.5rem);">Support FAQ</h1>
+        <p class="lead" style="margin-top: 12px;">
+          Quick answers for the most common setup and usage questions.
+        </p>
+      </section>
+
+      <section class="section" aria-label="Frequently asked questions">
+        <div class="faq">
+          <article class="faq-item">
+            <h3>Why can upload be disabled?</h3>
+            <p>
+              Upload is blocked when LLM provider settings are incomplete. Add provider, model, and API key in
+              Settings first.
+            </p>
+          </article>
+
+          <article class="faq-item">
+            <h3>What OCR options are available?</h3>
+            <p>
+              Local Tesseract, same LLM as metadata, or a separate LLM specifically for OCR. You can also set image
+              detail (auto/low/high) for OpenAI vision OCR.
+            </p>
+          </article>
+
+          <article class="faq-item">
+            <h3>Why does OCR sometimes time out on dense PDFs?</h3>
+            <p>
+              Large page images can take longer to process. Paperwise logs per-page OCR progress and retries timed-out
+              pages. Longer OCR request timeouts are enabled for vision calls.
+            </p>
+          </article>
+
+          <article class="faq-item">
+            <h3>How are duplicate files handled?</h3>
+            <p>
+              Documents are deduplicated by SHA256 checksum to prevent repeated ingestion of the same file content.
+            </p>
+          </article>
+
+          <article class="faq-item">
+            <h3>How do I change my password?</h3>
+            <p>
+              Open Settings and use the Security section. Enter your current password, a new password, and confirmation.
+            </p>
+          </article>
+
+          <article class="faq-item">
+            <h3>Where can I get additional help?</h3>
+            <p>
+              Open an issue in the repository if you have access:
+              <a href="https://github.com/zellux/paperwise" target="_blank" rel="noopener noreferrer">
+                github.com/zellux/paperwise
+              </a>
+              .
+            </p>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <div class="site-shell">Paperwise support and troubleshooting.</div>
+    </footer>
+  </body>
+</html>
