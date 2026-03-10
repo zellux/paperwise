@@ -5,6 +5,7 @@ from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
 
+from paperwise.api.routes import documents as documents_routes
 from paperwise.api.dependencies import (
     current_user_dependency,
     document_repository_dependency,
@@ -67,6 +68,17 @@ class FakeLLMProvider:
             "document_type": "Credit report",
             "tags": ["credit", "identity", "Identity"],
         }
+
+    def extract_ocr_text(
+        self,
+        *,
+        filename: str,
+        content_type: str,
+        text_preview: str,
+    ) -> str:
+        del filename
+        del content_type
+        return text_preview
 
 
 TEST_USER = User(
@@ -1247,5 +1259,55 @@ def test_llm_connection_test_accepts_payload_overrides_and_calls_provider() -> N
         assert payload["provider"] == "openai"
         assert payload["model"] == "gpt-4.1-mini"
         assert fake_provider.calls == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_local_ocr_status_endpoint_returns_capabilities() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+
+    try:
+        client = TestClient(app)
+        response = client.get("/documents/ocr/local-status")
+        assert response.status_code == 200
+        payload = response.json()
+        assert "available" in payload
+        assert "tesseract_available" in payload
+        assert "pdftoppm_available" in payload
+        assert "detail" in payload
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_parse_endpoint_returns_runtime_error_as_bad_request(monkeypatch) -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    def _raise_runtime_error(**kwargs):
+        del kwargs
+        raise RuntimeError("Local OCR unavailable: install `tesseract`.")
+
+    monkeypatch.setattr(documents_routes, "parse_document_blob", _raise_runtime_error)
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={"file": ("needs-ocr.pdf", b"%PDF-1.7\nsample", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        document_id = create_response.json()["id"]
+
+        parse_response = client.post(f"/documents/{document_id}/parse")
+        assert parse_response.status_code == 400
+        assert parse_response.json()["detail"] == "Local OCR unavailable: install `tesseract`."
     finally:
         app.dependency_overrides.clear()

@@ -20,6 +20,7 @@ const settingsLlmApiKeyInput = document.getElementById("settingsLlmApiKeyInput")
 const settingsTestLlmBtn = document.getElementById("settingsTestLlmBtn");
 const settingsLlmTestStatus = document.getElementById("settingsLlmTestStatus");
 const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
+const settingsOcrStatus = document.getElementById("settingsOcrStatus");
 const settingsOcrLlmProviderSelect = document.getElementById("settingsOcrLlmProviderSelect");
 const settingsOcrLlmModelInput = document.getElementById("settingsOcrLlmModelInput");
 const settingsOcrLlmBaseUrlInput = document.getElementById("settingsOcrLlmBaseUrlInput");
@@ -144,6 +145,7 @@ let ocrLlmSettings = {
   base_url: "",
   api_key: "",
 };
+let ocrStatusRequestSeq = 0;
 let docsFilters = {
   q: "",
   tag: [],
@@ -274,6 +276,7 @@ function renderSettingsForm() {
     settingsOcrLlmApiKeyInput.value = ocrLlmSettings.api_key;
   }
   syncOcrSeparateSettingsVisibility();
+  refreshLocalOcrStatus().catch(() => {});
   syncUploadAvailability();
 }
 
@@ -351,6 +354,50 @@ function setSettingsLlmTestStatus(message, tone = "") {
     settingsLlmTestStatus.classList.add("is-success");
   } else if (tone === "error") {
     settingsLlmTestStatus.classList.add("is-error");
+  }
+}
+
+function setSettingsOcrStatus(message, tone = "") {
+  if (!settingsOcrStatus) {
+    return;
+  }
+  settingsOcrStatus.textContent = message || "";
+  settingsOcrStatus.classList.remove("is-success", "is-error");
+  if (tone === "success") {
+    settingsOcrStatus.classList.add("is-success");
+  } else if (tone === "error") {
+    settingsOcrStatus.classList.add("is-error");
+  }
+}
+
+async function refreshLocalOcrStatus() {
+  const selectedProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
+  if (selectedProvider !== "tesseract") {
+    setSettingsOcrStatus("");
+    return;
+  }
+
+  const requestId = ++ocrStatusRequestSeq;
+  setSettingsOcrStatus("Checking local OCR tools...");
+  try {
+    const response = await apiFetch("/documents/ocr/local-status");
+    const payload = await response.json();
+    if (requestId !== ocrStatusRequestSeq) {
+      return;
+    }
+    if (!response.ok) {
+      setSettingsOcrStatus(payload.detail || response.statusText, "error");
+      return;
+    }
+    setSettingsOcrStatus(
+      payload.detail || "Local OCR tools status unknown.",
+      payload.available ? "success" : "error"
+    );
+  } catch (error) {
+    if (requestId !== ocrStatusRequestSeq) {
+      return;
+    }
+    setSettingsOcrStatus(error.message || "Failed to check local OCR tools.", "error");
   }
 }
 
@@ -1947,6 +1994,7 @@ settingsLlmProviderSelect?.addEventListener("change", () => {
 settingsOcrProviderSelect?.addEventListener("change", () => {
   ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect.value);
   syncOcrSeparateSettingsVisibility();
+  refreshLocalOcrStatus().catch(() => {});
 });
 
 settingsOcrLlmProviderSelect?.addEventListener("change", () => {

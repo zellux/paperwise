@@ -1,5 +1,6 @@
 import json
 import re
+import shutil
 from typing import Any
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -170,6 +171,13 @@ class LLMConnectionTestResponse(BaseModel):
     provider: str
     model: str
     message: str
+
+
+class LocalOCRStatusResponse(BaseModel):
+    available: bool
+    tesseract_available: bool
+    pdftoppm_available: bool
+    detail: str
 
 
 PENDING_STATUSES = {
@@ -578,6 +586,27 @@ def _to_history_event_response(event: DocumentHistoryEvent) -> DocumentHistoryEv
     )
 
 
+def _run_parse_document_blob_or_400(
+    *,
+    document_id: str,
+    blob_uri: str,
+    ocr_provider: str,
+    llm_provider: LLMProvider | None,
+) -> ParseResult:
+    try:
+        return parse_document_blob(
+            document_id=document_id,
+            blob_uri=blob_uri,
+            ocr_provider=ocr_provider,
+            llm_provider=llm_provider,
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+
 def _set_document_status(
     *,
     document: Document,
@@ -874,6 +903,30 @@ def test_llm_connection_endpoint(
     )
 
 
+@router.get("/ocr/local-status", response_model=LocalOCRStatusResponse)
+def local_ocr_status_endpoint(
+    current_user: User = Depends(current_user_dependency),
+) -> LocalOCRStatusResponse:
+    del current_user
+    tesseract_available = shutil.which("tesseract") is not None
+    pdftoppm_available = shutil.which("pdftoppm") is not None
+    available = tesseract_available and pdftoppm_available
+    if available:
+        detail = "Local OCR tools are available."
+    elif not tesseract_available and not pdftoppm_available:
+        detail = "Local OCR unavailable: install both `tesseract` and `pdftoppm`."
+    elif not tesseract_available:
+        detail = "Local OCR unavailable: install `tesseract`."
+    else:
+        detail = "Local OCR unavailable for PDFs: install `pdftoppm`."
+    return LocalOCRStatusResponse(
+        available=available,
+        tesseract_available=tesseract_available,
+        pdftoppm_available=pdftoppm_available,
+        detail=detail,
+    )
+
+
 @router.get("/{document_id}", response_model=DocumentResponse)
 def get_document_endpoint(
     document_id: str,
@@ -1013,16 +1066,13 @@ def parse_document_endpoint(
             )
         except HTTPException:
             ocr_llm_provider = None
-    try:
-        result = parse_document_blob(
-            document_id=document.id,
-            blob_uri=document.blob_uri,
-            ocr_provider=ocr_provider,
-            llm_provider=ocr_llm_provider,
-        )
-        repository.save_parse_result(result)
-    except Exception:
-        raise
+    result = _run_parse_document_blob_or_400(
+        document_id=document.id,
+        blob_uri=document.blob_uri,
+        ocr_provider=ocr_provider,
+        llm_provider=ocr_llm_provider,
+    )
+    repository.save_parse_result(result)
     return _to_parse_response(result)
 
 
@@ -1087,7 +1137,7 @@ def llm_parse_document_endpoint(
                 repository=repository,
                 status_value=DocumentStatus.PROCESSING,
             )
-            parse_result = parse_document_blob(
+            parse_result = _run_parse_document_blob_or_400(
                 document_id=document.id,
                 blob_uri=document.blob_uri,
                 ocr_provider=ocr_provider,
