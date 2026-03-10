@@ -916,6 +916,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   vertical-align: middle;
 }
 
+.activity-table td {
+  vertical-align: middle;
+}
+
 .docs-table th {
   position: sticky;
   top: 0;
