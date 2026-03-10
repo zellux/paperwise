@@ -365,6 +365,18 @@ def test_update_document_metadata_upserts_and_updates_taxonomy() -> None:
         detail = detail_response.json()
         assert detail["llm_metadata"]["suggested_title"] == "March Statement"
         assert detail["document"]["status"] == "ready"
+
+        history_response = client.get(f"/documents/{doc_id}/history")
+        assert history_response.status_code == 200
+        history = history_response.json()
+        event_types = {event["event_type"] for event in history}
+        assert "metadata_changed" in event_types
+        assert "tags_added" in event_types
+
+        patch_events = [event for event in history if event["source"] == "api.patch_metadata"]
+        assert patch_events
+        assert all(event["actor_type"] == "user" for event in patch_events)
+        assert all(event["actor_id"] == "user-edit" for event in patch_events)
     finally:
         app.dependency_overrides.clear()
 
@@ -512,6 +524,19 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         tag_stats = tag_stats_response.json()
         assert {"tag": "Credit", "document_count": 1} in tag_stats
         assert {"tag": "Identity", "document_count": 1} in tag_stats
+
+        history_response = client.get(f"/documents/{doc_id}/history")
+        assert history_response.status_code == 200
+        history = history_response.json()
+        event_types = {event["event_type"] for event in history}
+        assert "metadata_changed" in event_types
+        assert "tags_added" in event_types
+        assert "file_moved" in event_types
+
+        llm_events = [event for event in history if event["source"] == "api.llm_parse"]
+        assert llm_events
+        assert all(event["actor_type"] == "user" for event in llm_events)
+        assert all(event["actor_id"] == "user-llm" for event in llm_events)
     finally:
         app.dependency_overrides.clear()
 
@@ -525,5 +550,18 @@ def test_get_llm_parse_result_not_found() -> None:
         response = client.get("/documents/missing-doc/llm-parse")
         assert response.status_code == 404
         assert response.json()["detail"] == "LLM parse result not found"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_document_history_not_found() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        response = client.get("/documents/missing-doc/history")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Document not found"
     finally:
         app.dependency_overrides.clear()

@@ -2,7 +2,8 @@ from datetime import UTC, datetime
 from difflib import SequenceMatcher
 
 from zapis.application.interfaces import DocumentRepository, LLMProvider
-from zapis.domain.models import Document, LLMParseResult, ParseResult
+from zapis.application.services.history import build_metadata_history_events
+from zapis.domain.models import Document, HistoryActorType, LLMParseResult, ParseResult
 
 
 def _normalize_name(value: str) -> str:
@@ -70,6 +71,9 @@ def parse_with_llm(
     parse_result: ParseResult,
     repository: DocumentRepository,
     llm_provider: LLMProvider,
+    actor_type: HistoryActorType = HistoryActorType.SYSTEM,
+    actor_id: str | None = None,
+    history_source: str = "service.llm_parse",
 ) -> LLMParseResult:
     correspondents = repository.list_correspondents()
     document_types = repository.list_document_types()
@@ -98,6 +102,7 @@ def parse_with_llm(
     if created_tags:
         repository.add_tags(created_tags)
 
+    previous = repository.get_llm_parse_result(document.id)
     result = LLMParseResult(
         document_id=document.id,
         suggested_title=str(raw.get("suggested_title", document.filename)).strip() or document.filename,
@@ -111,4 +116,12 @@ def parse_with_llm(
         created_at=datetime.now(UTC),
     )
     repository.save_llm_parse_result(result)
+    events = build_metadata_history_events(
+        previous=previous,
+        current=result,
+        actor_type=actor_type,
+        actor_id=actor_id,
+        source=history_source,
+    )
+    repository.append_history_events(events)
     return result

@@ -1,5 +1,6 @@
 import json
 import re
+from typing import Any
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -22,9 +23,20 @@ from zapis.application.interfaces import (
 )
 from zapis.application.services.documents import CreateDocumentCommand, create_document, get_document
 from zapis.application.services.file_relocation import move_blob_to_processed
+from zapis.application.services.history import (
+    build_file_moved_history_event,
+    build_metadata_history_events,
+)
 from zapis.application.services.llm_parsing import parse_with_llm
 from zapis.application.services.parsing import parse_document_blob
-from zapis.domain.models import Document, DocumentStatus, LLMParseResult, ParseResult
+from zapis.domain.models import (
+    Document,
+    DocumentHistoryEvent,
+    DocumentStatus,
+    HistoryActorType,
+    LLMParseResult,
+    ParseResult,
+)
 from zapis.infrastructure.config import get_settings
 
 router = APIRouter(prefix="/documents", tags=["documents"])
@@ -81,6 +93,17 @@ class LLMParseResultResponse(BaseModel):
     created_correspondent: bool
     created_document_type: bool
     created_tags: list[str]
+    created_at: datetime
+
+
+class DocumentHistoryEventResponse(BaseModel):
+    id: str
+    document_id: str
+    event_type: str
+    actor_type: str
+    actor_id: str | None
+    source: str
+    changes: dict[str, Any]
     created_at: datetime
 
 
@@ -271,6 +294,19 @@ def _to_llm_parse_response(result: LLMParseResult) -> LLMParseResultResponse:
         created_document_type=result.created_document_type,
         created_tags=result.created_tags,
         created_at=result.created_at,
+    )
+
+
+def _to_history_event_response(event: DocumentHistoryEvent) -> DocumentHistoryEventResponse:
+    return DocumentHistoryEventResponse(
+        id=event.id,
+        document_id=event.document_id,
+        event_type=event.event_type.value,
+        actor_type=event.actor_type.value,
+        actor_id=event.actor_id,
+        source=event.source,
+        changes=event.changes,
+        created_at=event.created_at,
     )
 
 
@@ -567,6 +603,9 @@ def llm_parse_document_endpoint(
             parse_result=parse_result,
             repository=repository,
             llm_provider=llm_provider,
+            actor_type=HistoryActorType.USER,
+            actor_id=document.owner_id,
+            history_source="api.llm_parse",
         )
     except Exception:
         raise
@@ -576,8 +615,9 @@ def llm_parse_document_endpoint(
         repository=repository,
         status_value=DocumentStatus.READY,
     )
+    previous_blob_uri = document.blob_uri
     document.blob_uri = move_blob_to_processed(
-        blob_uri=document.blob_uri,
+        blob_uri=previous_blob_uri,
         object_store_root=settings.object_store_root,
         document_id=document.id,
         original_filename=document.filename,
@@ -586,6 +626,16 @@ def llm_parse_document_endpoint(
         size_bytes=document.size_bytes,
     )
     repository.save(document)
+    file_move_event = build_file_moved_history_event(
+        document_id=document.id,
+        actor_type=HistoryActorType.USER,
+        actor_id=document.owner_id,
+        source="api.llm_parse",
+        from_blob_uri=previous_blob_uri,
+        to_blob_uri=document.blob_uri,
+    )
+    if file_move_event is not None:
+        repository.append_history_events([file_move_event])
     return _to_llm_parse_response(result)
 
 
@@ -639,6 +689,7 @@ def update_document_metadata_endpoint(
     if created_tags:
         repository.add_tags(created_tags)
 
+    previous = repository.get_llm_parse_result(document_id)
     result = LLMParseResult(
         document_id=document_id,
         suggested_title=payload.suggested_title.strip() or document.filename,
@@ -652,12 +703,39 @@ def update_document_metadata_endpoint(
         created_at=datetime.now(UTC),
     )
     repository.save_llm_parse_result(result)
+    repository.append_history_events(
+        build_metadata_history_events(
+            previous=previous,
+            current=result,
+            actor_type=HistoryActorType.USER,
+            actor_id=document.owner_id,
+            source="api.patch_metadata",
+        )
+    )
     _set_document_status(
         document=document,
         repository=repository,
         status_value=DocumentStatus.READY,
     )
     return _to_llm_parse_response(result)
+
+
+@router.get("/{document_id}/history", response_model=list[DocumentHistoryEventResponse])
+def list_document_history_endpoint(
+    document_id: str,
+    limit: int = Query(100, ge=1, le=500),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> list[DocumentHistoryEventResponse]:
+    document = get_document(document_id=document_id, repository=repository)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    return [
+        _to_history_event_response(event)
+        for event in repository.list_history(document_id=document_id, limit=limit)
+    ]
 
 
 @router.get("/metadata/taxonomy", response_model=TaxonomyResponse)

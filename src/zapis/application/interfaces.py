@@ -1,6 +1,6 @@
 from typing import Any, Protocol
 
-from zapis.domain.models import Document, LLMParseResult, ParseResult
+from zapis.domain.models import Document, DocumentHistoryEvent, LLMParseResult, ParseResult
 
 
 class OCRProvider(Protocol):
@@ -78,6 +78,17 @@ class DocumentRepository(Protocol):
 
     def add_tags(self, names: list[str]) -> None:
         """Add tag names if missing."""
+
+    def append_history_events(self, events: list[DocumentHistoryEvent]) -> None:
+        """Append one or more immutable document history events."""
+
+    def list_history(
+        self,
+        document_id: str,
+        *,
+        limit: int = 100,
+    ) -> list[DocumentHistoryEvent]:
+        """Return document history entries ordered newest-first."""
 
 
 class IngestionDispatcher(Protocol):

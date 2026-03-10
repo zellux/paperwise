@@ -1,12 +1,25 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
+from typing import Any
 
 
 class DocumentStatus(StrEnum):
     RECEIVED = "received"
     PROCESSING = "processing"
     READY = "ready"
+
+
+class HistoryEventType(StrEnum):
+    METADATA_CHANGED = "metadata_changed"
+    TAGS_ADDED = "tags_added"
+    TAGS_REMOVED = "tags_removed"
+    FILE_MOVED = "file_moved"
+
+
+class HistoryActorType(StrEnum):
+    USER = "user"
+    SYSTEM = "system"
 
 
 @dataclass(slots=True)
@@ -44,4 +57,16 @@ class LLMParseResult:
     created_correspondent: bool
     created_document_type: bool
     created_tags: list[str]
+    created_at: datetime
+
+
+@dataclass(slots=True)
+class DocumentHistoryEvent:
+    id: str
+    document_id: str
+    event_type: HistoryEventType
+    actor_type: HistoryActorType
+    actor_id: str | None
+    source: str
+    changes: dict[str, Any]
     created_at: datetime

@@ -1,7 +1,7 @@
 from threading import RLock
 
 from zapis.application.interfaces import DocumentRepository
-from zapis.domain.models import Document, LLMParseResult, ParseResult
+from zapis.domain.models import Document, DocumentHistoryEvent, LLMParseResult, ParseResult
 
 
 def _normalize_name(value: str) -> str:
@@ -19,6 +19,7 @@ class InMemoryDocumentRepository(DocumentRepository):
         self._documents: dict[str, Document] = {}
         self._parse_results: dict[str, ParseResult] = {}
         self._llm_parse_results: dict[str, LLMParseResult] = {}
+        self._history: dict[str, list[DocumentHistoryEvent]] = {}
         self._correspondents: set[str] = set()
         self._document_types: set[str] = set()
         self._tags: set[str] = set()
@@ -132,3 +133,24 @@ class InMemoryDocumentRepository(DocumentRepository):
                 cleaned = name.strip()
                 if cleaned:
                     self._tags.add(_to_title_case(cleaned))
+
+    def append_history_events(self, events: list[DocumentHistoryEvent]) -> None:
+        if not events:
+            return
+        with self._lock:
+            for event in events:
+                self._history.setdefault(event.document_id, []).append(event)
+
+    def list_history(
+        self,
+        document_id: str,
+        *,
+        limit: int = 100,
+    ) -> list[DocumentHistoryEvent]:
+        with self._lock:
+            events = sorted(
+                self._history.get(document_id, []),
+                key=lambda event: event.created_at,
+                reverse=True,
+            )
+            return events[:limit]

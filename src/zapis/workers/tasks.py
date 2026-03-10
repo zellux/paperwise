@@ -2,9 +2,10 @@ from celery.utils.log import get_task_logger
 
 from zapis.application.interfaces import DocumentRepository, LLMProvider
 from zapis.application.services.file_relocation import move_blob_to_processed
+from zapis.application.services.history import build_file_moved_history_event
 from zapis.application.services.llm_parsing import parse_with_llm
 from zapis.application.services.parsing import parse_document_blob
-from zapis.domain.models import DocumentStatus
+from zapis.domain.models import DocumentStatus, HistoryActorType
 from zapis.infrastructure.config import get_settings
 from zapis.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 from zapis.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
@@ -88,9 +89,13 @@ def parse_document_task(
             parse_result=parsed,
             repository=repository,
             llm_provider=llm_provider,
+            actor_type=HistoryActorType.SYSTEM,
+            actor_id=None,
+            history_source="worker.parse_document",
         )
+        previous_blob_uri = document.blob_uri
         document.blob_uri = move_blob_to_processed(
-            blob_uri=document.blob_uri,
+            blob_uri=previous_blob_uri,
             object_store_root=settings.object_store_root,
             document_id=document.id,
             original_filename=document.filename,
@@ -100,6 +105,16 @@ def parse_document_task(
         )
         document.status = DocumentStatus.READY
         repository.save(document)
+        file_move_event = build_file_moved_history_event(
+            document_id=document.id,
+            actor_type=HistoryActorType.SYSTEM,
+            actor_id=None,
+            source="worker.parse_document",
+            from_blob_uri=previous_blob_uri,
+            to_blob_uri=document.blob_uri,
+        )
+        if file_move_event is not None:
+            repository.append_history_events([file_move_event])
     except Exception:
         logger.exception("analysis pipeline failed for document_id=%s", document_id)
         raise

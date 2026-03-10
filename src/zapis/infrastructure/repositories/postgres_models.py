@@ -62,3 +62,15 @@ class TagRow(Base):
 
     name: Mapped[str] = mapped_column(String(256), primary_key=True)
 
+
+class DocumentHistoryEventRow(Base):
+    __tablename__ = "document_history_events"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(64), index=True)
+    event_type: Mapped[str] = mapped_column(String(64), index=True)
+    actor_type: Mapped[str] = mapped_column(String(32))
+    actor_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    source: Mapped[str] = mapped_column(String(256))
+    changes: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
