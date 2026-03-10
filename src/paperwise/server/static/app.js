@@ -18,6 +18,8 @@ const searchRefreshCollectionsBtn = document.getElementById("searchRefreshCollec
 const searchScopeSelect = document.getElementById("searchScopeSelect");
 const collectionsTableBody = document.getElementById("collectionsTableBody");
 const searchCollectionDocsLabel = document.getElementById("searchCollectionDocsLabel");
+const searchCollectionDocsCount = document.getElementById("searchCollectionDocsCount");
+const searchCollectionDocFilter = document.getElementById("searchCollectionDocFilter");
 const searchCollectionDocPicker = document.getElementById("searchCollectionDocPicker");
 const searchCollectionDocsTableBody = document.getElementById("searchCollectionDocsTableBody");
 const searchAddDocsBtn = document.getElementById("searchAddDocsBtn");
@@ -1954,21 +1956,41 @@ function renderSearchCollectionDocPicker() {
   }
   searchCollectionDocPicker.disabled = false;
   const selectedIds = new Set(searchSelectedCollectionDocumentIds);
+  const filterText = String(searchCollectionDocFilter?.value || "").trim().toLowerCase();
+  let visibleOptions = 0;
   for (const doc of searchDocsCatalog) {
+    const title = getSearchCatalogTitle(doc);
+    const filename = String(doc.filename || "");
+    if (
+      filterText &&
+      !title.toLowerCase().includes(filterText) &&
+      !filename.toLowerCase().includes(filterText)
+    ) {
+      continue;
+    }
     const option = document.createElement("option");
     option.value = doc.id;
-    option.textContent = getSearchCatalogTitle(doc);
+    option.textContent = title;
     option.disabled = selectedIds.has(doc.id);
+    searchCollectionDocPicker.appendChild(option);
+    visibleOptions += 1;
+  }
+  if (visibleOptions === 0) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No matching documents";
+    option.disabled = true;
     searchCollectionDocPicker.appendChild(option);
   }
 }
 
 function renderSearchCollectionDocumentsTable() {
-  if (!searchCollectionDocsTableBody || !searchCollectionDocsLabel) {
+  if (!searchCollectionDocsTableBody || !searchCollectionDocsLabel || !searchCollectionDocsCount) {
     return;
   }
   if (!searchSelectedCollectionId) {
     searchCollectionDocsLabel.textContent = "Select a collection to manage document scope.";
+    searchCollectionDocsCount.textContent = "Documents in collection: 0";
     searchCollectionDocsTableBody.innerHTML = '<tr><td colspan="2">No collection selected.</td></tr>';
     if (searchAddDocsBtn) {
       searchAddDocsBtn.disabled = true;
@@ -1980,6 +2002,7 @@ function renderSearchCollectionDocumentsTable() {
   searchCollectionDocsLabel.textContent = collection
     ? `Editing collection: ${collection.name}`
     : "Editing selected collection";
+  searchCollectionDocsCount.textContent = `Documents in collection: ${searchSelectedCollectionDocumentIds.length}`;
   if (searchAddDocsBtn) {
     searchAddDocsBtn.disabled = false;
   }
@@ -2185,6 +2208,7 @@ async function loadSearchCollections() {
   renderSearchScopeOptions();
   renderCollectionsTable();
   renderSearchCollectionDocumentsTable();
+  renderSearchResultsMeta(`Collection scope: ${getSearchScopeLabel()}`);
 }
 
 async function loadSearchDocumentsCatalog() {
@@ -2412,7 +2436,7 @@ async function initializeSearchView() {
   } else {
     renderSearchCollectionDocumentsTable();
   }
-  renderSearchResultsMeta("No search run yet.");
+  renderSearchResultsMeta(`Ready. Scope: ${getSearchScopeLabel()}`);
 }
 
 function setRestartPendingButtonEnabled(enabled) {
@@ -2837,6 +2861,10 @@ searchRefreshCollectionsBtn?.addEventListener("click", async () => {
 searchScopeSelect?.addEventListener("change", async () => {
   searchSelectedCollectionId = String(searchScopeSelect.value || "");
   await loadSearchCollectionDocuments(searchSelectedCollectionId);
+});
+
+searchCollectionDocFilter?.addEventListener("input", () => {
+  renderSearchCollectionDocPicker();
 });
 
 searchAddDocsBtn?.addEventListener("click", async () => {
