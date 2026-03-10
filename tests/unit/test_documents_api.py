@@ -1,14 +1,17 @@
 from pathlib import Path
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
 from paperwise.api.dependencies import (
+    current_user_dependency,
     document_repository_dependency,
     ingestion_dispatcher_dependency,
     llm_provider_dependency,
     storage_dependency,
 )
 from paperwise.api.main import app
+from paperwise.domain.models import User
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -54,6 +57,16 @@ class FakeLLMProvider:
         }
 
 
+TEST_USER = User(
+    id="user-123",
+    email="user-123@example.com",
+    full_name="User Test",
+    password_hash="pbkdf2_sha256$1$aa$bb",
+    is_active=True,
+    created_at=datetime.now(UTC),
+)
+
+
 def test_create_and_get_document() -> None:
     store_dir = Path("local/test-object-store")
     if store_dir.exists():
@@ -65,6 +78,7 @@ def test_create_and_get_document() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
 
@@ -101,6 +115,7 @@ def test_create_and_get_document() -> None:
 def test_get_document_not_found() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
 
     try:
         client = TestClient(app)
@@ -111,9 +126,23 @@ def test_get_document_not_found() -> None:
         app.dependency_overrides.clear()
 
 
+def test_document_endpoints_require_authentication() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        response = client.get("/documents")
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Authentication required"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_get_document_file_not_found() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
 
     try:
         client = TestClient(app)
@@ -130,6 +159,7 @@ def test_list_documents() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
 
@@ -166,6 +196,7 @@ def test_list_documents_includes_llm_metadata_when_available() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
     app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
@@ -209,6 +240,7 @@ def test_list_documents_supports_metadata_filters() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
     app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
@@ -272,6 +304,7 @@ def test_list_pending_documents_excludes_ready() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
     app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
@@ -312,6 +345,7 @@ def test_restart_pending_documents_requeues_non_ready_only() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
     app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
@@ -358,6 +392,7 @@ def test_update_document_metadata_upserts_and_updates_taxonomy() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
 
@@ -365,7 +400,7 @@ def test_update_document_metadata_upserts_and_updates_taxonomy() -> None:
         client = TestClient(app)
         create_response = client.post(
             "/documents",
-            data={"owner_id": "user-edit"},
+            data={"owner_id": TEST_USER.id},
             files={"file": ("statement.pdf", b"%PDF-1.7\nstatement", "application/pdf")},
         )
         assert create_response.status_code == 201
@@ -405,7 +440,7 @@ def test_update_document_metadata_upserts_and_updates_taxonomy() -> None:
         patch_events = [event for event in history if event["source"] == "api.patch_metadata"]
         assert patch_events
         assert all(event["actor_type"] == "user" for event in patch_events)
-        assert all(event["actor_id"] == "user-edit" for event in patch_events)
+        assert all(event["actor_id"] == TEST_USER.id for event in patch_events)
     finally:
         app.dependency_overrides.clear()
 
@@ -416,6 +451,7 @@ def test_parse_document_roundtrip() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
 
@@ -452,6 +488,7 @@ def test_reprocess_document_requeues_and_sets_processing() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
     app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
@@ -496,12 +533,13 @@ def test_reprocess_document_requeues_and_sets_processing() -> None:
 def test_get_parse_result_not_found() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
 
     try:
         client = TestClient(app)
         response = client.get("/documents/missing-doc/parse")
         assert response.status_code == 404
-        assert response.json()["detail"] == "Parse result not found"
+        assert response.json()["detail"] == "Document not found"
     finally:
         app.dependency_overrides.clear()
 
@@ -516,6 +554,7 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
     app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
@@ -524,7 +563,7 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         client = TestClient(app)
         create_response = client.post(
             "/documents",
-            data={"owner_id": "user-llm"},
+            data={"owner_id": TEST_USER.id},
             files={"file": ("credit.pdf", b"%PDF-1.7\nexperian", "application/pdf")},
         )
         assert create_response.status_code == 201
@@ -574,7 +613,7 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         llm_events = [event for event in history if event["source"] == "api.llm_parse"]
         assert llm_events
         assert all(event["actor_type"] == "user" for event in llm_events)
-        assert all(event["actor_id"] == "user-llm" for event in llm_events)
+        assert all(event["actor_id"] == TEST_USER.id for event in llm_events)
     finally:
         app.dependency_overrides.clear()
 
@@ -582,12 +621,13 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
 def test_get_llm_parse_result_not_found() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
 
     try:
         client = TestClient(app)
         response = client.get("/documents/missing-doc/llm-parse")
         assert response.status_code == 404
-        assert response.json()["detail"] == "LLM parse result not found"
+        assert response.json()["detail"] == "Document not found"
     finally:
         app.dependency_overrides.clear()
 
@@ -595,6 +635,7 @@ def test_get_llm_parse_result_not_found() -> None:
 def test_get_document_history_not_found() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
 
     try:
         client = TestClient(app)
@@ -611,6 +652,7 @@ def test_metadata_update_preserves_acronyms_in_correspondent_and_tags() -> None:
     dispatcher = FakeDispatcher()
     storage = LocalStorageAdapter(str(store_dir))
     app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
 

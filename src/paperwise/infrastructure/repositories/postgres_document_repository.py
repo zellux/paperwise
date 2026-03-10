@@ -11,6 +11,7 @@ from paperwise.domain.models import (
     HistoryEventType,
     LLMParseResult,
     ParseResult,
+    User,
 )
 from paperwise.infrastructure.db import Base, build_engine, build_session_factory
 from paperwise.infrastructure.repositories.postgres_models import (
@@ -21,6 +22,7 @@ from paperwise.infrastructure.repositories.postgres_models import (
     LLMParseResultRow,
     ParseResultRow,
     TagRow,
+    UserRow,
 )
 
 
@@ -332,6 +334,65 @@ class PostgresDocumentRepository(DocumentRepository):
                     actor_id=row.actor_id,
                     source=row.source,
                     changes=dict(row.changes or {}),
+                    created_at=row.created_at,
+                )
+                for row in rows
+            ]
+
+    def save_user(self, user: User) -> None:
+        with self._session_factory() as session:
+            row = session.get(UserRow, user.id)
+            if row is None:
+                row = UserRow(id=user.id)
+                session.add(row)
+            row.email = user.email.strip().lower()
+            row.full_name = user.full_name
+            row.password_hash = user.password_hash
+            row.is_active = user.is_active
+            row.created_at = user.created_at
+            session.commit()
+
+    def get_user(self, user_id: str) -> User | None:
+        with self._session_factory() as session:
+            row = session.get(UserRow, user_id)
+            if row is None:
+                return None
+            return User(
+                id=row.id,
+                email=row.email,
+                full_name=row.full_name,
+                password_hash=row.password_hash,
+                is_active=row.is_active,
+                created_at=row.created_at,
+            )
+
+    def get_user_by_email(self, email: str) -> User | None:
+        normalized = email.strip().lower()
+        with self._session_factory() as session:
+            row = session.scalar(select(UserRow).where(UserRow.email == normalized))
+            if row is None:
+                return None
+            return User(
+                id=row.id,
+                email=row.email,
+                full_name=row.full_name,
+                password_hash=row.password_hash,
+                is_active=row.is_active,
+                created_at=row.created_at,
+            )
+
+    def list_users(self, limit: int = 100) -> list[User]:
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(UserRow).order_by(UserRow.created_at.desc()).limit(limit)
+            ).all()
+            return [
+                User(
+                    id=row.id,
+                    email=row.email,
+                    full_name=row.full_name,
+                    password_hash=row.password_hash,
+                    is_active=row.is_active,
                     created_at=row.created_at,
                 )
                 for row in rows

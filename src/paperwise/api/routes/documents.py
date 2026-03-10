@@ -12,6 +12,7 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from paperwise.api.dependencies import (
+    current_user_dependency,
     document_repository_dependency,
     ingestion_dispatcher_dependency,
     llm_provider_dependency,
@@ -40,6 +41,7 @@ from paperwise.domain.models import (
     HistoryActorType,
     LLMParseResult,
     ParseResult,
+    User,
 )
 from paperwise.infrastructure.config import get_settings
 
@@ -348,18 +350,35 @@ def _set_document_status(
     return document
 
 
+def _get_owned_document_or_404(
+    *,
+    document_id: str,
+    repository: DocumentRepository,
+    current_user: User,
+) -> Document:
+    document = get_document(document_id=document_id, repository=repository)
+    if document is None or document.owner_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    return document
+
+
 @router.post(
     "",
     status_code=status.HTTP_201_CREATED,
     response_model=CreateDocumentResponse,
 )
 def create_document_endpoint(
-    owner_id: str = Form(...),
+    owner_id: str = Form(""),
     file: UploadFile = File(...),
     repository: DocumentRepository = Depends(document_repository_dependency),
     dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
     storage: StorageProvider = Depends(storage_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> CreateDocumentResponse:
+    del owner_id
     filename = file.filename or "uploaded-document"
     content = file.file.read()
     checksum = sha256(content).hexdigest()
@@ -390,7 +409,7 @@ def create_document_endpoint(
     document, job_id = create_document(
         CreateDocumentCommand(
             filename=filename,
-            owner_id=owner_id,
+            owner_id=current_user.id,
             blob_uri=blob_uri,
             checksum_sha256=checksum,
             content_type=file.content_type or "application/octet-stream",
@@ -414,6 +433,7 @@ def list_documents_endpoint(
     document_type: list[str] | None = Query(None),
     status: list[str] | None = Query(None),
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentListItemResponse]:
     documents = repository.list_documents(limit=limit)
     normalized_tags = _normalized_values(tag)
@@ -425,6 +445,8 @@ def list_documents_endpoint(
 
     results: list[DocumentListItemResponse] = []
     for document in documents:
+        if document.owner_id != current_user.id:
+            continue
         llm_result = repository.get_llm_parse_result(document.id)
         if normalized_statuses and _normalize_name(document.status.value) not in normalized_statuses:
             continue
@@ -454,9 +476,14 @@ def list_documents_endpoint(
 def list_pending_documents_endpoint(
     limit: int = 100,
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentListItemResponse]:
     documents = repository.list_documents(limit=limit)
-    pending_docs = [document for document in documents if document.status in PENDING_STATUSES]
+    pending_docs = [
+        document
+        for document in documents
+        if document.status in PENDING_STATUSES and document.owner_id == current_user.id
+    ]
     return [
         _to_list_item_response(
             document=document,
@@ -471,6 +498,7 @@ def restart_pending_documents_endpoint(
     limit: int = 100,
     repository: DocumentRepository = Depends(document_repository_dependency),
     dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> RestartPendingResponse:
     documents = repository.list_documents(limit=limit)
     restarted_count = 0
@@ -478,6 +506,8 @@ def restart_pending_documents_endpoint(
     history_events: list[DocumentHistoryEvent] = []
 
     for document in documents:
+        if document.owner_id != current_user.id:
+            continue
         if document.status == DocumentStatus.READY:
             skipped_ready_count += 1
             continue
@@ -497,7 +527,7 @@ def restart_pending_documents_endpoint(
             build_processing_restarted_history_event(
                 document_id=document.id,
                 actor_type=HistoryActorType.USER,
-                actor_id=document.owner_id,
+                actor_id=current_user.id,
                 source="api.pending_restart",
                 previous_status=previous_status,
                 current_status=document.status.value,
@@ -516,13 +546,13 @@ def restart_pending_documents_endpoint(
 def get_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> DocumentResponse:
-    document = get_document(document_id=document_id, repository=repository)
-    if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
+    document = _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
     return _to_response(document)
 
 
@@ -530,13 +560,13 @@ def get_document_endpoint(
 def get_document_detail_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> DocumentDetailResponse:
-    document = get_document(document_id=document_id, repository=repository)
-    if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
+    document = _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
     llm_result = repository.get_llm_parse_result(document_id)
     return _to_detail_response(document=document, llm_result=llm_result)
 
@@ -545,13 +575,13 @@ def get_document_detail_endpoint(
 def get_document_file_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> FileResponse:
-    document = get_document(document_id=document_id, repository=repository)
-    if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
+    document = _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
     file_path = _resolve_file_path_from_uri(document.blob_uri)
     if file_path is None:
         raise HTTPException(
@@ -571,13 +601,13 @@ def reprocess_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
     dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> CreateDocumentResponse:
-    document = get_document(document_id=document_id, repository=repository)
-    if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
+    document = _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
 
     previous_status = document.status.value
     _set_document_status(
@@ -596,7 +626,7 @@ def reprocess_document_endpoint(
             build_processing_restarted_history_event(
                 document_id=document.id,
                 actor_type=HistoryActorType.USER,
-                actor_id=document.owner_id,
+                actor_id=current_user.id,
                 source="api.reprocess",
                 previous_status=previous_status,
                 current_status=document.status.value,
@@ -614,13 +644,13 @@ def reprocess_document_endpoint(
 def parse_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> ParseResultResponse:
-    document = get_document(document_id=document_id, repository=repository)
-    if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
+    document = _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
     _set_document_status(
         document=document,
         repository=repository,
@@ -638,7 +668,13 @@ def parse_document_endpoint(
 def get_parse_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> ParseResultResponse:
+    _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
     result = repository.get_parse_result(document_id)
     if result is None:
         raise HTTPException(
@@ -653,13 +689,13 @@ def llm_parse_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
     llm_provider: LLMProvider = Depends(llm_provider_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> LLMParseResultResponse:
-    document = get_document(document_id=document_id, repository=repository)
-    if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
+    document = _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
     try:
         parse_result = repository.get_parse_result(document_id)
         if parse_result is None:
@@ -682,7 +718,7 @@ def llm_parse_document_endpoint(
             repository=repository,
             llm_provider=llm_provider,
             actor_type=HistoryActorType.USER,
-            actor_id=document.owner_id,
+            actor_id=current_user.id,
             history_source="api.llm_parse",
         )
     except Exception:
@@ -709,7 +745,7 @@ def llm_parse_document_endpoint(
             build_processing_completed_history_event(
                 document_id=document.id,
                 actor_type=HistoryActorType.USER,
-                actor_id=document.owner_id,
+                actor_id=current_user.id,
                 source="api.llm_parse",
                 previous_status=DocumentStatus.PROCESSING.value,
                 current_status=document.status.value,
@@ -719,7 +755,7 @@ def llm_parse_document_endpoint(
     file_move_event = build_file_moved_history_event(
         document_id=document.id,
         actor_type=HistoryActorType.USER,
-        actor_id=document.owner_id,
+        actor_id=current_user.id,
         source="api.llm_parse",
         from_blob_uri=previous_blob_uri,
         to_blob_uri=document.blob_uri,
@@ -733,7 +769,13 @@ def llm_parse_document_endpoint(
 def get_llm_parse_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> LLMParseResultResponse:
+    _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
     result = repository.get_llm_parse_result(document_id)
     if result is None:
         raise HTTPException(
@@ -748,13 +790,13 @@ def update_document_metadata_endpoint(
     document_id: str,
     payload: MetadataUpdateRequest,
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> LLMParseResultResponse:
-    document = get_document(document_id=document_id, repository=repository)
-    if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
+    document = _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
 
     correspondents = repository.list_correspondents()
     document_types = repository.list_document_types()
@@ -798,7 +840,7 @@ def update_document_metadata_endpoint(
             previous=previous,
             current=result,
             actor_type=HistoryActorType.USER,
-            actor_id=document.owner_id,
+            actor_id=current_user.id,
             source="api.patch_metadata",
         )
     )
@@ -815,13 +857,13 @@ def list_document_history_endpoint(
     document_id: str,
     limit: int = Query(100, ge=1, le=500),
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentHistoryEventResponse]:
-    document = get_document(document_id=document_id, repository=repository)
-    if document is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
+    _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
     return [
         _to_history_event_response(event)
         for event in repository.list_history(document_id=document_id, limit=limit)
@@ -831,7 +873,9 @@ def list_document_history_endpoint(
 @router.get("/metadata/taxonomy", response_model=TaxonomyResponse)
 def get_taxonomy_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> TaxonomyResponse:
+    del current_user
     return TaxonomyResponse(
         correspondents=repository.list_correspondents(),
         document_types=repository.list_document_types(),
@@ -842,7 +886,9 @@ def get_taxonomy_endpoint(
 @router.get("/metadata/tag-stats", response_model=list[TagStatResponse])
 def get_tag_stats_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
 ) -> list[TagStatResponse]:
+    del current_user
     return [
         TagStatResponse(tag=tag, document_count=document_count)
         for tag, document_count in repository.list_tag_stats()

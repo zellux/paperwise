@@ -1,6 +1,12 @@
 from typing import Any, Protocol
 
-from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult, ParseResult
+from paperwise.domain.models import (
+    Document,
+    DocumentHistoryEvent,
+    LLMParseResult,
+    ParseResult,
+    User,
+)
 
 
 class OCRProvider(Protocol):
@@ -89,6 +95,18 @@ class DocumentRepository(Protocol):
         limit: int = 100,
     ) -> list[DocumentHistoryEvent]:
         """Return document history entries ordered newest-first."""
+
+    def save_user(self, user: User) -> None:
+        """Persist a user."""
+
+    def get_user(self, user_id: str) -> User | None:
+        """Load a user by ID."""
+
+    def get_user_by_email(self, email: str) -> User | None:
+        """Load a user by email."""
+
+    def list_users(self, limit: int = 100) -> list[User]:
+        """List users ordered newest-first."""
 
 
 class IngestionDispatcher(Protocol):

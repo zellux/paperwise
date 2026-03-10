@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_model: str = "gpt-4.1-mini"
     openai_base_url: str = "https://api.openai.com/v1"
+    auth_secret: str = "paperwise-dev-secret-change-me"
+    auth_token_ttl_seconds: int = 60 * 60 * 12
 
 
 @lru_cache

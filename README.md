@@ -37,6 +37,21 @@ PAPERWISE_OPENAI_BASE_URL=https://api.openai.com/v1
 
 If `PAPERWISE_OPENAI_API_KEY` is unset, `llm-parse` is disabled.
 
+## User System (MVP)
+
+The API now includes basic user management and login:
+
+- `POST /users` - create a user (`email`, `full_name`, `password`)
+- `GET /users` - list users
+- `GET /users/{user_id}` - fetch a user profile
+- `POST /users/login` - verify credentials
+- `GET /users/me` - validate bearer token and return current user
+
+Passwords are stored as PBKDF2-SHA256 hashes.
+
+Document endpoints require `Authorization: Bearer <token>` from `POST /users/login`.
+Guest access is disabled.
+
 ## Local Development Commands
 
 - `make setup` - create local virtualenv and install all dependencies.

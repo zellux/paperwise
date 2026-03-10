@@ -74,3 +74,14 @@ class DocumentHistoryEventRow(Base):
     source: Mapped[str] = mapped_column(String(256))
     changes: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class UserRow(Base):
+    __tablename__ = "users"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    full_name: Mapped[str] = mapped_column(String(256))
+    password_hash: Mapped[str] = mapped_column(String(512))
+    is_active: Mapped[bool]
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)

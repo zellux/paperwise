@@ -1,9 +1,13 @@
+from fastapi import Depends, Header, HTTPException, status
+
+from paperwise.application.services.auth_tokens import decode_access_token
 from paperwise.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
     LLMProvider,
     StorageProvider,
 )
+from paperwise.domain.models import User
 from paperwise.infrastructure.config import Settings, get_settings
 from paperwise.infrastructure.dispatchers.celery_ingestion_dispatcher import (
     CeleryIngestionDispatcher,
@@ -56,3 +60,27 @@ def storage_dependency() -> StorageProvider:
 def llm_provider_dependency() -> LLMProvider:
     return _llm_provider
 
+
+def current_user_dependency(
+    authorization: str | None = Header(default=None),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> User:
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required",
+        )
+    token = authorization.split(" ", 1)[1].strip()
+    payload = decode_access_token(token=token, secret=_settings.auth_secret)
+    if payload is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+    user = repository.get_user(str(payload["sub"]))
+    if user is None or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid user",
+        )
+    return user

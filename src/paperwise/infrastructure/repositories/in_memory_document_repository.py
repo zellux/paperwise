@@ -1,7 +1,7 @@
 from threading import RLock
 
 from paperwise.application.interfaces import DocumentRepository
-from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult, ParseResult
+from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult, ParseResult, User
 
 
 def _normalize_name(value: str) -> str:
@@ -26,6 +26,8 @@ def _to_title_case(value: str) -> str:
 class InMemoryDocumentRepository(DocumentRepository):
     def __init__(self) -> None:
         self._documents: dict[str, Document] = {}
+        self._users: dict[str, User] = {}
+        self._users_by_email: dict[str, User] = {}
         self._parse_results: dict[str, ParseResult] = {}
         self._llm_parse_results: dict[str, LLMParseResult] = {}
         self._history: dict[str, list[DocumentHistoryEvent]] = {}
@@ -163,3 +165,26 @@ class InMemoryDocumentRepository(DocumentRepository):
                 reverse=True,
             )
             return events[:limit]
+
+    def save_user(self, user: User) -> None:
+        with self._lock:
+            email_key = user.email.strip().lower()
+            self._users[user.id] = user
+            self._users_by_email[email_key] = user
+
+    def get_user(self, user_id: str) -> User | None:
+        with self._lock:
+            return self._users.get(user_id)
+
+    def get_user_by_email(self, email: str) -> User | None:
+        with self._lock:
+            return self._users_by_email.get(email.strip().lower())
+
+    def list_users(self, limit: int = 100) -> list[User]:
+        with self._lock:
+            users = sorted(
+                self._users.values(),
+                key=lambda user: user.created_at,
+                reverse=True,
+            )
+            return users[:limit]
