@@ -33,6 +33,8 @@ const searchAskQuestion = document.getElementById("searchAskQuestion");
 const searchAskTopKInput = document.getElementById("searchAskTopKInput");
 const searchAskAnswer = document.getElementById("searchAskAnswer");
 const searchAskCitationsBody = document.getElementById("searchAskCitationsBody");
+const searchTabButtons = [...document.querySelectorAll(".search-tab-btn")];
+const searchSubsections = [...document.querySelectorAll(".search-subsection")];
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
 const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
 const settingsLlmProviderSelect = document.getElementById("settingsLlmProviderSelect");
@@ -209,6 +211,7 @@ let searchCollections = [];
 let searchDocsCatalog = [];
 let searchSelectedCollectionId = "";
 let searchSelectedCollectionDocumentIds = [];
+let searchActiveSectionId = "search-section-collections";
 
 function normalizePageSize(value) {
   const size = Number(value);
@@ -982,7 +985,9 @@ function clearSession() {
   searchDocsCatalog = [];
   searchSelectedCollectionId = "";
   searchSelectedCollectionDocumentIds = [];
+  searchActiveSectionId = "search-section-collections";
   currentViewId = "section-docs";
+  setActiveSearchSection(searchActiveSectionId);
   renderSearchScopeOptions();
   renderCollectionsTable();
   renderSearchCollectionDocumentsTable();
@@ -1042,6 +1047,22 @@ function setActiveView(targetId) {
   currentViewId = targetId;
   for (const view of views) {
     view.classList.toggle("view-hidden", view.id !== targetId);
+  }
+}
+
+function setActiveSearchSection(sectionId) {
+  const defaultSectionId = "search-section-collections";
+  const nextSectionId = searchSubsections.some((section) => section.id === sectionId)
+    ? sectionId
+    : defaultSectionId;
+  searchActiveSectionId = nextSectionId;
+  for (const section of searchSubsections) {
+    section.classList.toggle("view-hidden", section.id !== nextSectionId);
+  }
+  for (const button of searchTabButtons) {
+    const isActive = button.dataset.searchSection === nextSectionId;
+    button.classList.toggle("is-active", isActive);
+    button.setAttribute("aria-selected", isActive ? "true" : "false");
   }
 }
 
@@ -2431,6 +2452,7 @@ async function runScopedAsk() {
 
 async function initializeSearchView() {
   await Promise.all([loadSearchCollections(), loadSearchDocumentsCatalog()]);
+  setActiveSearchSection(searchActiveSectionId);
   if (searchSelectedCollectionId) {
     await loadSearchCollectionDocuments(searchSelectedCollectionId);
   } else {
@@ -2847,6 +2869,13 @@ signOutBtn?.addEventListener("click", () => {
   clearSession();
   setAuthMessage("Signed out.");
 });
+
+for (const button of searchTabButtons) {
+  button.addEventListener("click", () => {
+    const sectionId = String(button.dataset.searchSection || "").trim();
+    setActiveSearchSection(sectionId);
+  });
+}
 
 searchCollectionCreateForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -3329,6 +3358,7 @@ async function initializeApp() {
 }
 
 applyTheme(currentTheme);
+setActiveSearchSection(searchActiveSectionId);
 
 initializeApp().catch((error) => {
   setAuthMessage(error.message || "Failed to initialize app.", true);
