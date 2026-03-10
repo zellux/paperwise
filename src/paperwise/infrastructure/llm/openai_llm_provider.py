@@ -47,6 +47,7 @@ class OpenAILLMProvider(LLMProvider):
             "tags must be an array of strings. "
             "Use natural casing: title case for normal words, but preserve acronyms in uppercase "
             "(for example: PPMG Pediatrics, IRS Notice). "
+            "Keep original casing when already meaningful; only normalize when text is all lowercase. "
             "When reusing existing taxonomy names, copy the existing names exactly."
         )
         user_prompt = {
@@ -60,6 +61,7 @@ class OpenAILLMProvider(LLMProvider):
                 "Only propose new names when no existing option is a good match. "
                 "Use title case for normal words in document_type/tags, "
                 "but keep acronyms uppercase (for example: PPMG Pediatrics, IRS). "
+                "Keep original casing when already meaningful; only normalize casing when all words are lowercase. "
                 "For correspondent: normalize punctuation/suffixes (e.g. 'Experian.' -> 'Experian'), "
                 "prefer organization names over department names, and never return the document owner."
             ),

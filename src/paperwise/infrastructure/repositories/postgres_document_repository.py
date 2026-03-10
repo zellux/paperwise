@@ -35,13 +35,29 @@ def _to_title_case(value: str) -> str:
     cleaned = " ".join(value.strip().split())
     if not cleaned:
         return cleaned
+
+    def looks_like_acronym_token(token: str) -> bool:
+        letters = "".join(ch for ch in token if ch.isalpha())
+        if not letters or not letters.isalpha():
+            return False
+        if len(letters) < 2 or len(letters) > 6:
+            return False
+        vowels = sum(ch in "aeiou" for ch in letters.lower())
+        return vowels == 0
+
     words: list[str] = []
     for word in cleaned.split(" "):
         letters = "".join(ch for ch in word if ch.isalpha())
         if len(letters) >= 2 and letters.isupper():
             words.append(word)
             continue
-        words.append(word[:1].upper() + word[1:].lower() if word else word)
+        if looks_like_acronym_token(word):
+            words.append(word.upper())
+            continue
+        if word.islower():
+            words.append(word[:1].upper() + word[1:] if word else word)
+            continue
+        words.append(word)
     return " ".join(words)
 
 

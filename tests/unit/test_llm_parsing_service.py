@@ -73,6 +73,30 @@ class NullDateLLMProvider:
         }
 
 
+class AcronymCaseLLMProvider:
+    def suggest_metadata(
+        self,
+        *,
+        filename: str,
+        text_preview: str,
+        existing_correspondents: list[str],
+        existing_document_types: list[str],
+        existing_tags: list[str],
+    ) -> dict:
+        del filename
+        del text_preview
+        del existing_correspondents
+        del existing_document_types
+        del existing_tags
+        return {
+            "suggested_title": "Pediatric Visit",
+            "document_date": "2026-03-10",
+            "correspondent": "Ppmg Pediatrics",
+            "document_type": "Office Visit",
+            "tags": ["Ppmg", "checkup"],
+        }
+
+
 def _build_document() -> Document:
     return Document(
         id="doc-llm-merge",
@@ -146,3 +170,19 @@ def test_parse_with_llm_keeps_previous_date_when_provider_returns_null() -> None
 
     assert first.document_date == "2026-01-15"
     assert second.document_date == first.document_date
+
+
+def test_parse_with_llm_preserves_acronym_like_casing() -> None:
+    repository = InMemoryDocumentRepository()
+    document = _build_document()
+    parse_result = _build_parse_result(document.id)
+
+    result = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=AcronymCaseLLMProvider(),
+    )
+
+    assert result.correspondent == "PPMG Pediatrics"
+    assert "PPMG" in result.tags
