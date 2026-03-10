@@ -8,6 +8,26 @@ from paperwise.infrastructure.config import get_settings
 from paperwise.application.services.storage_paths import blob_ref_to_path
 
 
+def _extract_text_like_segments(raw: bytes, *, max_chars: int) -> str:
+    # Heuristic text extraction from binary-heavy files (for stub OCR readability).
+    decoded = raw.decode("latin-1", errors="ignore").replace("\x00", " ")
+    segments = re.findall(r"[A-Za-z0-9][A-Za-z0-9\s,.;:()/#&'\"+\-]{2,}", decoded)
+    cleaned: list[str] = []
+    for segment in segments:
+        collapsed = " ".join(segment.split())
+        if len(collapsed) < 3:
+            continue
+        alpha = sum(ch.isalpha() for ch in collapsed)
+        if alpha == 0:
+            continue
+        if alpha / max(len(collapsed), 1) < 0.2:
+            continue
+        cleaned.append(collapsed)
+    if not cleaned:
+        return " ".join(decoded.split())[:max_chars]
+    return " ".join(cleaned)[:max_chars]
+
+
 def parse_document_blob(
     document_id: str,
     blob_uri: str,
@@ -29,8 +49,9 @@ def parse_document_blob(
         if page_count == 0:
             page_count = 1
         # Keep a stub distinction between OCR modes so reprocess output can visibly change.
-        preview_limit = 4000 if normalized_ocr == "llm" else 200
-        text_preview = raw[:preview_limit].decode("latin-1", errors="ignore").replace("\x00", "")
+        preview_limit = 4000 if normalized_ocr == "llm" else 600
+        byte_window = 24000 if normalized_ocr == "llm" else 6000
+        text_preview = _extract_text_like_segments(raw[:byte_window], max_chars=preview_limit)
     elif suffix in {".txt", ".md", ".markdown"}:
         text_preview = raw[:4000].decode("utf-8", errors="replace").replace("\x00", "")
         page_count = max(1, text_preview.count("\n\n") + 1) if text_preview.strip() else 1
