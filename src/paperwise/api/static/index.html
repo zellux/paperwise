@@ -19,7 +19,62 @@
     <div class="bg-orb bg-orb-b"></div>
     <div class="bg-grid"></div>
 
-    <main class="app-shell">
+    <section id="authGate" class="auth-gate">
+      <div class="auth-card">
+        <p class="eyebrow">paperwise / access</p>
+        <h1>Sign In Required</h1>
+        <p class="subhead">No guest mode. Create an account or sign in to continue.</p>
+        <div class="auth-layout">
+          <section class="auth-panel">
+            <h2 class="auth-panel-title">Sign In</h2>
+            <p class="auth-panel-note">Use your existing account.</p>
+            <form id="signInForm" class="stack">
+              <label class="label" for="signInEmail">Email</label>
+              <input id="signInEmail" name="signInEmail" type="text" required />
+              <label class="label" for="signInPassword">Password</label>
+              <input id="signInPassword" name="signInPassword" type="password" required />
+              <button type="submit" class="btn btn-primary">Sign In</button>
+            </form>
+          </section>
+          <section class="auth-panel">
+            <h2 class="auth-panel-title">Sign Up</h2>
+            <p class="auth-panel-note">Create a new account.</p>
+            <form id="registerForm" class="stack">
+              <label class="label" for="registerName">Full Name</label>
+              <input id="registerName" name="registerName" type="text" required />
+              <label class="label" for="registerEmail">Email</label>
+              <input id="registerEmail" name="registerEmail" type="text" required />
+              <label class="label" for="registerPassword">Password</label>
+              <input id="registerPassword" name="registerPassword" type="password" minlength="8" required />
+              <button type="submit" class="btn btn-primary">Create Account</button>
+            </form>
+          </section>
+        </div>
+        <p id="authMessage" class="auth-message">Enter credentials to continue.</p>
+      </div>
+    </section>
+
+    <main class="app-shell view-hidden">
+      <header class="topbar">
+        <div class="brand-block">
+          <img
+            src="/static/icons/paperwise-icon.png"
+            alt="paperwise logo"
+            class="brand-icon"
+            width="28"
+            height="28"
+          />
+          <div class="brand-copy">
+            <span class="brand-title">paperwise</span>
+            <span class="brand-subtitle">AI-Native Documents</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span id="sessionUserLabel" class="profile-label">Not signed in</span>
+          <button id="signOutBtn" type="button" class="btn btn-muted">Log Out</button>
+        </div>
+      </header>
+
       <aside class="sidebar">
         <p class="eyebrow">paperwise / control</p>
         <h1>Document Ops</h1>
@@ -232,9 +287,6 @@
         <article id="section-upload" class="panel panel-section view view-hidden">
           <h2>Upload Document</h2>
           <form id="uploadForm" class="stack">
-            <label class="label" for="ownerId">Owner ID</label>
-            <input id="ownerId" name="ownerId" type="text" value="local-user" required />
-
             <label class="label" for="fileInput">PDF file</label>
             <input id="fileInput" name="fileInput" type="file" accept="application/pdf" required />
 

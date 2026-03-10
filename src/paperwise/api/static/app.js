@@ -6,6 +6,13 @@ const viewDocumentFileBtn = document.getElementById("viewDocumentFileBtn");
 const docsFilterForm = document.getElementById("docsFilterForm");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 const restartPendingBtn = document.getElementById("restartPendingBtn");
+const authGate = document.getElementById("authGate");
+const appShell = document.querySelector(".app-shell");
+const signInForm = document.getElementById("signInForm");
+const registerForm = document.getElementById("registerForm");
+const authMessage = document.getElementById("authMessage");
+const signOutBtn = document.getElementById("signOutBtn");
+const sessionUserLabel = document.getElementById("sessionUserLabel");
 
 const metaTitleInput = document.getElementById("metaTitle");
 const metaDateInput = document.getElementById("metaDate");
@@ -66,12 +73,20 @@ const VIEW_ID_TO_PATH = {
 };
 
 let currentDocumentId = "";
+let authToken = window.localStorage.getItem("paperwise.auth.token") || "";
+let currentUser = null;
 const docsFilters = {
   tag: [],
   correspondent: [],
   document_type: [],
   status: ["ready"],
 };
+
+// Avoid auth-gate flash on page load when we already have a stored token.
+if (authToken && authGate && appShell) {
+  authGate.classList.add("view-hidden");
+  appShell.classList.remove("view-hidden");
+}
 
 function formatStatus(value) {
   if (!value) {
@@ -240,6 +255,72 @@ function delay(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function setAuthMessage(message, isError = false) {
+  if (!authMessage) {
+    return;
+  }
+  authMessage.textContent = message;
+  authMessage.style.color = isError ? "#9f3f1d" : "";
+}
+
+function persistSession(token, user) {
+  authToken = token || "";
+  currentUser = user || null;
+  if (authToken) {
+    window.localStorage.setItem("paperwise.auth.token", authToken);
+  } else {
+    window.localStorage.removeItem("paperwise.auth.token");
+  }
+}
+
+function renderSessionState() {
+  const signedIn = Boolean(authToken && currentUser);
+  authGate.classList.toggle("view-hidden", signedIn);
+  appShell.classList.toggle("view-hidden", !signedIn);
+  if (sessionUserLabel) {
+    sessionUserLabel.textContent = signedIn
+      ? `${currentUser.full_name} (${currentUser.email})`
+      : "Not signed in";
+  }
+}
+
+function clearSession() {
+  persistSession("", null);
+  renderSessionState();
+}
+
+async function apiFetch(url, options = {}) {
+  const headers = new Headers(options.headers || {});
+  if (authToken) {
+    headers.set("Authorization", `Bearer ${authToken}`);
+  }
+  const response = await window.fetch(url, { ...options, headers });
+  if (response.status === 401) {
+    clearSession();
+    throw new Error("Authentication required");
+  }
+  return response;
+}
+
+async function restoreSession() {
+  if (!authToken) {
+    renderSessionState();
+    return;
+  }
+  try {
+    const response = await apiFetch("/users/me");
+    if (!response.ok) {
+      clearSession();
+      return;
+    }
+    currentUser = await response.json();
+  } catch {
+    clearSession();
+    return;
+  }
+  renderSessionState();
 }
 
 function setActiveNav(targetId) {
@@ -624,8 +705,16 @@ function navigateToDocument(documentId) {
   window.location.href = `${url.pathname}?${url.searchParams.toString()}`;
 }
 
-function openDocumentFile(documentId) {
-  window.open(`/documents/${documentId}/file`, "_blank", "noopener,noreferrer");
+async function openDocumentFile(documentId) {
+  const response = await apiFetch(`/documents/${documentId}/file`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || response.statusText);
+  }
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  window.open(url, "_blank", "noopener,noreferrer");
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
 }
 
 function createActionIcon(name) {
@@ -783,7 +872,13 @@ function renderDocsList(documents) {
       createIconActionButton({
         icon: "eye",
         label: "View file",
-        onClick: () => openDocumentFile(doc.id),
+        onClick: async () => {
+          try {
+            await openDocumentFile(doc.id);
+          } catch (error) {
+            logActivity(`Failed to open file: ${error.message}`);
+          }
+        },
       })
     );
     actionCell.appendChild(actionsWrap);
@@ -909,7 +1004,7 @@ async function loadDocumentsList() {
     query.append("status", value);
   }
 
-  const response = await fetch(`/documents?${query.toString()}`);
+  const response = await apiFetch(`/documents?${query.toString()}`);
   const payload = await response.json();
   if (!response.ok) {
     logActivity(`Document list failed: ${payload.detail || response.statusText}`);
@@ -921,7 +1016,7 @@ async function loadDocumentsList() {
 }
 
 async function loadPendingDocuments() {
-  const response = await fetch("/documents/pending?limit=200");
+  const response = await apiFetch("/documents/pending?limit=200");
   const payload = await response.json();
   if (!response.ok) {
     setRestartPendingButtonEnabled(false);
@@ -934,7 +1029,7 @@ async function loadPendingDocuments() {
 }
 
 async function loadTagStats() {
-  const response = await fetch("/documents/metadata/tag-stats");
+  const response = await apiFetch("/documents/metadata/tag-stats");
   const payload = await response.json();
   if (!response.ok) {
     logActivity(`Tag stats load failed: ${payload.detail || response.statusText}`);
@@ -945,7 +1040,7 @@ async function loadTagStats() {
 }
 
 async function openDocumentView(documentId) {
-  const response = await fetch(`/documents/${documentId}/detail`);
+  const response = await apiFetch(`/documents/${documentId}/detail`);
   const payload = await response.json();
   if (!response.ok) {
     throw new Error(payload.detail || "Failed to load document detail");
@@ -973,7 +1068,7 @@ async function openDocumentView(documentId) {
   detailBlobUri.textContent = toRelativeBlobPath(doc.blob_uri);
   detailBlobUri.title = doc.blob_uri || "";
 
-  const historyResponse = await fetch(`/documents/${documentId}/history?limit=100`);
+  const historyResponse = await apiFetch(`/documents/${documentId}/history?limit=100`);
   const historyPayload = await historyResponse.json();
   if (!historyResponse.ok) {
     renderDocumentHistory([]);
@@ -991,7 +1086,7 @@ async function openDocumentView(documentId) {
 async function waitForDocumentReady(documentId, timeoutMs = 45000, intervalMs = 1500) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    const response = await fetch(`/documents/${documentId}`);
+    const response = await apiFetch(`/documents/${documentId}`);
     const payload = await response.json();
     if (!response.ok) {
       throw new Error(payload.detail || "Failed to refresh document status");
@@ -1004,23 +1099,85 @@ async function waitForDocumentReady(documentId, timeoutMs = 45000, intervalMs = 
   return false;
 }
 
+signInForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const email = document.getElementById("signInEmail").value.trim();
+  const password = document.getElementById("signInPassword").value;
+  const response = await apiFetch("/users/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    setAuthMessage(payload.detail || response.statusText, true);
+    return;
+  }
+  persistSession(payload.access_token, payload.user);
+  renderSessionState();
+  setAuthMessage(`Signed in as ${payload.user.email}.`);
+  await loadDocumentsList();
+  await loadTagStats();
+  await loadPendingDocuments();
+});
+
+registerForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const fullName = document.getElementById("registerName").value.trim();
+  const email = document.getElementById("registerEmail").value.trim();
+  const password = document.getElementById("registerPassword").value;
+  const registerResponse = await apiFetch("/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      full_name: fullName,
+      email,
+      password,
+    }),
+  });
+  const registerPayload = await registerResponse.json();
+  if (!registerResponse.ok) {
+    setAuthMessage(registerPayload.detail || registerResponse.statusText, true);
+    return;
+  }
+  const loginResponse = await apiFetch("/users/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  const loginPayload = await loginResponse.json();
+  if (!loginResponse.ok) {
+    setAuthMessage(loginPayload.detail || loginResponse.statusText, true);
+    return;
+  }
+  persistSession(loginPayload.access_token, loginPayload.user);
+  renderSessionState();
+  setAuthMessage(`Registered ${registerPayload.email}.`);
+  await loadDocumentsList();
+  await loadTagStats();
+  await loadPendingDocuments();
+});
+
+signOutBtn?.addEventListener("click", () => {
+  clearSession();
+  setAuthMessage("Signed out.");
+});
+
 uploadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  const ownerId = document.getElementById("ownerId").value.trim();
   const fileInput = document.getElementById("fileInput");
   const file = fileInput.files && fileInput.files[0];
-  if (!ownerId || !file) {
-    logActivity("Upload blocked: owner_id and file are required.");
+  if (!file) {
+    logActivity("Upload blocked: file is required.");
     return;
   }
 
   const form = new FormData();
-  form.append("owner_id", ownerId);
   form.append("file", file);
 
   logActivity(`Uploading ${file.name}...`);
-  const response = await fetch("/documents", { method: "POST", body: form });
+  const response = await apiFetch("/documents", { method: "POST", body: form });
   const payload = await response.json();
   if (!response.ok) {
     logActivity(`Upload failed: ${payload.detail || response.statusText}`);
@@ -1038,7 +1195,7 @@ documentMetaForm.addEventListener("submit", async (event) => {
     return;
   }
 
-  const response = await fetch(`/documents/${currentDocumentId}/metadata`, {
+  const response = await apiFetch(`/documents/${currentDocumentId}/metadata`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -1068,7 +1225,7 @@ reprocessDocumentBtn?.addEventListener("click", async () => {
     return;
   }
 
-  const response = await fetch(`/documents/${currentDocumentId}/reprocess`, {
+  const response = await apiFetch(`/documents/${currentDocumentId}/reprocess`, {
     method: "POST",
   });
   const payload = await response.json();
@@ -1095,12 +1252,16 @@ reprocessDocumentBtn?.addEventListener("click", async () => {
   }
 });
 
-viewDocumentFileBtn?.addEventListener("click", () => {
+viewDocumentFileBtn?.addEventListener("click", async () => {
   if (!currentDocumentId) {
     logActivity("No document selected.");
     return;
   }
-  openDocumentFile(currentDocumentId);
+  try {
+    await openDocumentFile(currentDocumentId);
+  } catch (error) {
+    logActivity(`Failed to open file: ${error.message}`);
+  }
 });
 
 backToDocsBtn.addEventListener("click", () => {
@@ -1162,7 +1323,7 @@ restartPendingBtn?.addEventListener("click", async () => {
     return;
   }
 
-  const response = await fetch("/documents/pending/restart?limit=200", {
+  const response = await apiFetch("/documents/pending/restart?limit=200", {
     method: "POST",
   });
   const payload = await response.json();
@@ -1180,6 +1341,9 @@ restartPendingBtn?.addEventListener("click", async () => {
 });
 
 window.addEventListener("popstate", async () => {
+  if (!authToken || !currentUser) {
+    return;
+  }
   readFiltersFromUrl();
   applyFiltersToControls();
   setActiveView(currentViewId);
@@ -1199,34 +1363,45 @@ window.addEventListener("popstate", async () => {
   await loadDocumentsList();
 });
 
-readFiltersFromUrl();
-applyFiltersToControls();
-setActiveView(currentViewId);
-setActiveNav(currentViewId);
+async function initializeApp() {
+  await restoreSession();
+  if (!authToken || !currentUser) {
+    return;
+  }
 
-if (currentViewId === "section-docs") {
-  loadDocumentsList().catch((error) => {
-    logActivity(`Initial document list failed: ${error.message}`);
-  });
-}
+  readFiltersFromUrl();
+  applyFiltersToControls();
+  setActiveView(currentViewId);
+  setActiveNav(currentViewId);
 
-if (currentViewId === "section-tags") {
-  loadTagStats().catch((error) => {
-    logActivity(`Initial tag stats failed: ${error.message}`);
-  });
-}
-
-if (currentViewId === "section-pending") {
-  loadPendingDocuments().catch((error) => {
-    logActivity(`Initial pending list failed: ${error.message}`);
-  });
-}
-
-if (currentViewId === "section-document") {
-  const docId = new URLSearchParams(window.location.search).get("id");
-  if (docId) {
-    openDocumentView(docId).catch((error) => {
-      logActivity(`Initial document detail failed: ${error.message}`);
+  if (currentViewId === "section-docs") {
+    loadDocumentsList().catch((error) => {
+      logActivity(`Initial document list failed: ${error.message}`);
     });
   }
+
+  if (currentViewId === "section-tags") {
+    loadTagStats().catch((error) => {
+      logActivity(`Initial tag stats failed: ${error.message}`);
+    });
+  }
+
+  if (currentViewId === "section-pending") {
+    loadPendingDocuments().catch((error) => {
+      logActivity(`Initial pending list failed: ${error.message}`);
+    });
+  }
+
+  if (currentViewId === "section-document") {
+    const docId = new URLSearchParams(window.location.search).get("id");
+    if (docId) {
+      openDocumentView(docId).catch((error) => {
+        logActivity(`Initial document detail failed: ${error.message}`);
+      });
+    }
+  }
 }
+
+initializeApp().catch((error) => {
+  setAuthMessage(error.message || "Failed to initialize app.", true);
+});
