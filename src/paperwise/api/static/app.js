@@ -28,6 +28,7 @@ const sessionUserLabel = document.getElementById("sessionUserLabel");
 const fileInput = document.getElementById("fileInput");
 const uploadDropzone = document.getElementById("uploadDropzone");
 const uploadSelectionLabel = document.getElementById("uploadSelectionLabel");
+const uploadSubmitBtn = document.getElementById("uploadSubmitBtn");
 
 const metaTitleInput = document.getElementById("metaTitle");
 const metaDateInput = document.getElementById("metaDate");
@@ -218,6 +219,59 @@ function renderSettingsForm() {
   if (settingsOcrProviderSelect && settingsOcrProviderSelect.value !== ocrProvider) {
     settingsOcrProviderSelect.value = ocrProvider;
   }
+  syncUploadAvailability();
+}
+
+function getLlmUploadBlockReason() {
+  const provider = normalizeLlmProvider(llmSettings.provider);
+  if (!provider) {
+    return "configure an LLM provider in Settings.";
+  }
+  if (!String(llmSettings.api_key || "").trim()) {
+    return "add your LLM API key in Settings.";
+  }
+  if (provider === "custom" && !String(llmSettings.base_url || "").trim()) {
+    return "set a custom LLM base URL in Settings.";
+  }
+  return "";
+}
+
+function syncUploadAvailability(options = {}) {
+  const announce = options.announce === true;
+  const navigateToSettings = options.navigateToSettings === true;
+  const reason = getLlmUploadBlockReason();
+  const blocked = Boolean(reason);
+
+  if (uploadSubmitBtn) {
+    uploadSubmitBtn.disabled = blocked;
+  }
+  if (fileInput) {
+    fileInput.disabled = blocked;
+  }
+  if (uploadDropzone) {
+    uploadDropzone.classList.toggle("is-disabled", blocked);
+    uploadDropzone.setAttribute("aria-disabled", blocked ? "true" : "false");
+    uploadDropzone.tabIndex = blocked ? -1 : 0;
+  }
+
+  if (blocked) {
+    if (uploadSelectionLabel) {
+      uploadSelectionLabel.textContent = "Upload disabled: update LLM settings first.";
+    }
+    if (announce) {
+      logActivity(`Upload blocked: ${reason} Go to Settings first.`);
+    }
+    if (navigateToSettings) {
+      setActiveView("section-settings");
+      setActiveNav("section-settings");
+      syncUrlFromFilters();
+      renderSettingsForm();
+    }
+    return false;
+  }
+
+  updateSelectedFilesLabel();
+  return true;
 }
 
 async function loadUserPreferences() {
@@ -600,6 +654,7 @@ function clearSession() {
   renderSettingsForm();
   renderActivityTokenTotal(0);
   renderSessionState();
+  syncUploadAvailability();
 }
 
 async function apiFetch(url, options = {}) {
@@ -1714,6 +1769,7 @@ settingsForm?.addEventListener("submit", async (event) => {
     api_key: String(settingsLlmApiKeyInput?.value || "").trim(),
   };
   ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
+  syncUploadAvailability();
   applyTheme(nextTheme);
   docsPageSize = nextPageSize;
   docsPage = 1;
@@ -1727,6 +1783,9 @@ settingsForm?.addEventListener("submit", async (event) => {
 
 uploadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
+  if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
+    return;
+  }
 
   const files = collectSupportedFiles(fileInput?.files || []);
   if (!files.length) {
@@ -1767,6 +1826,9 @@ fileInput?.addEventListener("change", () => {
 });
 
 uploadDropzone?.addEventListener("click", (event) => {
+  if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
+    return;
+  }
   if (event.target === fileInput) {
     return;
   }
@@ -1774,6 +1836,9 @@ uploadDropzone?.addEventListener("click", (event) => {
 });
 
 uploadDropzone?.addEventListener("keydown", (event) => {
+  if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
+    return;
+  }
   if (event.key !== "Enter" && event.key !== " ") {
     return;
   }
@@ -1783,6 +1848,9 @@ uploadDropzone?.addEventListener("keydown", (event) => {
 
 ["dragenter", "dragover"].forEach((eventName) => {
   uploadDropzone?.addEventListener(eventName, (event) => {
+    if (!syncUploadAvailability()) {
+      return;
+    }
     event.preventDefault();
     uploadDropzone.classList.add("is-drag-over");
   });
@@ -1796,6 +1864,9 @@ uploadDropzone?.addEventListener("keydown", (event) => {
 });
 
 uploadDropzone?.addEventListener("drop", (event) => {
+  if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
+    return;
+  }
   const dropped = collectSupportedFiles(event.dataTransfer?.files || []);
   if (!dropped.length) {
     logActivity("Drop ignored: only supported document types are accepted.");
@@ -2025,6 +2096,7 @@ async function initializeApp() {
   await hydrateUserPreferencesForSession();
   applyFiltersToControls();
   renderSettingsForm();
+  syncUploadAvailability();
   setActiveView(currentViewId);
   setActiveNav(currentViewId);
 

@@ -461,6 +461,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   outline: none;
 }
 
+.upload-dropzone.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  background: rgba(244, 244, 242, 0.86);
+  border-color: var(--stroke-strong);
+}
+
 .upload-dropzone-title {
   margin: 0;
   font-weight: 700;
