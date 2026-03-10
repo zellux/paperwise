@@ -271,3 +271,25 @@ def test_parse_document_blob_image_ocr_timeout_falls_back_to_extracted_text(
 
     assert result.parser == "stub-llm-ocr"
     assert "Readable sample OCR text" in result.text_preview
+
+
+def test_parse_document_blob_strips_nul_bytes_from_ocr_result(tmp_path, monkeypatch) -> None:
+    blob = tmp_path / "vision-nul.pdf"
+    blob.write_bytes(b"%PDF-1.7\nshort\n/Type /Page")
+    llm = RecordingOCRLLM("alpha\x00beta")
+
+    monkeypatch.setattr(
+        parsing_module,
+        "_render_pdf_pages_to_data_urls",
+        lambda **kwargs: ["data:image/png;base64,abc"],
+    )
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        ocr_provider="llm",
+        llm_provider=llm,
+        ocr_auto_switch=False,
+    )
+
+    assert result.text_preview == "alphabeta"

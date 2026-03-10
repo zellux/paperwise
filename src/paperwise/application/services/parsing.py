@@ -23,6 +23,10 @@ except Exception:  # pragma: no cover - optional runtime dependency
 logger = logging.getLogger(__name__)
 
 
+def _strip_nul(value: str) -> str:
+    return str(value).replace("\x00", "")
+
+
 def _extract_text_like_segments(raw: bytes, *, max_chars: int) -> str:
     # Heuristic text extraction from binary-heavy files (for stub OCR readability).
     decoded = raw.decode("latin-1", errors="ignore").replace("\x00", " ")
@@ -314,7 +318,7 @@ def parse_document_blob(
                     status="parsed",
                     size_bytes=len(raw),
                     page_count=page_count,
-                    text_preview=local_ocr_text,
+                    text_preview=_strip_nul(local_ocr_text),
                     created_at=datetime.now(UTC),
                 )
         extract_method = getattr(llm_provider, "extract_ocr_text", None) if llm_provider is not None else None
@@ -349,6 +353,7 @@ def parse_document_blob(
     elif normalized_ocr == "tesseract":
         parser_name = "local-tesseract-ocr"
 
+    text_preview = _strip_nul(text_preview)
     return ParseResult(
         document_id=document_id,
         parser=parser_name,
