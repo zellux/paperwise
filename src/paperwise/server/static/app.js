@@ -122,6 +122,7 @@ let authToken = window.localStorage.getItem("paperwise.auth.token") || "";
 let currentUser = null;
 let userPreferenceSaveTimer = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember"];
+const THEME_STORAGE_KEY = "paperwise.ui.theme";
 let currentTheme = "atlas";
 const SUPPORTED_LLM_PROVIDERS = ["openai", "gemini", "custom"];
 const LLM_PROVIDER_DEFAULTS = {
@@ -219,6 +220,20 @@ function normalizeThemeName(value) {
   return "atlas";
 }
 
+function readBootTheme() {
+  const bootTheme = normalizeThemeName(document.documentElement?.dataset?.uiTheme || "");
+  if (bootTheme !== "atlas") {
+    return bootTheme;
+  }
+  try {
+    return normalizeThemeName(window.localStorage.getItem(THEME_STORAGE_KEY));
+  } catch {
+    return "atlas";
+  }
+}
+
+currentTheme = readBootTheme();
+
 function normalizeLlmProvider(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (SUPPORTED_LLM_PROVIDERS.includes(normalized)) {
@@ -270,8 +285,20 @@ function normalizeOcrAutoSwitch(value) {
 function applyTheme(themeName) {
   currentTheme = normalizeThemeName(themeName);
   const classNames = SUPPORTED_THEMES.map((name) => `theme-${name}`);
-  document.body.classList.remove(...classNames);
-  document.body.classList.add(`theme-${currentTheme}`);
+  if (document.documentElement) {
+    document.documentElement.classList.remove(...classNames);
+    document.documentElement.classList.add(`theme-${currentTheme}`);
+    document.documentElement.dataset.uiTheme = currentTheme;
+  }
+  if (document.body) {
+    document.body.classList.remove(...classNames);
+    document.body.classList.add(`theme-${currentTheme}`);
+  }
+  try {
+    window.localStorage.setItem(THEME_STORAGE_KEY, currentTheme);
+  } catch {
+    // Ignore storage write errors (private mode, blocked storage, etc.).
+  }
   if (settingsThemeSelect && settingsThemeSelect.value !== currentTheme) {
     settingsThemeSelect.value = currentTheme;
   }

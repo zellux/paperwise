@@ -12,9 +12,24 @@
       href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,700&display=swap"
       rel="stylesheet"
     />
+    <script>
+      (() => {
+        try {
+          const key = "paperwise.ui.theme";
+          const supported = new Set(["atlas", "ledger", "moss", "ember"]);
+          const stored = String(window.localStorage.getItem(key) || "").trim().toLowerCase();
+          const theme = supported.has(stored) ? stored : "atlas";
+          document.documentElement.classList.add(`theme-${theme}`);
+          document.documentElement.dataset.uiTheme = theme;
+        } catch (_error) {
+          document.documentElement.classList.add("theme-atlas");
+          document.documentElement.dataset.uiTheme = "atlas";
+        }
+      })();
+    </script>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body class="theme-atlas">
+  <body>
     <div class="bg-orb bg-orb-a"></div>
     <div class="bg-orb bg-orb-b"></div>
     <div class="bg-grid"></div>

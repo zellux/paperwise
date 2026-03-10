@@ -22,6 +22,7 @@
   --table-pill-ink: #2e4d43;
 }
 
+:root.theme-atlas,
 body.theme-atlas {
   --bg-main: linear-gradient(140deg, #edf0ea, #e9eee8 55%, #eef2ed);
   --bg-panel: rgba(242, 244, 240, 0.9);
@@ -43,6 +44,7 @@ body.theme-atlas {
   --table-pill-ink: #2e4d43;
 }
 
+:root.theme-ledger,
 body.theme-ledger {
   --bg-main: linear-gradient(150deg, #f1f6fb, #edf2f9 55%, #f2f6fa);
   --bg-panel: rgba(249, 252, 255, 0.92);
@@ -64,6 +66,7 @@ body.theme-ledger {
   --table-pill-ink: #2a4c80;
 }
 
+:root.theme-moss,
 body.theme-moss {
   --bg-main: linear-gradient(145deg, #f2efe4, #edf3e8 52%, #f4f2e9);
   --bg-panel: rgba(250, 251, 246, 0.9);
@@ -85,6 +88,7 @@ body.theme-moss {
   --table-pill-ink: #3f5a2b;
 }
 
+:root.theme-ember,
 body.theme-ember {
   --bg-main: linear-gradient(150deg, #f6ede7, #f3ece6 52%, #f8f2eb);
   --bg-panel: rgba(255, 250, 246, 0.92);
