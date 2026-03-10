@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from paperwise.application.services.parsing import parse_document_blob
 
 
@@ -47,9 +49,23 @@ def test_parse_document_blob_skips_llm_ocr_for_local_provider(tmp_path) -> None:
     result = parse_document_blob(
         document_id="doc-1",
         blob_uri=Path(blob).as_uri(),
-        ocr_provider="tesseract",
+        ocr_provider="local",
         llm_provider=llm,
     )
 
     assert llm.calls == 0
     assert result.parser == "stub-local"
+
+
+def test_parse_document_blob_llm_mode_raises_when_no_readable_text(tmp_path) -> None:
+    blob = tmp_path / "scan.pdf"
+    blob.write_bytes(b"%PDF-1.7\n" + bytes([0, 159, 200, 10]) * 400)
+    llm = RecordingOCRLLM("unused")
+
+    with pytest.raises(RuntimeError, match="No readable text was extracted"):
+        parse_document_blob(
+            document_id="doc-1",
+            blob_uri=blob.as_uri(),
+            ocr_provider="llm",
+            llm_provider=llm,
+        )

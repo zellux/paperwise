@@ -336,12 +336,40 @@ def _resolve_llm_provider_for_user(
     )
 
 
+def _resolve_ocr_llm_provider_for_user(
+    *,
+    repository: DocumentRepository,
+    current_user: User,
+    default_llm_provider: LLMProvider,
+) -> LLMProvider:
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    return _resolve_llm_provider_from_preferences(
+        preferences=preferences,
+        default_llm_provider=default_llm_provider,
+        provider_key="ocr_llm_provider",
+        model_key="ocr_llm_model",
+        base_url_key="ocr_llm_base_url",
+        api_key_key="ocr_llm_api_key",
+        missing_provider_detail="Configure an OCR LLM provider in Settings before OCR parsing.",
+        missing_api_key_detail="Selected OCR LLM provider requires your OCR LLM API key in Settings.",
+        missing_base_url_detail="Custom OCR LLM provider requires a base URL in Settings.",
+    )
+
+
 def _resolve_llm_provider_from_preferences(
     *,
     preferences: dict[str, Any],
     default_llm_provider: LLMProvider,
+    provider_key: str = "llm_provider",
+    model_key: str = "llm_model",
+    base_url_key: str = "llm_base_url",
+    api_key_key: str = "llm_api_key",
+    missing_provider_detail: str = "Configure an LLM provider in Settings before running LLM parse.",
+    missing_api_key_detail: str = "Selected LLM provider requires your API key in Settings.",
+    missing_base_url_detail: str = "Custom LLM provider requires a base URL in Settings.",
 ) -> LLMProvider:
-    provider_name = str(preferences.get("llm_provider", "")).strip().lower()
+    provider_name = str(preferences.get(provider_key, "")).strip().lower()
 
     # Preserve testability when a fake provider is injected via dependency override.
     if not isinstance(
@@ -353,50 +381,50 @@ def _resolve_llm_provider_from_preferences(
     if not provider_name:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Configure an LLM provider in Settings before running LLM parse.",
+            detail=missing_provider_detail,
         )
 
-    configured_key = str(preferences.get("llm_api_key", "")).strip()
+    configured_key = str(preferences.get(api_key_key, "")).strip()
     if not configured_key:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Selected LLM provider requires your API key in Settings.",
+            detail=missing_api_key_detail,
         )
 
     if provider_name == "openai":
-        configured_key = str(preferences.get("llm_api_key", "")).strip()
+        configured_key = str(preferences.get(api_key_key, "")).strip()
         api_key = configured_key
-        model = str(preferences.get("llm_model", "")).strip() or settings.openai_model
-        base_url = str(preferences.get("llm_base_url", "")).strip() or settings.openai_base_url
+        model = str(preferences.get(model_key, "")).strip() or settings.openai_model
+        base_url = str(preferences.get(base_url_key, "")).strip() or settings.openai_base_url
         return OpenAILLMProvider(
             api_key=api_key,
             model=model,
             base_url=base_url,
         )
     if provider_name == "claude":
-        model = str(preferences.get("llm_model", "")).strip() or "claude-3-5-sonnet-latest"
-        base_url = str(preferences.get("llm_base_url", "")).strip() or "https://api.anthropic.com"
+        model = str(preferences.get(model_key, "")).strip() or "claude-3-5-sonnet-latest"
+        base_url = str(preferences.get(base_url_key, "")).strip() or "https://api.anthropic.com"
         return AnthropicLLMProvider(
             api_key=configured_key,
             model=model,
             base_url=base_url,
         )
     if provider_name == "gemini":
-        model = str(preferences.get("llm_model", "")).strip() or "gemini-2.0-flash"
-        base_url = str(preferences.get("llm_base_url", "")).strip() or "https://generativelanguage.googleapis.com/v1beta"
+        model = str(preferences.get(model_key, "")).strip() or "gemini-2.0-flash"
+        base_url = str(preferences.get(base_url_key, "")).strip() or "https://generativelanguage.googleapis.com/v1beta"
         return GeminiLLMProvider(
             api_key=configured_key,
             model=model,
             base_url=base_url,
         )
     if provider_name == "custom":
-        base_url = str(preferences.get("llm_base_url", "")).strip()
+        base_url = str(preferences.get(base_url_key, "")).strip()
         if not base_url:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Custom LLM provider requires a base URL in Settings.",
+                detail=missing_base_url_detail,
             )
-        model = str(preferences.get("llm_model", "")).strip() or settings.openai_model
+        model = str(preferences.get(model_key, "")).strip() or settings.openai_model
         return OpenAILLMProvider(
             api_key=configured_key,
             model=model,
@@ -966,12 +994,31 @@ def parse_document_endpoint(
         repository=repository,
         current_user=current_user,
     )
+    ocr_llm_provider: LLMProvider | None = None
+    if ocr_provider == "llm":
+        try:
+            ocr_llm_provider = _resolve_llm_provider_for_user(
+                repository=repository,
+                current_user=current_user,
+                default_llm_provider=default_llm_provider,
+            )
+        except HTTPException:
+            ocr_llm_provider = None
+    elif ocr_provider == "llm_separate":
+        try:
+            ocr_llm_provider = _resolve_ocr_llm_provider_for_user(
+                repository=repository,
+                current_user=current_user,
+                default_llm_provider=default_llm_provider,
+            )
+        except HTTPException:
+            ocr_llm_provider = None
     try:
         result = parse_document_blob(
             document_id=document.id,
             blob_uri=document.blob_uri,
             ocr_provider=ocr_provider,
-            llm_provider=default_llm_provider,
+            llm_provider=ocr_llm_provider,
         )
         repository.save_parse_result(result)
     except Exception:
@@ -1020,6 +1067,18 @@ def llm_parse_document_endpoint(
         repository=repository,
         current_user=current_user,
     )
+    ocr_llm_provider: LLMProvider | None = None
+    if ocr_provider == "llm":
+        ocr_llm_provider = llm_provider
+    elif ocr_provider == "llm_separate":
+        try:
+            ocr_llm_provider = _resolve_ocr_llm_provider_for_user(
+                repository=repository,
+                current_user=current_user,
+                default_llm_provider=default_llm_provider,
+            )
+        except HTTPException:
+            ocr_llm_provider = None
     try:
         parse_result = repository.get_parse_result(document_id)
         if parse_result is None:
@@ -1032,7 +1091,7 @@ def llm_parse_document_endpoint(
                 document_id=document.id,
                 blob_uri=document.blob_uri,
                 ocr_provider=ocr_provider,
-                llm_provider=llm_provider,
+                llm_provider=ocr_llm_provider,
             )
             repository.save_parse_result(parse_result)
         else:

@@ -10,8 +10,11 @@ from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.domain.models import DocumentStatus, HistoryActorType
 from paperwise.infrastructure.config import get_settings
+from paperwise.infrastructure.llm.anthropic_llm_provider import AnthropicLLMProvider
+from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
+from paperwise.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -49,6 +52,106 @@ def _resolve_ocr_provider_for_owner(repository: DocumentRepository, owner_id: st
     return "llm"
 
 
+def _resolve_llm_provider_from_preferences(
+    *,
+    preferences: dict[str, str],
+    default_llm_provider: LLMProvider,
+    provider_key: str = "llm_provider",
+    model_key: str = "llm_model",
+    base_url_key: str = "llm_base_url",
+    api_key_key: str = "llm_api_key",
+) -> LLMProvider:
+    provider_name = str(preferences.get(provider_key, "")).strip().lower()
+
+    # Preserve worker testability when a fake provider is injected.
+    if not isinstance(
+        default_llm_provider,
+        (MissingOpenAIProvider, OpenAILLMProvider, AnthropicLLMProvider, GeminiLLMProvider, SimpleLLMProvider),
+    ):
+        return default_llm_provider
+
+    if not provider_name:
+        raise RuntimeError(f"missing provider setting: {provider_key}")
+
+    configured_key = str(preferences.get(api_key_key, "")).strip()
+    if not configured_key:
+        raise RuntimeError(f"missing API key setting: {api_key_key}")
+
+    if provider_name == "openai":
+        model = str(preferences.get(model_key, "")).strip() or settings.openai_model
+        base_url = str(preferences.get(base_url_key, "")).strip() or settings.openai_base_url
+        return OpenAILLMProvider(
+            api_key=configured_key,
+            model=model,
+            base_url=base_url,
+        )
+    if provider_name == "claude":
+        model = str(preferences.get(model_key, "")).strip() or "claude-3-5-sonnet-latest"
+        base_url = str(preferences.get(base_url_key, "")).strip() or "https://api.anthropic.com"
+        return AnthropicLLMProvider(
+            api_key=configured_key,
+            model=model,
+            base_url=base_url,
+        )
+    if provider_name == "gemini":
+        model = str(preferences.get(model_key, "")).strip() or "gemini-2.0-flash"
+        base_url = str(preferences.get(base_url_key, "")).strip() or "https://generativelanguage.googleapis.com/v1beta"
+        return GeminiLLMProvider(
+            api_key=configured_key,
+            model=model,
+            base_url=base_url,
+        )
+    if provider_name == "custom":
+        base_url = str(preferences.get(base_url_key, "")).strip()
+        if not base_url:
+            raise RuntimeError(f"missing base URL setting: {base_url_key}")
+        model = str(preferences.get(model_key, "")).strip() or settings.openai_model
+        return OpenAILLMProvider(
+            api_key=configured_key,
+            model=model,
+            base_url=base_url,
+        )
+    raise RuntimeError(f"unsupported provider: {provider_name}")
+
+
+def _resolve_metadata_llm_provider_for_owner(
+    repository: DocumentRepository,
+    owner_id: str,
+    default_llm_provider: LLMProvider,
+) -> LLMProvider:
+    preference = repository.get_user_preference(owner_id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    return _resolve_llm_provider_from_preferences(
+        preferences=preferences,
+        default_llm_provider=default_llm_provider,
+    )
+
+
+def _resolve_ocr_llm_provider_for_owner(
+    repository: DocumentRepository,
+    owner_id: str,
+    default_llm_provider: LLMProvider,
+    ocr_provider: str,
+) -> LLMProvider | None:
+    if ocr_provider == "tesseract":
+        return None
+    preference = repository.get_user_preference(owner_id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    if ocr_provider == "llm_separate":
+        return _resolve_llm_provider_from_preferences(
+            preferences=preferences,
+            default_llm_provider=default_llm_provider,
+            provider_key="ocr_llm_provider",
+            model_key="ocr_llm_model",
+            base_url_key="ocr_llm_base_url",
+            api_key_key="ocr_llm_api_key",
+        )
+    return _resolve_llm_provider_from_preferences(
+        preferences=preferences,
+        default_llm_provider=default_llm_provider,
+    )
+
+
 @celery_app.task(name="paperwise.tasks.healthcheck")
 def healthcheck_task() -> str:
     logger.info("worker healthcheck task executed")
@@ -84,7 +187,7 @@ def parse_document_task(
     content_type: str,
 ) -> dict[str, str | int]:
     repository = _build_repository()
-    llm_provider = _build_llm_provider()
+    default_llm_provider = _build_llm_provider()
     document = repository.get(document_id)
     if document is None:
         logger.error("parse task failed; document_id=%s not found", document_id)
@@ -95,18 +198,29 @@ def parse_document_task(
         repository.save(document)
 
         ocr_provider = _resolve_ocr_provider_for_owner(repository, document.owner_id)
+        metadata_llm_provider = _resolve_metadata_llm_provider_for_owner(
+            repository=repository,
+            owner_id=document.owner_id,
+            default_llm_provider=default_llm_provider,
+        )
+        ocr_llm_provider = _resolve_ocr_llm_provider_for_owner(
+            repository=repository,
+            owner_id=document.owner_id,
+            default_llm_provider=default_llm_provider,
+            ocr_provider=ocr_provider,
+        )
         parsed = parse_document_blob(
             document_id=document_id,
             blob_uri=blob_uri,
             ocr_provider=ocr_provider,
-            llm_provider=llm_provider,
+            llm_provider=ocr_llm_provider,
         )
         repository.save_parse_result(parsed)
         parse_with_llm(
             document=document,
             parse_result=parsed,
             repository=repository,
-            llm_provider=llm_provider,
+            llm_provider=metadata_llm_provider,
             actor_type=HistoryActorType.SYSTEM,
             actor_id=None,
             history_source="worker.parse_document",
