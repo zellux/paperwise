@@ -25,6 +25,7 @@ const navLinks = [...document.querySelectorAll(".nav-link")];
 const views = [...document.querySelectorAll(".view")];
 const filterDropdownState = new Map();
 let activeFilterDropdown = null;
+let currentViewId = "section-docs";
 
 let currentDocumentId = "";
 const docsFilters = {
@@ -56,6 +57,10 @@ function setActiveNav(targetId) {
 }
 
 function setActiveView(targetId) {
+  if (!views.some((view) => view.id === targetId)) {
+    return;
+  }
+  currentViewId = targetId;
   for (const view of views) {
     view.classList.toggle("view-hidden", view.id !== targetId);
   }
@@ -364,6 +369,7 @@ function syncUrlFromFilters() {
   url.searchParams.delete("correspondent");
   url.searchParams.delete("document_type");
   url.searchParams.delete("status");
+  url.searchParams.delete("view");
 
   for (const value of docsFilters.tag) {
     url.searchParams.append("tag", value);
@@ -377,6 +383,7 @@ function syncUrlFromFilters() {
   for (const value of docsFilters.status) {
     url.searchParams.append("status", value);
   }
+  url.searchParams.set("view", currentViewId);
 
   const qs = url.searchParams.toString();
   window.history.replaceState(null, "", qs ? `${url.pathname}?${qs}` : url.pathname);
@@ -388,6 +395,12 @@ function readFiltersFromUrl() {
   docsFilters.correspondent = unique(params.getAll("correspondent"));
   docsFilters.document_type = unique(params.getAll("document_type"));
   docsFilters.status = unique(params.getAll("status"));
+  const viewFromUrl = params.get("view");
+  if (viewFromUrl && views.some((view) => view.id === viewFromUrl)) {
+    currentViewId = viewFromUrl;
+  } else {
+    currentViewId = "section-docs";
+  }
 }
 
 async function applyFiltersFromControls() {
@@ -512,9 +525,9 @@ function renderTagsList(tagStats) {
       docsFilters.document_type = [];
       docsFilters.status = [];
       applyFiltersToControls();
-      syncUrlFromFilters();
       setActiveView("section-docs");
       setActiveNav("section-docs");
+      syncUrlFromFilters();
       await loadDocumentsList();
       logActivity(`Filtered documents by tag: ${stat.tag}`);
     });
@@ -646,6 +659,7 @@ async function openDocumentView(documentId) {
 
   setActiveView("section-document");
   setActiveNav("section-document");
+  syncUrlFromFilters();
   logActivity(`Opened document ${documentId}`);
 }
 
@@ -714,6 +728,7 @@ documentMetaForm.addEventListener("submit", async (event) => {
 backToDocsBtn.addEventListener("click", () => {
   setActiveView("section-docs");
   setActiveNav("section-docs");
+  syncUrlFromFilters();
 });
 
 docsFilterForm.addEventListener("submit", (event) => {
@@ -793,6 +808,7 @@ for (const link of navLinks) {
     }
     setActiveView(targetId);
     setActiveNav(targetId);
+    syncUrlFromFilters();
     if (targetId === "section-docs") {
       await loadDocumentsList();
       return;
@@ -814,14 +830,27 @@ for (const link of navLinks) {
 window.addEventListener("popstate", async () => {
   readFiltersFromUrl();
   applyFiltersToControls();
+  setActiveView(currentViewId);
+  setActiveNav(currentViewId);
+  if (currentViewId === "section-tags") {
+    await loadTagStats();
+    return;
+  }
+  if (currentViewId === "section-pending") {
+    await loadPendingDocuments();
+    return;
+  }
+  if (currentViewId === "section-document" && currentDocumentId) {
+    await openDocumentView(currentDocumentId);
+    return;
+  }
   await loadDocumentsList();
 });
 
-setActiveView("section-docs");
-setActiveNav("section-docs");
-
 readFiltersFromUrl();
 applyFiltersToControls();
+setActiveView(currentViewId);
+setActiveNav(currentViewId);
 
 loadDocumentsList().catch((error) => {
   logActivity(`Initial document list failed: ${error.message}`);
