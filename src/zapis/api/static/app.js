@@ -162,7 +162,7 @@ function renderDocsList(documents) {
 
 function renderTagsList(tagStats) {
   if (!tagStats.length) {
-    tagsTableBody.innerHTML = '<tr><td colspan="2">No tags found.</td></tr>';
+    tagsTableBody.innerHTML = '<tr><td colspan="3">No tags found.</td></tr>';
     return;
   }
   tagsTableBody.innerHTML = "";
@@ -172,8 +172,29 @@ function renderTagsList(tagStats) {
     tagCell.textContent = stat.tag;
     const countCell = document.createElement("td");
     countCell.textContent = String(stat.document_count);
+    const actionCell = document.createElement("td");
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "btn";
+    viewBtn.type = "button";
+    viewBtn.textContent = "View Docs";
+    viewBtn.addEventListener("click", async () => {
+      docsFilters.tag = stat.tag;
+      docsFilters.correspondent = "";
+      docsFilters.document_type = "";
+      docsFilters.status = "";
+      filterTag.value = stat.tag;
+      filterCorrespondent.value = "";
+      filterType.value = "";
+      filterStatus.value = "";
+      setActiveView("section-docs");
+      setActiveNav("section-docs");
+      await loadDocumentsList();
+      logActivity(`Filtered documents by tag: ${stat.tag}`);
+    });
+    actionCell.appendChild(viewBtn);
     row.appendChild(tagCell);
     row.appendChild(countCell);
+    row.appendChild(actionCell);
     tagsTableBody.appendChild(row);
   }
 }
