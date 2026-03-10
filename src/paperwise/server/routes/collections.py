@@ -4,9 +4,14 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.domain.models import Collection, User
-from paperwise.server.dependencies import current_user_dependency, document_repository_dependency
+from paperwise.server.dependencies import (
+    current_user_dependency,
+    document_repository_dependency,
+    llm_provider_dependency,
+)
+from paperwise.server.routes.documents import _resolve_llm_provider_for_user
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
@@ -59,6 +64,25 @@ class SearchResponse(BaseModel):
     hits: list[SearchHitResponse]
 
 
+class AskRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=1000)
+    top_k_chunks: int = Field(default=18, ge=3, le=60)
+
+
+class AskCitationResponse(BaseModel):
+    chunk_id: str
+    document_id: str
+    title: str
+    quote: str
+
+
+class AskResponse(BaseModel):
+    question: str
+    answer: str
+    insufficient_evidence: bool
+    citations: list[AskCitationResponse]
+
+
 def _to_collection_response(
     *,
     repository: DocumentRepository,
@@ -92,6 +116,7 @@ def _build_search_response(
     *,
     repository: DocumentRepository,
     query: str,
+    limit: int,
     hits,
 ) -> SearchResponse:
     best_hits_by_doc: dict[str, tuple[object, float]] = {}
@@ -128,7 +153,104 @@ def _build_search_response(
                 tags=list(llm.tags or []) if llm is not None else [],
             )
         )
+        if len(items) >= max(1, limit):
+            break
     return SearchResponse(query=query, total_hits=len(items), hits=items)
+
+
+def _build_qa_contexts(
+    *,
+    repository: DocumentRepository,
+    chunk_hits,
+    top_k_chunks: int,
+) -> list[dict[str, str]]:
+    contexts: list[dict[str, str]] = []
+    seen_chunk_ids: set[str] = set()
+    for hit in chunk_hits:
+        chunk = hit.chunk
+        if chunk.id in seen_chunk_ids:
+            continue
+        seen_chunk_ids.add(chunk.id)
+        llm = repository.get_llm_parse_result(chunk.document_id)
+        document = repository.get(chunk.document_id)
+        if document is None:
+            continue
+        title = llm.suggested_title if llm is not None and llm.suggested_title else document.filename
+        contexts.append(
+            {
+                "chunk_id": chunk.id,
+                "document_id": chunk.document_id,
+                "title": title,
+                "content": chunk.content,
+            }
+        )
+        if len(contexts) >= top_k_chunks:
+            break
+    return contexts
+
+
+def _ask_grounded(
+    *,
+    repository: DocumentRepository,
+    llm_provider: LLMProvider,
+    owner_id: str,
+    question: str,
+    top_k_chunks: int,
+    document_ids: list[str] | None,
+) -> AskResponse:
+    chunk_hits = repository.search_document_chunks(
+        owner_id=owner_id,
+        query=question,
+        limit=max(top_k_chunks * 3, top_k_chunks),
+        document_ids=document_ids,
+    )
+    contexts = _build_qa_contexts(
+        repository=repository,
+        chunk_hits=chunk_hits,
+        top_k_chunks=top_k_chunks,
+    )
+    if not contexts:
+        return AskResponse(
+            question=question,
+            answer="Not enough evidence in the selected documents.",
+            insufficient_evidence=True,
+            citations=[],
+        )
+
+    llm_payload = llm_provider.answer_grounded(
+        question=question,
+        contexts=contexts,
+    )
+    citations: list[AskCitationResponse] = []
+    by_chunk = {ctx["chunk_id"]: ctx for ctx in contexts}
+    for citation in llm_payload.get("citations", []) if isinstance(llm_payload, dict) else []:
+        chunk_id = str(citation.get("chunk_id", "")).strip()
+        if not chunk_id or chunk_id not in by_chunk:
+            continue
+        context = by_chunk[chunk_id]
+        citations.append(
+            AskCitationResponse(
+                chunk_id=chunk_id,
+                document_id=context["document_id"],
+                title=context["title"],
+                quote=str(citation.get("quote", "")).strip() or context["content"][:200],
+            )
+        )
+
+    answer = str(llm_payload.get("answer", "")).strip() if isinstance(llm_payload, dict) else ""
+    insufficient = bool(llm_payload.get("insufficient_evidence", False)) if isinstance(llm_payload, dict) else True
+    if not answer:
+        answer = "Not enough evidence in the selected documents."
+        insufficient = True
+    if not citations and not insufficient:
+        insufficient = True
+        answer = "Not enough evidence in the selected documents."
+    return AskResponse(
+        question=question,
+        answer=answer,
+        insufficient_evidence=insufficient,
+        citations=citations,
+    )
 
 
 @router.post("", response_model=CollectionResponse, status_code=status.HTTP_201_CREATED)
@@ -266,7 +388,7 @@ def search_all_documents_endpoint(
         limit=max(payload.limit * 4, payload.limit),
         document_ids=None,
     )
-    return _build_search_response(repository=repository, query=payload.query, hits=hits)
+    return _build_search_response(repository=repository, query=payload.query, limit=payload.limit, hits=hits)
 
 
 @router.post("/{collection_id}/search", response_model=SearchResponse)
@@ -288,4 +410,55 @@ def search_collection_documents_endpoint(
         limit=max(payload.limit * 4, payload.limit),
         document_ids=scoped_ids,
     )
-    return _build_search_response(repository=repository, query=payload.query, hits=hits)
+    return _build_search_response(repository=repository, query=payload.query, limit=payload.limit, hits=hits)
+
+
+@router.post("/ask", response_model=AskResponse)
+def ask_all_documents_endpoint(
+    payload: AskRequest,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> AskResponse:
+    llm_provider = _resolve_llm_provider_for_user(
+        repository=repository,
+        current_user=current_user,
+        default_llm_provider=default_llm_provider,
+    )
+    return _ask_grounded(
+        repository=repository,
+        llm_provider=llm_provider,
+        owner_id=current_user.id,
+        question=payload.question,
+        top_k_chunks=payload.top_k_chunks,
+        document_ids=None,
+    )
+
+
+@router.post("/{collection_id}/ask", response_model=AskResponse)
+def ask_collection_documents_endpoint(
+    collection_id: str,
+    payload: AskRequest,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> AskResponse:
+    _get_collection_or_404(
+        collection_id=collection_id,
+        repository=repository,
+        current_user=current_user,
+    )
+    llm_provider = _resolve_llm_provider_for_user(
+        repository=repository,
+        current_user=current_user,
+        default_llm_provider=default_llm_provider,
+    )
+    scoped_ids = repository.list_collection_document_ids(collection_id)
+    return _ask_grounded(
+        repository=repository,
+        llm_provider=llm_provider,
+        owner_id=current_user.id,
+        question=payload.question,
+        top_k_chunks=payload.top_k_chunks,
+        document_ids=scoped_ids,
+    )

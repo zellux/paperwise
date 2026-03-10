@@ -17,6 +17,11 @@ from paperwise.infrastructure.llm.ocr_prompt import (
     build_ocr_user_prompt,
     extract_ocr_text_result,
 )
+from paperwise.infrastructure.llm.grounded_qa_prompt import (
+    GROUNDED_QA_SYSTEM_PROMPT,
+    build_grounded_qa_user_prompt,
+    extract_grounded_qa_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -334,3 +339,53 @@ class OpenAILLMProvider(LLMProvider):
         if last_error is not None:
             raise last_error
         raise RuntimeError("LLM OCR failed: provider returned empty OCR text.")
+
+    def answer_grounded(
+        self,
+        *,
+        question: str,
+        contexts: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        user_prompt = build_grounded_qa_user_prompt(question=question, contexts=contexts)
+        request_payload = {
+            "model": self._model,
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": GROUNDED_QA_SYSTEM_PROMPT},
+                {"role": "user", "content": json.dumps(user_prompt)},
+            ],
+        }
+        response: httpx.Response | None = None
+        response_payload: Any = None
+        try:
+            response = self._client.post("/chat/completions", json=request_payload)
+            try:
+                response_payload = response.json()
+            except ValueError:
+                response_payload = {"raw_text": getattr(response, "text", "")}
+        except Exception as exc:
+            log_llm_exchange(
+                provider="openai",
+                endpoint="/chat/completions",
+                request_payload=request_payload,
+                error=str(exc),
+            )
+            raise
+        log_llm_exchange(
+            provider="openai",
+            endpoint="/chat/completions",
+            request_payload=request_payload,
+            response_status=getattr(response, "status_code", None),
+            response_payload=response_payload,
+        )
+        response.raise_for_status()
+        payload = response_payload if isinstance(response_payload, dict) else response.json()
+        content = str(payload["choices"][0]["message"]["content"]).strip()
+        parsed = json.loads(content)
+        result = extract_grounded_qa_result(parsed)
+        usage = payload.get("usage", {})
+        total_tokens = usage.get("total_tokens")
+        if isinstance(total_tokens, int) and total_tokens > 0:
+            result["llm_total_tokens"] = total_tokens
+        return result

@@ -5,7 +5,11 @@ from fastapi.testclient import TestClient
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, ParseResult, User
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
-from paperwise.server.dependencies import current_user_dependency, document_repository_dependency
+from paperwise.server.dependencies import (
+    current_user_dependency,
+    document_repository_dependency,
+    llm_provider_dependency,
+)
 from paperwise.server.main import app
 
 
@@ -17,6 +21,30 @@ TEST_USER = User(
     is_active=True,
     created_at=datetime.now(UTC),
 )
+
+
+class FakeGroundedLLM:
+    def answer_grounded(self, *, question: str, contexts: list[dict]) -> dict:
+        del question
+        first = contexts[0] if contexts else {}
+        return {
+            "answer": "Grounded answer from context.",
+            "insufficient_evidence": False,
+            "citations": [
+                {
+                    "chunk_id": first.get("chunk_id", ""),
+                    "document_id": first.get("document_id", ""),
+                    "title": first.get("title", ""),
+                    "quote": str(first.get("content", ""))[:120],
+                }
+            ],
+        }
+
+    def suggest_metadata(self, **kwargs):  # pragma: no cover - unused in this test
+        raise RuntimeError("unused")
+
+    def extract_ocr_text(self, **kwargs):  # pragma: no cover - unused in this test
+        raise RuntimeError("unused")
 
 
 def _save_document(
@@ -162,5 +190,55 @@ def test_collection_rejects_documents_not_owned_by_user() -> None:
         )
         assert add_response.status_code == 400
         assert "Invalid document for collection" in add_response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_ask_collection_uses_scoped_chunks_only() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-a",
+        owner_id=TEST_USER.id,
+        filename="doc-a.pdf",
+        text_preview="Alpha topic details around indexing and retrieval.",
+        title="Alpha Doc",
+    )
+    _save_document(
+        repository,
+        doc_id="doc-b",
+        owner_id=TEST_USER.id,
+        filename="doc-b.pdf",
+        text_preview="Beta topic details around security and access controls.",
+        title="Beta Doc",
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeGroundedLLM()
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/collections",
+            json={"name": "Alpha Collection", "description": "Scoped QA"},
+        )
+        assert create_response.status_code == 201
+        collection_id = create_response.json()["id"]
+        add_response = client.post(
+            f"/collections/{collection_id}/documents",
+            json={"document_ids": ["doc-a"]},
+        )
+        assert add_response.status_code == 200
+
+        ask_response = client.post(
+            f"/collections/{collection_id}/ask",
+            json={"question": "What does alpha say about indexing?"},
+        )
+        assert ask_response.status_code == 200
+        payload = ask_response.json()
+        assert payload["insufficient_evidence"] is False
+        assert payload["citations"]
+        assert payload["citations"][0]["document_id"] == "doc-a"
     finally:
         app.dependency_overrides.clear()

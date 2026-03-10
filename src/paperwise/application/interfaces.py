@@ -48,6 +48,14 @@ class LLMProvider(Protocol):
     ) -> dict[str, Any]:
         """Suggest document metadata fields from parsed text and taxonomy context."""
 
+    def answer_grounded(
+        self,
+        *,
+        question: str,
+        contexts: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Answer a question strictly from provided contexts with citations."""
+
 
 class SearchProvider(Protocol):
     def search(self, query: str, limit: int = 10) -> list[dict]:

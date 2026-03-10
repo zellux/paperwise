@@ -15,6 +15,11 @@ from paperwise.infrastructure.llm.ocr_prompt import (
     build_ocr_user_prompt,
     extract_ocr_text_result,
 )
+from paperwise.infrastructure.llm.grounded_qa_prompt import (
+    GROUNDED_QA_SYSTEM_PROMPT,
+    build_grounded_qa_user_prompt,
+    extract_grounded_qa_result,
+)
 
 
 class AnthropicLLMProvider(LLMProvider):
@@ -183,3 +188,68 @@ class AnthropicLLMProvider(LLMProvider):
 
         extracted = extract_ocr_text_result(parsed)
         return extracted or content
+
+    def answer_grounded(
+        self,
+        *,
+        question: str,
+        contexts: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        user_prompt = build_grounded_qa_user_prompt(question=question, contexts=contexts)
+        request_payload = {
+            "model": self._model,
+            "max_tokens": 2000,
+            "temperature": 0,
+            "system": GROUNDED_QA_SYSTEM_PROMPT,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": json.dumps(user_prompt),
+                }
+            ],
+        }
+        response: httpx.Response | None = None
+        response_payload: Any = None
+        try:
+            response = self._client.post("/v1/messages", json=request_payload)
+            try:
+                response_payload = response.json()
+            except ValueError:
+                response_payload = {"raw_text": getattr(response, "text", "")}
+        except Exception as exc:
+            log_llm_exchange(
+                provider="claude",
+                endpoint="/v1/messages",
+                request_payload=request_payload,
+                error=str(exc),
+            )
+            raise
+
+        log_llm_exchange(
+            provider="claude",
+            endpoint="/v1/messages",
+            request_payload=request_payload,
+            response_status=getattr(response, "status_code", None),
+            response_payload=response_payload,
+        )
+        response.raise_for_status()
+        payload = response_payload if isinstance(response_payload, dict) else response.json()
+        content_blocks = payload.get("content", [])
+        text_chunks = [
+            str(block.get("text", ""))
+            for block in content_blocks
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+        parsed = json.loads("".join(text_chunks).strip())
+        result = extract_grounded_qa_result(parsed)
+        usage = payload.get("usage", {})
+        input_tokens = usage.get("input_tokens", 0)
+        output_tokens = usage.get("output_tokens", 0)
+        total_tokens = 0
+        if isinstance(input_tokens, int) and input_tokens > 0:
+            total_tokens += input_tokens
+        if isinstance(output_tokens, int) and output_tokens > 0:
+            total_tokens += output_tokens
+        if total_tokens > 0:
+            result["llm_total_tokens"] = total_tokens
+        return result

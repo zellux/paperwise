@@ -39,3 +39,15 @@ class MissingOpenAIProvider(LLMProvider):
         raise RuntimeError(
             "OpenAI provider is required for llm-parse. Set PAPERWISE_OPENAI_API_KEY in .env.local."
         )
+
+    def answer_grounded(
+        self,
+        *,
+        question: str,
+        contexts: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        del question
+        del contexts
+        raise RuntimeError(
+            "Grounded Q&A requires a configured LLM provider. Set provider and API key in Settings."
+        )

@@ -68,3 +68,33 @@ class SimpleLLMProvider(LLMProvider):
         if date_match:
             result["document_date"] = date_match.group(1)
         return result
+
+    def answer_grounded(
+        self,
+        *,
+        question: str,
+        contexts: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        terms = {part.lower() for part in re.findall(r"[A-Za-z0-9]{2,}", question)}
+        for ctx in contexts:
+            content = str(ctx.get("content", ""))
+            lowered = content.lower()
+            if not terms or any(term in lowered for term in terms):
+                snippet = " ".join(content.split())[:240]
+                return {
+                    "answer": snippet or "No answer content in context.",
+                    "insufficient_evidence": False,
+                    "citations": [
+                        {
+                            "chunk_id": str(ctx.get("chunk_id", "")),
+                            "document_id": str(ctx.get("document_id", "")),
+                            "title": str(ctx.get("title", "")),
+                            "quote": snippet,
+                        }
+                    ],
+                }
+        return {
+            "answer": "Not enough evidence in the selected documents.",
+            "insufficient_evidence": True,
+            "citations": [],
+        }
