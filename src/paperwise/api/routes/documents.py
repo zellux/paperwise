@@ -4,7 +4,6 @@ from typing import Any
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
-from urllib.parse import unquote, urlparse
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -34,6 +33,7 @@ from paperwise.application.services.history import (
 )
 from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.parsing import parse_document_blob
+from paperwise.application.services.storage_paths import blob_ref_to_path
 from paperwise.domain.models import (
     Document,
     DocumentHistoryEvent,
@@ -225,12 +225,9 @@ def _sanitize_filename(value: str) -> str:
 
 
 def _resolve_file_path_from_uri(blob_uri: str) -> Path | None:
-    if not blob_uri:
+    resolved = blob_ref_to_path(blob_uri, settings.object_store_root)
+    if resolved is None:
         return None
-    parsed = urlparse(blob_uri)
-    if parsed.scheme != "file":
-        return None
-    resolved = Path(unquote(parsed.path))
     if not resolved.exists() or not resolved.is_file():
         return None
     return resolved

@@ -5,7 +5,8 @@ import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
-from urllib.parse import unquote, urlparse
+
+from paperwise.application.services.storage_paths import blob_ref_to_path, path_to_blob_ref
 
 
 def _sanitize_filename(value: str) -> str:
@@ -27,12 +28,10 @@ def move_blob_to_processed(
     checksum_sha256: str,
     size_bytes: int,
 ) -> str:
-    parsed = urlparse(blob_uri)
-    if parsed.scheme != "file":
-        return blob_uri
-
-    source_path = Path(unquote(parsed.path))
     root_dir = Path(object_store_root).expanduser().resolve()
+    source_path = blob_ref_to_path(blob_uri, object_store_root)
+    if source_path is None:
+        return blob_uri
     target_filename = f"{document_id}_{_sanitize_filename(original_filename)}"
     target_path = root_dir / "processed" / document_id / target_filename
     target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -59,4 +58,4 @@ def move_blob_to_processed(
         encoding="utf-8",
     )
 
-    return target_path.resolve().as_uri()
+    return path_to_blob_ref(target_path, object_store_root)

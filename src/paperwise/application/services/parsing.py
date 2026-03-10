@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
-from pathlib import Path
-from urllib.parse import unquote, urlparse
 
 from paperwise.domain.models import ParseResult
+from paperwise.infrastructure.config import get_settings
+from paperwise.application.services.storage_paths import blob_ref_to_path
 
 
 def parse_document_blob(
@@ -10,8 +10,10 @@ def parse_document_blob(
     blob_uri: str,
 ) -> ParseResult:
     """Stub parser for local blob content until real OCR/extract pipeline lands."""
-    parsed_uri = urlparse(blob_uri)
-    blob_path = Path(unquote(parsed_uri.path))
+    settings = get_settings()
+    blob_path = blob_ref_to_path(blob_uri, settings.object_store_root)
+    if blob_path is None:
+        raise ValueError(f"Unsupported blob reference: {blob_uri}")
     raw = blob_path.read_bytes()
     is_pdf = raw.startswith(b"%PDF")
     page_count = raw.count(b"/Type /Page") if is_pdf else 0
@@ -28,4 +30,3 @@ def parse_document_blob(
         text_preview=text_preview,
         created_at=datetime.now(UTC),
     )
-

@@ -14,6 +14,7 @@ from paperwise.infrastructure.config import get_settings
 from paperwise.infrastructure.repositories.postgres_document_repository import (
     PostgresDocumentRepository,
 )
+from paperwise.application.services.storage_paths import path_to_blob_ref
 
 
 def _sanitize_filename(value: str) -> str:
@@ -158,7 +159,7 @@ def main() -> None:
             encoding="utf-8",
         )
 
-        new_blob_uri = target_path.resolve().as_uri()
+        new_blob_uri = path_to_blob_ref(target_path, str(root_dir))
         if document.blob_uri != new_blob_uri:
             document.blob_uri = new_blob_uri
             repository.save(document)

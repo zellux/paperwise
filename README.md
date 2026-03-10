@@ -97,10 +97,18 @@ local/object-store/processed/<doc_id>/<doc_id>_<sanitized_filename>.metadata.jso
 ```
 
 Each metadata sidecar JSON includes the original filename, content type, checksum, and size.
+Database `documents.blob_uri` values store relative object-store keys (for example:
+`incoming/2026/03/10/<token>_file.pdf`) to avoid machine-specific absolute paths.
 
 To migrate existing stored files and update `documents.blob_uri` paths:
 
 ```bash
 . .venv/bin/activate
 python scripts/migrate_storage_layout.py --apply
+```
+
+To convert legacy absolute `file://` blob references in Postgres to relative keys:
+
+```bash
+PAPERWISE_REPOSITORY_BACKEND=postgres .venv/bin/python scripts/migrate_blob_refs_relative.py --apply
 ```

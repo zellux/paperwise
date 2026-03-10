@@ -101,7 +101,7 @@ def test_create_and_get_document() -> None:
         assert get_response.json()["filename"] == "receipt.pdf"
         assert get_response.json()["content_type"] == "application/pdf"
         assert get_response.json()["size_bytes"] == 11
-        assert get_response.json()["blob_uri"].startswith("file://")
+        assert get_response.json()["blob_uri"].startswith("incoming/")
         assert dispatcher.enqueued == [payload["id"]]
 
         file_response = client.get(f"/documents/{payload['id']}/file")
@@ -215,7 +215,7 @@ def test_list_documents_includes_llm_metadata_when_available() -> None:
         get_response = client.get(f"/documents/{doc_id}")
         assert get_response.status_code == 200
         assert get_response.json()["status"] == "ready"
-        assert "/processed/" in get_response.json()["blob_uri"]
+        assert get_response.json()["blob_uri"].startswith("processed/")
 
         file_response = client.get(f"/documents/{doc_id}/file")
         assert file_response.status_code == 200
@@ -582,7 +582,7 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         get_response = client.get(f"/documents/{doc_id}")
         assert get_response.status_code == 200
         assert get_response.json()["status"] == "ready"
-        assert "/processed/" in get_response.json()["blob_uri"]
+        assert get_response.json()["blob_uri"].startswith("processed/")
 
         fetch_response = client.get(f"/documents/{doc_id}/llm-parse")
         assert fetch_response.status_code == 200
