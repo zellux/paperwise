@@ -24,6 +24,9 @@ const settingsOcrLlmProviderSelect = document.getElementById("settingsOcrLlmProv
 const settingsOcrLlmModelInput = document.getElementById("settingsOcrLlmModelInput");
 const settingsOcrLlmBaseUrlInput = document.getElementById("settingsOcrLlmBaseUrlInput");
 const settingsOcrLlmApiKeyInput = document.getElementById("settingsOcrLlmApiKeyInput");
+const settingsOcrSeparateOnlyFields = [
+  ...document.querySelectorAll(".ocr-separate-only"),
+];
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
 const signInForm = document.getElementById("signInForm");
@@ -270,7 +273,16 @@ function renderSettingsForm() {
   if (settingsOcrLlmApiKeyInput && settingsOcrLlmApiKeyInput.value !== ocrLlmSettings.api_key) {
     settingsOcrLlmApiKeyInput.value = ocrLlmSettings.api_key;
   }
+  syncOcrSeparateSettingsVisibility();
   syncUploadAvailability();
+}
+
+function syncOcrSeparateSettingsVisibility() {
+  const selectedProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
+  const showOcrLlmFields = selectedProvider === "llm_separate";
+  settingsOcrSeparateOnlyFields.forEach((element) => {
+    element.hidden = !showOcrLlmFields;
+  });
 }
 
 function readLlmSettingsFromControls() {
@@ -1930,6 +1942,11 @@ settingsLlmProviderSelect?.addEventListener("change", () => {
     { force: true }
   );
   setSettingsLlmTestStatus("");
+});
+
+settingsOcrProviderSelect?.addEventListener("change", () => {
+  ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect.value);
+  syncOcrSeparateSettingsVisibility();
 });
 
 settingsOcrLlmProviderSelect?.addEventListener("change", () => {

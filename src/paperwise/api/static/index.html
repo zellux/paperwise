@@ -458,8 +458,12 @@
                   <option value="tesseract">Local Tesseract</option>
                 </select>
 
-                <label class="label" for="settingsOcrLlmProviderSelect">OCR LLM Provider (separate mode)</label>
-                <select id="settingsOcrLlmProviderSelect" name="settingsOcrLlmProviderSelect">
+                <label class="label ocr-separate-only" for="settingsOcrLlmProviderSelect">OCR LLM Provider (separate mode)</label>
+                <select
+                  id="settingsOcrLlmProviderSelect"
+                  name="settingsOcrLlmProviderSelect"
+                  class="ocr-separate-only"
+                >
                   <option value="">Select provider</option>
                   <option value="openai">OpenAI</option>
                   <option value="claude">Claude</option>
@@ -467,24 +471,27 @@
                   <option value="custom">Custom (OpenAI-Compatible)</option>
                 </select>
 
-                <label class="label" for="settingsOcrLlmModelInput">OCR LLM Model</label>
+                <label class="label ocr-separate-only" for="settingsOcrLlmModelInput">OCR LLM Model</label>
                 <input
+                  class="ocr-separate-only"
                   id="settingsOcrLlmModelInput"
                   name="settingsOcrLlmModelInput"
                   type="text"
                   placeholder="e.g. gpt-4.1-mini"
                 />
 
-                <label class="label" for="settingsOcrLlmBaseUrlInput">OCR LLM Base URL</label>
+                <label class="label ocr-separate-only" for="settingsOcrLlmBaseUrlInput">OCR LLM Base URL</label>
                 <input
+                  class="ocr-separate-only"
                   id="settingsOcrLlmBaseUrlInput"
                   name="settingsOcrLlmBaseUrlInput"
                   type="text"
                   placeholder="https://api.openai.com/v1"
                 />
 
-                <label class="label" for="settingsOcrLlmApiKeyInput">OCR LLM API Key</label>
+                <label class="label ocr-separate-only" for="settingsOcrLlmApiKeyInput">OCR LLM API Key</label>
                 <input
+                  class="ocr-separate-only"
                   id="settingsOcrLlmApiKeyInput"
                   name="settingsOcrLlmApiKeyInput"
                   type="password"
