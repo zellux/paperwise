@@ -1,3 +1,5 @@
+import json
+import re
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
@@ -172,6 +174,15 @@ def _normalized_values(values: list[str] | None) -> set[str]:
     return normalized
 
 
+def _sanitize_filename(value: str) -> str:
+    cleaned = Path(value).name.strip()
+    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", cleaned)
+    cleaned = re.sub(r"_+", "_", cleaned).strip("._")
+    if not cleaned:
+        return "uploaded-document.bin"
+    return cleaned
+
+
 def _to_response(document: Document) -> DocumentResponse:
     return DocumentResponse(
         id=document.id,
@@ -288,11 +299,28 @@ def create_document_endpoint(
     filename = file.filename or "uploaded-document"
     content = file.file.read()
     checksum = sha256(content).hexdigest()
-    storage_key = f"documents/{uuid4()}-{Path(filename).name}"
+    now = datetime.now(UTC)
+    date_path = now.strftime("%Y/%m/%d")
+    storage_token = str(uuid4())
+    storage_key = f"incoming/{date_path}/{storage_token}_{_sanitize_filename(filename)}"
     blob_uri = storage.put(
         key=storage_key,
         data=content,
         content_type=file.content_type or "application/octet-stream",
+    )
+    metadata_key = f"incoming/{date_path}/{storage_token}.metadata.json"
+    metadata_payload = {
+        "original_filename": filename,
+        "content_type": file.content_type or "application/octet-stream",
+        "checksum_sha256": checksum,
+        "size_bytes": len(content),
+        "stored_key": storage_key,
+        "stored_at": now.isoformat(),
+    }
+    storage.put(
+        key=metadata_key,
+        data=json.dumps(metadata_payload, ensure_ascii=True, indent=2).encode("utf-8"),
+        content_type="application/json",
     )
 
     document, job_id = create_document(

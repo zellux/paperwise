@@ -71,3 +71,21 @@ ZAPIS_POSTGRES_URL=postgresql+psycopg://zapis:zapis@localhost:5432/zapis
 ```
 
 Then run `make deps-up` and restart `make api`.
+
+## Local Object Storage Layout
+
+Uploaded files are stored under:
+
+```text
+local/object-store/incoming/YYYY/MM/DD/<storage_token>_<sanitized_filename>
+local/object-store/incoming/YYYY/MM/DD/<storage_token>.metadata.json
+```
+
+Each metadata sidecar JSON includes the original filename, content type, checksum, and size.
+
+To migrate existing stored files and update `documents.blob_uri` paths:
+
+```bash
+. .venv/bin/activate
+python scripts/migrate_storage_layout.py --apply
+```
