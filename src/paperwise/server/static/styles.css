@@ -728,13 +728,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   max-width: 100%;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
+  gap: 12px;
   align-items: start;
 }
 
 .settings-column {
   display: grid;
-  gap: 0;
+  gap: 12px;
   align-content: start;
 }
 
@@ -795,7 +795,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 
   .settings-column {
-    gap: 0;
+    gap: 12px;
   }
 }
 
