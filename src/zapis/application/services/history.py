@@ -147,3 +147,27 @@ def build_processing_restarted_history_event(
             }
         },
     )
+
+
+def build_processing_completed_history_event(
+    *,
+    document_id: str,
+    actor_type: HistoryActorType,
+    actor_id: str | None,
+    source: str,
+    previous_status: str | None,
+    current_status: str,
+) -> DocumentHistoryEvent:
+    return _new_event(
+        document_id=document_id,
+        event_type=HistoryEventType.PROCESSING_COMPLETED,
+        actor_type=actor_type,
+        actor_id=actor_id,
+        source=source,
+        changes={
+            "status": {
+                "before": previous_status,
+                "after": current_status,
+            }
+        },
+    )

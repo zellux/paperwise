@@ -26,6 +26,7 @@ from zapis.application.services.file_relocation import move_blob_to_processed
 from zapis.application.services.history import (
     build_file_moved_history_event,
     build_metadata_history_events,
+    build_processing_completed_history_event,
     build_processing_restarted_history_event,
 )
 from zapis.application.services.llm_parsing import parse_with_llm
@@ -653,6 +654,18 @@ def llm_parse_document_endpoint(
         size_bytes=document.size_bytes,
     )
     repository.save(document)
+    repository.append_history_events(
+        [
+            build_processing_completed_history_event(
+                document_id=document.id,
+                actor_type=HistoryActorType.USER,
+                actor_id=document.owner_id,
+                source="api.llm_parse",
+                previous_status=DocumentStatus.PROCESSING.value,
+                current_status=document.status.value,
+            )
+        ]
+    )
     file_move_event = build_file_moved_history_event(
         document_id=document.id,
         actor_type=HistoryActorType.USER,

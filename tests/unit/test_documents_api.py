@@ -539,6 +539,7 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         event_types = {event["event_type"] for event in history}
         assert "metadata_changed" in event_types
         assert "tags_added" in event_types
+        assert "processing_completed" in event_types
         assert "file_moved" in event_types
 
         llm_events = [event for event in history if event["source"] == "api.llm_parse"]

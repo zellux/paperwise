@@ -2,7 +2,10 @@ from celery.utils.log import get_task_logger
 
 from zapis.application.interfaces import DocumentRepository, LLMProvider
 from zapis.application.services.file_relocation import move_blob_to_processed
-from zapis.application.services.history import build_file_moved_history_event
+from zapis.application.services.history import (
+    build_file_moved_history_event,
+    build_processing_completed_history_event,
+)
 from zapis.application.services.llm_parsing import parse_with_llm
 from zapis.application.services.parsing import parse_document_blob
 from zapis.domain.models import DocumentStatus, HistoryActorType
@@ -103,8 +106,21 @@ def parse_document_task(
             checksum_sha256=document.checksum_sha256,
             size_bytes=document.size_bytes,
         )
+        previous_status = document.status.value
         document.status = DocumentStatus.READY
         repository.save(document)
+        repository.append_history_events(
+            [
+                build_processing_completed_history_event(
+                    document_id=document.id,
+                    actor_type=HistoryActorType.SYSTEM,
+                    actor_id=None,
+                    source="worker.parse_document",
+                    previous_status=previous_status,
+                    current_status=document.status.value,
+                )
+            ]
+        )
         file_move_event = build_file_moved_history_event(
             document_id=document.id,
             actor_type=HistoryActorType.SYSTEM,

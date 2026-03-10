@@ -105,6 +105,7 @@ function formatHistoryEventType(value) {
     tags_removed: "Tags removed",
     file_moved: "File moved",
     processing_restarted: "Processing restarted",
+    processing_completed: "Processing completed",
   };
   return labels[value] || formatStatus(value || "update");
 }
@@ -148,6 +149,11 @@ function buildHistoryChangeLines(event) {
     return [`From: ${fromPath}`, `To: ${toPath}`];
   }
   if (event.event_type === "processing_restarted") {
+    const before = stringifyHistoryValue(changes.status?.before);
+    const after = stringifyHistoryValue(changes.status?.after);
+    return [`Status: ${before} -> ${after}`];
+  }
+  if (event.event_type === "processing_completed") {
     const before = stringifyHistoryValue(changes.status?.before);
     const after = stringifyHistoryValue(changes.status?.after);
     return [`Status: ${before} -> ${after}`];
