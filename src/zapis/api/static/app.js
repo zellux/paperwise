@@ -1,20 +1,15 @@
 const uploadForm = document.getElementById("uploadForm");
 const docLookupForm = document.getElementById("docLookupForm");
-const parseNowBtn = document.getElementById("parseNowBtn");
-const parseFetchBtn = document.getElementById("parseFetchBtn");
-const llmParseBtn = document.getElementById("llmParseBtn");
-const llmFetchBtn = document.getElementById("llmFetchBtn");
-const taxonomyBtn = document.getElementById("taxonomyBtn");
 const refreshDocsBtn = document.getElementById("refreshDocsBtn");
 const refreshTagsBtn = document.getElementById("refreshTagsBtn");
+const refreshPendingBtn = document.getElementById("refreshPendingBtn");
 
 const docIdInput = document.getElementById("docIdInput");
 const docOutput = document.getElementById("docOutput");
-const parseOutput = document.getElementById("parseOutput");
-const llmOutput = document.getElementById("llmOutput");
 const activityOutput = document.getElementById("activityOutput");
 const docsTableBody = document.getElementById("docsTableBody");
 const tagsTableBody = document.getElementById("tagsTableBody");
+const pendingTableBody = document.getElementById("pendingTableBody");
 const navLinks = [...document.querySelectorAll(".nav-link")];
 const views = [...document.querySelectorAll(".view")];
 
@@ -130,6 +125,51 @@ function renderTagsList(tagStats) {
   }
 }
 
+function getSuggestedTitle(doc) {
+  if (doc.llm_metadata && doc.llm_metadata.suggested_title) {
+    return doc.llm_metadata.suggested_title;
+  }
+  return "(Pending title)";
+}
+
+function renderPendingList(documents) {
+  if (!documents.length) {
+    pendingTableBody.innerHTML = '<tr><td colspan="4">No pending documents.</td></tr>';
+    return;
+  }
+  pendingTableBody.innerHTML = "";
+  for (const doc of documents) {
+    const row = document.createElement("tr");
+
+    const titleCell = document.createElement("td");
+    titleCell.textContent = getSuggestedTitle(doc);
+    const statusCell = document.createElement("td");
+    statusCell.textContent = formatStatus(doc.status);
+    const createdCell = document.createElement("td");
+    createdCell.textContent = new Date(doc.created_at).toLocaleString();
+    const actionCell = document.createElement("td");
+
+    const button = document.createElement("button");
+    button.className = "btn";
+    button.type = "button";
+    button.textContent = "Open";
+    button.addEventListener("click", async () => {
+      try {
+        await loadDocument(doc.id);
+      } catch (error) {
+        logActivity(error.message);
+      }
+    });
+    actionCell.appendChild(button);
+
+    row.appendChild(titleCell);
+    row.appendChild(statusCell);
+    row.appendChild(createdCell);
+    row.appendChild(actionCell);
+    pendingTableBody.appendChild(row);
+  }
+}
+
 function setActiveNav(targetId) {
   for (const link of navLinks) {
     link.classList.toggle("active", link.dataset.target === targetId);
@@ -151,6 +191,17 @@ async function loadDocumentsList() {
   }
   renderDocsList(payload);
   logActivity(`Loaded ${payload.length} document(s)`);
+}
+
+async function loadPendingDocuments() {
+  const response = await fetch("/documents/pending?limit=200");
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Pending list failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+  renderPendingList(payload);
+  logActivity(`Loaded ${payload.length} pending document(s)`);
 }
 
 async function loadTagStats() {
@@ -190,7 +241,9 @@ uploadForm.addEventListener("submit", async (event) => {
   logActivity(`Uploaded ${file.name} => document ${payload.id}`);
   await loadDocument(payload.id);
   await loadDocumentsList();
-  parseOutput.textContent = "No parse result yet.";
+  await loadPendingDocuments();
+  await loadTagStats();
+  logActivity("Automatic analysis queued (parse + LLM enrichment).");
 });
 
 docLookupForm.addEventListener("submit", async (event) => {
@@ -207,95 +260,16 @@ docLookupForm.addEventListener("submit", async (event) => {
   }
 });
 
-parseNowBtn.addEventListener("click", async () => {
-  const documentId = docIdInput.value.trim() || currentDocumentId;
-  if (!documentId) {
-    logActivity("Parse blocked: load or upload a document first.");
-    return;
-  }
-
-  logActivity(`Parsing document ${documentId}...`);
-  const response = await fetch(`/documents/${documentId}/parse`, { method: "POST" });
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Parse failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-
-  parseOutput.textContent = pretty(payload);
-  logActivity(`Parse completed for ${documentId}`);
-});
-
-parseFetchBtn.addEventListener("click", async () => {
-  const documentId = docIdInput.value.trim() || currentDocumentId;
-  if (!documentId) {
-    logActivity("Fetch blocked: load or upload a document first.");
-    return;
-  }
-
-  const response = await fetch(`/documents/${documentId}/parse`);
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Fetch parse failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-
-  parseOutput.textContent = pretty(payload);
-  logActivity(`Fetched parse result for ${documentId}`);
-});
-
-llmParseBtn.addEventListener("click", async () => {
-  const documentId = docIdInput.value.trim() || currentDocumentId;
-  if (!documentId) {
-    logActivity("LLM parse blocked: load or upload a document first.");
-    return;
-  }
-
-  const response = await fetch(`/documents/${documentId}/llm-parse`, { method: "POST" });
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`LLM parse failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-  llmOutput.textContent = pretty(payload);
-  logActivity(`LLM parse completed for ${documentId}`);
-  await loadDocumentsList();
-  await loadTagStats();
-});
-
-llmFetchBtn.addEventListener("click", async () => {
-  const documentId = docIdInput.value.trim() || currentDocumentId;
-  if (!documentId) {
-    logActivity("LLM fetch blocked: load or upload a document first.");
-    return;
-  }
-  const response = await fetch(`/documents/${documentId}/llm-parse`);
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`LLM fetch failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-  llmOutput.textContent = pretty(payload);
-  logActivity(`Fetched LLM parse result for ${documentId}`);
-});
-
-taxonomyBtn.addEventListener("click", async () => {
-  const response = await fetch("/documents/metadata/taxonomy");
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Taxonomy load failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-  llmOutput.textContent = pretty(payload);
-  logActivity("Loaded current taxonomy");
-});
-
 refreshDocsBtn.addEventListener("click", async () => {
   await loadDocumentsList();
 });
 
 refreshTagsBtn.addEventListener("click", async () => {
   await loadTagStats();
+});
+
+refreshPendingBtn.addEventListener("click", async () => {
+  await loadPendingDocuments();
 });
 
 for (const link of navLinks) {
@@ -318,4 +292,8 @@ loadDocumentsList().catch((error) => {
 
 loadTagStats().catch((error) => {
   logActivity(`Initial tag stats failed: ${error.message}`);
+});
+
+loadPendingDocuments().catch((error) => {
+  logActivity(`Initial pending list failed: ${error.message}`);
 });

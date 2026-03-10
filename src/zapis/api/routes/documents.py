@@ -90,6 +90,15 @@ class TagStatResponse(BaseModel):
     document_count: int
 
 
+PENDING_STATUSES = {
+    DocumentStatus.RECEIVED,
+    DocumentStatus.PARSING,
+    DocumentStatus.PARSED,
+    DocumentStatus.ENRICHING,
+    DocumentStatus.PROCESSING,
+}
+
+
 def _to_response(document: Document) -> DocumentResponse:
     return DocumentResponse(
         id=document.id,
@@ -224,6 +233,22 @@ def list_documents_endpoint(
             llm_result=repository.get_llm_parse_result(document.id),
         )
         for document in documents
+    ]
+
+
+@router.get("/pending", response_model=list[DocumentListItemResponse])
+def list_pending_documents_endpoint(
+    limit: int = 100,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> list[DocumentListItemResponse]:
+    documents = repository.list_documents(limit=limit)
+    pending_docs = [document for document in documents if document.status in PENDING_STATUSES]
+    return [
+        _to_list_item_response(
+            document=document,
+            llm_result=repository.get_llm_parse_result(document.id),
+        )
+        for document in pending_docs
     ]
 
 

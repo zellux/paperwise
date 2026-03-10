@@ -173,6 +173,46 @@ def test_list_documents_includes_llm_metadata_when_available() -> None:
         app.dependency_overrides.clear()
 
 
+def test_list_pending_documents_excludes_ready() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
+
+    try:
+        client = TestClient(app)
+        pending_create_response = client.post(
+            "/documents",
+            data={"owner_id": "user-pending"},
+            files={"file": ("pending.pdf", b"%PDF-1.4\npending", "application/pdf")},
+        )
+        assert pending_create_response.status_code == 201
+        pending_id = pending_create_response.json()["id"]
+
+        ready_create_response = client.post(
+            "/documents",
+            data={"owner_id": "user-pending"},
+            files={"file": ("ready.pdf", b"%PDF-1.4\nready", "application/pdf")},
+        )
+        assert ready_create_response.status_code == 201
+        ready_id = ready_create_response.json()["id"]
+        llm_response = client.post(f"/documents/{ready_id}/llm-parse")
+        assert llm_response.status_code == 200
+
+        pending_response = client.get("/documents/pending")
+        assert pending_response.status_code == 200
+        pending_docs = pending_response.json()
+        pending_ids = {item["id"] for item in pending_docs}
+        assert pending_id in pending_ids
+        assert ready_id not in pending_ids
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_parse_document_roundtrip() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()

@@ -236,6 +236,10 @@ input[type="file"] {
   min-width: 360px;
 }
 
+.pending-table {
+  min-width: 600px;
+}
+
 .docs-table th,
 .docs-table td {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);

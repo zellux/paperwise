@@ -1,9 +1,42 @@
 from celery.utils.log import get_task_logger
 
+from zapis.application.interfaces import DocumentRepository, LLMProvider
+from zapis.application.services.llm_parsing import parse_with_llm
 from zapis.application.services.parsing import parse_document_blob
+from zapis.domain.models import DocumentStatus
+from zapis.infrastructure.config import get_settings
+from zapis.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
+from zapis.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
+from zapis.infrastructure.repositories.in_memory_document_repository import (
+    InMemoryDocumentRepository,
+)
+from zapis.infrastructure.repositories.postgres_document_repository import (
+    PostgresDocumentRepository,
+)
 from zapis.workers.celery_app import celery_app
 
 logger = get_task_logger(__name__)
+settings = get_settings()
+
+
+def _build_repository() -> DocumentRepository:
+    if settings.repository_backend.lower() == "postgres":
+        return PostgresDocumentRepository(settings.postgres_url)
+    return InMemoryDocumentRepository()
+
+
+def _build_llm_provider() -> LLMProvider:
+    if settings.openai_api_key:
+        return OpenAILLMProvider(
+            api_key=settings.openai_api_key,
+            model=settings.openai_model,
+            base_url=settings.openai_base_url,
+        )
+    return MissingOpenAIProvider()
+
+
+repository = _build_repository()
+llm_provider = _build_llm_provider()
 
 
 @celery_app.task(name="zapis.tasks.healthcheck")
@@ -40,9 +73,38 @@ def parse_document_task(
     filename: str,
     content_type: str,
 ) -> dict[str, str | int]:
-    parsed = parse_document_blob(document_id=document_id, blob_uri=blob_uri)
+    document = repository.get(document_id)
+    if document is None:
+        logger.error("parse task failed; document_id=%s not found", document_id)
+        return {"document_id": document_id, "status": "not_found"}
+
+    try:
+        document.status = DocumentStatus.PARSING
+        repository.save(document)
+
+        parsed = parse_document_blob(document_id=document_id, blob_uri=blob_uri)
+        repository.save_parse_result(parsed)
+        document.status = DocumentStatus.PARSED
+        repository.save(document)
+
+        document.status = DocumentStatus.ENRICHING
+        repository.save(document)
+        parse_with_llm(
+            document=document,
+            parse_result=parsed,
+            repository=repository,
+            llm_provider=llm_provider,
+        )
+        document.status = DocumentStatus.READY
+        repository.save(document)
+    except Exception:
+        document.status = DocumentStatus.FAILED
+        repository.save(document)
+        logger.exception("analysis pipeline failed for document_id=%s", document_id)
+        raise
+
     logger.info(
-        "parsed document_id=%s filename=%s bytes=%d pages=%d content_type=%s",
+        "analysis complete document_id=%s filename=%s bytes=%d pages=%d content_type=%s",
         document_id,
         filename,
         parsed.size_bytes,
@@ -53,5 +115,5 @@ def parse_document_task(
         "document_id": document_id,
         "bytes": parsed.size_bytes,
         "parser": parsed.parser,
-        "status": parsed.status,
+        "status": "ready",
     }
