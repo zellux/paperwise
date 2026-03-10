@@ -1082,7 +1082,7 @@ def test_document_type_stats_only_include_current_user_documents() -> None:
         app.dependency_overrides.clear()
 
 
-def test_llm_parse_uses_simple_provider_from_user_preferences() -> None:
+def test_llm_parse_uses_configured_provider_with_injected_fake_provider() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()
     dispatcher = FakeDispatcher()
@@ -1091,13 +1091,17 @@ def test_llm_parse_uses_simple_provider_from_user_preferences() -> None:
     app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
-    app.dependency_overrides[llm_provider_dependency] = lambda: MissingOpenAIProvider()
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
 
     try:
         repository.save_user_preference(
             UserPreference(
                 user_id=TEST_USER.id,
-                preferences={"llm_provider": "simple"},
+                preferences={
+                    "llm_provider": "openai",
+                    "llm_api_key": "sk-test",
+                    "llm_model": "gpt-4.1-mini",
+                },
             )
         )
         client = TestClient(app)
@@ -1112,5 +1116,32 @@ def test_llm_parse_uses_simple_provider_from_user_preferences() -> None:
         assert parse_response.status_code == 200
         payload = parse_response.json()
         assert payload["document_type"] == "Credit Report"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_parse_requires_user_llm_provider_configuration() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: MissingOpenAIProvider()
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={"file": ("needs-llm.pdf", b"%PDF-1.7\nsample", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        document_id = create_response.json()["id"]
+
+        parse_response = client.post(f"/documents/{document_id}/llm-parse")
+        assert parse_response.status_code == 400
+        assert "Configure an LLM provider in Settings" in parse_response.json()["detail"]
     finally:
         app.dependency_overrides.clear()

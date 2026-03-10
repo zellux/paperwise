@@ -103,9 +103,9 @@ let currentUser = null;
 let userPreferenceSaveTimer = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember"];
 let currentTheme = "atlas";
-const SUPPORTED_LLM_PROVIDERS = ["default", "openai", "simple"];
+const SUPPORTED_LLM_PROVIDERS = ["openai", "claude", "gemini", "custom"];
 let llmSettings = {
-  provider: "default",
+  provider: "",
   model: "",
   base_url: "",
   api_key: "",
@@ -175,7 +175,7 @@ function normalizeLlmProvider(value) {
   if (SUPPORTED_LLM_PROVIDERS.includes(normalized)) {
     return normalized;
   }
-  return "default";
+  return "";
 }
 
 function normalizeOcrProvider(value) {
@@ -582,7 +582,7 @@ function clearSession() {
   persistSession("", null);
   applyTheme("atlas");
   llmSettings = {
-    provider: "default",
+    provider: "",
     model: "",
     base_url: "",
     api_key: "",

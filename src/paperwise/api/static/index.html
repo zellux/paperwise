@@ -395,13 +395,15 @@
 
             <section class="settings-group">
               <h3 class="settings-group-title">LLM</h3>
-              <p class="settings-group-note">Provider selection and model connection settings.</p>
+              <p class="settings-group-note">Provider selection and model connection settings (user-managed API credentials).</p>
               <div class="settings-group-fields">
                 <label class="label" for="settingsLlmProviderSelect">LLM Provider</label>
                 <select id="settingsLlmProviderSelect" name="settingsLlmProviderSelect">
-                  <option value="default">Default (Server)</option>
+                  <option value="">Select provider</option>
                   <option value="openai">OpenAI</option>
-                  <option value="simple">Simple Local</option>
+                  <option value="claude">Claude</option>
+                  <option value="gemini">Gemini</option>
+                  <option value="custom">Custom (OpenAI-Compatible)</option>
                 </select>
 
                 <label class="label" for="settingsLlmModelInput">LLM Model</label>

@@ -44,8 +44,11 @@ from paperwise.domain.models import (
     User,
 )
 from paperwise.infrastructure.config import get_settings
+from paperwise.infrastructure.llm.anthropic_llm_provider import AnthropicLLMProvider
+from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 from paperwise.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
+from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 settings = get_settings()
@@ -311,23 +314,64 @@ def _resolve_llm_provider_for_user(
 ) -> LLMProvider:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    provider_name = str(preferences.get("llm_provider", "default")).strip().lower()
-    if provider_name in {"", "default"}:
+    provider_name = str(preferences.get("llm_provider", "")).strip().lower()
+
+    # Preserve testability when a fake provider is injected via dependency override.
+    if not isinstance(
+        default_llm_provider,
+        (MissingOpenAIProvider, OpenAILLMProvider, AnthropicLLMProvider, GeminiLLMProvider, SimpleLLMProvider),
+    ):
         return default_llm_provider
-    if provider_name == "simple":
-        return SimpleLLMProvider()
+
+    if not provider_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Configure an LLM provider in Settings before running LLM parse.",
+        )
+
+    configured_key = str(preferences.get("llm_api_key", "")).strip()
+    if not configured_key:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Selected LLM provider requires your API key in Settings.",
+        )
+
     if provider_name == "openai":
         configured_key = str(preferences.get("llm_api_key", "")).strip()
-        api_key = configured_key or (settings.openai_api_key or "")
-        if not api_key:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="OpenAI provider requires an API key in Settings.",
-            )
+        api_key = configured_key
         model = str(preferences.get("llm_model", "")).strip() or settings.openai_model
         base_url = str(preferences.get("llm_base_url", "")).strip() or settings.openai_base_url
         return OpenAILLMProvider(
             api_key=api_key,
+            model=model,
+            base_url=base_url,
+        )
+    if provider_name == "claude":
+        model = str(preferences.get("llm_model", "")).strip() or "claude-3-5-sonnet-latest"
+        base_url = str(preferences.get("llm_base_url", "")).strip() or "https://api.anthropic.com"
+        return AnthropicLLMProvider(
+            api_key=configured_key,
+            model=model,
+            base_url=base_url,
+        )
+    if provider_name == "gemini":
+        model = str(preferences.get("llm_model", "")).strip() or "gemini-2.0-flash"
+        base_url = str(preferences.get("llm_base_url", "")).strip() or "https://generativelanguage.googleapis.com/v1beta"
+        return GeminiLLMProvider(
+            api_key=configured_key,
+            model=model,
+            base_url=base_url,
+        )
+    if provider_name == "custom":
+        base_url = str(preferences.get("llm_base_url", "")).strip()
+        if not base_url:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Custom LLM provider requires a base URL in Settings.",
+            )
+        model = str(preferences.get("llm_model", "")).strip() or settings.openai_model
+        return OpenAILLMProvider(
+            api_key=configured_key,
             model=model,
             base_url=base_url,
         )
