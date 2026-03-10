@@ -61,11 +61,11 @@ body {
 .app-shell {
   position: relative;
   z-index: 1;
-  width: min(1280px, 94vw);
-  margin: 28px auto 34px;
+  width: min(1720px, 97vw);
+  margin: 24px auto 30px;
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 16px;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 18px;
   animation: rise-in 450ms ease-out;
 }
 
@@ -144,7 +144,7 @@ h1 {
 
 .content-pane {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .view-hidden {
@@ -152,7 +152,7 @@ h1 {
 }
 
 .panel {
-  padding: 16px;
+  padding: 18px;
 }
 
 .panel h2 {
@@ -594,7 +594,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .docs-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 860px;
+  min-width: 920px;
 }
 
 .tags-table {
@@ -693,6 +693,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @media (max-width: 980px) {
   .app-shell {
     grid-template-columns: 1fr;
+    width: min(100%, 98vw);
+    margin: 14px auto 18px;
   }
 
   .sidebar {
@@ -718,5 +720,43 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .btn-muted {
     width: 100%;
+  }
+}
+
+@media (min-width: 1400px) {
+  .app-shell {
+    grid-template-columns: 330px minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .sidebar {
+    padding: 22px;
+  }
+
+  .panel {
+    padding: 20px;
+  }
+
+  .document-detail-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .docs-table {
+    min-width: 1060px;
+  }
+}
+
+@media (min-width: 1800px) {
+  .app-shell {
+    width: min(1960px, 98vw);
+    grid-template-columns: 360px minmax(0, 1fr);
+  }
+
+  .sidebar {
+    padding: 24px;
+  }
+
+  .document-detail-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
