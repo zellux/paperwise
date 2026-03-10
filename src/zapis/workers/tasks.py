@@ -35,10 +35,6 @@ def _build_llm_provider() -> LLMProvider:
     return MissingOpenAIProvider()
 
 
-repository = _build_repository()
-llm_provider = _build_llm_provider()
-
-
 @celery_app.task(name="zapis.tasks.healthcheck")
 def healthcheck_task() -> str:
     logger.info("worker healthcheck task executed")
@@ -73,6 +69,8 @@ def parse_document_task(
     filename: str,
     content_type: str,
 ) -> dict[str, str | int]:
+    repository = _build_repository()
+    llm_provider = _build_llm_provider()
     document = repository.get(document_id)
     if document is None:
         logger.error("parse task failed; document_id=%s not found", document_id)
