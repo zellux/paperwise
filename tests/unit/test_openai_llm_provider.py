@@ -197,7 +197,14 @@ def test_openai_provider_image_ocr_calls_each_page_and_combines(monkeypatch) -> 
     class FakeClient:
         def post(self, _path: str, json: dict):
             captured_requests.append(json)
-            call_index = len(captured_requests)
+            user_content = json["messages"][1]["content"]
+            prompt = user_content[0]["text"]
+            page_marker = "Page "
+            marker_index = prompt.find(page_marker)
+            call_index = 0
+            if marker_index != -1:
+                suffix = prompt[marker_index + len(page_marker) :]
+                call_index = int(suffix.split(" of ", 1)[0])
 
             class Response:
                 status_code = 200

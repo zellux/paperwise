@@ -1,4 +1,5 @@
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import httpx
@@ -188,10 +189,10 @@ class OpenAILLMProvider(LLMProvider):
     ) -> str:
         if not image_data_urls:
             raise RuntimeError("No images provided for OCR.")
-        extracted_pages: list[str] = []
+        extracted_pages: dict[int, str] = {}
         last_error: Exception | None = None
 
-        for index, image_url in enumerate(image_data_urls, start=1):
+        def _ocr_single_page(index: int, image_url: str) -> tuple[int, str | None, Exception | None]:
             request_payload = {
                 "model": self._model,
                 "temperature": 0,
@@ -204,11 +205,11 @@ class OpenAILLMProvider(LLMProvider):
                         "content": [
                             {
                                 "type": "text",
-                                "text": (
-                                    "Perform OCR for this document and return strict JSON "
-                                    "with key ocr_text. Filename: "
-                                    + filename
-                                    + f". Page {index} of {len(image_data_urls)}."
+                                    "text": (
+                                        "Perform OCR for this document and return strict JSON "
+                                        "with key ocr_text. Filename: "
+                                        + filename
+                                        + f". Page {index} of {len(image_data_urls)}."
                                 ),
                             },
                             {
@@ -224,6 +225,7 @@ class OpenAILLMProvider(LLMProvider):
             }
             response: httpx.Response | None = None
             response_payload: Any = None
+            page_error: Exception | None = None
 
             for attempt in range(2):
                 try:
@@ -243,7 +245,7 @@ class OpenAILLMProvider(LLMProvider):
                         response_payload = {"raw_text": getattr(response, "text", "")}
                     break
                 except Exception as exc:
-                    last_error = exc
+                    page_error = exc
                     log_llm_exchange(
                         provider="openai",
                         endpoint="/chat/completions",
@@ -255,7 +257,7 @@ class OpenAILLMProvider(LLMProvider):
                     break
 
             if response is None:
-                continue
+                return index, None, page_error
 
             log_llm_exchange(
                 provider="openai",
@@ -273,10 +275,25 @@ class OpenAILLMProvider(LLMProvider):
             except json.JSONDecodeError:
                 extracted = content
             if extracted and extracted.strip():
-                extracted_pages.append(extracted.strip())
+                return index, extracted.strip(), None
+            return index, None, RuntimeError("LLM OCR failed: provider returned empty OCR text.")
+
+        max_workers = min(3, len(image_data_urls))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [
+                executor.submit(_ocr_single_page, index, image_url)
+                for index, image_url in enumerate(image_data_urls, start=1)
+            ]
+            for future in as_completed(futures):
+                index, extracted, page_error = future.result()
+                if extracted:
+                    extracted_pages[index] = extracted
+                elif page_error is not None:
+                    last_error = page_error
 
         if extracted_pages:
-            return "\n\n".join(extracted_pages).strip()
+            ordered = [extracted_pages[idx] for idx in sorted(extracted_pages)]
+            return "\n\n".join(ordered).strip()
         if last_error is not None:
             raise last_error
         raise RuntimeError("LLM OCR failed: provider returned empty OCR text.")
