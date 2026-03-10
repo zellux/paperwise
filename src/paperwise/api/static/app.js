@@ -128,7 +128,7 @@ let llmSettings = {
   api_key: "",
 };
 const SUPPORTED_OCR_PROVIDERS = ["tesseract", "llm"];
-let ocrProvider = "tesseract";
+let ocrProvider = "llm";
 let docsFilters = {
   q: "",
   tag: [],
@@ -208,7 +208,7 @@ function normalizeOcrProvider(value) {
   if (SUPPORTED_OCR_PROVIDERS.includes(normalized)) {
     return normalized;
   }
-  return "tesseract";
+  return "llm";
 }
 
 function applyTheme(themeName) {
@@ -720,7 +720,7 @@ function clearSession() {
     base_url: "",
     api_key: "",
   };
-  ocrProvider = "tesseract";
+  ocrProvider = "llm";
   docsPage = 1;
   docsPageSize = 20;
   docsFilters = sanitizeDocsFilters({

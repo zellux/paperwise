@@ -12,7 +12,7 @@ def parse_document_blob(
     document_id: str,
     blob_uri: str,
     *,
-    ocr_provider: str = "tesseract",
+    ocr_provider: str = "llm",
 ) -> ParseResult:
     """Stub parser for local blob content until real OCR/extract pipeline lands."""
     settings = get_settings()

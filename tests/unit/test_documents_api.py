@@ -330,7 +330,7 @@ def test_upload_and_parse_text_document() -> None:
         parse_response = client.post(f"/documents/{doc_id}/parse")
         assert parse_response.status_code == 200
         payload = parse_response.json()
-        assert payload["parser"] == "stub-local"
+        assert payload["parser"] == "stub-llm-ocr"
         assert "PPMG Pediatrics" in payload["text_preview"]
     finally:
         app.dependency_overrides.clear()
@@ -364,7 +364,7 @@ def test_upload_and_parse_docx_document() -> None:
         parse_response = client.post(f"/documents/{doc_id}/parse")
         assert parse_response.status_code == 200
         payload = parse_response.json()
-        assert payload["parser"] == "stub-local"
+        assert payload["parser"] == "stub-llm-ocr"
         assert "PPMG Pediatrics annual visit" in payload["text_preview"]
     finally:
         app.dependency_overrides.clear()

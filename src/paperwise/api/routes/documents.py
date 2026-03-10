@@ -429,10 +429,10 @@ def _resolve_ocr_provider_for_user(
 ) -> str:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    provider_name = str(preferences.get("ocr_provider", "tesseract")).strip().lower()
+    provider_name = str(preferences.get("ocr_provider", "llm")).strip().lower()
     if provider_name in {"tesseract", "llm"}:
         return provider_name
-    return "tesseract"
+    return "llm"
 
 
 def _resolve_file_path_from_uri(blob_uri: str) -> Path | None:
