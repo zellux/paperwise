@@ -727,6 +727,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   gap: 8px;
 }
 
+.settings-group .actions {
+  margin-top: 10px;
+  margin-bottom: 0;
+}
+
 .filter-chip {
   position: relative;
   display: flex;
