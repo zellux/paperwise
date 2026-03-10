@@ -276,6 +276,48 @@ def test_list_pending_documents_excludes_ready() -> None:
         app.dependency_overrides.clear()
 
 
+def test_restart_pending_documents_requeues_non_ready_only() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
+
+    try:
+        client = TestClient(app)
+        pending_create_response = client.post(
+            "/documents",
+            data={"owner_id": "user-restart"},
+            files={"file": ("pending.pdf", b"%PDF-1.4\npending", "application/pdf")},
+        )
+        assert pending_create_response.status_code == 201
+        pending_id = pending_create_response.json()["id"]
+
+        ready_create_response = client.post(
+            "/documents",
+            data={"owner_id": "user-restart"},
+            files={"file": ("ready.pdf", b"%PDF-1.4\nready", "application/pdf")},
+        )
+        assert ready_create_response.status_code == 201
+        ready_id = ready_create_response.json()["id"]
+        llm_response = client.post(f"/documents/{ready_id}/llm-parse")
+        assert llm_response.status_code == 200
+
+        restart_response = client.post("/documents/pending/restart?limit=200")
+        assert restart_response.status_code == 200
+        payload = restart_response.json()
+        assert payload["restarted_count"] == 1
+        assert payload["skipped_ready_count"] >= 1
+
+        assert dispatcher.enqueued.count(pending_id) == 2
+        assert dispatcher.enqueued.count(ready_id) == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_update_document_metadata_upserts_and_updates_taxonomy() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()

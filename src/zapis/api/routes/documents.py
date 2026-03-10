@@ -90,6 +90,11 @@ class TagStatResponse(BaseModel):
     document_count: int
 
 
+class RestartPendingResponse(BaseModel):
+    restarted_count: int
+    skipped_ready_count: int
+
+
 class DocumentDetailResponse(BaseModel):
     document: DocumentResponse
     llm_metadata: DocumentListMetadata | None = None
@@ -365,6 +370,39 @@ def list_pending_documents_endpoint(
         )
         for document in pending_docs
     ]
+
+
+@router.post("/pending/restart", response_model=RestartPendingResponse)
+def restart_pending_documents_endpoint(
+    limit: int = 100,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
+) -> RestartPendingResponse:
+    documents = repository.list_documents(limit=limit)
+    restarted_count = 0
+    skipped_ready_count = 0
+
+    for document in documents:
+        if document.status == DocumentStatus.READY:
+            skipped_ready_count += 1
+            continue
+        _set_document_status(
+            document=document,
+            repository=repository,
+            status_value=DocumentStatus.PROCESSING,
+        )
+        dispatcher.enqueue(
+            document_id=document.id,
+            blob_uri=document.blob_uri,
+            filename=document.filename,
+            content_type=document.content_type,
+        )
+        restarted_count += 1
+
+    return RestartPendingResponse(
+        restarted_count=restarted_count,
+        skipped_ready_count=skipped_ready_count,
+    )
 
 
 @router.get("/{document_id}", response_model=DocumentResponse)
