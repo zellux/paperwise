@@ -447,7 +447,11 @@
             <section class="settings-group">
               <h3 class="settings-group-title">OCR</h3>
               <p class="settings-group-note">
-                Select how OCR text extraction is handled. For cost estimation, refer to
+                Select how OCR is handled.
+                <code>LLM</code> mode sends rendered document images to the model for image-to-text transcription.
+                <code>Local Tesseract</code> runs OCR locally using system tools (<code>tesseract</code> and <code>pdftoppm</code>).
+                When auto-switch is enabled, the app tries local OCR first and only calls LLM OCR if local output is not good enough.
+                For cost estimation, refer to
                 <a href="https://developers.openai.com/api/docs/guides/images-vision/" target="_blank" rel="noopener noreferrer">this reference page</a>.
               </p>
               <div class="settings-group-fields">
