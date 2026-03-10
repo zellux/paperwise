@@ -104,6 +104,7 @@ let docsFilters = {
 };
 let docsPage = 1;
 let docsPageSize = 20;
+let docsTotalCount = 0;
 
 function normalizePageSize(value) {
   const size = Number(value);
@@ -1378,27 +1379,40 @@ async function loadDocumentsList() {
     query.append("status", value);
   }
 
-  const response = await apiFetch(`/documents?${query.toString()}`);
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Document list failed: ${payload.detail || response.statusText}`);
+  const [listResponse, countResponse] = await Promise.all([
+    apiFetch(`/documents?${query.toString()}`),
+    apiFetch(`/documents/count?${query.toString()}`),
+  ]);
+  const payload = await listResponse.json();
+  const countPayload = await countResponse.json();
+  if (!listResponse.ok) {
+    logActivity(`Document list failed: ${payload.detail || listResponse.statusText}`);
     return;
   }
+  if (!countResponse.ok) {
+    logActivity(`Document count failed: ${countPayload.detail || countResponse.statusText}`);
+    return;
+  }
+  docsTotalCount = Number(countPayload.total || 0);
   renderDocsList(payload);
   refreshFilterOptionsFromDocuments(payload);
   renderPaginationControls(payload.length);
-  logActivity(`Loaded ${payload.length} document(s)`);
+  logActivity(`Loaded ${payload.length} document(s) of ${docsTotalCount} total`);
 }
 
 function renderPaginationControls(currentCount) {
+  const totalPages = Math.max(1, Math.ceil(docsTotalCount / docsPageSize));
+  if (docsPage > totalPages) {
+    docsPage = totalPages;
+  }
   if (pageIndicator) {
-    pageIndicator.textContent = `Page ${docsPage}`;
+    pageIndicator.textContent = `Page ${docsPage} / ${totalPages}`;
   }
   if (pagePrevBtn) {
     pagePrevBtn.disabled = docsPage <= 1;
   }
   if (pageNextBtn) {
-    pageNextBtn.disabled = currentCount < docsPageSize;
+    pageNextBtn.disabled = docsPage >= totalPages || currentCount < docsPageSize;
   }
 }
 

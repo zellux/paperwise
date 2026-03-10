@@ -202,6 +202,64 @@ def test_list_documents_supports_offset_pagination() -> None:
         app.dependency_overrides.clear()
 
 
+def test_count_documents_with_filters() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
+
+    try:
+        client = TestClient(app)
+        first_response = client.post(
+            "/documents",
+            files={"file": ("count-1.pdf", b"%PDF-1.7\na", "application/pdf")},
+        )
+        assert first_response.status_code == 201
+        first_doc_id = first_response.json()["id"]
+        first_llm = client.post(f"/documents/{first_doc_id}/llm-parse")
+        assert first_llm.status_code == 200
+
+        second_response = client.post(
+            "/documents",
+            files={"file": ("count-2.pdf", b"%PDF-1.7\nb", "application/pdf")},
+        )
+        assert second_response.status_code == 201
+        second_doc_id = second_response.json()["id"]
+        second_doc = repository.get(second_doc_id)
+        assert second_doc is not None
+        second_doc.owner_id = "different-user-id"
+        repository.save(second_doc)
+        repository.save_llm_parse_result(
+            LLMParseResult(
+                document_id=second_doc_id,
+                suggested_title="Other User Doc",
+                document_date="2026-03-01",
+                correspondent="Other Corp",
+                document_type="Statement",
+                tags=["PrivateTag"],
+                created_correspondent=True,
+                created_document_type=True,
+                created_tags=["PrivateTag"],
+                created_at=datetime.now(UTC),
+            )
+        )
+
+        count_response = client.get("/documents/count?status=ready")
+        assert count_response.status_code == 200
+        assert count_response.json()["total"] == 1
+
+        tag_count_response = client.get("/documents/count?status=ready&tag=Credit")
+        assert tag_count_response.status_code == 200
+        assert tag_count_response.json()["total"] == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_upload_dedupes_by_owner_and_checksum() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()

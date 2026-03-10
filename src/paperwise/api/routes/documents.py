@@ -134,6 +134,10 @@ class RestartPendingResponse(BaseModel):
     skipped_ready_count: int
 
 
+class CountResponse(BaseModel):
+    total: int
+
+
 class DocumentDetailResponse(BaseModel):
     document: DocumentResponse
     llm_metadata: DocumentListMetadata | None = None
@@ -496,6 +500,53 @@ def list_documents_endpoint(
             )
         )
     return results
+
+
+@router.get("/count", response_model=CountResponse)
+def count_documents_endpoint(
+    tag: list[str] | None = Query(None),
+    correspondent: list[str] | None = Query(None),
+    document_type: list[str] | None = Query(None),
+    status: list[str] | None = Query(None),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> CountResponse:
+    normalized_tags = _normalized_values(tag)
+    normalized_correspondents = _normalized_values(correspondent)
+    normalized_document_types = _normalized_values(document_type)
+    normalized_statuses = _normalized_values(status)
+    if not normalized_statuses:
+        normalized_statuses = {_normalize_name(DocumentStatus.READY.value)}
+
+    total = 0
+    batch_size = 1000
+    offset = 0
+    while True:
+        documents = repository.list_documents(limit=batch_size, offset=offset)
+        if not documents:
+            break
+        for document in documents:
+            if document.owner_id != current_user.id:
+                continue
+            llm_result = repository.get_llm_parse_result(document.id)
+            if normalized_statuses and _normalize_name(document.status.value) not in normalized_statuses:
+                continue
+            if normalized_tags:
+                if llm_result is None or not normalized_tags.intersection(
+                    {_normalize_name(item) for item in llm_result.tags}
+                ):
+                    continue
+            if normalized_correspondents:
+                if llm_result is None or _normalize_name(llm_result.correspondent) not in normalized_correspondents:
+                    continue
+            if normalized_document_types:
+                if llm_result is None or _normalize_name(llm_result.document_type) not in normalized_document_types:
+                    continue
+            total += 1
+        if len(documents) < batch_size:
+            break
+        offset += batch_size
+    return CountResponse(total=total)
 
 
 @router.get("/pending", response_model=list[DocumentListItemResponse])
