@@ -620,6 +620,13 @@ function renderPendingList(documents) {
   }
 }
 
+function setRestartPendingButtonEnabled(enabled) {
+  if (!restartPendingBtn) {
+    return;
+  }
+  restartPendingBtn.disabled = !enabled;
+}
+
 async function loadDocumentsList() {
   const query = new URLSearchParams({ limit: "200" });
   for (const value of docsFilters.tag) {
@@ -650,10 +657,12 @@ async function loadPendingDocuments() {
   const response = await fetch("/documents/pending?limit=200");
   const payload = await response.json();
   if (!response.ok) {
+    setRestartPendingButtonEnabled(false);
     logActivity(`Pending list failed: ${payload.detail || response.statusText}`);
     return;
   }
   renderPendingList(payload);
+  setRestartPendingButtonEnabled(payload.length > 0);
   logActivity(`Loaded ${payload.length} pending document(s)`);
 }
 
@@ -800,6 +809,9 @@ clearFiltersBtn.addEventListener("click", async () => {
 });
 
 restartPendingBtn?.addEventListener("click", async () => {
+  if (restartPendingBtn.disabled) {
+    return;
+  }
   const confirmed = window.confirm(
     "Restart analysis for all documents that are not ready?"
   );
