@@ -221,7 +221,16 @@ class OpenAILLMProvider(LLMProvider):
 
             for attempt in range(2):
                 try:
-                    response = self._client.post("/chat/completions", json=request_payload)
+                    # Dense scanned pages can take much longer than metadata calls.
+                    try:
+                        response = self._client.post(
+                            "/chat/completions",
+                            json=request_payload,
+                            timeout=120.0,
+                        )
+                    except TypeError:
+                        # Test doubles may not accept per-request timeout kwargs.
+                        response = self._client.post("/chat/completions", json=request_payload)
                     try:
                         response_payload = response.json()
                     except ValueError:
