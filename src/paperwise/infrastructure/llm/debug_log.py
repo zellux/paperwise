@@ -11,12 +11,35 @@ from paperwise.infrastructure.config import get_settings
 _LOG_LOCK = Lock()
 
 
+def _is_token_usage_metric_key(normalized_key: str) -> bool:
+    return (
+        normalized_key.endswith("_tokens")
+        or normalized_key.endswith("_tokens_details")
+        or normalized_key.endswith("_token_count")
+        or "token_count" in normalized_key
+        or normalized_key.endswith("tokencount")
+        or normalized_key.endswith("tokensdetails")
+    )
+
+
+def _should_redact_key(key: str) -> bool:
+    normalized = str(key).strip().lower().replace("-", "_")
+    if "secret" in normalized:
+        return True
+    if "authorization" in normalized or "api_key" in normalized or normalized.endswith("apikey"):
+        return True
+    if normalized in {"token", "access_token", "refresh_token", "id_token"}:
+        return True
+    if "token" in normalized and not _is_token_usage_metric_key(normalized):
+        return True
+    return False
+
+
 def _redact(value: Any) -> Any:
     if isinstance(value, dict):
         redacted: dict[str, Any] = {}
         for key, item in value.items():
-            normalized = str(key).strip().lower()
-            if any(token in normalized for token in ("api_key", "authorization", "token", "secret")):
+            if _should_redact_key(str(key)):
                 redacted[key] = "***REDACTED***"
                 continue
             redacted[key] = _redact(item)
