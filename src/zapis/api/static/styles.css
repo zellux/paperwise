@@ -227,13 +227,13 @@ input[type="file"] {
 
 .filter-chip {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   border: 1px solid var(--stroke);
   border-radius: 10px;
-  padding: 0 8px 0 12px;
+  padding: 8px 8px 8px 12px;
   background: rgba(247, 248, 246, 0.9);
-  min-height: 48px;
+  min-height: 64px;
 }
 
 .chip-prefix {
@@ -263,6 +263,15 @@ input[type="file"] {
 
 .filter-select:focus {
   outline: none;
+}
+
+.filter-select[multiple] {
+  appearance: auto;
+  -webkit-appearance: auto;
+  background-image: none;
+  min-width: 160px;
+  min-height: 44px;
+  padding: 2px 2px 2px 0;
 }
 
 .btn-muted {
