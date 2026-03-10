@@ -156,6 +156,20 @@ class MetadataUpdateRequest(BaseModel):
     tags: list[str]
 
 
+class LLMConnectionTestRequest(BaseModel):
+    provider: str | None = None
+    model: str | None = None
+    base_url: str | None = None
+    api_key: str | None = None
+
+
+class LLMConnectionTestResponse(BaseModel):
+    ok: bool
+    provider: str
+    model: str
+    message: str
+
+
 PENDING_STATUSES = {
     DocumentStatus.RECEIVED,
     DocumentStatus.PROCESSING,
@@ -314,6 +328,17 @@ def _resolve_llm_provider_for_user(
 ) -> LLMProvider:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
+    return _resolve_llm_provider_from_preferences(
+        preferences=preferences,
+        default_llm_provider=default_llm_provider,
+    )
+
+
+def _resolve_llm_provider_from_preferences(
+    *,
+    preferences: dict[str, Any],
+    default_llm_provider: LLMProvider,
+) -> LLMProvider:
     provider_name = str(preferences.get("llm_provider", "")).strip().lower()
 
     # Preserve testability when a fake provider is injected via dependency override.
@@ -379,6 +404,22 @@ def _resolve_llm_provider_for_user(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail=f"Unsupported LLM provider: {provider_name}",
     )
+
+
+def _merge_llm_preferences(
+    preferences: dict[str, Any],
+    payload: LLMConnectionTestRequest,
+) -> dict[str, Any]:
+    merged = dict(preferences)
+    if payload.provider is not None:
+        merged["llm_provider"] = payload.provider
+    if payload.model is not None:
+        merged["llm_model"] = payload.model
+    if payload.base_url is not None:
+        merged["llm_base_url"] = payload.base_url
+    if payload.api_key is not None:
+        merged["llm_api_key"] = payload.api_key
+    return merged
 
 
 def _resolve_ocr_provider_for_user(
@@ -755,6 +796,48 @@ def restart_pending_documents_endpoint(
     return RestartPendingResponse(
         restarted_count=restarted_count,
         skipped_ready_count=skipped_ready_count,
+    )
+
+
+@router.post("/llm/test", response_model=LLMConnectionTestResponse)
+def test_llm_connection_endpoint(
+    payload: LLMConnectionTestRequest,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
+) -> LLMConnectionTestResponse:
+    preference = repository.get_user_preference(current_user.id)
+    base_preferences = dict(preference.preferences) if preference is not None else {}
+    merged_preferences = _merge_llm_preferences(base_preferences, payload)
+    llm_provider = _resolve_llm_provider_from_preferences(
+        preferences=merged_preferences,
+        default_llm_provider=default_llm_provider,
+    )
+    provider_name = str(merged_preferences.get("llm_provider", "")).strip().lower() or "custom"
+    model_name = str(merged_preferences.get("llm_model", "")).strip() or "default"
+    try:
+        llm_provider.suggest_metadata(
+            filename="connection-test.txt",
+            text_preview="Connection test sample.",
+            current_correspondent=None,
+            current_document_type=None,
+            existing_correspondents=[],
+            existing_document_types=[],
+            existing_tags=["Test"],
+        )
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"LLM API test failed: {exc}",
+        ) from exc
+
+    return LLMConnectionTestResponse(
+        ok=True,
+        provider=provider_name,
+        model=model_name,
+        message=f"LLM API test succeeded for {provider_name}.",
     )
 
 

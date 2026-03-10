@@ -17,6 +17,7 @@ const settingsLlmProviderSelect = document.getElementById("settingsLlmProviderSe
 const settingsLlmModelInput = document.getElementById("settingsLlmModelInput");
 const settingsLlmBaseUrlInput = document.getElementById("settingsLlmBaseUrlInput");
 const settingsLlmApiKeyInput = document.getElementById("settingsLlmApiKeyInput");
+const settingsTestLlmBtn = document.getElementById("settingsTestLlmBtn");
 const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
@@ -222,18 +223,31 @@ function renderSettingsForm() {
   syncUploadAvailability();
 }
 
-function getLlmUploadBlockReason() {
-  const provider = normalizeLlmProvider(llmSettings.provider);
+function readLlmSettingsFromControls() {
+  return {
+    provider: normalizeLlmProvider(settingsLlmProviderSelect?.value || llmSettings.provider),
+    model: String(settingsLlmModelInput?.value || "").trim(),
+    base_url: String(settingsLlmBaseUrlInput?.value || "").trim(),
+    api_key: String(settingsLlmApiKeyInput?.value || "").trim(),
+  };
+}
+
+function getLlmUploadBlockReasonForSettings(candidateSettings) {
+  const provider = normalizeLlmProvider(candidateSettings?.provider);
   if (!provider) {
     return "configure an LLM provider in Settings.";
   }
-  if (!String(llmSettings.api_key || "").trim()) {
+  if (!String(candidateSettings?.api_key || "").trim()) {
     return "add your LLM API key in Settings.";
   }
-  if (provider === "custom" && !String(llmSettings.base_url || "").trim()) {
+  if (provider === "custom" && !String(candidateSettings?.base_url || "").trim()) {
     return "set a custom LLM base URL in Settings.";
   }
   return "";
+}
+
+function getLlmUploadBlockReason() {
+  return getLlmUploadBlockReasonForSettings(llmSettings);
 }
 
 function syncUploadAvailability(options = {}) {
@@ -1762,12 +1776,7 @@ settingsForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const nextTheme = normalizeThemeName(settingsThemeSelect?.value || currentTheme);
   const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || docsPageSize);
-  llmSettings = {
-    provider: normalizeLlmProvider(settingsLlmProviderSelect?.value || llmSettings.provider),
-    model: String(settingsLlmModelInput?.value || "").trim(),
-    base_url: String(settingsLlmBaseUrlInput?.value || "").trim(),
-    api_key: String(settingsLlmApiKeyInput?.value || "").trim(),
-  };
+  llmSettings = readLlmSettingsFromControls();
   ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
   syncUploadAvailability();
   applyTheme(nextTheme);
@@ -1779,6 +1788,43 @@ settingsForm?.addEventListener("submit", async (event) => {
     await loadDocumentsList();
   }
   logActivity("Saved settings.");
+});
+
+settingsTestLlmBtn?.addEventListener("click", async () => {
+  const candidateSettings = readLlmSettingsFromControls();
+  const reason = getLlmUploadBlockReasonForSettings(candidateSettings);
+  if (reason) {
+    logActivity(`LLM API test blocked: ${reason}`);
+    return;
+  }
+
+  const previousText = settingsTestLlmBtn.textContent;
+  settingsTestLlmBtn.disabled = true;
+  settingsTestLlmBtn.textContent = "Testing...";
+  logActivity("Testing LLM API connection...");
+  try {
+    const response = await apiFetch("/documents/llm/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        provider: candidateSettings.provider,
+        model: candidateSettings.model,
+        base_url: candidateSettings.base_url,
+        api_key: candidateSettings.api_key,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      logActivity(`LLM API test failed: ${payload.detail || response.statusText}`);
+      return;
+    }
+    logActivity(`LLM API test passed (${payload.provider} / ${payload.model}).`);
+  } catch (error) {
+    logActivity(`LLM API test failed: ${error.message}`);
+  } finally {
+    settingsTestLlmBtn.disabled = false;
+    settingsTestLlmBtn.textContent = previousText || "Test LLM API";
+  }
 });
 
 uploadForm.addEventListener("submit", async (event) => {

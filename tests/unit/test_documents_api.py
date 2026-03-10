@@ -38,6 +38,9 @@ class FakeDispatcher:
 
 
 class FakeLLMProvider:
+    def __init__(self) -> None:
+        self.calls = 0
+
     def suggest_metadata(
         self,
         *,
@@ -56,6 +59,7 @@ class FakeLLMProvider:
         del existing_correspondents
         del existing_document_types
         del existing_tags
+        self.calls += 1
         return {
             "suggested_title": "Experian Credit Report",
             "document_date": "2026-03-01",
@@ -1143,5 +1147,64 @@ def test_llm_parse_requires_user_llm_provider_configuration() -> None:
         parse_response = client.post(f"/documents/{document_id}/llm-parse")
         assert parse_response.status_code == 400
         assert "Configure an LLM provider in Settings" in parse_response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_connection_test_requires_provider_configuration() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+
+    try:
+        client = TestClient(app)
+        response = client.post("/documents/llm/test", json={})
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Configure an LLM provider in Settings before running LLM parse."
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_connection_test_requires_base_url_for_custom_provider() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents/llm/test",
+            json={"provider": "custom", "api_key": "sk-test"},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == "Custom LLM provider requires a base URL in Settings."
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_connection_test_accepts_payload_overrides_and_calls_provider() -> None:
+    repository = InMemoryDocumentRepository()
+    fake_provider = FakeLLMProvider()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: fake_provider
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents/llm/test",
+            json={
+                "provider": "openai",
+                "model": "gpt-4.1-mini",
+                "api_key": "sk-test",
+                "base_url": "https://api.openai.com/v1",
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["ok"] is True
+        assert payload["provider"] == "openai"
+        assert payload["model"] == "gpt-4.1-mini"
+        assert fake_provider.calls == 1
     finally:
         app.dependency_overrides.clear()
