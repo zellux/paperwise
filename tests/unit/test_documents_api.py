@@ -449,6 +449,14 @@ def test_reprocess_document_requeues_and_sets_processing() -> None:
         assert payload["job_id"] == "job-test-1"
         assert dispatcher.enqueued.count(doc_id) == 2
 
+        history_response = client.get(f"/documents/{doc_id}/history")
+        assert history_response.status_code == 200
+        history = history_response.json()
+        reprocess_events = [event for event in history if event["source"] == "api.reprocess"]
+        assert reprocess_events
+        assert reprocess_events[0]["event_type"] == "processing_restarted"
+        assert reprocess_events[0]["changes"]["status"]["after"] == "processing"
+
         get_response = client.get(f"/documents/{doc_id}")
         assert get_response.status_code == 200
         assert get_response.json()["status"] == "processing"

@@ -123,3 +123,27 @@ def build_file_moved_history_event(
             "to_blob_uri": to_blob_uri,
         },
     )
+
+
+def build_processing_restarted_history_event(
+    *,
+    document_id: str,
+    actor_type: HistoryActorType,
+    actor_id: str | None,
+    source: str,
+    previous_status: str | None,
+    current_status: str,
+) -> DocumentHistoryEvent:
+    return _new_event(
+        document_id=document_id,
+        event_type=HistoryEventType.PROCESSING_RESTARTED,
+        actor_type=actor_type,
+        actor_id=actor_id,
+        source=source,
+        changes={
+            "status": {
+                "before": previous_status,
+                "after": current_status,
+            }
+        },
+    )

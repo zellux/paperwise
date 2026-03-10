@@ -26,6 +26,7 @@ from zapis.application.services.file_relocation import move_blob_to_processed
 from zapis.application.services.history import (
     build_file_moved_history_event,
     build_metadata_history_events,
+    build_processing_restarted_history_event,
 )
 from zapis.application.services.llm_parsing import parse_with_llm
 from zapis.application.services.parsing import parse_document_blob
@@ -448,11 +449,13 @@ def restart_pending_documents_endpoint(
     documents = repository.list_documents(limit=limit)
     restarted_count = 0
     skipped_ready_count = 0
+    history_events: list[DocumentHistoryEvent] = []
 
     for document in documents:
         if document.status == DocumentStatus.READY:
             skipped_ready_count += 1
             continue
+        previous_status = document.status.value
         _set_document_status(
             document=document,
             repository=repository,
@@ -464,8 +467,19 @@ def restart_pending_documents_endpoint(
             filename=document.filename,
             content_type=document.content_type,
         )
+        history_events.append(
+            build_processing_restarted_history_event(
+                document_id=document.id,
+                actor_type=HistoryActorType.USER,
+                actor_id=document.owner_id,
+                source="api.pending_restart",
+                previous_status=previous_status,
+                current_status=document.status.value,
+            )
+        )
         restarted_count += 1
 
+    repository.append_history_events(history_events)
     return RestartPendingResponse(
         restarted_count=restarted_count,
         skipped_ready_count=skipped_ready_count,
@@ -514,6 +528,7 @@ def reprocess_document_endpoint(
             detail="Document not found",
         )
 
+    previous_status = document.status.value
     _set_document_status(
         document=document,
         repository=repository,
@@ -524,6 +539,18 @@ def reprocess_document_endpoint(
         blob_uri=document.blob_uri,
         filename=document.filename,
         content_type=document.content_type,
+    )
+    repository.append_history_events(
+        [
+            build_processing_restarted_history_event(
+                document_id=document.id,
+                actor_type=HistoryActorType.USER,
+                actor_id=document.owner_id,
+                source="api.reprocess",
+                previous_status=previous_status,
+                current_status=document.status.value,
+            )
+        ]
     )
     return CreateDocumentResponse(
         id=document.id,

@@ -15,6 +15,7 @@ class HistoryEventType(StrEnum):
     TAGS_ADDED = "tags_added"
     TAGS_REMOVED = "tags_removed"
     FILE_MOVED = "file_moved"
+    PROCESSING_RESTARTED = "processing_restarted"
 
 
 class HistoryActorType(StrEnum):
