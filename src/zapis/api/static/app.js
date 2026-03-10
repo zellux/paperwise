@@ -666,6 +666,7 @@ function renderDocsList(documents) {
     }
 
     const titleCell = document.createElement("td");
+    titleCell.setAttribute("data-label", "Title");
     const titleButton = document.createElement("button");
     titleButton.className = "link-button";
     titleButton.type = "button";
@@ -676,10 +677,13 @@ function renderDocsList(documents) {
     titleCell.appendChild(titleButton);
 
     const typeCell = document.createElement("td");
+    typeCell.setAttribute("data-label", "Type");
     typeCell.textContent = documentType;
     const correspondentCell = document.createElement("td");
+    correspondentCell.setAttribute("data-label", "Correspondent");
     correspondentCell.textContent = correspondent;
     const tagsCell = document.createElement("td");
+    tagsCell.setAttribute("data-label", "Tags");
     if (doc.llm_metadata && Array.isArray(doc.llm_metadata.tags) && doc.llm_metadata.tags.length) {
       const pills = document.createElement("div");
       pills.className = "tag-pills";
@@ -694,11 +698,14 @@ function renderDocsList(documents) {
       tagsCell.textContent = tags;
     }
     const dateCell = document.createElement("td");
+    dateCell.setAttribute("data-label", "Date");
     dateCell.textContent = documentDate;
     const statusCell = document.createElement("td");
+    statusCell.setAttribute("data-label", "Status");
     statusCell.textContent = formatStatus(doc.status);
 
     const actionCell = document.createElement("td");
+    actionCell.setAttribute("data-label", "Action");
     const actionsWrap = document.createElement("div");
     actionsWrap.className = "table-actions";
     actionsWrap.appendChild(
@@ -737,10 +744,13 @@ function renderTagsList(tagStats) {
   for (const stat of tagStats) {
     const row = document.createElement("tr");
     const tagCell = document.createElement("td");
+    tagCell.setAttribute("data-label", "Tag");
     tagCell.textContent = stat.tag;
     const countCell = document.createElement("td");
+    countCell.setAttribute("data-label", "Documents");
     countCell.textContent = String(stat.document_count);
     const actionCell = document.createElement("td");
+    actionCell.setAttribute("data-label", "Action");
 
     const viewBtn = document.createElement("button");
     viewBtn.className = "btn";
@@ -777,6 +787,7 @@ function renderPendingList(documents) {
     const row = document.createElement("tr");
 
     const titleCell = document.createElement("td");
+    titleCell.setAttribute("data-label", "Title");
     const titleButton = document.createElement("button");
     titleButton.className = "link-button";
     titleButton.type = "button";
@@ -787,10 +798,13 @@ function renderPendingList(documents) {
     titleCell.appendChild(titleButton);
 
     const statusCell = document.createElement("td");
+    statusCell.setAttribute("data-label", "Status");
     statusCell.textContent = formatStatus(doc.status);
     const createdCell = document.createElement("td");
+    createdCell.setAttribute("data-label", "Created");
     createdCell.textContent = new Date(doc.created_at).toLocaleString();
     const actionCell = document.createElement("td");
+    actionCell.setAttribute("data-label", "Action");
 
     const button = document.createElement("button");
     button.className = "btn";
