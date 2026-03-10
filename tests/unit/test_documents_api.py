@@ -89,6 +89,11 @@ def test_create_and_get_document() -> None:
         assert get_response.json()["size_bytes"] == 11
         assert get_response.json()["blob_uri"].startswith("file://")
         assert dispatcher.enqueued == [payload["id"]]
+
+        file_response = client.get(f"/documents/{payload['id']}/file")
+        assert file_response.status_code == 200
+        assert file_response.content == b"%PDF-sample"
+        assert file_response.headers["content-type"].startswith("application/pdf")
     finally:
         app.dependency_overrides.clear()
 
@@ -100,6 +105,19 @@ def test_get_document_not_found() -> None:
     try:
         client = TestClient(app)
         response = client.get("/documents/missing-doc")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Document not found"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_document_file_not_found() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        response = client.get("/documents/missing-doc/file")
         assert response.status_code == 404
         assert response.json()["detail"] == "Document not found"
     finally:
@@ -161,6 +179,11 @@ def test_list_documents_includes_llm_metadata_when_available() -> None:
         assert get_response.status_code == 200
         assert get_response.json()["status"] == "ready"
         assert "/processed/" in get_response.json()["blob_uri"]
+
+        file_response = client.get(f"/documents/{doc_id}/file")
+        assert file_response.status_code == 200
+        assert file_response.headers["content-type"].startswith("application/pdf")
+        assert file_response.content == b"%PDF-1.7\nexperian"
 
         list_response = client.get("/documents")
         assert list_response.status_code == 200

@@ -4,9 +4,11 @@ from typing import Any
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
+from urllib.parse import unquote, urlparse
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from zapis.api.dependencies import (
@@ -218,6 +220,18 @@ def _sanitize_filename(value: str) -> str:
     if not cleaned:
         return "uploaded-document.bin"
     return cleaned
+
+
+def _resolve_file_path_from_uri(blob_uri: str) -> Path | None:
+    if not blob_uri:
+        return None
+    parsed = urlparse(blob_uri)
+    if parsed.scheme != "file":
+        return None
+    resolved = Path(unquote(parsed.path))
+    if not resolved.exists() or not resolved.is_file():
+        return None
+    return resolved
 
 
 def _to_response(document: Document) -> DocumentResponse:
@@ -523,6 +537,30 @@ def get_document_detail_endpoint(
         )
     llm_result = repository.get_llm_parse_result(document_id)
     return _to_detail_response(document=document, llm_result=llm_result)
+
+
+@router.get("/{document_id}/file")
+def get_document_file_endpoint(
+    document_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> FileResponse:
+    document = get_document(document_id=document_id, repository=repository)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    file_path = _resolve_file_path_from_uri(document.blob_uri)
+    if file_path is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document file not found",
+        )
+    return FileResponse(
+        path=file_path,
+        media_type=document.content_type or "application/octet-stream",
+        filename=document.filename,
+    )
 
 
 @router.post("/{document_id}/reprocess", response_model=CreateDocumentResponse)
