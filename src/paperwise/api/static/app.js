@@ -260,10 +260,13 @@ function delay(ms) {
   });
 }
 
-function collectPdfFiles(fileList) {
+const SUPPORTED_UPLOAD_EXTENSIONS = new Set([".pdf", ".txt", ".md", ".markdown", ".doc", ".docx"]);
+
+function collectSupportedFiles(fileList) {
   return [...(fileList || [])].filter((file) => {
     const name = (file.name || "").toLowerCase();
-    return file.type === "application/pdf" || name.endsWith(".pdf");
+    const ext = name.includes(".") ? `.${name.split(".").pop()}` : "";
+    return SUPPORTED_UPLOAD_EXTENSIONS.has(ext);
   });
 }
 
@@ -273,7 +276,7 @@ function updateSelectedFilesLabel() {
   }
   const files = fileInput.files ? [...fileInput.files] : [];
   if (!files.length) {
-    uploadSelectionLabel.textContent = "or click to select one or more files";
+    uploadSelectionLabel.textContent = "Supports: PDF, TXT, MD, DOCX, DOC";
     return;
   }
   if (files.length === 1) {
@@ -1215,9 +1218,9 @@ signOutBtn?.addEventListener("click", () => {
 uploadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  const files = collectPdfFiles(fileInput?.files || []);
+  const files = collectSupportedFiles(fileInput?.files || []);
   if (!files.length) {
-    logActivity("Upload blocked: at least one PDF file is required.");
+    logActivity("Upload blocked: select at least one supported document file.");
     return;
   }
 
@@ -1283,9 +1286,9 @@ uploadDropzone?.addEventListener("keydown", (event) => {
 });
 
 uploadDropzone?.addEventListener("drop", (event) => {
-  const dropped = collectPdfFiles(event.dataTransfer?.files || []);
+  const dropped = collectSupportedFiles(event.dataTransfer?.files || []);
   if (!dropped.length) {
-    logActivity("Drop ignored: only PDF files are supported.");
+    logActivity("Drop ignored: only supported document types are accepted.");
     return;
   }
   setSelectedFiles(dropped);

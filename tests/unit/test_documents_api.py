@@ -1,5 +1,7 @@
 from pathlib import Path
 from datetime import UTC, datetime
+import io
+from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
 
@@ -67,6 +69,43 @@ TEST_USER = User(
 )
 
 
+def _build_docx_bytes(text: str) -> bytes:
+    buffer = io.BytesIO()
+    with ZipFile(buffer, "w") as zip_file:
+        zip_file.writestr(
+            "[Content_Types].xml",
+            (
+                '<?xml version="1.0" encoding="UTF-8"?>'
+                '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+                '<Default Extension="xml" ContentType="application/xml"/>'
+                '<Override PartName="/word/document.xml" '
+                'ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+                "</Types>"
+            ),
+        )
+        zip_file.writestr(
+            "_rels/.rels",
+            (
+                '<?xml version="1.0" encoding="UTF-8"?>'
+                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                '<Relationship Id="rId1" '
+                'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+                'Target="word/document.xml"/>'
+                "</Relationships>"
+            ),
+        )
+        zip_file.writestr(
+            "word/document.xml",
+            (
+                '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                f"<w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:body></w:document>"
+            ),
+        )
+    return buffer.getvalue()
+
+
 def test_create_and_get_document() -> None:
     store_dir = Path("local/test-object-store")
     if store_dir.exists():
@@ -122,6 +161,68 @@ def test_get_document_not_found() -> None:
         response = client.get("/documents/missing-doc")
         assert response.status_code == 404
         assert response.json()["detail"] == "Document not found"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_upload_and_parse_text_document() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={"file": ("notes.txt", b"PPMG Pediatrics follow-up notes", "text/plain")},
+        )
+        assert create_response.status_code == 201
+        doc_id = create_response.json()["id"]
+
+        parse_response = client.post(f"/documents/{doc_id}/parse")
+        assert parse_response.status_code == 200
+        payload = parse_response.json()
+        assert payload["parser"] == "stub-local"
+        assert "PPMG Pediatrics" in payload["text_preview"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_upload_and_parse_docx_document() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={
+                "file": (
+                    "visit.docx",
+                    _build_docx_bytes("PPMG Pediatrics annual visit"),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
+        assert create_response.status_code == 201
+        doc_id = create_response.json()["id"]
+
+        parse_response = client.post(f"/documents/{doc_id}/parse")
+        assert parse_response.status_code == 200
+        payload = parse_response.json()
+        assert payload["parser"] == "stub-local"
+        assert "PPMG Pediatrics annual visit" in payload["text_preview"]
     finally:
         app.dependency_overrides.clear()
 

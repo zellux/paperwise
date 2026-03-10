@@ -100,6 +100,9 @@ Each metadata sidecar JSON includes the original filename, content type, checksu
 Database `documents.blob_uri` values store relative object-store keys (for example:
 `incoming/2026/03/10/<token>_file.pdf`) to avoid machine-specific absolute paths.
 
+Upload supports multiple document types in the UI and API, including:
+`PDF`, `TXT`, `MD`, `DOCX`, and `DOC`.
+
 To migrate existing stored files and update `documents.blob_uri` paths:
 
 ```bash

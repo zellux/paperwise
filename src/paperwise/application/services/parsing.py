@@ -1,4 +1,7 @@
 from datetime import UTC, datetime
+from html import unescape
+import re
+from zipfile import BadZipFile, ZipFile
 
 from paperwise.domain.models import ParseResult
 from paperwise.infrastructure.config import get_settings
@@ -15,11 +18,33 @@ def parse_document_blob(
     if blob_path is None:
         raise ValueError(f"Unsupported blob reference: {blob_uri}")
     raw = blob_path.read_bytes()
-    is_pdf = raw.startswith(b"%PDF")
-    page_count = raw.count(b"/Type /Page") if is_pdf else 0
-    if is_pdf and page_count == 0:
+    suffix = blob_path.suffix.lower()
+
+    is_pdf = raw.startswith(b"%PDF") or suffix == ".pdf"
+    if is_pdf:
+        page_count = raw.count(b"/Type /Page")
+        if page_count == 0:
+            page_count = 1
+        text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
+    elif suffix in {".txt", ".md", ".markdown"}:
+        text_preview = raw[:4000].decode("utf-8", errors="replace").replace("\x00", "")
+        page_count = max(1, text_preview.count("\n\n") + 1) if text_preview.strip() else 1
+    elif suffix == ".docx":
+        try:
+            with ZipFile(blob_path) as zip_file:
+                xml = zip_file.read("word/document.xml").decode("utf-8", errors="ignore")
+            text = re.sub(r"</w:p>", "\n", xml)
+            text = re.sub(r"<[^>]+>", "", text)
+            text_preview = unescape(text).replace("\x00", "").strip()
+            if not text_preview:
+                text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
+            page_count = max(1, text.count("\n") // 30 + 1)
+        except (KeyError, BadZipFile):
+            text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
+            page_count = 1
+    else:
+        text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
         page_count = 1
-    text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
 
     return ParseResult(
         document_id=document_id,
