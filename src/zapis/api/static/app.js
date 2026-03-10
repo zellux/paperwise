@@ -67,7 +67,18 @@ function renderDocsList(documents) {
     }
 
     const titleCell = document.createElement("td");
-    titleCell.textContent = suggestedTitle;
+    const titleButton = document.createElement("button");
+    titleButton.className = "link-button";
+    titleButton.type = "button";
+    titleButton.textContent = suggestedTitle;
+    titleButton.addEventListener("click", async () => {
+      try {
+        await loadDocument(doc.id);
+      } catch (error) {
+        logActivity(error.message);
+      }
+    });
+    titleCell.appendChild(titleButton);
     const typeCell = document.createElement("td");
     typeCell.textContent = documentType;
     const correspondentCell = document.createElement("td");

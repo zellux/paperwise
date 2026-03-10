@@ -198,6 +198,17 @@ input[type="file"] {
   border-color: rgba(0, 0, 0, 0.1);
 }
 
+.link-button {
+  border: 0;
+  background: transparent;
+  color: #0b6e4f;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+  text-decoration: underline;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;
