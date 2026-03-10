@@ -1,15 +1,18 @@
 :root {
-  --bg-main: #f4f1e8;
-  --bg-panel: rgba(255, 255, 255, 0.8);
-  --stroke: rgba(21, 33, 27, 0.16);
+  --bg-main: linear-gradient(140deg, #f4f1e8, #ebf2ea 50%, #f5ece6);
+  --bg-panel: rgba(255, 255, 255, 0.78);
+  --stroke: rgba(21, 33, 27, 0.18);
+  --stroke-soft: rgba(21, 33, 27, 0.1);
   --ink: #15211b;
   --ink-soft: #4b5a4f;
   --accent: #146f52;
+  --accent-soft: rgba(20, 111, 82, 0.12);
   --accent-2: #bf5e25;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --sans: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
   --serif: "Newsreader", Georgia, serif;
-  --shadow: 0 14px 30px rgba(20, 38, 30, 0.11);
+  --shadow: 0 12px 28px rgba(20, 38, 30, 0.12);
+  --link: #0b6e4f;
 }
 
 * {
@@ -21,7 +24,7 @@ body {
   margin: 0;
   min-height: 100%;
   color: var(--ink);
-  background: linear-gradient(145deg, #f4f1e8, #ebf2ea 45%, #f5ece6);
+  background: var(--bg-main);
   font-family: var(--sans);
 }
 
@@ -115,7 +118,7 @@ h1 {
 
 .nav-link {
   text-align: left;
-  border: 1px solid rgba(0, 0, 0, 0.14);
+  border: 1px solid var(--stroke);
   background: rgba(255, 255, 255, 0.85);
   color: var(--ink);
   border-radius: 10px;
@@ -126,8 +129,8 @@ h1 {
 }
 
 .nav-link.active {
-  background: rgba(20, 111, 82, 0.14);
-  color: #114d39;
+  background: var(--accent-soft);
+  color: #15523d;
   border-color: transparent;
 }
 
@@ -203,7 +206,7 @@ input[type="file"] {
 .link-button {
   border: 0;
   background: transparent;
-  color: #0d6b4e;
+  color: var(--link);
   cursor: pointer;
   font: inherit;
   padding: 0;
@@ -247,7 +250,7 @@ input[type="file"] {
   margin: 0;
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--stroke-soft);
   background: rgba(255, 255, 255, 0.78);
   min-height: 150px;
   font-family: var(--mono);
@@ -257,7 +260,7 @@ input[type="file"] {
 }
 
 .docs-table-wrap {
-  border: 1px solid rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--stroke);
   border-radius: 12px;
   overflow: auto;
   background: rgba(255, 255, 255, 0.82);
@@ -280,7 +283,7 @@ input[type="file"] {
 
 .docs-table th,
 .docs-table td {
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--stroke-soft);
   padding: 9px 10px;
   text-align: left;
   vertical-align: top;
@@ -290,15 +293,15 @@ input[type="file"] {
 .docs-table th {
   position: sticky;
   top: 0;
-  background: rgba(20, 111, 82, 0.1);
-  color: #184031;
+  background: var(--accent-soft);
+  color: #15523d;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   font-size: 0.72rem;
 }
 
 .docs-table tbody tr:hover {
-  background: rgba(20, 111, 82, 0.055);
+  background: rgba(20, 111, 82, 0.06);
 }
 
 @keyframes rise-in {
