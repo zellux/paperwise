@@ -49,6 +49,11 @@ def activity_page() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
 
 
+@router.get("/ui/settings", include_in_schema=False)
+def settings_page() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
 @router.get("/style-lab", include_in_schema=False)
 def style_lab() -> FileResponse:
     return FileResponse(_STATIC_DIR / "style-lab.html")

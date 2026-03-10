@@ -6,10 +6,12 @@ const viewDocumentFileBtn = document.getElementById("viewDocumentFileBtn");
 const docsFilterForm = document.getElementById("docsFilterForm");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 const restartPendingBtn = document.getElementById("restartPendingBtn");
-const pageSizeSelect = document.getElementById("pageSizeSelect");
 const pagePrevBtn = document.getElementById("pagePrevBtn");
 const pageNextBtn = document.getElementById("pageNextBtn");
 const pageIndicator = document.getElementById("pageIndicator");
+const settingsForm = document.getElementById("settingsForm");
+const settingsThemeSelect = document.getElementById("settingsThemeSelect");
+const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
 const signInForm = document.getElementById("signInForm");
@@ -17,7 +19,6 @@ const registerForm = document.getElementById("registerForm");
 const authMessage = document.getElementById("authMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const sessionUserLabel = document.getElementById("sessionUserLabel");
-const themeSelect = document.getElementById("themeSelect");
 const fileInput = document.getElementById("fileInput");
 const uploadDropzone = document.getElementById("uploadDropzone");
 const uploadSelectionLabel = document.getElementById("uploadSelectionLabel");
@@ -61,6 +62,7 @@ const VIEW_ID_TO_PARAM = {
   "section-pending": "pending",
   "section-upload": "upload",
   "section-activity": "activity",
+  "section-settings": "settings",
 };
 const VIEW_PARAM_TO_ID = Object.fromEntries(
   Object.entries(VIEW_ID_TO_PARAM).map(([viewId, param]) => [param, viewId])
@@ -73,6 +75,7 @@ const PATH_TO_VIEW_ID = {
   "/ui/pending": "section-pending",
   "/ui/upload": "section-upload",
   "/ui/activity": "section-activity",
+  "/ui/settings": "section-settings",
 };
 const VIEW_ID_TO_PATH = {
   "section-docs": "/ui/documents",
@@ -82,6 +85,7 @@ const VIEW_ID_TO_PATH = {
   "section-pending": "/ui/pending",
   "section-upload": "/ui/upload",
   "section-activity": "/ui/activity",
+  "section-settings": "/ui/settings",
 };
 
 let currentDocumentId = "";
@@ -150,8 +154,17 @@ function applyTheme(themeName) {
   const classNames = SUPPORTED_THEMES.map((name) => `theme-${name}`);
   document.body.classList.remove(...classNames);
   document.body.classList.add(`theme-${currentTheme}`);
-  if (themeSelect && themeSelect.value !== currentTheme) {
-    themeSelect.value = currentTheme;
+  if (settingsThemeSelect && settingsThemeSelect.value !== currentTheme) {
+    settingsThemeSelect.value = currentTheme;
+  }
+}
+
+function renderSettingsForm() {
+  if (settingsThemeSelect && settingsThemeSelect.value !== currentTheme) {
+    settingsThemeSelect.value = currentTheme;
+  }
+  if (settingsPageSizeSelect && settingsPageSizeSelect.value !== String(docsPageSize)) {
+    settingsPageSizeSelect.value = String(docsPageSize);
   }
 }
 
@@ -509,6 +522,7 @@ function clearSession() {
     status: ["ready"],
   });
   currentViewId = "section-docs";
+  renderSettingsForm();
   renderSessionState();
 }
 
@@ -1302,9 +1316,6 @@ function renderPaginationControls(currentCount) {
   if (pageIndicator) {
     pageIndicator.textContent = `Page ${docsPage}`;
   }
-  if (pageSizeSelect && pageSizeSelect.value !== String(docsPageSize)) {
-    pageSizeSelect.value = String(docsPageSize);
-  }
   if (pagePrevBtn) {
     pagePrevBtn.disabled = docsPage <= 1;
   }
@@ -1482,9 +1493,19 @@ signOutBtn?.addEventListener("click", () => {
   setAuthMessage("Signed out.");
 });
 
-themeSelect?.addEventListener("change", () => {
-  applyTheme(themeSelect.value);
-  scheduleUserPreferenceSave();
+settingsForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const nextTheme = normalizeThemeName(settingsThemeSelect?.value || currentTheme);
+  const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || docsPageSize);
+  applyTheme(nextTheme);
+  docsPageSize = nextPageSize;
+  docsPage = 1;
+  syncUrlFromFilters();
+  await saveUserPreferences();
+  if (currentViewId === "section-docs") {
+    await loadDocumentsList();
+  }
+  logActivity("Saved settings.");
 });
 
 uploadForm.addEventListener("submit", async (event) => {
@@ -1694,13 +1715,6 @@ clearFiltersBtn.addEventListener("click", async () => {
   await loadDocumentsList();
 });
 
-pageSizeSelect?.addEventListener("change", async () => {
-  docsPageSize = normalizePageSize(pageSizeSelect.value);
-  docsPage = 1;
-  syncUrlFromFilters();
-  await loadDocumentsList();
-});
-
 pagePrevBtn?.addEventListener("click", async () => {
   if (docsPage <= 1) {
     return;
@@ -1750,6 +1764,7 @@ window.addEventListener("popstate", async () => {
   }
   readFiltersFromUrl();
   applyFiltersToControls();
+  renderSettingsForm();
   setActiveView(currentViewId);
   setActiveNav(currentViewId);
   if (currentViewId === "section-tags") {
@@ -1768,6 +1783,10 @@ window.addEventListener("popstate", async () => {
     await openDocumentView(currentDocumentId);
     return;
   }
+  if (currentViewId === "section-settings") {
+    renderSettingsForm();
+    return;
+  }
   await loadDocumentsList();
 });
 
@@ -1779,6 +1798,7 @@ async function initializeApp() {
 
   await hydrateUserPreferencesForSession();
   applyFiltersToControls();
+  renderSettingsForm();
   setActiveView(currentViewId);
   setActiveNav(currentViewId);
 
@@ -1813,6 +1833,10 @@ async function initializeApp() {
         logActivity(`Initial document detail failed: ${error.message}`);
       });
     }
+  }
+
+  if (currentViewId === "section-settings") {
+    renderSettingsForm();
   }
 }
 
