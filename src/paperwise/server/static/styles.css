@@ -1004,6 +1004,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   box-shadow: 0 8px 16px rgba(70, 78, 83, 0.14);
 }
 
+#restartPendingBtn:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 22%, white);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--stroke));
+  color: color-mix(in srgb, var(--accent) 80%, black);
+}
+
+#restartPendingBtn:not(:disabled):hover {
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
 .filters-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
