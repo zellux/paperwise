@@ -707,6 +707,7 @@ def test_update_document_metadata_upserts_and_updates_taxonomy() -> None:
         assert detail["llm_metadata"]["suggested_title"] == "March Statement"
         assert detail["document"]["status"] == "ready"
         assert detail["ocr_text_preview"] is None
+        assert detail["ocr_parsed_at"] is None
 
         history_response = client.get(f"/documents/{doc_id}/history")
         assert history_response.status_code == 200
@@ -759,7 +760,9 @@ def test_parse_document_roundtrip() -> None:
 
         detail_response = client.get(f"/documents/{doc_id}/detail")
         assert detail_response.status_code == 200
-        assert "fake-content" in detail_response.json()["ocr_text_preview"]
+        detail_payload = detail_response.json()
+        assert "fake-content" in detail_payload["ocr_text_preview"]
+        assert detail_payload["ocr_parsed_at"] is not None
     finally:
         app.dependency_overrides.clear()
 

@@ -147,6 +147,7 @@ class DocumentDetailResponse(BaseModel):
     document: DocumentResponse
     llm_metadata: DocumentListMetadata | None = None
     ocr_text_preview: str | None = None
+    ocr_parsed_at: datetime | None = None
 
 
 class MetadataUpdateRequest(BaseModel):
@@ -505,6 +506,7 @@ def _to_detail_response(
             else None
         ),
         ocr_text_preview=parse_result.text_preview if parse_result is not None else None,
+        ocr_parsed_at=parse_result.created_at if parse_result is not None else None,
     )
 
 

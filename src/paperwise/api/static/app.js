@@ -43,6 +43,7 @@ const detailFilename = document.getElementById("detailFilename");
 const detailStatus = document.getElementById("detailStatus");
 const detailOcrContent = document.getElementById("detailOcrContent");
 const detailCreatedAt = document.getElementById("detailCreatedAt");
+const detailOcrParsedAt = document.getElementById("detailOcrParsedAt");
 const detailContentType = document.getElementById("detailContentType");
 const detailSizeBytes = document.getElementById("detailSizeBytes");
 const detailChecksum = document.getElementById("detailChecksum");
@@ -1727,6 +1728,9 @@ async function openDocumentView(documentId) {
   detailOcrContent.textContent = String(payload.ocr_text_preview || "").trim() || "-";
   detailCreatedAt.textContent = doc.created_at
     ? new Date(doc.created_at).toLocaleString()
+    : "-";
+  detailOcrParsedAt.textContent = payload.ocr_parsed_at
+    ? new Date(payload.ocr_parsed_at).toLocaleString()
     : "-";
   detailContentType.textContent = doc.content_type || "-";
   detailSizeBytes.textContent = `${formatBytes(doc.size_bytes)} (${doc.size_bytes || 0} bytes)`;

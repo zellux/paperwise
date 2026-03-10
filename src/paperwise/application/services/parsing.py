@@ -20,6 +20,7 @@ def parse_document_blob(
     if blob_path is None:
         raise ValueError(f"Unsupported blob reference: {blob_uri}")
     raw = blob_path.read_bytes()
+    normalized_ocr = str(ocr_provider).strip().lower()
     suffix = blob_path.suffix.lower()
 
     is_pdf = raw.startswith(b"%PDF") or suffix == ".pdf"
@@ -27,7 +28,9 @@ def parse_document_blob(
         page_count = raw.count(b"/Type /Page")
         if page_count == 0:
             page_count = 1
-        text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
+        # Keep a stub distinction between OCR modes so reprocess output can visibly change.
+        preview_limit = 4000 if normalized_ocr == "llm" else 200
+        text_preview = raw[:preview_limit].decode("latin-1", errors="ignore").replace("\x00", "")
     elif suffix in {".txt", ".md", ".markdown"}:
         text_preview = raw[:4000].decode("utf-8", errors="replace").replace("\x00", "")
         page_count = max(1, text_preview.count("\n\n") + 1) if text_preview.strip() else 1
@@ -49,7 +52,7 @@ def parse_document_blob(
         page_count = 1
 
     parser_name = "stub-local"
-    if str(ocr_provider).strip().lower() == "llm":
+    if normalized_ocr == "llm":
         parser_name = "stub-llm-ocr"
 
     return ParseResult(
