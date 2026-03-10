@@ -12,3 +12,7 @@ _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 def index() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
 
+
+@router.get("/style-lab", include_in_schema=False)
+def style_lab() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "style-lab.html")

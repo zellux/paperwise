@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>zapis style lab</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Manrope:wght@400;600;700&family=Newsreader:opsz,wght@6..72,500;6..72,700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/style-lab.css" />
+  </head>
+  <body class="theme-atlas">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">zapis</p>
+        <h1>UI Style Lab</h1>
+        <p class="subhead">Pick one visual direction for the production UI.</p>
+      </div>
+      <div class="theme-switcher">
+        <button class="theme-btn active" data-theme="atlas" type="button">Atlas Paper</button>
+        <button class="theme-btn" data-theme="ledger" type="button">Ledger Pro</button>
+        <button class="theme-btn" data-theme="signal" type="button">Signal Grid</button>
+        <button class="theme-btn" data-theme="studio" type="button">Studio Calm</button>
+      </div>
+    </header>
+
+    <main class="shell">
+      <aside class="sidebar card">
+        <p class="eyebrow">navigation</p>
+        <button class="nav-item active" type="button">Documents</button>
+        <button class="nav-item" type="button">Document</button>
+        <button class="nav-item" type="button">Tags</button>
+        <button class="nav-item" type="button">Pending Analysis</button>
+        <button class="nav-item" type="button">Upload</button>
+      </aside>
+
+      <section class="content card">
+        <div class="content-head">
+          <h2>Documents</h2>
+          <span class="pill">24 results</span>
+        </div>
+
+        <div class="filters">
+          <label class="filter"><span>Tags</span><select><option>Identity</option></select></label>
+          <label class="filter"><span>Correspondent</span><select><option>Experian</option></select></label>
+          <label class="filter"><span>Type</span><select><option>Credit Report</option></select></label>
+          <label class="filter"><span>Status</span><select><option>Ready</option></select></label>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Title</th>
+                <th>Type</th>
+                <th>Correspondent</th>
+                <th>Tags</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><a href="#">Experian Credit Report</a></td>
+                <td>Credit Report</td>
+                <td>Experian</td>
+                <td>Identity, Credit</td>
+                <td><span class="status ready">Ready</span></td>
+              </tr>
+              <tr>
+                <td><a href="#">Blue Shield Claim Summary</a></td>
+                <td>Medical Reports</td>
+                <td>Blue Shield</td>
+                <td>Insurance, Medical</td>
+                <td><span class="status parsing">Parsing</span></td>
+              </tr>
+              <tr>
+                <td><a href="#">Power Bill - February</a></td>
+                <td>Bill</td>
+                <td>Pacific Gas &amp; Electric</td>
+                <td>Utilities</td>
+                <td><span class="status received">Received</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/style-lab.js" defer></script>
+  </body>
+</html>

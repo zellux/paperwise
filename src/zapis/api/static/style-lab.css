@@ -1,0 +1,304 @@
+:root {
+  --font-sans: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
+  --font-serif: "Newsreader", Georgia, serif;
+  --font-mono: "IBM Plex Mono", Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  padding: 20px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 18px;
+  margin-bottom: 16px;
+}
+
+h1 {
+  margin: 4px 0 2px;
+  font-size: 1.6rem;
+  font-family: var(--heading-font, var(--font-sans));
+}
+
+h2 {
+  margin: 0;
+  font-size: 1.05rem;
+  font-family: var(--heading-font, var(--font-sans));
+}
+
+.eyebrow {
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.11em;
+  font-size: 0.7rem;
+  font-family: var(--font-mono);
+  color: var(--muted);
+}
+
+.subhead {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.theme-switcher {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.theme-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  color: var(--text);
+  padding: 7px 11px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.theme-btn.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  border-color: transparent;
+}
+
+.shell {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 14px;
+}
+
+.card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+
+.sidebar {
+  padding: 14px;
+}
+
+.nav-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  padding: 9px 10px;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.nav-item.active {
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+.content {
+  padding: 14px;
+}
+
+.content-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.pill {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 9px;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.filter {
+  display: grid;
+  gap: 4px;
+  font-size: 0.73rem;
+  color: var(--muted);
+}
+
+.filter select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 9px;
+  text-align: left;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 0.82rem;
+}
+
+th {
+  font-size: 0.7rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+td a {
+  color: var(--link);
+  text-decoration: underline;
+}
+
+.status {
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 0.7rem;
+  border: 1px solid transparent;
+}
+
+.status.ready {
+  background: var(--status-ready-bg);
+  color: var(--status-ready-text);
+}
+
+.status.parsing {
+  background: var(--status-progress-bg);
+  color: var(--status-progress-text);
+}
+
+.status.received {
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+}
+
+.theme-atlas {
+  --bg: linear-gradient(140deg, #f4f1e8, #ebf2ea 50%, #f5ece6);
+  --panel: rgba(255, 255, 255, 0.78);
+  --text: #15211b;
+  --muted: #4b5a4f;
+  --line: rgba(21, 33, 27, 0.18);
+  --line-soft: rgba(21, 33, 27, 0.1);
+  --accent: #146f52;
+  --accent-soft: rgba(20, 111, 82, 0.12);
+  --accent-text: #f4fff9;
+  --link: #0b6e4f;
+  --shadow: 0 12px 28px rgba(20, 38, 30, 0.12);
+  --heading-font: var(--font-serif);
+  --status-ready-bg: rgba(20, 111, 82, 0.12);
+  --status-ready-text: #15523d;
+  --status-progress-bg: rgba(191, 94, 37, 0.14);
+  --status-progress-text: #88431b;
+  --status-pending-bg: rgba(9, 98, 140, 0.12);
+  --status-pending-text: #0f4f6f;
+}
+
+.theme-ledger {
+  --bg: linear-gradient(160deg, #f8fafc, #eef3fa 55%, #f0f5f7);
+  --panel: #ffffff;
+  --text: #1b2430;
+  --muted: #5f6e81;
+  --line: #d6e0eb;
+  --line-soft: #e7edf4;
+  --accent: #1f6feb;
+  --accent-soft: rgba(31, 111, 235, 0.12);
+  --accent-text: #f4f9ff;
+  --link: #165ac0;
+  --shadow: 0 10px 22px rgba(21, 45, 79, 0.09);
+  --heading-font: var(--font-sans);
+  --status-ready-bg: rgba(31, 111, 235, 0.12);
+  --status-ready-text: #1f4d93;
+  --status-progress-bg: rgba(236, 121, 24, 0.14);
+  --status-progress-text: #8b4d18;
+  --status-pending-bg: rgba(98, 110, 134, 0.14);
+  --status-pending-text: #415068;
+}
+
+.theme-signal {
+  --bg: linear-gradient(155deg, #121317, #1c1f26 45%, #15171d);
+  --panel: #1f222b;
+  --text: #e8edf7;
+  --muted: #9da8bc;
+  --line: #333846;
+  --line-soft: #2b303c;
+  --accent: #f35f3a;
+  --accent-soft: rgba(243, 95, 58, 0.18);
+  --accent-text: #fff3ef;
+  --link: #ffc078;
+  --shadow: 0 14px 30px rgba(0, 0, 0, 0.35);
+  --heading-font: var(--font-sans);
+  --status-ready-bg: rgba(60, 186, 128, 0.18);
+  --status-ready-text: #8de3b9;
+  --status-progress-bg: rgba(243, 95, 58, 0.2);
+  --status-progress-text: #ffc2b4;
+  --status-pending-bg: rgba(80, 126, 255, 0.2);
+  --status-pending-text: #b3c8ff;
+}
+
+.theme-signal .filter select,
+.theme-signal .nav-item,
+.theme-signal .theme-btn {
+  color: #e8edf7;
+}
+
+.theme-studio {
+  --bg: linear-gradient(140deg, #f0eef9, #edf4ff 60%, #eff6f2);
+  --panel: rgba(255, 255, 255, 0.83);
+  --text: #26223a;
+  --muted: #665f86;
+  --line: rgba(38, 34, 58, 0.16);
+  --line-soft: rgba(38, 34, 58, 0.1);
+  --accent: #3f4ac8;
+  --accent-soft: rgba(63, 74, 200, 0.14);
+  --accent-text: #f2f3ff;
+  --link: #3f4ac8;
+  --shadow: 0 13px 26px rgba(42, 44, 92, 0.12);
+  --heading-font: var(--font-serif);
+  --status-ready-bg: rgba(63, 74, 200, 0.12);
+  --status-ready-text: #2f399c;
+  --status-progress-bg: rgba(178, 99, 38, 0.14);
+  --status-progress-text: #814519;
+  --status-pending-bg: rgba(77, 146, 146, 0.14);
+  --status-pending-text: #2c6666;
+}
+
+@media (max-width: 960px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .filters {
+    grid-template-columns: 1fr 1fr;
+  }
+}
