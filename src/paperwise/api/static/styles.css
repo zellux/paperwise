@@ -666,6 +666,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   gap: 8px;
 }
 
+.docs-total-label {
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+  font-family: var(--mono);
+}
+
 .page-indicator {
   min-width: 70px;
   text-align: center;

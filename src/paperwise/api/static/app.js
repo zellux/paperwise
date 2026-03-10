@@ -9,6 +9,7 @@ const restartPendingBtn = document.getElementById("restartPendingBtn");
 const pagePrevBtn = document.getElementById("pagePrevBtn");
 const pageNextBtn = document.getElementById("pageNextBtn");
 const pageIndicator = document.getElementById("pageIndicator");
+const docsTotalLabel = document.getElementById("docsTotalLabel");
 const settingsForm = document.getElementById("settingsForm");
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
 const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
@@ -1404,6 +1405,9 @@ function renderPaginationControls(currentCount) {
   const totalPages = Math.max(1, Math.ceil(docsTotalCount / docsPageSize));
   if (docsPage > totalPages) {
     docsPage = totalPages;
+  }
+  if (docsTotalLabel) {
+    docsTotalLabel.textContent = `Total documents: ${docsTotalCount.toLocaleString()}`;
   }
   if (pageIndicator) {
     pageIndicator.textContent = `Page ${docsPage} / ${totalPages}`;
