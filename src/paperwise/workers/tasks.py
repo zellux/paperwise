@@ -8,6 +8,7 @@ from paperwise.application.services.history import (
 )
 from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.parsing import parse_document_blob
+from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.domain.models import DocumentStatus, HistoryActorType
 from paperwise.infrastructure.config import get_settings
 from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
@@ -227,6 +228,12 @@ def parse_document_task(
             ocr_auto_switch=ocr_auto_switch,
         )
         repository.save_parse_result(parsed)
+        chunk_count = index_document_chunks(
+            repository=repository,
+            document=document,
+            parse_result=parsed,
+        )
+        logger.info("Indexed %d chunk(s) for document_id=%s", chunk_count, document.id)
         parse_with_llm(
             document=document,
             parse_result=parsed,

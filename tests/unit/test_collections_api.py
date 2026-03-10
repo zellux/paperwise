@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 
+from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, ParseResult, User
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from paperwise.server.dependencies import current_user_dependency, document_repository_dependency
@@ -52,6 +53,11 @@ def _save_document(
             created_at=now,
         )
     )
+    parse_result = repository.get_parse_result(doc_id)
+    document = repository.get(doc_id)
+    assert parse_result is not None
+    assert document is not None
+    index_document_chunks(repository=repository, document=document, parse_result=parse_result)
     repository.save_llm_parse_result(
         LLMParseResult(
             document_id=doc_id,

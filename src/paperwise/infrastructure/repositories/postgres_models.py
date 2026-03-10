@@ -111,3 +111,15 @@ class CollectionDocumentRow(Base):
     collection_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
     document_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
     added_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class DocumentChunkRow(Base):
+    __tablename__ = "document_chunks"
+
+    id: Mapped[str] = mapped_column(String(96), primary_key=True)
+    document_id: Mapped[str] = mapped_column(String(64), index=True)
+    owner_id: Mapped[str] = mapped_column(String(64), index=True)
+    chunk_index: Mapped[int] = mapped_column(Integer)
+    content: Mapped[str] = mapped_column(Text)
+    token_count: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)

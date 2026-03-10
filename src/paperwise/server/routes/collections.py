@@ -94,19 +94,35 @@ def _build_search_response(
     query: str,
     hits,
 ) -> SearchResponse:
-    items: list[SearchHitResponse] = []
+    best_hits_by_doc: dict[str, tuple[object, float]] = {}
+    ordered_doc_ids: list[str] = []
     for hit in hits:
-        llm = repository.get_llm_parse_result(hit.document.id)
-        title = llm.suggested_title if llm is not None and llm.suggested_title else hit.document.filename
+        doc_id = hit.chunk.document_id
+        score = float(hit.score)
+        current = best_hits_by_doc.get(doc_id)
+        if current is None:
+            best_hits_by_doc[doc_id] = (hit, score)
+            ordered_doc_ids.append(doc_id)
+            continue
+        if score > current[1]:
+            best_hits_by_doc[doc_id] = (hit, score)
+    items: list[SearchHitResponse] = []
+    for doc_id in ordered_doc_ids:
+        hit = best_hits_by_doc[doc_id][0]
+        document = repository.get(doc_id)
+        if document is None:
+            continue
+        llm = repository.get_llm_parse_result(doc_id)
+        title = llm.suggested_title if llm is not None and llm.suggested_title else document.filename
         items.append(
             SearchHitResponse(
-                document_id=hit.document.id,
+                document_id=doc_id,
                 title=title,
-                filename=hit.document.filename,
+                filename=document.filename,
                 score=hit.score,
-                snippet=hit.snippet,
+                snippet=hit.chunk.content[:280],
                 matched_terms=hit.matched_terms,
-                created_at=hit.document.created_at,
+                created_at=document.created_at,
                 document_type=llm.document_type if llm is not None else None,
                 correspondent=llm.correspondent if llm is not None else None,
                 tags=list(llm.tags or []) if llm is not None else [],
@@ -244,10 +260,10 @@ def search_all_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> SearchResponse:
-    hits = repository.search_documents(
+    hits = repository.search_document_chunks(
         owner_id=current_user.id,
         query=payload.query,
-        limit=payload.limit,
+        limit=max(payload.limit * 4, payload.limit),
         document_ids=None,
     )
     return _build_search_response(repository=repository, query=payload.query, hits=hits)
@@ -266,10 +282,10 @@ def search_collection_documents_endpoint(
         current_user=current_user,
     )
     scoped_ids = repository.list_collection_document_ids(collection_id)
-    hits = repository.search_documents(
+    hits = repository.search_document_chunks(
         owner_id=current_user.id,
         query=payload.query,
-        limit=payload.limit,
+        limit=max(payload.limit * 4, payload.limit),
         document_ids=scoped_ids,
     )
     return _build_search_response(repository=repository, query=payload.query, hits=hits)

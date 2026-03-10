@@ -107,3 +107,21 @@ class DocumentSearchHit:
     score: float
     snippet: str
     matched_terms: list[str]
+
+
+@dataclass(slots=True)
+class DocumentChunk:
+    id: str
+    document_id: str
+    owner_id: str
+    chunk_index: int
+    content: str
+    token_count: int
+    created_at: datetime
+
+
+@dataclass(slots=True)
+class DocumentChunkSearchHit:
+    chunk: DocumentChunk
+    score: float
+    matched_terms: list[str]

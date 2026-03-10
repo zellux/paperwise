@@ -34,6 +34,7 @@ from paperwise.application.services.history import (
 )
 from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.parsing import parse_document_blob
+from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.application.services.storage_paths import blob_ref_to_path
 from paperwise.domain.models import (
     Document,
@@ -1093,6 +1094,11 @@ def parse_document_endpoint(
         ocr_auto_switch=ocr_auto_switch,
     )
     repository.save_parse_result(result)
+    index_document_chunks(
+        repository=repository,
+        document=document,
+        parse_result=result,
+    )
     return _to_parse_response(result)
 
 
@@ -1169,6 +1175,11 @@ def llm_parse_document_endpoint(
                 ocr_auto_switch=ocr_auto_switch,
             )
             repository.save_parse_result(parse_result)
+            index_document_chunks(
+                repository=repository,
+                document=document,
+                parse_result=parse_result,
+            )
         else:
             _set_document_status(
                 document=document,

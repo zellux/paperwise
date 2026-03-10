@@ -3,6 +3,8 @@ from typing import Any, Protocol
 
 from paperwise.domain.models import (
     Collection,
+    DocumentChunk,
+    DocumentChunkSearchHit,
     Document,
     DocumentSearchHit,
     DocumentHistoryEvent,
@@ -168,6 +170,28 @@ class DocumentRepository(Protocol):
         document_ids: list[str] | None = None,
     ) -> list[DocumentSearchHit]:
         """Run keyword search over owner-visible documents (optionally scoped to IDs)."""
+
+    def replace_document_chunks(
+        self,
+        *,
+        document_id: str,
+        owner_id: str,
+        chunks: list[DocumentChunk],
+    ) -> None:
+        """Replace indexed chunks for one document."""
+
+    def list_document_chunks(self, document_id: str) -> list[DocumentChunk]:
+        """List indexed chunks for one document."""
+
+    def search_document_chunks(
+        self,
+        *,
+        owner_id: str,
+        query: str,
+        limit: int = 40,
+        document_ids: list[str] | None = None,
+    ) -> list[DocumentChunkSearchHit]:
+        """Run keyword chunk search over owner-visible chunks (optionally scoped)."""
 
 
 class IngestionDispatcher(Protocol):

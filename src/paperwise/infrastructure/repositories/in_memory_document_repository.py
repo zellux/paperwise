@@ -5,6 +5,8 @@ from threading import RLock
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.domain.models import (
     Collection,
+    DocumentChunk,
+    DocumentChunkSearchHit,
     Document,
     DocumentSearchHit,
     DocumentHistoryEvent,
@@ -84,6 +86,7 @@ class InMemoryDocumentRepository(DocumentRepository):
         self._history: dict[str, list[DocumentHistoryEvent]] = {}
         self._collections: dict[str, Collection] = {}
         self._collection_documents: dict[str, dict[str, datetime]] = {}
+        self._document_chunks: dict[str, list[DocumentChunk]] = {}
         self._correspondents: set[str] = set()
         self._document_types: set[str] = set()
         self._tags: set[str] = set()
@@ -366,4 +369,56 @@ class InMemoryDocumentRepository(DocumentRepository):
                     )
                 )
         hits.sort(key=lambda hit: (hit.score, hit.document.created_at), reverse=True)
+        return hits[: max(1, limit)]
+
+    def replace_document_chunks(
+        self,
+        *,
+        document_id: str,
+        owner_id: str,
+        chunks: list[DocumentChunk],
+    ) -> None:
+        del owner_id
+        with self._lock:
+            self._document_chunks[document_id] = list(chunks)
+
+    def list_document_chunks(self, document_id: str) -> list[DocumentChunk]:
+        with self._lock:
+            return list(self._document_chunks.get(document_id, []))
+
+    def search_document_chunks(
+        self,
+        *,
+        owner_id: str,
+        query: str,
+        limit: int = 40,
+        document_ids: list[str] | None = None,
+    ) -> list[DocumentChunkSearchHit]:
+        terms = _tokenize_query(query)
+        if not terms:
+            return []
+        allowed_ids = set(document_ids or [])
+        has_scope = document_ids is not None
+        hits: list[DocumentChunkSearchHit] = []
+        with self._lock:
+            for doc_id, chunks in self._document_chunks.items():
+                if has_scope and doc_id not in allowed_ids:
+                    continue
+                document = self._documents.get(doc_id)
+                if document is None or document.owner_id != owner_id:
+                    continue
+                for chunk in chunks:
+                    lowered = chunk.content.lower()
+                    matched = [term for term in terms if term in lowered]
+                    if not matched:
+                        continue
+                    score = float(sum(lowered.count(term) for term in matched))
+                    hits.append(
+                        DocumentChunkSearchHit(
+                            chunk=chunk,
+                            score=score,
+                            matched_terms=matched,
+                        )
+                    )
+        hits.sort(key=lambda item: (item.score, item.chunk.created_at, item.chunk.chunk_index), reverse=True)
         return hits[: max(1, limit)]
