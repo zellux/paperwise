@@ -200,9 +200,16 @@ input[type="file"] {
   transition: transform 120ms ease, box-shadow 120ms ease;
 }
 
-.btn:hover {
+.btn:hover:not(:disabled) {
   transform: translateY(-1px);
   box-shadow: 0 6px 12px rgba(46, 57, 52, 0.12);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 .btn-primary {
@@ -403,7 +410,7 @@ input[type="file"] {
   border-color: #8f989d;
 }
 
-.btn-muted:hover {
+.btn-muted:hover:not(:disabled) {
   box-shadow: 0 8px 16px rgba(70, 78, 83, 0.14);
 }
 
