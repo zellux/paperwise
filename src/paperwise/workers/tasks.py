@@ -91,7 +91,8 @@ def _resolve_llm_provider_from_preferences(
         ocr_image_detail = "auto"
 
     if provider_name == "openai":
-        model = str(preferences.get(model_key, "")).strip() or settings.openai_model
+        openai_default_model = "gpt-4.1-nano" if model_key == "ocr_llm_model" else settings.openai_model
+        model = str(preferences.get(model_key, "")).strip() or openai_default_model
         base_url = str(preferences.get(base_url_key, "")).strip() or settings.openai_base_url
         return OpenAILLMProvider(
             api_key=configured_key,
@@ -111,7 +112,8 @@ def _resolve_llm_provider_from_preferences(
         base_url = str(preferences.get(base_url_key, "")).strip()
         if not base_url:
             raise RuntimeError(f"missing base URL setting: {base_url_key}")
-        model = str(preferences.get(model_key, "")).strip() or settings.openai_model
+        openai_default_model = "gpt-4.1-nano" if model_key == "ocr_llm_model" else settings.openai_model
+        model = str(preferences.get(model_key, "")).strip() or openai_default_model
         return OpenAILLMProvider(
             api_key=configured_key,
             model=model,

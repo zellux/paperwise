@@ -134,6 +134,16 @@ const LLM_PROVIDER_DEFAULTS = {
     base_url: "https://generativelanguage.googleapis.com/v1beta",
   },
 };
+const OCR_LLM_PROVIDER_DEFAULTS = {
+  openai: {
+    model: "gpt-4.1-nano",
+    base_url: "https://api.openai.com/v1",
+  },
+  gemini: {
+    model: "gemini-2.0-flash",
+    base_url: "https://generativelanguage.googleapis.com/v1beta",
+  },
+};
 let llmSettings = {
   provider: "",
   model: "",
@@ -223,6 +233,14 @@ function getLlmProviderDefaults(provider) {
     return null;
   }
   return LLM_PROVIDER_DEFAULTS[normalized] || null;
+}
+
+function getOcrLlmProviderDefaults(provider) {
+  const normalized = normalizeLlmProvider(provider);
+  if (!normalized) {
+    return null;
+  }
+  return OCR_LLM_PROVIDER_DEFAULTS[normalized] || null;
 }
 
 function normalizeOcrProvider(value) {
@@ -594,7 +612,7 @@ function applyUserPreferences(preferences, options = {}) {
     base_url: String(preferences.ocr_llm_base_url || "").trim(),
     api_key: String(preferences.ocr_llm_api_key || "").trim(),
   };
-  const ocrDefaults = getLlmProviderDefaults(ocrLlmSettings.provider);
+  const ocrDefaults = getOcrLlmProviderDefaults(ocrLlmSettings.provider);
   if (ocrDefaults) {
     if (!ocrLlmSettings.model) {
       ocrLlmSettings.model = ocrDefaults.model;
@@ -2072,12 +2090,15 @@ settingsOcrProviderSelect?.addEventListener("change", () => {
 
 settingsOcrLlmProviderSelect?.addEventListener("change", () => {
   const nextProvider = normalizeLlmProvider(settingsOcrLlmProviderSelect.value);
-  applyLlmProviderDefaultsToControls(
-    nextProvider,
-    settingsOcrLlmModelInput,
-    settingsOcrLlmBaseUrlInput,
-    { force: true }
-  );
+  const defaults = getOcrLlmProviderDefaults(nextProvider);
+  if (defaults) {
+    if (settingsOcrLlmModelInput) {
+      settingsOcrLlmModelInput.value = defaults.model;
+    }
+    if (settingsOcrLlmBaseUrlInput) {
+      settingsOcrLlmBaseUrlInput.value = defaults.base_url;
+    }
+  }
 });
 
 settingsTestLlmBtn?.addEventListener("click", async () => {

@@ -405,7 +405,8 @@ def _resolve_llm_provider_from_preferences(
     if provider_name == "openai":
         configured_key = str(preferences.get(api_key_key, "")).strip()
         api_key = configured_key
-        model = str(preferences.get(model_key, "")).strip() or settings.openai_model
+        openai_default_model = "gpt-4.1-nano" if model_key == "ocr_llm_model" else settings.openai_model
+        model = str(preferences.get(model_key, "")).strip() or openai_default_model
         base_url = str(preferences.get(base_url_key, "")).strip() or settings.openai_base_url
         return OpenAILLMProvider(
             api_key=api_key,
@@ -428,7 +429,8 @@ def _resolve_llm_provider_from_preferences(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=missing_base_url_detail,
             )
-        model = str(preferences.get(model_key, "")).strip() or settings.openai_model
+        openai_default_model = "gpt-4.1-nano" if model_key == "ocr_llm_model" else settings.openai_model
+        model = str(preferences.get(model_key, "")).strip() or openai_default_model
         return OpenAILLMProvider(
             api_key=configured_key,
             model=model,
