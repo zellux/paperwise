@@ -1883,9 +1883,15 @@ async function openDocumentView(documentId) {
   logActivity(`Opened document ${documentId}`);
 }
 
-async function waitForDocumentReady(documentId, timeoutMs = 45000, intervalMs = 1500) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
+async function waitForDocumentReady(
+  documentId,
+  fastPhaseMs = 45000,
+  fastIntervalMs = 1500,
+  slowPhaseMs = 300000,
+  slowIntervalMs = 10000
+) {
+  const fastDeadline = Date.now() + fastPhaseMs;
+  while (Date.now() < fastDeadline) {
     const response = await apiFetch(`/documents/${documentId}`);
     const payload = await response.json();
     if (!response.ok) {
@@ -1894,8 +1900,22 @@ async function waitForDocumentReady(documentId, timeoutMs = 45000, intervalMs = 
     if (payload.status === "ready") {
       return true;
     }
-    await delay(intervalMs);
+    await delay(fastIntervalMs);
   }
+
+  const slowDeadline = Date.now() + slowPhaseMs;
+  while (Date.now() < slowDeadline) {
+    const response = await apiFetch(`/documents/${documentId}`);
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.detail || "Failed to refresh document status");
+    }
+    if (payload.status === "ready") {
+      return true;
+    }
+    await delay(slowIntervalMs);
+  }
+
   return false;
 }
 
