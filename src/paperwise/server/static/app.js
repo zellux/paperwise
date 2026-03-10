@@ -1897,6 +1897,7 @@ function renderPaginationControls(currentCount, options = {}) {
 
 async function loadPendingDocuments() {
   const requestSeq = ++pendingDocsRequestSeq;
+  renderTableLoading(pendingTableBody, 4, "Loading pending documents...");
   const response = await apiFetch("/documents/pending?limit=200");
   if (requestSeq !== pendingDocsRequestSeq) {
     return;
@@ -1932,9 +1933,17 @@ function renderActivityTokenLoading() {
   activityTokenTotal.textContent = "LLM tokens processed: loading...";
 }
 
+function renderTableLoading(tbody, colspan, message) {
+  if (!tbody) {
+    return;
+  }
+  tbody.innerHTML = `<tr><td colspan="${colspan}">${message}</td></tr>`;
+}
+
 async function loadProcessedDocumentsActivity() {
   const requestSeq = ++processedActivityRequestSeq;
   const limit = Math.max(1, normalizePageSize(docsPageSize));
+  renderTableLoading(processedDocsTableBody, 4, "Loading processed documents...");
   renderActivityTokenLoading();
   const preferencesPromise = loadUserPreferences().catch(() => ({}));
   const response = await apiFetch(`/documents?status=ready&limit=${limit}&offset=0`);
@@ -1961,6 +1970,7 @@ async function loadProcessedDocumentsActivity() {
 
 async function loadTagStats() {
   const requestSeq = ++tagStatsRequestSeq;
+  renderTableLoading(tagsTableBody, 3, "Loading tags...");
   const response = await apiFetch("/documents/metadata/tag-stats");
   if (requestSeq !== tagStatsRequestSeq) {
     return;
@@ -1979,6 +1989,7 @@ async function loadTagStats() {
 
 async function loadDocumentTypeStats() {
   const requestSeq = ++documentTypeStatsRequestSeq;
+  renderTableLoading(documentTypesTableBody, 3, "Loading document types...");
   const response = await apiFetch("/documents/metadata/document-type-stats");
   if (requestSeq !== documentTypeStatsRequestSeq) {
     return;
