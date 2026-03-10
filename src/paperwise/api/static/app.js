@@ -107,6 +107,20 @@ let userPreferenceSaveTimer = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember"];
 let currentTheme = "atlas";
 const SUPPORTED_LLM_PROVIDERS = ["openai", "claude", "gemini", "custom"];
+const LLM_PROVIDER_DEFAULTS = {
+  openai: {
+    model: "gpt-4.1-mini",
+    base_url: "https://api.openai.com/v1",
+  },
+  claude: {
+    model: "claude-3-5-sonnet-latest",
+    base_url: "https://api.anthropic.com",
+  },
+  gemini: {
+    model: "gemini-2.0-flash",
+    base_url: "https://generativelanguage.googleapis.com/v1beta",
+  },
+};
 let llmSettings = {
   provider: "",
   model: "",
@@ -181,6 +195,14 @@ function normalizeLlmProvider(value) {
   return "";
 }
 
+function getLlmProviderDefaults(provider) {
+  const normalized = normalizeLlmProvider(provider);
+  if (!normalized) {
+    return null;
+  }
+  return LLM_PROVIDER_DEFAULTS[normalized] || null;
+}
+
 function normalizeOcrProvider(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (SUPPORTED_OCR_PROVIDERS.includes(normalized)) {
@@ -231,6 +253,26 @@ function readLlmSettingsFromControls() {
     base_url: String(settingsLlmBaseUrlInput?.value || "").trim(),
     api_key: String(settingsLlmApiKeyInput?.value || "").trim(),
   };
+}
+
+function applyLlmProviderDefaultsToControls(provider, options = {}) {
+  const force = options.force === true;
+  const defaults = getLlmProviderDefaults(provider);
+  if (!defaults) {
+    return;
+  }
+  if (settingsLlmModelInput) {
+    const currentModel = String(settingsLlmModelInput.value || "").trim();
+    if (force || !currentModel) {
+      settingsLlmModelInput.value = defaults.model;
+    }
+  }
+  if (settingsLlmBaseUrlInput) {
+    const currentBaseUrl = String(settingsLlmBaseUrlInput.value || "").trim();
+    if (force || !currentBaseUrl) {
+      settingsLlmBaseUrlInput.value = defaults.base_url;
+    }
+  }
 }
 
 function getLlmUploadBlockReasonForSettings(candidateSettings) {
@@ -392,6 +434,15 @@ function applyUserPreferences(preferences, options = {}) {
     base_url: String(preferences.llm_base_url || "").trim(),
     api_key: String(preferences.llm_api_key || "").trim(),
   };
+  const defaults = getLlmProviderDefaults(llmSettings.provider);
+  if (defaults) {
+    if (!llmSettings.model) {
+      llmSettings.model = defaults.model;
+    }
+    if (!llmSettings.base_url) {
+      llmSettings.base_url = defaults.base_url;
+    }
+  }
   ocrProvider = normalizeOcrProvider(preferences.ocr_provider);
 }
 
@@ -1802,6 +1853,12 @@ settingsForm?.addEventListener("submit", async (event) => {
     await loadDocumentsList();
   }
   logActivity("Saved settings.");
+});
+
+settingsLlmProviderSelect?.addEventListener("change", () => {
+  const nextProvider = normalizeLlmProvider(settingsLlmProviderSelect.value);
+  applyLlmProviderDefaultsToControls(nextProvider, { force: true });
+  setSettingsLlmTestStatus("");
 });
 
 settingsTestLlmBtn?.addEventListener("click", async () => {
