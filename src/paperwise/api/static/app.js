@@ -889,8 +889,10 @@ async function apiFetch(url, options = {}) {
   if (authToken) {
     headers.set("Authorization", `Bearer ${authToken}`);
   }
-  const response = await window.fetch(url, { ...options, headers });
-  if (response.status === 401) {
+  const allowUnauthorized = options.allowUnauthorized === true;
+  const { allowUnauthorized: _allowUnauthorized, ...fetchOptions } = options;
+  const response = await window.fetch(url, { ...fetchOptions, headers });
+  if (response.status === 401 && !allowUnauthorized) {
     clearSession();
     throw new Error("Authentication required");
   }
@@ -1942,6 +1944,7 @@ signInForm?.addEventListener("submit", async (event) => {
   const response = await apiFetch("/users/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    allowUnauthorized: true,
     body: JSON.stringify({ email, password }),
   });
   const payload = await response.json();
@@ -1984,6 +1987,7 @@ registerForm?.addEventListener("submit", async (event) => {
   const loginResponse = await apiFetch("/users/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    allowUnauthorized: true,
     body: JSON.stringify({ email, password }),
   });
   const loginPayload = await loginResponse.json();
