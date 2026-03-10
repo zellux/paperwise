@@ -68,6 +68,10 @@ function unique(values) {
   return [...new Set(values.filter((item) => item && item.trim()))];
 }
 
+function sortValues(values) {
+  return [...values].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
 function getSelectedValues(selectEl) {
   return [...selectEl.selectedOptions].map((option) => option.value);
 }
@@ -79,6 +83,19 @@ function setSelectedValues(selectEl, values) {
   }
 }
 
+function getFilterKey(selectEl) {
+  if (selectEl === filterTag) {
+    return "tag";
+  }
+  if (selectEl === filterCorrespondent) {
+    return "correspondent";
+  }
+  if (selectEl === filterType) {
+    return "document_type";
+  }
+  return "status";
+}
+
 function applyFiltersToControls() {
   setSelectedValues(filterTag, docsFilters.tag);
   setSelectedValues(filterCorrespondent, docsFilters.correspondent);
@@ -87,17 +104,11 @@ function applyFiltersToControls() {
 }
 
 function setSelectOptions(selectEl, values) {
-  const selected = new Set(
-    selectEl === filterTag
-      ? docsFilters.tag
-      : selectEl === filterCorrespondent
-        ? docsFilters.correspondent
-        : selectEl === filterType
-          ? docsFilters.document_type
-          : docsFilters.status,
-  );
+  const selectedValues = docsFilters[getFilterKey(selectEl)] || [];
+  const selected = new Set(selectedValues);
+  const mergedValues = sortValues(unique([...values, ...selectedValues]));
   selectEl.innerHTML = "";
-  for (const value of values) {
+  for (const value of mergedValues) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = value;
@@ -111,6 +122,37 @@ function readFiltersFromControls() {
   docsFilters.correspondent = unique(getSelectedValues(filterCorrespondent));
   docsFilters.document_type = unique(getSelectedValues(filterType));
   docsFilters.status = unique(getSelectedValues(filterStatus));
+}
+
+function refreshFilterOptionsFromDocuments(documents) {
+  const tags = new Set();
+  const correspondents = new Set();
+  const documentTypes = new Set();
+  const statuses = new Set();
+
+  for (const doc of documents) {
+    statuses.add(doc.status);
+    const metadata = doc.llm_metadata;
+    if (!metadata) {
+      continue;
+    }
+    if (metadata.correspondent) {
+      correspondents.add(metadata.correspondent);
+    }
+    if (metadata.document_type) {
+      documentTypes.add(metadata.document_type);
+    }
+    for (const tag of metadata.tags || []) {
+      if (tag) {
+        tags.add(tag);
+      }
+    }
+  }
+
+  setSelectOptions(filterTag, [...tags]);
+  setSelectOptions(filterCorrespondent, [...correspondents]);
+  setSelectOptions(filterType, [...documentTypes]);
+  setSelectOptions(filterStatus, [...statuses]);
 }
 
 function syncUrlFromFilters() {
@@ -339,6 +381,7 @@ async function loadDocumentsList() {
     return;
   }
   renderDocsList(payload);
+  refreshFilterOptionsFromDocuments(payload);
   logActivity(`Loaded ${payload.length} document(s)`);
 }
 
@@ -362,19 +405,6 @@ async function loadTagStats() {
   }
   renderTagsList(payload);
   logActivity(`Loaded ${payload.length} tag(s)`);
-}
-
-async function loadFilterOptions() {
-  const response = await fetch("/documents/metadata/taxonomy");
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Filter options load failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-  setSelectOptions(filterTag, payload.tags || []);
-  setSelectOptions(filterCorrespondent, payload.correspondents || []);
-  setSelectOptions(filterType, payload.document_types || []);
-  applyFiltersToControls();
 }
 
 async function openDocumentView(documentId) {
@@ -428,7 +458,6 @@ uploadForm.addEventListener("submit", async (event) => {
   await loadDocumentsList();
   await loadPendingDocuments();
   await loadTagStats();
-  await loadFilterOptions();
   await openDocumentView(payload.id);
   logActivity("Automatic analysis queued (parse + LLM enrichment).");
 });
@@ -462,7 +491,6 @@ documentMetaForm.addEventListener("submit", async (event) => {
   await loadDocumentsList();
   await loadPendingDocuments();
   await loadTagStats();
-  await loadFilterOptions();
 });
 
 backToDocsBtn.addEventListener("click", () => {
@@ -500,7 +528,6 @@ for (const link of navLinks) {
     setActiveView(targetId);
     setActiveNav(targetId);
     if (targetId === "section-docs") {
-      await loadFilterOptions();
       await loadDocumentsList();
       return;
     }
@@ -520,7 +547,7 @@ for (const link of navLinks) {
 
 window.addEventListener("popstate", async () => {
   readFiltersFromUrl();
-  await loadFilterOptions();
+  applyFiltersToControls();
   await loadDocumentsList();
 });
 
@@ -528,10 +555,7 @@ setActiveView("section-docs");
 setActiveNav("section-docs");
 
 readFiltersFromUrl();
-
-loadFilterOptions().catch((error) => {
-  logActivity(`Initial filter options failed: ${error.message}`);
-});
+applyFiltersToControls();
 
 loadDocumentsList().catch((error) => {
   logActivity(`Initial document list failed: ${error.message}`);
