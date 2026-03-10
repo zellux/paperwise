@@ -138,7 +138,7 @@ function hasExplicitNavigationState() {
   if (params.toString()) {
     return true;
   }
-  return path !== "/" && path !== "/ui/documents";
+  return path !== "/" && Object.prototype.hasOwnProperty.call(PATH_TO_VIEW_ID, path);
 }
 
 function normalizeThemeName(value) {
@@ -226,7 +226,8 @@ function scheduleUserPreferenceSave() {
   }, 250);
 }
 
-function applyUserPreferences(preferences) {
+function applyUserPreferences(preferences, options = {}) {
+  const includeLastView = options.includeLastView !== false;
   if (!preferences || typeof preferences !== "object") {
     return;
   }
@@ -234,6 +235,7 @@ function applyUserPreferences(preferences) {
     docsFilters = sanitizeDocsFilters(preferences.docs_filters);
   }
   if (
+    includeLastView &&
     typeof preferences.last_view === "string" &&
     views.some((view) => view.id === preferences.last_view)
   ) {
@@ -248,8 +250,10 @@ function applyUserPreferences(preferences) {
 }
 
 async function hydrateUserPreferencesForSession() {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const explicitPath = path !== "/" && Object.prototype.hasOwnProperty.call(PATH_TO_VIEW_ID, path);
   const preferences = await loadUserPreferences();
-  applyUserPreferences(preferences);
+  applyUserPreferences(preferences, { includeLastView: !explicitPath });
   if (hasExplicitNavigationState()) {
     readFiltersFromUrl();
     return;
