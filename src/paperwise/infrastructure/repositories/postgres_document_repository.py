@@ -1,10 +1,14 @@
 from collections.abc import Callable
+from datetime import UTC, datetime
+import re
 
 from sqlalchemy import select
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.domain.models import (
+    Collection,
     Document,
+    DocumentSearchHit,
     DocumentHistoryEvent,
     DocumentStatus,
     HistoryActorType,
@@ -16,6 +20,8 @@ from paperwise.domain.models import (
 )
 from paperwise.infrastructure.db import Base, build_engine, build_session_factory
 from paperwise.infrastructure.repositories.postgres_models import (
+    CollectionDocumentRow,
+    CollectionRow,
     CorrespondentRow,
     DocumentRow,
     DocumentHistoryEventRow,
@@ -74,6 +80,28 @@ def _coerce_document_status(value: str) -> DocumentStatus:
     if normalized in legacy_map:
         return legacy_map[normalized]
     return DocumentStatus(normalized)
+
+
+def _tokenize_query(query: str) -> list[str]:
+    return [token.lower() for token in re.findall(r"[A-Za-z0-9]{2,}", query)]
+
+
+def _extract_snippet(text: str, terms: list[str], *, max_len: int = 240) -> str:
+    source = str(text or "")
+    if not source.strip():
+        return ""
+    lowered = source.lower()
+    pos = -1
+    for term in terms:
+        idx = lowered.find(term)
+        if idx >= 0:
+            pos = idx
+            break
+    if pos < 0:
+        return " ".join(source.split())[:max_len]
+    start = max(0, pos - max_len // 3)
+    end = min(len(source), start + max_len)
+    return " ".join(source[start:end].split())
 
 
 class PostgresDocumentRepository(DocumentRepository):
@@ -460,3 +488,179 @@ class PostgresDocumentRepository(DocumentRepository):
                 user_id=row.user_id,
                 preferences=dict(row.preferences or {}),
             )
+
+    def create_collection(self, collection: Collection) -> None:
+        with self._session_factory() as session:
+            row = session.get(CollectionRow, collection.id)
+            if row is None:
+                row = CollectionRow(id=collection.id)
+                session.add(row)
+            row.owner_id = collection.owner_id
+            row.name = collection.name
+            row.description = collection.description
+            row.created_at = collection.created_at
+            row.updated_at = collection.updated_at
+            session.commit()
+
+    def get_collection(self, collection_id: str) -> Collection | None:
+        with self._session_factory() as session:
+            row = session.get(CollectionRow, collection_id)
+            if row is None:
+                return None
+            return Collection(
+                id=row.id,
+                owner_id=row.owner_id,
+                name=row.name,
+                description=row.description or "",
+                created_at=row.created_at,
+                updated_at=row.updated_at,
+            )
+
+    def list_collections(self, owner_id: str) -> list[Collection]:
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(CollectionRow)
+                .where(CollectionRow.owner_id == owner_id)
+                .order_by(CollectionRow.updated_at.desc())
+            ).all()
+            return [
+                Collection(
+                    id=row.id,
+                    owner_id=row.owner_id,
+                    name=row.name,
+                    description=row.description or "",
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                )
+                for row in rows
+            ]
+
+    def delete_collection(self, collection_id: str) -> None:
+        with self._session_factory() as session:
+            doc_rows = session.scalars(
+                select(CollectionDocumentRow).where(CollectionDocumentRow.collection_id == collection_id)
+            ).all()
+            for row in doc_rows:
+                session.delete(row)
+            row = session.get(CollectionRow, collection_id)
+            if row is not None:
+                session.delete(row)
+            session.commit()
+
+    def add_collection_documents(
+        self,
+        collection_id: str,
+        document_ids: list[str],
+        *,
+        added_at: datetime,
+    ) -> None:
+        unique_ids = sorted(set(document_ids))
+        with self._session_factory() as session:
+            existing = session.scalars(
+                select(CollectionDocumentRow).where(CollectionDocumentRow.collection_id == collection_id)
+            ).all()
+            existing_ids = {row.document_id for row in existing}
+            for document_id in unique_ids:
+                if document_id in existing_ids:
+                    continue
+                session.add(
+                    CollectionDocumentRow(
+                        collection_id=collection_id,
+                        document_id=document_id,
+                        added_at=added_at,
+                    )
+                )
+            row = session.get(CollectionRow, collection_id)
+            if row is not None:
+                row.updated_at = datetime.now(UTC)
+            session.commit()
+
+    def remove_collection_document(self, collection_id: str, document_id: str) -> None:
+        with self._session_factory() as session:
+            row = session.get(CollectionDocumentRow, {"collection_id": collection_id, "document_id": document_id})
+            if row is not None:
+                session.delete(row)
+            collection = session.get(CollectionRow, collection_id)
+            if collection is not None:
+                collection.updated_at = datetime.now(UTC)
+            session.commit()
+
+    def list_collection_document_ids(self, collection_id: str) -> list[str]:
+        with self._session_factory() as session:
+            rows = session.scalars(
+                select(CollectionDocumentRow)
+                .where(CollectionDocumentRow.collection_id == collection_id)
+                .order_by(CollectionDocumentRow.document_id.asc())
+            ).all()
+            return [row.document_id for row in rows]
+
+    def search_documents(
+        self,
+        *,
+        owner_id: str,
+        query: str,
+        limit: int = 20,
+        document_ids: list[str] | None = None,
+    ) -> list[DocumentSearchHit]:
+        terms = _tokenize_query(query)
+        if not terms:
+            return []
+        scoped_ids = sorted(set(document_ids or []))
+        has_scope = document_ids is not None
+        with self._session_factory() as session:
+            query_stmt = select(DocumentRow).where(DocumentRow.owner_id == owner_id)
+            if has_scope:
+                if not scoped_ids:
+                    return []
+                query_stmt = query_stmt.where(DocumentRow.id.in_(scoped_ids))
+            doc_rows = session.scalars(query_stmt.order_by(DocumentRow.created_at.desc())).all()
+            if not doc_rows:
+                return []
+            ids = [row.id for row in doc_rows]
+            parse_rows = session.scalars(select(ParseResultRow).where(ParseResultRow.document_id.in_(ids))).all()
+            llm_rows = session.scalars(select(LLMParseResultRow).where(LLMParseResultRow.document_id.in_(ids))).all()
+            parse_by_id = {row.document_id: row for row in parse_rows}
+            llm_by_id = {row.document_id: row for row in llm_rows}
+
+            hits: list[DocumentSearchHit] = []
+            for row in doc_rows:
+                parse_row = parse_by_id.get(row.id)
+                llm_row = llm_by_id.get(row.id)
+                searchable_parts = [
+                    row.filename or "",
+                    parse_row.text_preview if parse_row is not None else "",
+                    llm_row.suggested_title if llm_row is not None else "",
+                    llm_row.correspondent if llm_row is not None else "",
+                    llm_row.document_type if llm_row is not None else "",
+                    " ".join(llm_row.tags or []) if llm_row is not None else "",
+                ]
+                searchable_text = " ".join(part for part in searchable_parts if part).strip()
+                lowered = searchable_text.lower()
+                matched = [term for term in terms if term in lowered]
+                if not matched:
+                    continue
+                score = float(sum(lowered.count(term) for term in matched))
+                snippet = _extract_snippet(
+                    parse_row.text_preview if parse_row is not None else searchable_text,
+                    matched,
+                )
+                hits.append(
+                    DocumentSearchHit(
+                        document=Document(
+                            id=row.id,
+                            filename=row.filename,
+                            owner_id=row.owner_id,
+                            blob_uri=row.blob_uri,
+                            checksum_sha256=row.checksum_sha256,
+                            content_type=row.content_type,
+                            size_bytes=row.size_bytes,
+                            status=_coerce_document_status(row.status),
+                            created_at=row.created_at,
+                        ),
+                        score=score,
+                        snippet=snippet,
+                        matched_terms=matched,
+                    )
+                )
+            hits.sort(key=lambda hit: (hit.score, hit.document.created_at), reverse=True)
+            return hits[: max(1, limit)]

@@ -89,3 +89,21 @@ class User:
 class UserPreference:
     user_id: str
     preferences: dict[str, Any]
+
+
+@dataclass(slots=True)
+class Collection:
+    id: str
+    owner_id: str
+    name: str
+    description: str
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(slots=True)
+class DocumentSearchHit:
+    document: Document
+    score: float
+    snippet: str
+    matched_terms: list[str]

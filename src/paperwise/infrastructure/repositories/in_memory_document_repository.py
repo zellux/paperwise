@@ -1,8 +1,12 @@
+from datetime import UTC, datetime
+import re
 from threading import RLock
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.domain.models import (
+    Collection,
     Document,
+    DocumentSearchHit,
     DocumentHistoryEvent,
     LLMParseResult,
     ParseResult,
@@ -46,6 +50,29 @@ def _to_title_case(value: str) -> str:
     return " ".join(words)
 
 
+def _tokenize_query(query: str) -> list[str]:
+    return [token.lower() for token in re.findall(r"[A-Za-z0-9]{2,}", query)]
+
+
+def _extract_snippet(text: str, terms: list[str], *, max_len: int = 240) -> str:
+    source = str(text or "")
+    if not source.strip():
+        return ""
+    lowered = source.lower()
+    pos = -1
+    for term in terms:
+        idx = lowered.find(term)
+        if idx >= 0:
+            pos = idx
+            break
+    if pos < 0:
+        compact = " ".join(source.split())
+        return compact[:max_len]
+    start = max(0, pos - max_len // 3)
+    end = min(len(source), start + max_len)
+    return " ".join(source[start:end].split())
+
+
 class InMemoryDocumentRepository(DocumentRepository):
     def __init__(self) -> None:
         self._documents: dict[str, Document] = {}
@@ -55,6 +82,8 @@ class InMemoryDocumentRepository(DocumentRepository):
         self._parse_results: dict[str, ParseResult] = {}
         self._llm_parse_results: dict[str, LLMParseResult] = {}
         self._history: dict[str, list[DocumentHistoryEvent]] = {}
+        self._collections: dict[str, Collection] = {}
+        self._collection_documents: dict[str, dict[str, datetime]] = {}
         self._correspondents: set[str] = set()
         self._document_types: set[str] = set()
         self._tags: set[str] = set()
@@ -238,3 +267,103 @@ class InMemoryDocumentRepository(DocumentRepository):
                 user_id=preference.user_id,
                 preferences=dict(preference.preferences or {}),
             )
+
+    def create_collection(self, collection: Collection) -> None:
+        with self._lock:
+            self._collections[collection.id] = collection
+
+    def get_collection(self, collection_id: str) -> Collection | None:
+        with self._lock:
+            return self._collections.get(collection_id)
+
+    def list_collections(self, owner_id: str) -> list[Collection]:
+        with self._lock:
+            items = [c for c in self._collections.values() if c.owner_id == owner_id]
+            return sorted(items, key=lambda item: item.updated_at, reverse=True)
+
+    def delete_collection(self, collection_id: str) -> None:
+        with self._lock:
+            self._collections.pop(collection_id, None)
+            self._collection_documents.pop(collection_id, None)
+
+    def add_collection_documents(
+        self,
+        collection_id: str,
+        document_ids: list[str],
+        *,
+        added_at: datetime,
+    ) -> None:
+        with self._lock:
+            docs = self._collection_documents.setdefault(collection_id, {})
+            for document_id in document_ids:
+                docs[document_id] = added_at
+            collection = self._collections.get(collection_id)
+            if collection is not None:
+                collection.updated_at = datetime.now(UTC)
+
+    def remove_collection_document(self, collection_id: str, document_id: str) -> None:
+        with self._lock:
+            docs = self._collection_documents.get(collection_id)
+            if docs is not None:
+                docs.pop(document_id, None)
+            collection = self._collections.get(collection_id)
+            if collection is not None:
+                collection.updated_at = datetime.now(UTC)
+
+    def list_collection_document_ids(self, collection_id: str) -> list[str]:
+        with self._lock:
+            docs = self._collection_documents.get(collection_id, {})
+            return sorted(docs.keys())
+
+    def search_documents(
+        self,
+        *,
+        owner_id: str,
+        query: str,
+        limit: int = 20,
+        document_ids: list[str] | None = None,
+    ) -> list[DocumentSearchHit]:
+        terms = _tokenize_query(query)
+        if not terms:
+            return []
+        allowed_ids = set(document_ids or [])
+        has_scope = bool(document_ids is not None)
+        hits: list[DocumentSearchHit] = []
+        with self._lock:
+            docs = [
+                doc
+                for doc in self._documents.values()
+                if doc.owner_id == owner_id and (not has_scope or doc.id in allowed_ids)
+            ]
+            docs.sort(key=lambda item: item.created_at, reverse=True)
+            for doc in docs:
+                parse_result = self._parse_results.get(doc.id)
+                llm = self._llm_parse_results.get(doc.id)
+                searchable_parts = [
+                    doc.filename,
+                    parse_result.text_preview if parse_result is not None else "",
+                    llm.suggested_title if llm is not None else "",
+                    llm.correspondent if llm is not None else "",
+                    llm.document_type if llm is not None else "",
+                    " ".join(llm.tags) if llm is not None else "",
+                ]
+                searchable_text = " ".join(part for part in searchable_parts if part).strip()
+                lowered = searchable_text.lower()
+                matched = [term for term in terms if term in lowered]
+                if not matched:
+                    continue
+                score = float(sum(lowered.count(term) for term in matched))
+                snippet = _extract_snippet(
+                    parse_result.text_preview if parse_result is not None else searchable_text,
+                    matched,
+                )
+                hits.append(
+                    DocumentSearchHit(
+                        document=doc,
+                        score=score,
+                        snippet=snippet,
+                        matched_terms=matched,
+                    )
+                )
+        hits.sort(key=lambda hit: (hit.score, hit.document.created_at), reverse=True)
+        return hits[: max(1, limit)]

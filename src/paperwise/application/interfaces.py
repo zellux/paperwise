@@ -1,7 +1,10 @@
+from datetime import datetime
 from typing import Any, Protocol
 
 from paperwise.domain.models import (
+    Collection,
     Document,
+    DocumentSearchHit,
     DocumentHistoryEvent,
     LLMParseResult,
     ParseResult,
@@ -128,6 +131,43 @@ class DocumentRepository(Protocol):
 
     def get_user_preference(self, user_id: str) -> UserPreference | None:
         """Load user preferences by user ID."""
+
+    def create_collection(self, collection: Collection) -> None:
+        """Persist a user-owned collection."""
+
+    def get_collection(self, collection_id: str) -> Collection | None:
+        """Load a collection by ID."""
+
+    def list_collections(self, owner_id: str) -> list[Collection]:
+        """List collections for a user."""
+
+    def delete_collection(self, collection_id: str) -> None:
+        """Delete a collection and its document memberships."""
+
+    def add_collection_documents(
+        self,
+        collection_id: str,
+        document_ids: list[str],
+        *,
+        added_at: datetime,
+    ) -> None:
+        """Add one or more documents to a collection."""
+
+    def remove_collection_document(self, collection_id: str, document_id: str) -> None:
+        """Remove one document from a collection."""
+
+    def list_collection_document_ids(self, collection_id: str) -> list[str]:
+        """Return document IDs contained in a collection."""
+
+    def search_documents(
+        self,
+        *,
+        owner_id: str,
+        query: str,
+        limit: int = 20,
+        document_ids: list[str] | None = None,
+    ) -> list[DocumentSearchHit]:
+        """Run keyword search over owner-visible documents (optionally scoped to IDs)."""
 
 
 class IngestionDispatcher(Protocol):

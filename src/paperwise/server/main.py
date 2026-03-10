@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from paperwise.server.routes.documents import router as documents_router
+from paperwise.server.routes.collections import router as collections_router
 from paperwise.server.routes.health import router as health_router
 from paperwise.server.routes.ui import router as ui_router
 from paperwise.server.routes.users import router as users_router
@@ -24,6 +25,7 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
     app.include_router(ui_router)
     app.include_router(documents_router)
+    app.include_router(collections_router)
     app.include_router(users_router)
     app.include_router(health_router)
     return app

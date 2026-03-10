@@ -92,3 +92,22 @@ class UserPreferenceRow(Base):
 
     user_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     preferences: Mapped[dict] = mapped_column(JSON)
+
+
+class CollectionRow(Base):
+    __tablename__ = "collections"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(256))
+    description: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class CollectionDocumentRow(Base):
+    __tablename__ = "collection_documents"
+
+    collection_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    document_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    added_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
