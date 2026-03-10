@@ -672,6 +672,11 @@ function createActionIcon(name) {
     addPolyline("10 9 9 9 8 9");
     return svg;
   }
+  if (name === "eye") {
+    addPath("M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0");
+    addPath("M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6");
+    return svg;
+  }
   if (name === "edit") {
     addPath("M12 20h9");
     addPath("M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z");
@@ -776,7 +781,7 @@ function renderDocsList(documents) {
     );
     actionsWrap.appendChild(
       createIconActionButton({
-        icon: "file-text",
+        icon: "eye",
         label: "View file",
         onClick: () => openDocumentFile(doc.id),
       })
