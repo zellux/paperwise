@@ -52,7 +52,7 @@ settings = get_settings()
 class CreateDocumentResponse(BaseModel):
     id: str
     status: str
-    job_id: str
+    job_id: str | None = None
 
 
 class DocumentResponse(BaseModel):
@@ -400,6 +400,13 @@ def create_document_endpoint(
     filename = file.filename or "uploaded-document"
     content = file.file.read()
     checksum = sha256(content).hexdigest()
+    existing = repository.get_by_owner_checksum(current_user.id, checksum)
+    if existing is not None:
+        return CreateDocumentResponse(
+            id=existing.id,
+            status=existing.status.value,
+            job_id=None,
+        )
     now = datetime.now(UTC)
     date_path = now.strftime("%Y/%m/%d")
     storage_token = str(uuid4())

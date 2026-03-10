@@ -68,6 +68,13 @@ class InMemoryDocumentRepository(DocumentRepository):
         with self._lock:
             return self._documents.get(document_id)
 
+    def get_by_owner_checksum(self, owner_id: str, checksum_sha256: str) -> Document | None:
+        with self._lock:
+            for document in self._documents.values():
+                if document.owner_id == owner_id and document.checksum_sha256 == checksum_sha256:
+                    return document
+            return None
+
     def list_documents(self, limit: int = 100, *, offset: int = 0) -> list[Document]:
         with self._lock:
             docs = sorted(

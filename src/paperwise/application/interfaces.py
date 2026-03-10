@@ -50,6 +50,9 @@ class DocumentRepository(Protocol):
     def get(self, document_id: str) -> Document | None:
         """Load a document by ID."""
 
+    def get_by_owner_checksum(self, owner_id: str, checksum_sha256: str) -> Document | None:
+        """Find an existing document by owner + SHA256 checksum."""
+
     def list_documents(self, limit: int = 100, *, offset: int = 0) -> list[Document]:
         """List recent documents."""
 

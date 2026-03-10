@@ -180,7 +180,7 @@ def test_list_documents_supports_offset_pagination() -> None:
         for name in ("first.pdf", "second.pdf", "third.pdf"):
             response = client.post(
                 "/documents",
-                files={"file": (name, b"%PDF-1.7\nsample", "application/pdf")},
+                files={"file": (name, f"%PDF-1.7\n{name}".encode("utf-8"), "application/pdf")},
             )
             assert response.status_code == 201
 
@@ -194,6 +194,40 @@ def test_list_documents_supports_offset_pagination() -> None:
         paged_payload = paged_response.json()
         assert len(paged_payload) == 1
         assert paged_payload[0]["id"] == full_payload[1]["id"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_upload_dedupes_by_owner_and_checksum() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        content = b"%PDF-1.7\nsame-content"
+        first_response = client.post(
+            "/documents",
+            files={"file": ("dup.pdf", content, "application/pdf")},
+        )
+        assert first_response.status_code == 201
+        first_payload = first_response.json()
+        assert first_payload["job_id"] == "job-test-1"
+
+        second_response = client.post(
+            "/documents",
+            files={"file": ("dup-copy.pdf", content, "application/pdf")},
+        )
+        assert second_response.status_code == 201
+        second_payload = second_response.json()
+        assert second_payload["id"] == first_payload["id"]
+        assert second_payload["job_id"] is None
+        assert dispatcher.enqueued == [first_payload["id"]]
     finally:
         app.dependency_overrides.clear()
 
@@ -303,7 +337,7 @@ def test_list_documents() -> None:
             create_response = client.post(
                 "/documents",
                 data={"owner_id": "user-list"},
-                files={"file": (name, b"%PDF-1.4\nx", "application/pdf")},
+                files={"file": (name, f"%PDF-1.4\n{name}".encode("utf-8"), "application/pdf")},
             )
             assert create_response.status_code == 201
 

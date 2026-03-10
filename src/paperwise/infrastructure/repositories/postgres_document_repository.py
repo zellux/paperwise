@@ -115,6 +115,29 @@ class PostgresDocumentRepository(DocumentRepository):
                 created_at=row.created_at,
             )
 
+    def get_by_owner_checksum(self, owner_id: str, checksum_sha256: str) -> Document | None:
+        with self._session_factory() as session:
+            row = session.scalar(
+                select(DocumentRow)
+                .where(DocumentRow.owner_id == owner_id)
+                .where(DocumentRow.checksum_sha256 == checksum_sha256)
+                .order_by(DocumentRow.created_at.desc())
+                .limit(1)
+            )
+            if row is None:
+                return None
+            return Document(
+                id=row.id,
+                filename=row.filename,
+                owner_id=row.owner_id,
+                blob_uri=row.blob_uri,
+                checksum_sha256=row.checksum_sha256,
+                content_type=row.content_type,
+                size_bytes=row.size_bytes,
+                status=_coerce_document_status(row.status),
+                created_at=row.created_at,
+            )
+
     def list_documents(self, limit: int = 100, *, offset: int = 0) -> list[Document]:
         with self._session_factory() as session:
             rows = session.scalars(
