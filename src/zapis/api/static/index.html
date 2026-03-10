@@ -35,28 +35,38 @@
       <section class="content-pane">
         <article id="section-docs" class="panel panel-section view">
           <h2>Documents</h2>
-          <form id="docsFilterForm" class="filters-grid">
-            <select id="filterTag" name="filterTag">
-              <option value="">All Tags</option>
-            </select>
-            <select id="filterCorrespondent" name="filterCorrespondent">
-              <option value="">All Correspondents</option>
-            </select>
-            <select id="filterType" name="filterType">
-              <option value="">All Types</option>
-            </select>
-            <select id="filterStatus" name="filterStatus">
-              <option value="">All Statuses</option>
-              <option value="received">Received</option>
-              <option value="parsing">Parsing</option>
-              <option value="parsed">Parsed</option>
-              <option value="enriching">Enriching</option>
-              <option value="ready">Ready</option>
-              <option value="failed">Failed</option>
-            </select>
-            <div class="actions">
-              <button id="clearFiltersBtn" type="button" class="btn">Clear</button>
+          <form id="docsFilterForm" class="filters-toolbar">
+            <div class="filter-chip">
+              <span class="chip-prefix">Tags</span>
+              <select id="filterTag" name="filterTag" class="filter-select">
+                <option value="">Any</option>
+              </select>
             </div>
+            <div class="filter-chip">
+              <span class="chip-prefix">Correspondent</span>
+              <select id="filterCorrespondent" name="filterCorrespondent" class="filter-select">
+                <option value="">Any</option>
+              </select>
+            </div>
+            <div class="filter-chip">
+              <span class="chip-prefix">Document Type</span>
+              <select id="filterType" name="filterType" class="filter-select">
+                <option value="">Any</option>
+              </select>
+            </div>
+            <div class="filter-chip">
+              <span class="chip-prefix">Status</span>
+              <select id="filterStatus" name="filterStatus" class="filter-select">
+                <option value="">Any</option>
+                <option value="received">Received</option>
+                <option value="parsing">Parsing</option>
+                <option value="parsed">Parsed</option>
+                <option value="enriching">Enriching</option>
+                <option value="ready">Ready</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+            <button id="clearFiltersBtn" type="button" class="btn btn-muted">Reset Filters</button>
           </form>
           <div class="docs-table-wrap">
             <table class="docs-table">
