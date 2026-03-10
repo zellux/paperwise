@@ -41,6 +41,7 @@ const filterSelects = [filterTag, filterCorrespondent, filterType, filterStatus]
 const activityOutput = document.getElementById("activityOutput");
 const docsTableBody = document.getElementById("docsTableBody");
 const tagsTableBody = document.getElementById("tagsTableBody");
+const documentTypesTableBody = document.getElementById("documentTypesTableBody");
 const pendingTableBody = document.getElementById("pendingTableBody");
 const navLinks = [...document.querySelectorAll(".nav-link")];
 const views = [...document.querySelectorAll(".view")];
@@ -51,6 +52,7 @@ const VIEW_ID_TO_PARAM = {
   "section-docs": "docs",
   "section-document": "document",
   "section-tags": "tags",
+  "section-document-types": "document-types",
   "section-pending": "pending",
   "section-upload": "upload",
   "section-activity": "activity",
@@ -62,6 +64,7 @@ const PATH_TO_VIEW_ID = {
   "/ui/documents": "section-docs",
   "/ui/document": "section-document",
   "/ui/tags": "section-tags",
+  "/ui/document-types": "section-document-types",
   "/ui/pending": "section-pending",
   "/ui/upload": "section-upload",
   "/ui/activity": "section-activity",
@@ -70,6 +73,7 @@ const VIEW_ID_TO_PATH = {
   "section-docs": "/ui/documents",
   "section-document": "/ui/document",
   "section-tags": "/ui/tags",
+  "section-document-types": "/ui/document-types",
   "section-pending": "/ui/pending",
   "section-upload": "/ui/upload",
   "section-activity": "/ui/activity",
@@ -988,6 +992,48 @@ function renderTagsList(tagStats) {
   }
 }
 
+function renderDocumentTypesList(typeStats) {
+  if (!typeStats.length) {
+    documentTypesTableBody.innerHTML = '<tr><td colspan="3">No document types found.</td></tr>';
+    return;
+  }
+  documentTypesTableBody.innerHTML = "";
+  for (const stat of typeStats) {
+    const row = document.createElement("tr");
+    const typeCell = document.createElement("td");
+    typeCell.setAttribute("data-label", "Document Type");
+    typeCell.textContent = stat.document_type;
+    const countCell = document.createElement("td");
+    countCell.setAttribute("data-label", "Documents");
+    countCell.textContent = String(stat.document_count);
+    const actionCell = document.createElement("td");
+    actionCell.setAttribute("data-label", "Action");
+
+    const viewBtn = document.createElement("button");
+    viewBtn.className = "btn";
+    viewBtn.type = "button";
+    viewBtn.textContent = "View Docs";
+    viewBtn.addEventListener("click", async () => {
+      docsFilters.tag = [];
+      docsFilters.correspondent = [];
+      docsFilters.document_type = [stat.document_type];
+      docsFilters.status = [];
+      applyFiltersToControls();
+      setActiveView("section-docs");
+      setActiveNav("section-docs");
+      syncUrlFromFilters();
+      await loadDocumentsList();
+      logActivity(`Filtered documents by type: ${stat.document_type}`);
+    });
+
+    actionCell.appendChild(viewBtn);
+    row.appendChild(typeCell);
+    row.appendChild(countCell);
+    row.appendChild(actionCell);
+    documentTypesTableBody.appendChild(row);
+  }
+}
+
 function renderPendingList(documents) {
   if (!documents.length) {
     pendingTableBody.innerHTML = '<tr><td colspan="4">No pending documents.</td></tr>';
@@ -1091,6 +1137,17 @@ async function loadTagStats() {
   logActivity(`Loaded ${payload.length} tag(s)`);
 }
 
+async function loadDocumentTypeStats() {
+  const response = await apiFetch("/documents/metadata/document-type-stats");
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Document type stats load failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+  renderDocumentTypesList(payload);
+  logActivity(`Loaded ${payload.length} document type(s)`);
+}
+
 async function openDocumentView(documentId) {
   const response = await apiFetch(`/documents/${documentId}/detail`);
   const payload = await response.json();
@@ -1170,6 +1227,7 @@ signInForm?.addEventListener("submit", async (event) => {
   setAuthMessage(`Signed in as ${payload.user.email}.`);
   await loadDocumentsList();
   await loadTagStats();
+  await loadDocumentTypeStats();
   await loadPendingDocuments();
 });
 
@@ -1207,6 +1265,7 @@ registerForm?.addEventListener("submit", async (event) => {
   setAuthMessage(`Registered ${registerPayload.email}.`);
   await loadDocumentsList();
   await loadTagStats();
+  await loadDocumentTypeStats();
   await loadPendingDocuments();
 });
 
@@ -1324,6 +1383,7 @@ documentMetaForm.addEventListener("submit", async (event) => {
   await loadDocumentsList();
   await loadPendingDocuments();
   await loadTagStats();
+  await loadDocumentTypeStats();
 });
 
 reprocessDocumentBtn?.addEventListener("click", async () => {
@@ -1354,6 +1414,7 @@ reprocessDocumentBtn?.addEventListener("click", async () => {
     await loadDocumentsList();
     await loadPendingDocuments();
     await loadTagStats();
+    await loadDocumentTypeStats();
   } else {
     logActivity(`Reprocessing still running for ${currentDocumentId}. Refresh to check later.`);
   }
@@ -1459,6 +1520,10 @@ window.addEventListener("popstate", async () => {
     await loadTagStats();
     return;
   }
+  if (currentViewId === "section-document-types") {
+    await loadDocumentTypeStats();
+    return;
+  }
   if (currentViewId === "section-pending") {
     await loadPendingDocuments();
     return;
@@ -1490,6 +1555,12 @@ async function initializeApp() {
   if (currentViewId === "section-tags") {
     loadTagStats().catch((error) => {
       logActivity(`Initial tag stats failed: ${error.message}`);
+    });
+  }
+
+  if (currentViewId === "section-document-types") {
+    loadDocumentTypeStats().catch((error) => {
+      logActivity(`Initial document type stats failed: ${error.message}`);
     });
   }
 

@@ -124,6 +124,11 @@ class TagStatResponse(BaseModel):
     document_count: int
 
 
+class DocumentTypeStatResponse(BaseModel):
+    document_type: str
+    document_count: int
+
+
 class RestartPendingResponse(BaseModel):
     restarted_count: int
     skipped_ready_count: int
@@ -924,6 +929,36 @@ def get_tag_stats_endpoint(
             counts[key] = counts.get(key, 0) + 1
     return [
         TagStatResponse(tag=display_name_by_key[key], document_count=count)
+        for key, count in sorted(
+            counts.items(),
+            key=lambda item: (-item[1], display_name_by_key[item[0]].casefold()),
+        )
+    ]
+
+
+@router.get("/metadata/document-type-stats", response_model=list[DocumentTypeStatResponse])
+def get_document_type_stats_endpoint(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> list[DocumentTypeStatResponse]:
+    counts: dict[str, int] = {}
+    display_name_by_key: dict[str, str] = {}
+    documents = repository.list_documents(limit=10_000)
+    for document in documents:
+        if document.owner_id != current_user.id:
+            continue
+        llm_result = repository.get_llm_parse_result(document.id)
+        if llm_result is None:
+            continue
+        cleaned = str(llm_result.document_type).strip()
+        if not cleaned:
+            continue
+        key = cleaned.casefold()
+        if key not in display_name_by_key:
+            display_name_by_key[key] = _to_title_case(cleaned)
+        counts[key] = counts.get(key, 0) + 1
+    return [
+        DocumentTypeStatResponse(document_type=display_name_by_key[key], document_count=count)
         for key, count in sorted(
             counts.items(),
             key=lambda item: (-item[1], display_name_by_key[item[0]].casefold()),
