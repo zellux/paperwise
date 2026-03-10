@@ -683,6 +683,30 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   max-width: 420px;
 }
 
+.settings-group {
+  border: 1px solid var(--stroke-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 12px;
+}
+
+.settings-group-title {
+  margin: 0;
+  font-size: 0.94rem;
+  font-family: var(--serif);
+}
+
+.settings-group-note {
+  margin: 4px 0 10px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.settings-group-fields {
+  display: grid;
+  gap: 8px;
+}
+
 .filter-chip {
   position: relative;
   display: flex;
