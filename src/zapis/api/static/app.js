@@ -20,6 +20,7 @@ const detailContentType = document.getElementById("detailContentType");
 const detailSizeBytes = document.getElementById("detailSizeBytes");
 const detailChecksum = document.getElementById("detailChecksum");
 const detailBlobUri = document.getElementById("detailBlobUri");
+const documentHistoryList = document.getElementById("documentHistoryList");
 const filterTag = document.getElementById("filterTag");
 const filterCorrespondent = document.getElementById("filterCorrespondent");
 const filterType = document.getElementById("filterType");
@@ -95,6 +96,105 @@ function formatBytes(value) {
   }
   const mb = kb / 1024;
   return `${mb.toFixed(2)} MB`;
+}
+
+function formatHistoryEventType(value) {
+  const labels = {
+    metadata_changed: "Metadata changed",
+    tags_added: "Tags added",
+    tags_removed: "Tags removed",
+    file_moved: "File moved",
+  };
+  return labels[value] || formatStatus(value || "update");
+}
+
+function formatHistoryActor(event) {
+  if (event.actor_type === "user") {
+    return event.actor_id ? `User: ${event.actor_id}` : "User";
+  }
+  return "System";
+}
+
+function stringifyHistoryValue(value) {
+  if (value === null || value === undefined || value === "") {
+    return "(empty)";
+  }
+  return String(value);
+}
+
+function buildHistoryChangeLines(event) {
+  const changes = event.changes || {};
+  if (event.event_type === "metadata_changed") {
+    const lines = [];
+    for (const [field, values] of Object.entries(changes)) {
+      const before = stringifyHistoryValue(values?.before);
+      const after = stringifyHistoryValue(values?.after);
+      lines.push(`${field}: ${before} -> ${after}`);
+    }
+    return lines;
+  }
+  if (event.event_type === "tags_added") {
+    const tags = Array.isArray(changes.tags) ? changes.tags : [];
+    return [tags.length ? `Added: ${tags.join(", ")}` : "Added tags"];
+  }
+  if (event.event_type === "tags_removed") {
+    const tags = Array.isArray(changes.tags) ? changes.tags : [];
+    return [tags.length ? `Removed: ${tags.join(", ")}` : "Removed tags"];
+  }
+  if (event.event_type === "file_moved") {
+    const fromPath = toRelativeBlobPath(changes.from_blob_uri || "");
+    const toPath = toRelativeBlobPath(changes.to_blob_uri || "");
+    return [`From: ${fromPath}`, `To: ${toPath}`];
+  }
+  try {
+    return [JSON.stringify(changes)];
+  } catch {
+    return ["Details unavailable"];
+  }
+}
+
+function renderDocumentHistory(events) {
+  if (!documentHistoryList) {
+    return;
+  }
+  if (!Array.isArray(events) || !events.length) {
+    documentHistoryList.innerHTML =
+      '<p class="document-history-empty">No history entries yet.</p>';
+    return;
+  }
+
+  documentHistoryList.innerHTML = "";
+  for (const event of events) {
+    const item = document.createElement("article");
+    item.className = "document-history-item";
+
+    const header = document.createElement("div");
+    header.className = "document-history-header";
+
+    const type = document.createElement("span");
+    type.className = "document-history-type";
+    type.textContent = formatHistoryEventType(event.event_type);
+
+    const meta = document.createElement("span");
+    meta.className = "document-history-meta";
+    const timestamp = event.created_at ? new Date(event.created_at).toLocaleString() : "-";
+    meta.textContent = `${formatHistoryActor(event)} | ${event.source || "-"} | ${timestamp}`;
+
+    const changes = document.createElement("div");
+    changes.className = "document-history-changes";
+    for (const line of buildHistoryChangeLines(event)) {
+      const changeLine = document.createElement("p");
+      changeLine.className = "document-history-change";
+      changeLine.textContent = line;
+      changes.appendChild(changeLine);
+    }
+
+    header.appendChild(type);
+    header.appendChild(meta);
+    item.appendChild(header);
+    item.appendChild(changes);
+    documentHistoryList.appendChild(item);
+  }
 }
 
 function toRelativeBlobPath(blobUri) {
@@ -751,6 +851,15 @@ async function openDocumentView(documentId) {
   detailChecksum.textContent = doc.checksum_sha256 || "-";
   detailBlobUri.textContent = toRelativeBlobPath(doc.blob_uri);
   detailBlobUri.title = doc.blob_uri || "";
+
+  const historyResponse = await fetch(`/documents/${documentId}/history?limit=100`);
+  const historyPayload = await historyResponse.json();
+  if (!historyResponse.ok) {
+    renderDocumentHistory([]);
+    logActivity(`History load failed: ${historyPayload.detail || historyResponse.statusText}`);
+  } else {
+    renderDocumentHistory(historyPayload);
+  }
 
   setActiveView("section-document");
   setActiveNav("section-document");

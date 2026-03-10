@@ -285,6 +285,70 @@ input[type="file"] {
   white-space: pre-wrap;
 }
 
+.document-history-card {
+  border: 1px solid var(--stroke-soft);
+  border-radius: 12px;
+  background: rgba(248, 250, 248, 0.92);
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.document-history-title {
+  margin: 0 0 10px;
+  font-size: 0.98rem;
+  font-family: var(--serif);
+}
+
+.document-history-list {
+  display: grid;
+  gap: 8px;
+}
+
+.document-history-empty {
+  margin: 0;
+  font-size: 0.84rem;
+  color: var(--ink-soft);
+}
+
+.document-history-item {
+  border: 1px solid var(--stroke-soft);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 10px;
+}
+
+.document-history-header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+
+.document-history-type {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: #1f5f4c;
+}
+
+.document-history-meta {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
+.document-history-changes {
+  margin: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.document-history-change {
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--ink);
+  word-break: break-word;
+}
+
 .filters-toolbar {
   display: flex;
   flex-wrap: wrap;
