@@ -560,6 +560,7 @@ def get_document_file_endpoint(
         path=file_path,
         media_type=document.content_type or "application/octet-stream",
         filename=document.filename,
+        content_disposition_type="inline",
     )
 
 
