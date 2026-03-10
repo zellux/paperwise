@@ -1,5 +1,6 @@
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import logging
 from typing import Any
 
 import httpx
@@ -16,6 +17,8 @@ from paperwise.infrastructure.llm.ocr_prompt import (
     build_ocr_user_prompt,
     extract_ocr_text_result,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class OpenAILLMProvider(LLMProvider):
@@ -191,8 +194,15 @@ class OpenAILLMProvider(LLMProvider):
             raise RuntimeError("No images provided for OCR.")
         extracted_pages: dict[int, str] = {}
         last_error: Exception | None = None
+        total_pages = len(image_data_urls)
+        logger.info(
+            "Starting vision OCR for %s with %d rendered page image(s).",
+            filename,
+            total_pages,
+        )
 
         def _ocr_single_page(index: int, image_url: str) -> tuple[int, str | None, Exception | None]:
+            logger.info("Submitting vision OCR page %d/%d for %s.", index, total_pages, filename)
             request_payload = {
                 "model": self._model,
                 "temperature": 0,
@@ -252,6 +262,14 @@ class OpenAILLMProvider(LLMProvider):
                         request_payload=request_payload,
                         error=str(exc),
                     )
+                    logger.warning(
+                        "Vision OCR page %d/%d failed for %s (attempt %d): %s",
+                        index,
+                        total_pages,
+                        filename,
+                        attempt + 1,
+                        exc,
+                    )
                     if isinstance(exc, httpx.ReadTimeout) and attempt == 0:
                         continue
                     break
@@ -284,15 +302,34 @@ class OpenAILLMProvider(LLMProvider):
                 executor.submit(_ocr_single_page, index, image_url)
                 for index, image_url in enumerate(image_data_urls, start=1)
             ]
+            completed_pages = 0
+            successful_pages = 0
             for future in as_completed(futures):
                 index, extracted, page_error = future.result()
+                completed_pages += 1
                 if extracted:
                     extracted_pages[index] = extracted
+                    successful_pages += 1
                 elif page_error is not None:
                     last_error = page_error
+                remaining = total_pages - completed_pages
+                logger.info(
+                    "Vision OCR progress for %s: completed=%d/%d success=%d remaining=%d",
+                    filename,
+                    completed_pages,
+                    total_pages,
+                    successful_pages,
+                    remaining,
+                )
 
         if extracted_pages:
             ordered = [extracted_pages[idx] for idx in sorted(extracted_pages)]
+            logger.info(
+                "Vision OCR finished for %s: received %d/%d page result(s).",
+                filename,
+                len(ordered),
+                total_pages,
+            )
             return "\n\n".join(ordered).strip()
         if last_error is not None:
             raise last_error

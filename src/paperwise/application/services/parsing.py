@@ -286,7 +286,13 @@ def parse_document_blob(
             and is_pdf
             and callable(extract_images_method)
         ):
+            logger.info("Rendering PDF pages for vision OCR: %s", blob_path)
             image_data_urls = _render_pdf_pages_to_data_urls(blob_path=blob_path, max_pages=3)
+            logger.info(
+                "Rendered %d PDF page image(s) for vision OCR: %s",
+                len(image_data_urls),
+                blob_path,
+            )
             try:
                 ocr_text = extract_images_method(
                     filename=blob_path.name,
