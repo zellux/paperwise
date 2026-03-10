@@ -1842,30 +1842,18 @@ function renderActivityTokenTotal(totalTokens) {
 }
 
 async function loadProcessedDocumentsActivity() {
-  const allDocuments = [];
-  const batchSize = 200;
-  const maxDocuments = 5_000;
-  let offset = 0;
-  while (offset < maxDocuments) {
-    const response = await apiFetch(
-      `/documents?status=ready&limit=${batchSize}&offset=${offset}`
-    );
-    const payload = await response.json();
-    if (!response.ok) {
-      logActivity(`Processed documents load failed: ${payload.detail || response.statusText}`);
-      return;
-    }
-    allDocuments.push(...payload);
-    if (payload.length < batchSize) {
-      break;
-    }
-    offset += batchSize;
+  const limit = Math.max(1, normalizePageSize(docsPageSize));
+  const response = await apiFetch(`/documents?status=ready&limit=${limit}&offset=0`);
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Processed documents load failed: ${payload.detail || response.statusText}`);
+    return;
   }
-  renderProcessedDocsActivity(allDocuments);
+  renderProcessedDocsActivity(payload);
   const preferences = await loadUserPreferences();
   const totalTokens = Number(preferences.llm_total_tokens_processed || 0);
   renderActivityTokenTotal(totalTokens);
-  logActivity(`Loaded ${allDocuments.length} processed document(s).`);
+  logActivity(`Loaded ${payload.length} latest processed document(s).`);
 }
 
 async function loadTagStats() {
