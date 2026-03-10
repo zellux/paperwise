@@ -4,6 +4,16 @@ from zapis.application.interfaces import DocumentRepository
 from zapis.domain.models import Document, LLMParseResult, ParseResult
 
 
+def _normalize_name(value: str) -> str:
+    cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
+    return " ".join(cleaned.split())
+
+
+def _to_title_case(value: str) -> str:
+    cleaned = " ".join(value.strip().split())
+    return cleaned.title()
+
+
 class InMemoryDocumentRepository(DocumentRepository):
     def __init__(self) -> None:
         self._documents: dict[str, Document] = {}
@@ -41,6 +51,26 @@ class InMemoryDocumentRepository(DocumentRepository):
 
     def save_llm_parse_result(self, result: LLMParseResult) -> None:
         with self._lock:
+            normalized_tags: list[str] = []
+            seen_tags: set[str] = set()
+            for tag in result.tags:
+                normalized = _normalize_name(tag)
+                if not normalized or normalized in seen_tags:
+                    continue
+                seen_tags.add(normalized)
+                normalized_tags.append(_to_title_case(tag))
+
+            normalized_created_tags: list[str] = []
+            seen_created: set[str] = set()
+            for tag in result.created_tags:
+                normalized = _normalize_name(tag)
+                if not normalized or normalized in seen_created:
+                    continue
+                seen_created.add(normalized)
+                normalized_created_tags.append(_to_title_case(tag))
+
+            result.tags = normalized_tags
+            result.created_tags = normalized_created_tags
             self._llm_parse_results[result.document_id] = result
 
     def get_llm_parse_result(self, document_id: str) -> LLMParseResult | None:
@@ -57,7 +87,13 @@ class InMemoryDocumentRepository(DocumentRepository):
 
     def list_tags(self) -> list[str]:
         with self._lock:
-            return sorted(self._tags)
+            by_norm: dict[str, str] = {}
+            for tag in self._tags:
+                normalized = _normalize_name(tag)
+                if not normalized:
+                    continue
+                by_norm[normalized] = _to_title_case(tag)
+            return sorted(by_norm.values())
 
     def list_tag_stats(self) -> list[tuple[str, int]]:
         with self._lock:
@@ -75,7 +111,7 @@ class InMemoryDocumentRepository(DocumentRepository):
                         continue
                     seen.add(key)
                     if key not in display_name_by_key:
-                        display_name_by_key[key] = cleaned
+                        display_name_by_key[key] = _to_title_case(cleaned)
                     counts[key] = counts.get(key, 0) + 1
             return sorted(
                 [(display_name_by_key[key], count) for key, count in counts.items()],
@@ -95,4 +131,4 @@ class InMemoryDocumentRepository(DocumentRepository):
             for name in names:
                 cleaned = name.strip()
                 if cleaned:
-                    self._tags.add(cleaned)
+                    self._tags.add(_to_title_case(cleaned))

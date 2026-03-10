@@ -15,6 +15,16 @@ from zapis.infrastructure.repositories.postgres_models import (
 )
 
 
+def _normalize_name(value: str) -> str:
+    cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
+    return " ".join(cleaned.split())
+
+
+def _to_title_case(value: str) -> str:
+    cleaned = " ".join(value.strip().split())
+    return cleaned.title()
+
+
 def _coerce_document_status(value: str) -> DocumentStatus:
     legacy_map = {
         "parsing": DocumentStatus.PROCESSING,
@@ -117,6 +127,24 @@ class PostgresDocumentRepository(DocumentRepository):
             )
 
     def save_llm_parse_result(self, result: LLMParseResult) -> None:
+        normalized_tags: list[str] = []
+        seen_tags: set[str] = set()
+        for tag in result.tags:
+            normalized = _normalize_name(tag)
+            if not normalized or normalized in seen_tags:
+                continue
+            seen_tags.add(normalized)
+            normalized_tags.append(_to_title_case(tag))
+
+        normalized_created_tags: list[str] = []
+        seen_created: set[str] = set()
+        for tag in result.created_tags:
+            normalized = _normalize_name(tag)
+            if not normalized or normalized in seen_created:
+                continue
+            seen_created.add(normalized)
+            normalized_created_tags.append(_to_title_case(tag))
+
         with self._session_factory() as session:
             row = session.get(LLMParseResultRow, result.document_id)
             if row is None:
@@ -126,10 +154,10 @@ class PostgresDocumentRepository(DocumentRepository):
             row.document_date = result.document_date
             row.correspondent = result.correspondent
             row.document_type = result.document_type
-            row.tags = result.tags
+            row.tags = normalized_tags
             row.created_correspondent = result.created_correspondent
             row.created_document_type = result.created_document_type
-            row.created_tags = result.created_tags
+            row.created_tags = normalized_created_tags
             row.created_at = result.created_at
             session.commit()
 
@@ -138,16 +166,33 @@ class PostgresDocumentRepository(DocumentRepository):
             row = session.get(LLMParseResultRow, document_id)
             if row is None:
                 return None
+            normalized_tags: list[str] = []
+            seen_tags: set[str] = set()
+            for tag in list(row.tags or []):
+                normalized = _normalize_name(str(tag))
+                if not normalized or normalized in seen_tags:
+                    continue
+                seen_tags.add(normalized)
+                normalized_tags.append(_to_title_case(str(tag)))
+
+            normalized_created_tags: list[str] = []
+            seen_created: set[str] = set()
+            for tag in list(row.created_tags or []):
+                normalized = _normalize_name(str(tag))
+                if not normalized or normalized in seen_created:
+                    continue
+                seen_created.add(normalized)
+                normalized_created_tags.append(_to_title_case(str(tag)))
             return LLMParseResult(
                 document_id=row.document_id,
                 suggested_title=row.suggested_title,
                 document_date=row.document_date,
                 correspondent=row.correspondent,
                 document_type=row.document_type,
-                tags=list(row.tags or []),
+                tags=normalized_tags,
                 created_correspondent=row.created_correspondent,
                 created_document_type=row.created_document_type,
-                created_tags=list(row.created_tags or []),
+                created_tags=normalized_created_tags,
                 created_at=row.created_at,
             )
 
@@ -164,7 +209,13 @@ class PostgresDocumentRepository(DocumentRepository):
     def list_tags(self) -> list[str]:
         with self._session_factory() as session:
             rows = session.scalars(select(TagRow).order_by(TagRow.name)).all()
-            return [row.name for row in rows]
+            by_norm: dict[str, str] = {}
+            for row in rows:
+                normalized = _normalize_name(row.name)
+                if not normalized:
+                    continue
+                by_norm[normalized] = _to_title_case(row.name)
+            return sorted(by_norm.values())
 
     def list_tag_stats(self) -> list[tuple[str, int]]:
         with self._session_factory() as session:
@@ -182,7 +233,7 @@ class PostgresDocumentRepository(DocumentRepository):
                         continue
                     seen.add(key)
                     if key not in display_name_by_key:
-                        display_name_by_key[key] = cleaned
+                        display_name_by_key[key] = _to_title_case(cleaned)
                     counts[key] = counts.get(key, 0) + 1
             return sorted(
                 [(display_name_by_key[key], count) for key, count in counts.items()],
@@ -208,11 +259,16 @@ class PostgresDocumentRepository(DocumentRepository):
                 session.commit()
 
     def add_tags(self, names: list[str]) -> None:
-        cleaned_names = [name.strip() for name in names if name.strip()]
+        cleaned_names = [_to_title_case(name) for name in names if name.strip()]
         if not cleaned_names:
             return
         with self._session_factory() as session:
+            existing_rows = session.scalars(select(TagRow)).all()
+            existing_by_norm = {_normalize_name(row.name): row.name for row in existing_rows}
             for name in cleaned_names:
-                if session.get(TagRow, name) is None:
-                    session.add(TagRow(name=name))
+                normalized = _normalize_name(name)
+                if not normalized or normalized in existing_by_norm:
+                    continue
+                session.add(TagRow(name=name))
+                existing_by_norm[normalized] = name
             session.commit()

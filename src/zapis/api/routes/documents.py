@@ -139,7 +139,7 @@ def _validate_date(value: str | None) -> str | None:
 
 
 def _resolve_tags(candidate_tags: list[str], existing_tags: list[str]) -> tuple[list[str], list[str]]:
-    existing_by_norm = {_normalize_name(tag): tag for tag in existing_tags}
+    existing_by_norm = {_normalize_name(tag): _to_title_case(tag) for tag in existing_tags}
     resolved: list[str] = []
     created: list[str] = []
     seen: set[str] = set()
