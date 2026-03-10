@@ -49,8 +49,9 @@ def parse_document_blob(
         if page_count == 0:
             page_count = 1
         # Keep a stub distinction between OCR modes so reprocess output can visibly change.
-        preview_limit = 4000 if normalized_ocr == "llm" else 600
-        byte_window = 24000 if normalized_ocr == "llm" else 6000
+        is_llm_ocr = normalized_ocr in {"llm", "llm_separate"}
+        preview_limit = 4000 if is_llm_ocr else 600
+        byte_window = 24000 if is_llm_ocr else 6000
         text_preview = _extract_text_like_segments(raw[:byte_window], max_chars=preview_limit)
     elif suffix in {".txt", ".md", ".markdown"}:
         text_preview = raw[:4000].decode("utf-8", errors="replace").replace("\x00", "")
@@ -75,6 +76,8 @@ def parse_document_blob(
     parser_name = "stub-local"
     if normalized_ocr == "llm":
         parser_name = "stub-llm-ocr"
+    elif normalized_ocr == "llm_separate":
+        parser_name = "stub-llm-ocr-separate"
 
     return ParseResult(
         document_id=document_id,

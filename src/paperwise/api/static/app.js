@@ -20,6 +20,10 @@ const settingsLlmApiKeyInput = document.getElementById("settingsLlmApiKeyInput")
 const settingsTestLlmBtn = document.getElementById("settingsTestLlmBtn");
 const settingsLlmTestStatus = document.getElementById("settingsLlmTestStatus");
 const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
+const settingsOcrLlmProviderSelect = document.getElementById("settingsOcrLlmProviderSelect");
+const settingsOcrLlmModelInput = document.getElementById("settingsOcrLlmModelInput");
+const settingsOcrLlmBaseUrlInput = document.getElementById("settingsOcrLlmBaseUrlInput");
+const settingsOcrLlmApiKeyInput = document.getElementById("settingsOcrLlmApiKeyInput");
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
 const signInForm = document.getElementById("signInForm");
@@ -129,8 +133,14 @@ let llmSettings = {
   base_url: "",
   api_key: "",
 };
-const SUPPORTED_OCR_PROVIDERS = ["tesseract", "llm"];
+const SUPPORTED_OCR_PROVIDERS = ["tesseract", "llm", "llm_separate"];
 let ocrProvider = "llm";
+let ocrLlmSettings = {
+  provider: "",
+  model: "",
+  base_url: "",
+  api_key: "",
+};
 let docsFilters = {
   q: "",
   tag: [],
@@ -245,6 +255,21 @@ function renderSettingsForm() {
   if (settingsOcrProviderSelect && settingsOcrProviderSelect.value !== ocrProvider) {
     settingsOcrProviderSelect.value = ocrProvider;
   }
+  if (
+    settingsOcrLlmProviderSelect &&
+    settingsOcrLlmProviderSelect.value !== ocrLlmSettings.provider
+  ) {
+    settingsOcrLlmProviderSelect.value = ocrLlmSettings.provider;
+  }
+  if (settingsOcrLlmModelInput && settingsOcrLlmModelInput.value !== ocrLlmSettings.model) {
+    settingsOcrLlmModelInput.value = ocrLlmSettings.model;
+  }
+  if (settingsOcrLlmBaseUrlInput && settingsOcrLlmBaseUrlInput.value !== ocrLlmSettings.base_url) {
+    settingsOcrLlmBaseUrlInput.value = ocrLlmSettings.base_url;
+  }
+  if (settingsOcrLlmApiKeyInput && settingsOcrLlmApiKeyInput.value !== ocrLlmSettings.api_key) {
+    settingsOcrLlmApiKeyInput.value = ocrLlmSettings.api_key;
+  }
   syncUploadAvailability();
 }
 
@@ -257,22 +282,31 @@ function readLlmSettingsFromControls() {
   };
 }
 
-function applyLlmProviderDefaultsToControls(provider, options = {}) {
+function readOcrLlmSettingsFromControls() {
+  return {
+    provider: normalizeLlmProvider(settingsOcrLlmProviderSelect?.value || ocrLlmSettings.provider),
+    model: String(settingsOcrLlmModelInput?.value || "").trim(),
+    base_url: String(settingsOcrLlmBaseUrlInput?.value || "").trim(),
+    api_key: String(settingsOcrLlmApiKeyInput?.value || "").trim(),
+  };
+}
+
+function applyLlmProviderDefaultsToControls(provider, modelInput, baseUrlInput, options = {}) {
   const force = options.force === true;
   const defaults = getLlmProviderDefaults(provider);
   if (!defaults) {
     return;
   }
-  if (settingsLlmModelInput) {
-    const currentModel = String(settingsLlmModelInput.value || "").trim();
+  if (modelInput) {
+    const currentModel = String(modelInput.value || "").trim();
     if (force || !currentModel) {
-      settingsLlmModelInput.value = defaults.model;
+      modelInput.value = defaults.model;
     }
   }
-  if (settingsLlmBaseUrlInput) {
-    const currentBaseUrl = String(settingsLlmBaseUrlInput.value || "").trim();
+  if (baseUrlInput) {
+    const currentBaseUrl = String(baseUrlInput.value || "").trim();
     if (force || !currentBaseUrl) {
-      settingsLlmBaseUrlInput.value = defaults.base_url;
+      baseUrlInput.value = defaults.base_url;
     }
   }
 }
@@ -379,6 +413,10 @@ async function saveUserPreferences() {
       llm_base_url: llmSettings.base_url,
       llm_api_key: llmSettings.api_key,
       ocr_provider: ocrProvider,
+      ocr_llm_provider: ocrLlmSettings.provider,
+      ocr_llm_model: ocrLlmSettings.model,
+      ocr_llm_base_url: ocrLlmSettings.base_url,
+      ocr_llm_api_key: ocrLlmSettings.api_key,
     },
   };
   try {
@@ -446,6 +484,21 @@ function applyUserPreferences(preferences, options = {}) {
     }
   }
   ocrProvider = normalizeOcrProvider(preferences.ocr_provider);
+  ocrLlmSettings = {
+    provider: normalizeLlmProvider(preferences.ocr_llm_provider),
+    model: String(preferences.ocr_llm_model || "").trim(),
+    base_url: String(preferences.ocr_llm_base_url || "").trim(),
+    api_key: String(preferences.ocr_llm_api_key || "").trim(),
+  };
+  const ocrDefaults = getLlmProviderDefaults(ocrLlmSettings.provider);
+  if (ocrDefaults) {
+    if (!ocrLlmSettings.model) {
+      ocrLlmSettings.model = ocrDefaults.model;
+    }
+    if (!ocrLlmSettings.base_url) {
+      ocrLlmSettings.base_url = ocrDefaults.base_url;
+    }
+  }
 }
 
 async function hydrateUserPreferencesForSession() {
@@ -723,6 +776,12 @@ function clearSession() {
     api_key: "",
   };
   ocrProvider = "llm";
+  ocrLlmSettings = {
+    provider: "",
+    model: "",
+    base_url: "",
+    api_key: "",
+  };
   docsPage = 1;
   docsPageSize = 20;
   docsFilters = sanitizeDocsFilters({
@@ -1849,6 +1908,7 @@ settingsForm?.addEventListener("submit", async (event) => {
   const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || docsPageSize);
   llmSettings = readLlmSettingsFromControls();
   ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
+  ocrLlmSettings = readOcrLlmSettingsFromControls();
   syncUploadAvailability();
   applyTheme(nextTheme);
   docsPageSize = nextPageSize;
@@ -1863,8 +1923,23 @@ settingsForm?.addEventListener("submit", async (event) => {
 
 settingsLlmProviderSelect?.addEventListener("change", () => {
   const nextProvider = normalizeLlmProvider(settingsLlmProviderSelect.value);
-  applyLlmProviderDefaultsToControls(nextProvider, { force: true });
+  applyLlmProviderDefaultsToControls(
+    nextProvider,
+    settingsLlmModelInput,
+    settingsLlmBaseUrlInput,
+    { force: true }
+  );
   setSettingsLlmTestStatus("");
+});
+
+settingsOcrLlmProviderSelect?.addEventListener("change", () => {
+  const nextProvider = normalizeLlmProvider(settingsOcrLlmProviderSelect.value);
+  applyLlmProviderDefaultsToControls(
+    nextProvider,
+    settingsOcrLlmModelInput,
+    settingsOcrLlmBaseUrlInput,
+    { force: true }
+  );
 });
 
 settingsTestLlmBtn?.addEventListener("click", async () => {

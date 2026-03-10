@@ -144,7 +144,11 @@ def test_user_preferences_round_trip() -> None:
                     "llm_model": "gpt-4.1-mini",
                     "llm_base_url": "https://api.openai.com/v1",
                     "llm_api_key": "sk-test",
-                    "ocr_provider": "llm",
+                    "ocr_provider": "llm_separate",
+                    "ocr_llm_provider": "gemini",
+                    "ocr_llm_model": "gemini-2.0-flash",
+                    "ocr_llm_base_url": "https://generativelanguage.googleapis.com/v1beta",
+                    "ocr_llm_api_key": "gk-test",
                     "docs_filters": {
                         "tag": ["Credit"],
                         "correspondent": [],
@@ -160,7 +164,9 @@ def test_user_preferences_round_trip() -> None:
         assert put_response.json()["preferences"]["docs_page_size"] == 50
         assert put_response.json()["preferences"]["llm_provider"] == "openai"
         assert put_response.json()["preferences"]["llm_model"] == "gpt-4.1-mini"
-        assert put_response.json()["preferences"]["ocr_provider"] == "llm"
+        assert put_response.json()["preferences"]["ocr_provider"] == "llm_separate"
+        assert put_response.json()["preferences"]["ocr_llm_provider"] == "gemini"
+        assert put_response.json()["preferences"]["ocr_llm_model"] == "gemini-2.0-flash"
 
         get_saved = client.get("/users/me/preferences", headers=headers)
         assert get_saved.status_code == 200
@@ -169,7 +175,9 @@ def test_user_preferences_round_trip() -> None:
         assert get_saved.json()["preferences"]["docs_page_size"] == 50
         assert get_saved.json()["preferences"]["llm_provider"] == "openai"
         assert get_saved.json()["preferences"]["llm_model"] == "gpt-4.1-mini"
-        assert get_saved.json()["preferences"]["ocr_provider"] == "llm"
+        assert get_saved.json()["preferences"]["ocr_provider"] == "llm_separate"
+        assert get_saved.json()["preferences"]["ocr_llm_provider"] == "gemini"
+        assert get_saved.json()["preferences"]["ocr_llm_model"] == "gemini-2.0-flash"
         assert get_saved.json()["preferences"]["docs_filters"]["tag"] == ["Credit"]
     finally:
         app.dependency_overrides.clear()

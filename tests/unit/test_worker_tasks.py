@@ -18,6 +18,14 @@ def test_resolve_ocr_provider_reads_saved_preference() -> None:
     assert _resolve_ocr_provider_for_owner(repository, "user-1") == "tesseract"
 
 
+def test_resolve_ocr_provider_supports_separate_llm_mode() -> None:
+    repository = InMemoryDocumentRepository()
+    repository.save_user_preference(
+        UserPreference(user_id="user-1", preferences={"ocr_provider": "llm_separate"})
+    )
+    assert _resolve_ocr_provider_for_owner(repository, "user-1") == "llm_separate"
+
+
 def test_resolve_ocr_provider_falls_back_to_llm_for_invalid_value() -> None:
     repository = InMemoryDocumentRepository()
     repository.save_user_preference(

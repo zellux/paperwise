@@ -432,7 +432,7 @@ def _resolve_ocr_provider_for_user(
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
     provider_name = str(preferences.get("ocr_provider", "llm")).strip().lower()
-    if provider_name in {"tesseract", "llm"}:
+    if provider_name in {"tesseract", "llm", "llm_separate"}:
         return provider_name
     return "llm"
 
