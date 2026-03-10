@@ -725,7 +725,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .settings-form {
-  max-width: 420px;
+  max-width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
 }
 
 .settings-group {
@@ -769,6 +773,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin-top: 10px;
   margin-bottom: 0;
   align-items: center;
+}
+
+.settings-group-wide {
+  grid-column: 1 / -1;
+}
+
+.settings-form-actions {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 960px) {
+  .settings-form {
+    grid-template-columns: 1fr;
+  }
 }
 
 .settings-inline-status {
