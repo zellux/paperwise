@@ -605,6 +605,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   white-space: pre-wrap;
 }
 
+.document-ocr-preview {
+  margin: 0;
+  display: block;
+  border: 1px solid var(--stroke-soft);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 8px 10px;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  max-height: 220px;
+  overflow: auto;
+}
+
 .document-history-card {
   border: 1px solid var(--stroke-soft);
   border-radius: 12px;

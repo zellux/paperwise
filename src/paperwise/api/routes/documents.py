@@ -146,7 +146,7 @@ class CountResponse(BaseModel):
 class DocumentDetailResponse(BaseModel):
     document: DocumentResponse
     llm_metadata: DocumentListMetadata | None = None
-    ocr_provider: str | None = None
+    ocr_text_preview: str | None = None
 
 
 class MetadataUpdateRequest(BaseModel):
@@ -504,17 +504,8 @@ def _to_detail_response(
             if llm_result is not None
             else None
         ),
-        ocr_provider=_infer_ocr_provider_from_parse_result(parse_result),
+        ocr_text_preview=parse_result.text_preview if parse_result is not None else None,
     )
-
-
-def _infer_ocr_provider_from_parse_result(parse_result: ParseResult | None) -> str | None:
-    if parse_result is None:
-        return None
-    parser_name = str(parse_result.parser or "").strip().lower()
-    if "llm" in parser_name:
-        return "llm"
-    return "tesseract"
 
 
 def _to_parse_response(result: ParseResult) -> ParseResultResponse:

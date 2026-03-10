@@ -41,7 +41,7 @@ const detailDocId = document.getElementById("detailDocId");
 const detailOwnerId = document.getElementById("detailOwnerId");
 const detailFilename = document.getElementById("detailFilename");
 const detailStatus = document.getElementById("detailStatus");
-const detailOcrProvider = document.getElementById("detailOcrProvider");
+const detailOcrContent = document.getElementById("detailOcrContent");
 const detailCreatedAt = document.getElementById("detailCreatedAt");
 const detailContentType = document.getElementById("detailContentType");
 const detailSizeBytes = document.getElementById("detailSizeBytes");
@@ -473,17 +473,6 @@ function formatStatus(value) {
     .split("_")
     .join(" ")
     .toUpperCase();
-}
-
-function formatOcrProvider(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "llm") {
-    return "LLM";
-  }
-  if (normalized === "tesseract") {
-    return "Tesseract";
-  }
-  return "-";
 }
 
 function formatBytes(value) {
@@ -1735,7 +1724,7 @@ async function openDocumentView(documentId) {
   detailOwnerId.textContent = doc.owner_id || "-";
   detailFilename.textContent = doc.filename || "-";
   detailStatus.textContent = formatStatus(doc.status);
-  detailOcrProvider.textContent = formatOcrProvider(payload.ocr_provider);
+  detailOcrContent.textContent = String(payload.ocr_text_preview || "").trim() || "-";
   detailCreatedAt.textContent = doc.created_at
     ? new Date(doc.created_at).toLocaleString()
     : "-";
