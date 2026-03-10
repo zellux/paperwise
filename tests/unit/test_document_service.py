@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 
-from zapis.application.services.documents import CreateDocumentCommand, create_document
-from zapis.domain.models import Document, DocumentStatus
+from paperwise.application.services.documents import CreateDocumentCommand, create_document
+from paperwise.domain.models import Document, DocumentStatus
 
 
 class FakeRepository:

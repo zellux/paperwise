@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 
-from zapis.application.services.llm_parsing import parse_with_llm
-from zapis.domain.models import Document, DocumentStatus, ParseResult
-from zapis.infrastructure.repositories.in_memory_document_repository import (
+from paperwise.application.services.llm_parsing import parse_with_llm
+from paperwise.domain.models import Document, DocumentStatus, ParseResult
+from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
 

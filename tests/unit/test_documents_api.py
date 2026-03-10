@@ -2,17 +2,17 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from zapis.api.dependencies import (
+from paperwise.api.dependencies import (
     document_repository_dependency,
     ingestion_dispatcher_dependency,
     llm_provider_dependency,
     storage_dependency,
 )
-from zapis.api.main import app
-from zapis.infrastructure.repositories.in_memory_document_repository import (
+from paperwise.api.main import app
+from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
-from zapis.infrastructure.storage.local_storage import LocalStorageAdapter
+from paperwise.infrastructure.storage.local_storage import LocalStorageAdapter
 
 
 class FakeDispatcher:

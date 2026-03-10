@@ -1,6 +1,6 @@
 import json
 
-from zapis.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
+from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 
 
 def test_openai_provider_parses_json_response(monkeypatch) -> None:

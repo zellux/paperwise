@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from zapis.api.main import app
+from paperwise.api.main import app
 
 
 def test_healthz() -> None:

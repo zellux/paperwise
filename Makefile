@@ -16,10 +16,10 @@ deps-down:
 	docker compose -f infra/docker-compose.yml down
 
 api:
-	$(ACTIVATE) && uvicorn zapis.api.main:app --reload
+	$(ACTIVATE) && uvicorn paperwise.api.main:app --reload
 
 worker:
-	$(ACTIVATE) && celery -A zapis.workers.celery_app.celery_app worker --loglevel=INFO
+	$(ACTIVATE) && celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO
 
 test:
 	$(ACTIVATE) && pytest

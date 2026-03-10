@@ -3,7 +3,7 @@ requires = ["setuptools>=69.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "zapis"
+name = "paperwise"
 version = "0.1.0"
 description = "AI-native document management platform"
 readme = "README.md"

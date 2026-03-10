@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 
-from zapis.infrastructure.dispatchers.celery_ingestion_dispatcher import (
+from paperwise.infrastructure.dispatchers.celery_ingestion_dispatcher import (
     CeleryIngestionDispatcher,
 )
 
@@ -15,7 +15,7 @@ def test_celery_ingestion_dispatcher_enqueues_and_returns_job_id(monkeypatch) ->
             return SimpleNamespace(id="celery-job-1")
 
     monkeypatch.setattr(
-        "zapis.infrastructure.dispatchers.celery_ingestion_dispatcher.ingest_document_task",
+        "paperwise.infrastructure.dispatchers.celery_ingestion_dispatcher.ingest_document_task",
         FakeTask,
     )
 

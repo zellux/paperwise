@@ -1,16 +1,16 @@
-# zapis
+# paperwise
 
 AI-native document management platform (Python-first).
 
 ## Repository Layout
 
-- `src/zapis/api` - FastAPI entrypoint and HTTP routes.
-- `src/zapis/workers` - Celery app and async/background tasks.
-- `src/zapis/domain` - core domain models and invariants.
-- `src/zapis/application` - use cases and provider interfaces.
-- `src/zapis/adapters` - provider implementations (LLM, OCR, search, storage).
-- `src/zapis/infrastructure` - config and external integrations.
-- `src/zapis/events` - internal event contracts.
+- `src/paperwise/api` - FastAPI entrypoint and HTTP routes.
+- `src/paperwise/workers` - Celery app and async/background tasks.
+- `src/paperwise/domain` - core domain models and invariants.
+- `src/paperwise/application` - use cases and provider interfaces.
+- `src/paperwise/adapters` - provider implementations (LLM, OCR, search, storage).
+- `src/paperwise/infrastructure` - config and external integrations.
+- `src/paperwise/events` - internal event contracts.
 - `tests` - unit and integration tests.
 - `infra` - local infrastructure definitions (Docker Compose).
 - `docs` - product/design documents.
@@ -37,12 +37,12 @@ Open [http://localhost:8000](http://localhost:8000) for the initial web UI.
 Set these in `.env.local` for `llm-parse`:
 
 ```bash
-ZAPIS_OPENAI_API_KEY=your_key_here
-ZAPIS_OPENAI_MODEL=gpt-4.1-mini
-ZAPIS_OPENAI_BASE_URL=https://api.openai.com/v1
+PAPERWISE_OPENAI_API_KEY=your_key_here
+PAPERWISE_OPENAI_MODEL=gpt-4.1-mini
+PAPERWISE_OPENAI_BASE_URL=https://api.openai.com/v1
 ```
 
-If `ZAPIS_OPENAI_API_KEY` is unset, `llm-parse` is disabled.
+If `PAPERWISE_OPENAI_API_KEY` is unset, `llm-parse` is disabled.
 
 ## Local Development Commands
 
@@ -60,14 +60,14 @@ If `ZAPIS_OPENAI_API_KEY` is unset, `llm-parse` is disabled.
 By default, local config uses in-memory storage:
 
 ```bash
-ZAPIS_REPOSITORY_BACKEND=memory
+PAPERWISE_REPOSITORY_BACKEND=memory
 ```
 
 To persist data in Postgres:
 
 ```bash
-ZAPIS_REPOSITORY_BACKEND=postgres
-ZAPIS_POSTGRES_URL=postgresql+psycopg://zapis:zapis@localhost:5432/zapis
+PAPERWISE_REPOSITORY_BACKEND=postgres
+PAPERWISE_POSTGRES_URL=postgresql+psycopg://paperwise:paperwise@localhost:5432/paperwise
 ```
 
 Then run `make deps-up` and restart `make api`.

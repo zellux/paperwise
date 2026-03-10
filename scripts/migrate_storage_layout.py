@@ -10,8 +10,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import unquote, urlparse
 
-from zapis.infrastructure.config import get_settings
-from zapis.infrastructure.repositories.postgres_document_repository import (
+from paperwise.infrastructure.config import get_settings
+from paperwise.infrastructure.repositories.postgres_document_repository import (
     PostgresDocumentRepository,
 )
 

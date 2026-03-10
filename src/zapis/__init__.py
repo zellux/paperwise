@@ -1,2 +1,0 @@
-"""zapis package."""
-
