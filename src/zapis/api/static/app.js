@@ -37,6 +37,22 @@ const VIEW_ID_TO_PARAM = {
 const VIEW_PARAM_TO_ID = Object.fromEntries(
   Object.entries(VIEW_ID_TO_PARAM).map(([viewId, param]) => [param, viewId])
 );
+const PATH_TO_VIEW_ID = {
+  "/ui/documents": "section-docs",
+  "/ui/document": "section-document",
+  "/ui/tags": "section-tags",
+  "/ui/pending": "section-pending",
+  "/ui/upload": "section-upload",
+  "/ui/activity": "section-activity",
+};
+const VIEW_ID_TO_PATH = {
+  "section-docs": "/ui/documents",
+  "section-document": "/ui/document",
+  "section-tags": "/ui/tags",
+  "section-pending": "/ui/pending",
+  "section-upload": "/ui/upload",
+  "section-activity": "/ui/activity",
+};
 
 let currentDocumentId = "";
 const docsFilters = {
@@ -75,6 +91,11 @@ function setActiveView(targetId) {
   for (const view of views) {
     view.classList.toggle("view-hidden", view.id !== targetId);
   }
+}
+
+function getCurrentPathViewId() {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  return PATH_TO_VIEW_ID[path] || "section-docs";
 }
 
 function splitTags(value) {
@@ -394,7 +415,10 @@ function syncUrlFromFilters() {
   for (const value of docsFilters.status) {
     url.searchParams.append("status", value);
   }
-  url.searchParams.set("view", VIEW_ID_TO_PARAM[currentViewId] || "docs");
+  const viewPath = VIEW_ID_TO_PATH[currentViewId];
+  if (viewPath) {
+    url.pathname = viewPath;
+  }
 
   const qs = url.searchParams.toString();
   window.history.replaceState(null, "", qs ? `${url.pathname}?${qs}` : url.pathname);
@@ -407,10 +431,12 @@ function readFiltersFromUrl() {
   docsFilters.document_type = unique(params.getAll("document_type"));
   docsFilters.status = unique(params.getAll("status"));
   const viewFromUrl = params.get("view");
-  const mappedViewId = viewFromUrl
-    ? (VIEW_PARAM_TO_ID[viewFromUrl] || viewFromUrl)
-    : "";
-  if (mappedViewId && views.some((view) => view.id === mappedViewId)) {
+  const mappedViewId = viewFromUrl ? (VIEW_PARAM_TO_ID[viewFromUrl] || viewFromUrl) : "";
+  const pathViewId = getCurrentPathViewId();
+  if (pathViewId && views.some((view) => view.id === pathViewId)) {
+    currentViewId = pathViewId;
+  } else if (mappedViewId && views.some((view) => view.id === mappedViewId)) {
+    // Backward compatibility for old links that use ?view=...
     currentViewId = mappedViewId;
   } else {
     currentViewId = "section-docs";
@@ -421,6 +447,12 @@ async function applyFiltersFromControls() {
   readFiltersFromControls();
   syncUrlFromFilters();
   await loadDocumentsList();
+}
+
+function navigateToDocument(documentId) {
+  const url = new URL("/ui/document", window.location.origin);
+  url.searchParams.set("id", documentId);
+  window.location.href = `${url.pathname}?${url.searchParams.toString()}`;
 }
 
 function getSuggestedTitle(doc) {
@@ -458,12 +490,8 @@ function renderDocsList(documents) {
     titleButton.className = "link-button";
     titleButton.type = "button";
     titleButton.textContent = suggestedTitle;
-    titleButton.addEventListener("click", async () => {
-      try {
-        await openDocumentView(doc.id);
-      } catch (error) {
-        logActivity(error.message);
-      }
+    titleButton.addEventListener("click", () => {
+      navigateToDocument(doc.id);
     });
     titleCell.appendChild(titleButton);
 
@@ -495,12 +523,8 @@ function renderDocsList(documents) {
     button.className = "btn";
     button.type = "button";
     button.textContent = "Open";
-    button.addEventListener("click", async () => {
-      try {
-        await openDocumentView(doc.id);
-      } catch (error) {
-        logActivity(error.message);
-      }
+    button.addEventListener("click", () => {
+      navigateToDocument(doc.id);
     });
     actionCell.appendChild(button);
 
@@ -568,12 +592,8 @@ function renderPendingList(documents) {
     titleButton.className = "link-button";
     titleButton.type = "button";
     titleButton.textContent = getSuggestedTitle(doc);
-    titleButton.addEventListener("click", async () => {
-      try {
-        await openDocumentView(doc.id);
-      } catch (error) {
-        logActivity(error.message);
-      }
+    titleButton.addEventListener("click", () => {
+      navigateToDocument(doc.id);
     });
     titleCell.appendChild(titleButton);
 
@@ -587,12 +607,8 @@ function renderPendingList(documents) {
     button.className = "btn";
     button.type = "button";
     button.textContent = "Open";
-    button.addEventListener("click", async () => {
-      try {
-        await openDocumentView(doc.id);
-      } catch (error) {
-        logActivity(error.message);
-      }
+    button.addEventListener("click", () => {
+      navigateToDocument(doc.id);
     });
     actionCell.appendChild(button);
 
@@ -701,11 +717,7 @@ uploadForm.addEventListener("submit", async (event) => {
   }
 
   logActivity(`Uploaded ${file.name} => document ${payload.id}`);
-  await loadDocumentsList();
-  await loadPendingDocuments();
-  await loadTagStats();
-  await openDocumentView(payload.id);
-  logActivity("Automatic analysis queued (parse + LLM enrichment).");
+  navigateToDocument(payload.id);
 });
 
 documentMetaForm.addEventListener("submit", async (event) => {
@@ -740,9 +752,8 @@ documentMetaForm.addEventListener("submit", async (event) => {
 });
 
 backToDocsBtn.addEventListener("click", () => {
-  setActiveView("section-docs");
-  setActiveNav("section-docs");
-  syncUrlFromFilters();
+  const url = new URL("/ui/documents", window.location.origin);
+  window.location.href = `${url.pathname}?${url.searchParams.toString()}`;
 });
 
 docsFilterForm.addEventListener("submit", (event) => {
@@ -813,34 +824,6 @@ restartPendingBtn?.addEventListener("click", async () => {
   await loadDocumentsList();
 });
 
-for (const link of navLinks) {
-  link.addEventListener("click", async () => {
-    const targetId = link.dataset.target;
-    const target = document.getElementById(targetId);
-    if (!target) {
-      return;
-    }
-    setActiveView(targetId);
-    setActiveNav(targetId);
-    syncUrlFromFilters();
-    if (targetId === "section-docs") {
-      await loadDocumentsList();
-      return;
-    }
-    if (targetId === "section-tags") {
-      await loadTagStats();
-      return;
-    }
-    if (targetId === "section-pending") {
-      await loadPendingDocuments();
-      return;
-    }
-    if (targetId === "section-document" && currentDocumentId) {
-      await openDocumentView(currentDocumentId);
-    }
-  });
-}
-
 window.addEventListener("popstate", async () => {
   readFiltersFromUrl();
   applyFiltersToControls();
@@ -866,14 +849,29 @@ applyFiltersToControls();
 setActiveView(currentViewId);
 setActiveNav(currentViewId);
 
-loadDocumentsList().catch((error) => {
-  logActivity(`Initial document list failed: ${error.message}`);
-});
+if (currentViewId === "section-docs") {
+  loadDocumentsList().catch((error) => {
+    logActivity(`Initial document list failed: ${error.message}`);
+  });
+}
 
-loadTagStats().catch((error) => {
-  logActivity(`Initial tag stats failed: ${error.message}`);
-});
+if (currentViewId === "section-tags") {
+  loadTagStats().catch((error) => {
+    logActivity(`Initial tag stats failed: ${error.message}`);
+  });
+}
 
-loadPendingDocuments().catch((error) => {
-  logActivity(`Initial pending list failed: ${error.message}`);
-});
+if (currentViewId === "section-pending") {
+  loadPendingDocuments().catch((error) => {
+    logActivity(`Initial pending list failed: ${error.message}`);
+  });
+}
+
+if (currentViewId === "section-document") {
+  const docId = new URLSearchParams(window.location.search).get("id");
+  if (docId) {
+    openDocumentView(docId).catch((error) => {
+      logActivity(`Initial document detail failed: ${error.message}`);
+    });
+  }
+}
