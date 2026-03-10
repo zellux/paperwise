@@ -49,6 +49,7 @@ const docsTableBody = document.getElementById("docsTableBody");
 const tagsTableBody = document.getElementById("tagsTableBody");
 const documentTypesTableBody = document.getElementById("documentTypesTableBody");
 const pendingTableBody = document.getElementById("pendingTableBody");
+const processedDocsTableBody = document.getElementById("processedDocsTableBody");
 const navLinks = [...document.querySelectorAll(".nav-link")];
 const views = [...document.querySelectorAll(".view")];
 const filterDropdownState = new Map();
@@ -1285,6 +1286,71 @@ function renderPendingList(documents) {
   }
 }
 
+function renderProcessedDocsActivity(documents) {
+  if (!processedDocsTableBody) {
+    return;
+  }
+  if (!documents.length) {
+    processedDocsTableBody.innerHTML = '<tr><td colspan="4">No processed documents.</td></tr>';
+    return;
+  }
+  processedDocsTableBody.innerHTML = "";
+  for (const doc of documents) {
+    const row = document.createElement("tr");
+
+    const titleCell = document.createElement("td");
+    titleCell.setAttribute("data-label", "Title");
+    const titleButton = document.createElement("button");
+    titleButton.className = "link-button";
+    titleButton.type = "button";
+    titleButton.textContent = getSuggestedTitle(doc);
+    titleButton.addEventListener("click", () => {
+      navigateToDocument(doc.id);
+    });
+    titleCell.appendChild(titleButton);
+
+    const statusCell = document.createElement("td");
+    statusCell.setAttribute("data-label", "Status");
+    statusCell.textContent = formatStatus(doc.status);
+
+    const uploadedCell = document.createElement("td");
+    uploadedCell.setAttribute("data-label", "Uploaded");
+    uploadedCell.textContent = doc.created_at ? new Date(doc.created_at).toLocaleString() : "-";
+
+    const actionCell = document.createElement("td");
+    actionCell.setAttribute("data-label", "Action");
+    const actionsWrap = document.createElement("div");
+    actionsWrap.className = "table-actions";
+    actionsWrap.appendChild(
+      createIconActionButton({
+        icon: "edit",
+        label: "Open document",
+        onClick: () => navigateToDocument(doc.id),
+      })
+    );
+    actionsWrap.appendChild(
+      createIconActionButton({
+        icon: "eye",
+        label: "View file",
+        onClick: async () => {
+          try {
+            await openDocumentFile(doc.id);
+          } catch (error) {
+            logActivity(`Failed to open file: ${error.message}`);
+          }
+        },
+      })
+    );
+    actionCell.appendChild(actionsWrap);
+
+    row.appendChild(titleCell);
+    row.appendChild(statusCell);
+    row.appendChild(uploadedCell);
+    row.appendChild(actionCell);
+    processedDocsTableBody.appendChild(row);
+  }
+}
+
 function setRestartPendingButtonEnabled(enabled) {
   if (!restartPendingBtn) {
     return;
@@ -1345,6 +1411,30 @@ async function loadPendingDocuments() {
   renderPendingList(payload);
   setRestartPendingButtonEnabled(payload.length > 0);
   logActivity(`Loaded ${payload.length} pending document(s)`);
+}
+
+async function loadProcessedDocumentsActivity() {
+  const allDocuments = [];
+  const batchSize = 200;
+  const maxDocuments = 5_000;
+  let offset = 0;
+  while (offset < maxDocuments) {
+    const response = await apiFetch(
+      `/documents?status=ready&limit=${batchSize}&offset=${offset}`
+    );
+    const payload = await response.json();
+    if (!response.ok) {
+      logActivity(`Processed documents load failed: ${payload.detail || response.statusText}`);
+      return;
+    }
+    allDocuments.push(...payload);
+    if (payload.length < batchSize) {
+      break;
+    }
+    offset += batchSize;
+  }
+  renderProcessedDocsActivity(allDocuments);
+  logActivity(`Loaded ${allDocuments.length} processed document(s).`);
 }
 
 async function loadTagStats() {
@@ -1785,6 +1875,10 @@ window.addEventListener("popstate", async () => {
     await loadDocumentTypeStats();
     return;
   }
+  if (currentViewId === "section-activity") {
+    await loadProcessedDocumentsActivity();
+    return;
+  }
   if (currentViewId === "section-pending") {
     await loadPendingDocuments();
     return;
@@ -1833,6 +1927,12 @@ async function initializeApp() {
   if (currentViewId === "section-pending") {
     loadPendingDocuments().catch((error) => {
       logActivity(`Initial pending list failed: ${error.message}`);
+    });
+  }
+
+  if (currentViewId === "section-activity") {
+    loadProcessedDocumentsActivity().catch((error) => {
+      logActivity(`Initial processed activity failed: ${error.message}`);
     });
   }
 
