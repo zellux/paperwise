@@ -239,7 +239,19 @@ function renderDocsList(documents) {
     const correspondentCell = document.createElement("td");
     correspondentCell.textContent = correspondent;
     const tagsCell = document.createElement("td");
-    tagsCell.textContent = tags;
+    if (doc.llm_metadata && Array.isArray(doc.llm_metadata.tags) && doc.llm_metadata.tags.length) {
+      const pills = document.createElement("div");
+      pills.className = "tag-pills";
+      for (const tag of doc.llm_metadata.tags) {
+        const pill = document.createElement("span");
+        pill.className = "tag-pill";
+        pill.textContent = tag;
+        pills.appendChild(pill);
+      }
+      tagsCell.appendChild(pills);
+    } else {
+      tagsCell.textContent = tags;
+    }
     const dateCell = document.createElement("td");
     dateCell.textContent = documentDate;
     const statusCell = document.createElement("td");
