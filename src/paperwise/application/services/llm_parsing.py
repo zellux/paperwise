@@ -3,7 +3,13 @@ from difflib import SequenceMatcher
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.history import build_metadata_history_events
-from paperwise.domain.models import Document, HistoryActorType, LLMParseResult, ParseResult
+from paperwise.domain.models import (
+    Document,
+    HistoryActorType,
+    LLMParseResult,
+    ParseResult,
+    UserPreference,
+)
 
 
 def _normalize_name(value: str) -> str:
@@ -112,6 +118,8 @@ def parse_with_llm(
         existing_document_types=document_types,
         existing_tags=tags,
     )
+    raw_total_tokens = raw.get("llm_total_tokens")
+    llm_total_tokens = raw_total_tokens if isinstance(raw_total_tokens, int) and raw_total_tokens > 0 else 0
 
     if "correspondent" in raw and str(raw.get("correspondent") or "").strip():
         candidate_correspondent = str(raw.get("correspondent", "Unknown Sender"))
@@ -188,8 +196,21 @@ def parse_with_llm(
         created_document_type=created_document_type,
         created_tags=created_tags,
         created_at=datetime.now(UTC),
+        llm_total_tokens=llm_total_tokens,
     )
     repository.save_llm_parse_result(result)
+    if llm_total_tokens > 0:
+        preference = repository.get_user_preference(document.owner_id)
+        preference_data = dict(preference.preferences) if preference is not None else {}
+        existing_total = preference_data.get("llm_total_tokens_processed", 0)
+        running_total = existing_total if isinstance(existing_total, int) and existing_total >= 0 else 0
+        preference_data["llm_total_tokens_processed"] = running_total + llm_total_tokens
+        repository.save_user_preference(
+            UserPreference(
+                user_id=document.owner_id,
+                preferences=preference_data,
+            )
+        )
     events = build_metadata_history_events(
         previous=previous,
         current=result,

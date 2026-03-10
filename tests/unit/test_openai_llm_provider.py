@@ -14,6 +14,7 @@ def test_openai_provider_parses_json_response(monkeypatch) -> None:
 
                 def json(self) -> dict:
                     return {
+                        "usage": {"total_tokens": 321},
                         "choices": [
                             {
                                 "message": {
@@ -50,6 +51,7 @@ def test_openai_provider_parses_json_response(monkeypatch) -> None:
     assert result["correspondent"] == "Experian"
     assert result["document_type"] == "Credit Report"
     assert result["tags"] == ["credit", "identity"]
+    assert result["llm_total_tokens"] == 321
 
 
 def test_openai_provider_omits_missing_keys(monkeypatch) -> None:

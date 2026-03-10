@@ -384,6 +384,13 @@ h1 {
   letter-spacing: 0.01em;
 }
 
+.activity-token-total {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-family: var(--mono);
+}
+
 .stack {
   display: grid;
   gap: 8px;

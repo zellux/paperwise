@@ -60,6 +60,7 @@ class LLMParseResult:
     created_document_type: bool
     created_tags: list[str]
     created_at: datetime
+    llm_total_tokens: int = 0
 
 
 @dataclass(slots=True)

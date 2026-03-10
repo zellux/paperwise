@@ -50,6 +50,7 @@ const tagsTableBody = document.getElementById("tagsTableBody");
 const documentTypesTableBody = document.getElementById("documentTypesTableBody");
 const pendingTableBody = document.getElementById("pendingTableBody");
 const processedDocsTableBody = document.getElementById("processedDocsTableBody");
+const activityTokenTotal = document.getElementById("activityTokenTotal");
 const navLinks = [...document.querySelectorAll(".nav-link")];
 const views = [...document.querySelectorAll(".view")];
 const filterDropdownState = new Map();
@@ -528,6 +529,7 @@ function clearSession() {
   });
   currentViewId = "section-docs";
   renderSettingsForm();
+  renderActivityTokenTotal(0);
   renderSessionState();
 }
 
@@ -1413,6 +1415,14 @@ async function loadPendingDocuments() {
   logActivity(`Loaded ${payload.length} pending document(s)`);
 }
 
+function renderActivityTokenTotal(totalTokens) {
+  if (!activityTokenTotal) {
+    return;
+  }
+  const value = Number.isFinite(totalTokens) && totalTokens > 0 ? Math.floor(totalTokens) : 0;
+  activityTokenTotal.textContent = `LLM tokens processed: ${value.toLocaleString()}`;
+}
+
 async function loadProcessedDocumentsActivity() {
   const allDocuments = [];
   const batchSize = 200;
@@ -1434,6 +1444,9 @@ async function loadProcessedDocumentsActivity() {
     offset += batchSize;
   }
   renderProcessedDocsActivity(allDocuments);
+  const preferences = await loadUserPreferences();
+  const totalTokens = Number(preferences.llm_total_tokens_processed || 0);
+  renderActivityTokenTotal(totalTokens);
   logActivity(`Loaded ${allDocuments.length} processed document(s).`);
 }
 

@@ -91,6 +91,7 @@ class OpenAILLMProvider(LLMProvider):
         payload = response.json()
         content = payload["choices"][0]["message"]["content"]
         parsed = json.loads(content)
+        usage = payload.get("usage", {})
 
         result: dict[str, Any] = {}
 
@@ -112,5 +113,9 @@ class OpenAILLMProvider(LLMProvider):
         tags = parsed.get("tags")
         if isinstance(tags, list):
             result["tags"] = [str(tag) for tag in tags if str(tag).strip()]
+
+        total_tokens = usage.get("total_tokens")
+        if isinstance(total_tokens, int) and total_tokens > 0:
+            result["llm_total_tokens"] = total_tokens
 
         return result

@@ -97,6 +97,34 @@ class AcronymCaseLLMProvider:
         }
 
 
+class TokenUsageLLMProvider:
+    def __init__(self, total_tokens: int) -> None:
+        self._total_tokens = total_tokens
+
+    def suggest_metadata(
+        self,
+        *,
+        filename: str,
+        text_preview: str,
+        existing_correspondents: list[str],
+        existing_document_types: list[str],
+        existing_tags: list[str],
+    ) -> dict:
+        del filename
+        del text_preview
+        del existing_correspondents
+        del existing_document_types
+        del existing_tags
+        return {
+            "suggested_title": "Tokenized Statement",
+            "document_date": "2026-03-10",
+            "correspondent": "Experian",
+            "document_type": "Credit Report",
+            "tags": ["Credit"],
+            "llm_total_tokens": self._total_tokens,
+        }
+
+
 def _build_document() -> Document:
     return Document(
         id="doc-llm-merge",
@@ -186,3 +214,28 @@ def test_parse_with_llm_preserves_acronym_like_casing() -> None:
 
     assert result.correspondent == "PPMG Pediatrics"
     assert "PPMG" in result.tags
+
+
+def test_parse_with_llm_tracks_total_tokens_in_user_preferences() -> None:
+    repository = InMemoryDocumentRepository()
+    document = _build_document()
+    parse_result = _build_parse_result(document.id)
+
+    first = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=TokenUsageLLMProvider(120),
+    )
+    second = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=TokenUsageLLMProvider(80),
+    )
+
+    assert first.llm_total_tokens == 120
+    assert second.llm_total_tokens == 80
+    preference = repository.get_user_preference(document.owner_id)
+    assert preference is not None
+    assert preference.preferences["llm_total_tokens_processed"] == 200
