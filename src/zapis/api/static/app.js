@@ -235,6 +235,12 @@ function logActivity(message) {
   activityOutput.textContent = `[${now}] ${message}\n${activityOutput.textContent}`;
 }
 
+function delay(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
 function setActiveNav(targetId) {
   for (const link of navLinks) {
     link.classList.toggle("active", link.dataset.target === targetId);
@@ -879,6 +885,22 @@ async function openDocumentView(documentId) {
   logActivity(`Opened document ${documentId}`);
 }
 
+async function waitForDocumentReady(documentId, timeoutMs = 45000, intervalMs = 1500) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const response = await fetch(`/documents/${documentId}`);
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.detail || "Failed to refresh document status");
+    }
+    if (payload.status === "ready") {
+      return true;
+    }
+    await delay(intervalMs);
+  }
+  return false;
+}
+
 uploadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -958,6 +980,16 @@ reprocessDocumentBtn?.addEventListener("click", async () => {
   await openDocumentView(currentDocumentId);
   await loadDocumentsList();
   await loadPendingDocuments();
+  const completed = await waitForDocumentReady(currentDocumentId);
+  if (completed) {
+    logActivity(`Reprocessing completed for ${currentDocumentId}.`);
+    await openDocumentView(currentDocumentId);
+    await loadDocumentsList();
+    await loadPendingDocuments();
+    await loadTagStats();
+  } else {
+    logActivity(`Reprocessing still running for ${currentDocumentId}. Refresh to check later.`);
+  }
 });
 
 backToDocsBtn.addEventListener("click", () => {

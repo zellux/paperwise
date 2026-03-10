@@ -52,6 +52,27 @@ class PartialMetadataLLMProvider:
         }
 
 
+class NullDateLLMProvider:
+    def suggest_metadata(
+        self,
+        *,
+        filename: str,
+        text_preview: str,
+        existing_correspondents: list[str],
+        existing_document_types: list[str],
+        existing_tags: list[str],
+    ) -> dict:
+        del filename
+        del text_preview
+        del existing_correspondents
+        del existing_document_types
+        del existing_tags
+        # Provider included the key, but did not infer a value.
+        return {
+            "document_date": None,
+        }
+
+
 def _build_document() -> Document:
     return Document(
         id="doc-llm-merge",
@@ -103,3 +124,25 @@ def test_parse_with_llm_keeps_previous_fields_when_provider_omits_keys() -> None
     assert second.correspondent == first.correspondent
     assert second.document_type == first.document_type
     assert second.tags == first.tags
+
+
+def test_parse_with_llm_keeps_previous_date_when_provider_returns_null() -> None:
+    repository = InMemoryDocumentRepository()
+    document = _build_document()
+    parse_result = _build_parse_result(document.id)
+
+    first = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=FullMetadataLLMProvider(),
+    )
+    second = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=NullDateLLMProvider(),
+    )
+
+    assert first.document_date == "2026-01-15"
+    assert second.document_date == first.document_date

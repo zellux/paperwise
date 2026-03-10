@@ -79,14 +79,25 @@ class OpenAILLMProvider(LLMProvider):
         content = payload["choices"][0]["message"]["content"]
         parsed = json.loads(content)
 
-        tags = parsed.get("tags")
-        if not isinstance(tags, list):
-            tags = []
+        result: dict[str, Any] = {}
 
-        return {
-            "suggested_title": str(parsed.get("suggested_title") or filename),
-            "document_date": parsed.get("document_date"),
-            "correspondent": str(parsed.get("correspondent") or "Unknown Sender"),
-            "document_type": str(parsed.get("document_type") or "General Document"),
-            "tags": [str(tag) for tag in tags if str(tag).strip()],
-        }
+        suggested_title = parsed.get("suggested_title")
+        if isinstance(suggested_title, str) and suggested_title.strip():
+            result["suggested_title"] = suggested_title.strip()
+
+        if "document_date" in parsed:
+            result["document_date"] = parsed.get("document_date")
+
+        correspondent = parsed.get("correspondent")
+        if isinstance(correspondent, str) and correspondent.strip():
+            result["correspondent"] = correspondent.strip()
+
+        document_type = parsed.get("document_type")
+        if isinstance(document_type, str) and document_type.strip():
+            result["document_type"] = document_type.strip()
+
+        tags = parsed.get("tags")
+        if isinstance(tags, list):
+            result["tags"] = [str(tag) for tag in tags if str(tag).strip()]
+
+        return result

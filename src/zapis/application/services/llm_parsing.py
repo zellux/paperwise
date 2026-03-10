@@ -134,7 +134,19 @@ def parse_with_llm(
 
     if "document_date" in raw:
         raw_date = raw.get("document_date")
-        document_date = _validate_date(raw_date) if isinstance(raw_date, str) else None
+        if isinstance(raw_date, str):
+            validated_date = _validate_date(raw_date)
+            if validated_date is not None:
+                document_date = validated_date
+            elif previous is not None:
+                document_date = previous.document_date
+            else:
+                document_date = None
+        elif raw_date is None and previous is not None:
+            # Preserve previously known date when provider omits this value.
+            document_date = previous.document_date
+        else:
+            document_date = None
     elif previous is not None:
         document_date = previous.document_date
     else:

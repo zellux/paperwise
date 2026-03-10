@@ -25,7 +25,6 @@ class SimpleLLMProvider(LLMProvider):
         title = re.sub(r"\s+", " ", title).title() or "Untitled Document"
 
         date_match = re.search(r"\b(20\d{2}-\d{2}-\d{2})\b", text_preview)
-        document_date = date_match.group(1) if date_match else None
 
         text = f"{filename} {text_preview}".lower()
         if "credit" in text or "experian" in text:
@@ -45,10 +44,12 @@ class SimpleLLMProvider(LLMProvider):
             correspondent = "Unknown Sender"
             tags = ["Document"]
 
-        return {
+        result: dict[str, Any] = {
             "suggested_title": title,
-            "document_date": document_date,
             "correspondent": correspondent,
             "document_type": document_type,
             "tags": tags,
         }
+        if date_match:
+            result["document_date"] = date_match.group(1)
+        return result
