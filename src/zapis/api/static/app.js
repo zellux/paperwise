@@ -624,6 +624,17 @@ function openDocumentFile(documentId) {
   window.open(`/documents/${documentId}/file`, "_blank", "noopener,noreferrer");
 }
 
+function createIconActionButton({ icon, label, onClick }) {
+  const button = document.createElement("button");
+  button.className = "action-icon-btn";
+  button.type = "button";
+  button.textContent = icon;
+  button.title = label;
+  button.setAttribute("aria-label", label);
+  button.addEventListener("click", onClick);
+  return button;
+}
+
 function getSuggestedTitle(doc) {
   if (doc.llm_metadata && doc.llm_metadata.suggested_title) {
     return doc.llm_metadata.suggested_title;
@@ -688,23 +699,23 @@ function renderDocsList(documents) {
     statusCell.textContent = formatStatus(doc.status);
 
     const actionCell = document.createElement("td");
-    const openButton = document.createElement("button");
-    openButton.className = "btn";
-    openButton.type = "button";
-    openButton.textContent = "Open";
-    openButton.addEventListener("click", () => {
-      navigateToDocument(doc.id);
-    });
-    const viewButton = document.createElement("button");
-    viewButton.className = "btn btn-muted";
-    viewButton.type = "button";
-    viewButton.textContent = "View";
-    viewButton.addEventListener("click", () => {
-      openDocumentFile(doc.id);
-    });
-    actionCell.appendChild(openButton);
-    actionCell.appendChild(document.createTextNode(" "));
-    actionCell.appendChild(viewButton);
+    const actionsWrap = document.createElement("div");
+    actionsWrap.className = "table-actions";
+    actionsWrap.appendChild(
+      createIconActionButton({
+        icon: "↗",
+        label: "Open document",
+        onClick: () => navigateToDocument(doc.id),
+      })
+    );
+    actionsWrap.appendChild(
+      createIconActionButton({
+        icon: "◫",
+        label: "View file",
+        onClick: () => openDocumentFile(doc.id),
+      })
+    );
+    actionCell.appendChild(actionsWrap);
 
     row.appendChild(titleCell);
     row.appendChild(typeCell);
