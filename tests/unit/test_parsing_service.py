@@ -10,6 +10,7 @@ class RecordingOCRLLM:
     def __init__(self, ocr_text: str) -> None:
         self.ocr_text = ocr_text
         self.calls = 0
+        self.image_calls = 0
 
     def extract_ocr_text(
         self,
@@ -22,6 +23,17 @@ class RecordingOCRLLM:
         del content_type
         del text_preview
         self.calls += 1
+        return self.ocr_text
+
+    def extract_ocr_text_from_images(
+        self,
+        *,
+        filename: str,
+        image_data_urls: list[str],
+    ) -> str:
+        del filename
+        del image_data_urls
+        self.image_calls += 1
         return self.ocr_text
 
 
@@ -39,11 +51,30 @@ class TimeoutOCRLLM:
         raise RuntimeError("The read operation timed out")
 
 
-def test_parse_document_blob_uses_llm_ocr_when_configured(tmp_path) -> None:
+class TextOnlyOCRLLM:
+    def extract_ocr_text(
+        self,
+        *,
+        filename: str,
+        content_type: str,
+        text_preview: str,
+    ) -> str:
+        del filename
+        del content_type
+        del text_preview
+        return "unused"
+
+
+def test_parse_document_blob_uses_llm_ocr_when_configured(tmp_path, monkeypatch) -> None:
     blob = tmp_path / "sample.pdf"
     blob.write_bytes(b"%PDF-1.7\nFake content for OCR\n/Type /Page")
     llm = RecordingOCRLLM("Structured OCR text")
 
+    monkeypatch.setattr(
+        parsing_module,
+        "_render_pdf_pages_to_data_urls",
+        lambda **kwargs: ["data:image/png;base64,abc"],
+    )
     result = parse_document_blob(
         document_id="doc-1",
         blob_uri=blob.as_uri(),
@@ -51,7 +82,8 @@ def test_parse_document_blob_uses_llm_ocr_when_configured(tmp_path) -> None:
         llm_provider=llm,
     )
 
-    assert llm.calls == 1
+    assert llm.image_calls == 1
+    assert llm.calls == 0
     assert result.text_preview == "Structured OCR text"
     assert result.parser == "stub-llm-ocr"
 
@@ -75,7 +107,7 @@ def test_parse_document_blob_skips_llm_ocr_for_local_provider(tmp_path) -> None:
 def test_parse_document_blob_llm_mode_raises_when_no_readable_text(tmp_path) -> None:
     blob = tmp_path / "scan.pdf"
     blob.write_bytes(b"%PDF-1.7\n" + bytes([0, 159, 200, 10]) * 400)
-    llm = RecordingOCRLLM("unused")
+    llm = TextOnlyOCRLLM()
 
     with pytest.raises(RuntimeError, match="No readable text was extracted"):
         parse_document_blob(
@@ -159,6 +191,11 @@ def test_parse_document_blob_auto_switch_off_does_not_run_local_ocr(tmp_path, mo
         return "Strong local OCR text that should not be used"
 
     monkeypatch.setattr(parsing_module, "_extract_with_local_tesseract", _fake_local_ocr)
+    monkeypatch.setattr(
+        parsing_module,
+        "_render_pdf_pages_to_data_urls",
+        lambda **kwargs: ["data:image/png;base64,abc"],
+    )
 
     result = parse_document_blob(
         document_id="doc-1",
@@ -169,5 +206,31 @@ def test_parse_document_blob_auto_switch_off_does_not_run_local_ocr(tmp_path, mo
     )
 
     assert local_calls["count"] == 0
-    assert llm.calls == 1
+    assert llm.image_calls == 1
+    assert llm.calls == 0
     assert result.parser == "stub-llm-ocr"
+
+
+def test_parse_document_blob_auto_switch_off_pdf_uses_image_ocr_path(tmp_path, monkeypatch) -> None:
+    blob = tmp_path / "vision.pdf"
+    blob.write_bytes(b"%PDF-1.7\nshort\n/Type /Page")
+    llm = RecordingOCRLLM("Vision OCR output used")
+
+    monkeypatch.setattr(
+        parsing_module,
+        "_render_pdf_pages_to_data_urls",
+        lambda **kwargs: ["data:image/png;base64,abc"],
+    )
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        ocr_provider="llm",
+        llm_provider=llm,
+        ocr_auto_switch=False,
+    )
+
+    assert llm.image_calls == 1
+    assert llm.calls == 0
+    assert result.parser == "stub-llm-ocr"
+    assert result.text_preview == "Vision OCR output used"

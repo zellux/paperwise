@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import base64
 from html import unescape
 import logging
 from pathlib import Path
@@ -173,6 +174,42 @@ def _extract_with_local_tesseract(
     return combined[:max_chars]
 
 
+def _render_pdf_pages_to_data_urls(
+    *,
+    blob_path,
+    max_pages: int = 3,
+) -> list[str]:
+    pdftoppm = shutil.which("pdftoppm")
+    if pdftoppm is None:
+        raise RuntimeError("pdftoppm executable not found for PDF image rendering.")
+
+    with TemporaryDirectory(prefix="paperwise-vision-") as temp_dir:
+        out_prefix = f"{temp_dir}/page"
+        subprocess.run(
+            [
+                pdftoppm,
+                "-f",
+                "1",
+                "-l",
+                str(max(1, max_pages)),
+                "-png",
+                str(blob_path),
+                out_prefix,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        image_paths = sorted(Path(temp_dir).glob("page-*.png"))
+        if not image_paths:
+            raise RuntimeError("No PDF pages were rendered for LLM OCR.")
+        data_urls: list[str] = []
+        for image_path in image_paths[:max_pages]:
+            encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+            data_urls.append(f"data:image/png;base64,{encoded}")
+        return data_urls
+
+
 def parse_document_blob(
     document_id: str,
     blob_uri: str,
@@ -237,6 +274,22 @@ def parse_document_blob(
         page_count = 1
 
     if normalized_ocr in {"llm", "llm_separate"}:
+        extract_images_method = (
+            getattr(llm_provider, "extract_ocr_text_from_images", None) if llm_provider is not None else None
+        )
+        if (
+            not ocr_auto_switch
+            and is_pdf
+            and callable(extract_images_method)
+        ):
+            image_data_urls = _render_pdf_pages_to_data_urls(blob_path=blob_path, max_pages=3)
+            ocr_text = extract_images_method(
+                filename=blob_path.name,
+                image_data_urls=image_data_urls,
+            )
+            if not isinstance(ocr_text, str) or not ocr_text.strip():
+                raise RuntimeError("LLM OCR failed: provider returned empty OCR text.")
+            text_preview = ocr_text.strip()
         if ocr_auto_switch:
             try:
                 local_ocr_text = _extract_with_local_tesseract(
@@ -258,7 +311,7 @@ def parse_document_blob(
                     created_at=datetime.now(UTC),
                 )
         extract_method = getattr(llm_provider, "extract_ocr_text", None) if llm_provider is not None else None
-        if callable(extract_method):
+        if callable(extract_method) and not (not ocr_auto_switch and is_pdf and callable(extract_images_method)):
             if not text_preview.strip():
                 raise RuntimeError(
                     "No readable text was extracted from this file before OCR. "

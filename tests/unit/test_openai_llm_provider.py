@@ -141,3 +141,47 @@ def test_openai_provider_uses_ocr_specific_prompt(monkeypatch) -> None:
 
     assert result == "Invoice #123\nTotal Due: $1,200.00"
     assert captured_request["payload"]["messages"][0]["content"] == OCR_SYSTEM_PROMPT
+
+
+def test_openai_provider_uses_image_ocr_payload(monkeypatch) -> None:
+    captured_request: dict[str, dict] = {}
+
+    class FakeClient:
+        def post(self, _path: str, json: dict):
+            captured_request["payload"] = json
+
+            class Response:
+                status_code = 200
+                text = ""
+
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": json_module.dumps(
+                                        {"ocr_text": "Detected page text from image"}
+                                    )
+                                }
+                            }
+                        ]
+                    }
+
+            return Response()
+
+    json_module = json
+    provider = OpenAILLMProvider(api_key="k", model="m")
+    monkeypatch.setattr(provider, "_client", FakeClient())
+
+    result = provider.extract_ocr_text_from_images(
+        filename="scan.pdf",
+        image_data_urls=["data:image/png;base64,abc123"],
+    )
+
+    assert result == "Detected page text from image"
+    user_content = captured_request["payload"]["messages"][1]["content"]
+    assert isinstance(user_content, list)
+    assert any(item.get("type") == "image_url" for item in user_content if isinstance(item, dict))

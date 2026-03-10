@@ -176,3 +176,74 @@ class OpenAILLMProvider(LLMProvider):
 
         extracted = extract_ocr_text_result(parsed)
         return extracted or content
+
+    def extract_ocr_text_from_images(
+        self,
+        *,
+        filename: str,
+        image_data_urls: list[str],
+    ) -> str:
+        if not image_data_urls:
+            raise RuntimeError("No images provided for OCR.")
+        request_payload = {
+            "model": self._model,
+            "temperature": 0,
+            "max_tokens": 3000,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": OCR_SYSTEM_PROMPT},
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "Perform OCR for this document and return strict JSON "
+                                "with key ocr_text. Filename: " + filename
+                            ),
+                        },
+                        *[
+                            {
+                                "type": "image_url",
+                                "image_url": {"url": image_url},
+                            }
+                            for image_url in image_data_urls
+                        ],
+                    ],
+                },
+            ],
+        }
+        response: httpx.Response | None = None
+        response_payload: Any = None
+
+        try:
+            response = self._client.post("/chat/completions", json=request_payload)
+            try:
+                response_payload = response.json()
+            except ValueError:
+                response_payload = {"raw_text": getattr(response, "text", "")}
+        except Exception as exc:
+            log_llm_exchange(
+                provider="openai",
+                endpoint="/chat/completions",
+                request_payload=request_payload,
+                error=str(exc),
+            )
+            raise
+
+        log_llm_exchange(
+            provider="openai",
+            endpoint="/chat/completions",
+            request_payload=request_payload,
+            response_status=getattr(response, "status_code", None),
+            response_payload=response_payload,
+        )
+        response.raise_for_status()
+        payload = response_payload if isinstance(response_payload, dict) else response.json()
+        content = str(payload["choices"][0]["message"]["content"]).strip()
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            return content
+        extracted = extract_ocr_text_result(parsed)
+        return extracted or content
