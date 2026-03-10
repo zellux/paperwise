@@ -1,6 +1,7 @@
 const uploadForm = document.getElementById("uploadForm");
 const documentMetaForm = document.getElementById("documentMetaForm");
 const backToDocsBtn = document.getElementById("backToDocsBtn");
+const reprocessDocumentBtn = document.getElementById("reprocessDocumentBtn");
 const docsFilterForm = document.getElementById("docsFilterForm");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 const restartPendingBtn = document.getElementById("restartPendingBtn");
@@ -758,6 +759,29 @@ documentMetaForm.addEventListener("submit", async (event) => {
   await loadDocumentsList();
   await loadPendingDocuments();
   await loadTagStats();
+});
+
+reprocessDocumentBtn?.addEventListener("click", async () => {
+  if (!currentDocumentId) {
+    logActivity("No document selected.");
+    return;
+  }
+
+  const response = await fetch(`/documents/${currentDocumentId}/reprocess`, {
+    method: "POST",
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Reprocess failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+
+  logActivity(
+    `Reprocessing queued for ${currentDocumentId} (job ${payload.job_id}).`
+  );
+  await openDocumentView(currentDocumentId);
+  await loadDocumentsList();
+  await loadPendingDocuments();
 });
 
 backToDocsBtn.addEventListener("click", () => {

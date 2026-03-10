@@ -404,6 +404,45 @@ def test_parse_document_roundtrip() -> None:
         app.dependency_overrides.clear()
 
 
+def test_reprocess_document_requeues_and_sets_processing() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            data={"owner_id": "user-reprocess"},
+            files={"file": ("credit.pdf", b"%PDF-1.7\nexperian", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        doc_id = create_response.json()["id"]
+
+        llm_response = client.post(f"/documents/{doc_id}/llm-parse")
+        assert llm_response.status_code == 200
+        assert client.get(f"/documents/{doc_id}").json()["status"] == "ready"
+
+        reprocess_response = client.post(f"/documents/{doc_id}/reprocess")
+        assert reprocess_response.status_code == 200
+        payload = reprocess_response.json()
+        assert payload["id"] == doc_id
+        assert payload["status"] == "processing"
+        assert payload["job_id"] == "job-test-1"
+        assert dispatcher.enqueued.count(doc_id) == 2
+
+        get_response = client.get(f"/documents/{doc_id}")
+        assert get_response.status_code == 200
+        assert get_response.json()["status"] == "processing"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_get_parse_result_not_found() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository

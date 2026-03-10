@@ -434,6 +434,37 @@ def get_document_detail_endpoint(
     return _to_detail_response(document=document, llm_result=llm_result)
 
 
+@router.post("/{document_id}/reprocess", response_model=CreateDocumentResponse)
+def reprocess_document_endpoint(
+    document_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
+) -> CreateDocumentResponse:
+    document = get_document(document_id=document_id, repository=repository)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    _set_document_status(
+        document=document,
+        repository=repository,
+        status_value=DocumentStatus.PROCESSING,
+    )
+    job_id = dispatcher.enqueue(
+        document_id=document.id,
+        blob_uri=document.blob_uri,
+        filename=document.filename,
+        content_type=document.content_type,
+    )
+    return CreateDocumentResponse(
+        id=document.id,
+        status=document.status.value,
+        job_id=job_id,
+    )
+
+
 @router.post("/{document_id}/parse", response_model=ParseResultResponse)
 def parse_document_endpoint(
     document_id: str,
