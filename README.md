@@ -21,7 +21,7 @@ AI-native document management platform (Python-first).
 cp .env.example .env.local
 make setup
 make deps-up
-make api
+make backend
 ```
 
 In another shell:
@@ -50,7 +50,8 @@ If `PAPERWISE_OPENAI_API_KEY` is unset, `llm-parse` is disabled.
 - `make setup PYTHON=python3.13` - explicitly use Python 3.13 if needed.
 - `make deps-up` - start local dependency services (Redis + Postgres).
 - `make deps-down` - stop local dependency services.
-- `make api` - run FastAPI from local virtualenv.
+- `make backend` - run FastAPI backend from local virtualenv.
+- `make api` - alias for `make backend` (kept for backward compatibility).
 - `make worker` - run Celery worker from local virtualenv.
 - `make test` - run tests.
 - `make smoke-llm` - upload a sample PDF to a running API and run `llm-parse`.
@@ -70,7 +71,7 @@ PAPERWISE_REPOSITORY_BACKEND=postgres
 PAPERWISE_POSTGRES_URL=postgresql+psycopg://paperwise:paperwise@localhost:5432/paperwise
 ```
 
-Then run `make deps-up` and restart `make api`.
+Then run `make deps-up` and restart `make backend`.
 
 ## Local Object Storage Layout
 
