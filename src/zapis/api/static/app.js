@@ -1,8 +1,5 @@
 const uploadForm = document.getElementById("uploadForm");
 const docLookupForm = document.getElementById("docLookupForm");
-const refreshDocsBtn = document.getElementById("refreshDocsBtn");
-const refreshTagsBtn = document.getElementById("refreshTagsBtn");
-const refreshPendingBtn = document.getElementById("refreshPendingBtn");
 
 const docIdInput = document.getElementById("docIdInput");
 const docOutput = document.getElementById("docOutput");
@@ -260,20 +257,8 @@ docLookupForm.addEventListener("submit", async (event) => {
   }
 });
 
-refreshDocsBtn.addEventListener("click", async () => {
-  await loadDocumentsList();
-});
-
-refreshTagsBtn.addEventListener("click", async () => {
-  await loadTagStats();
-});
-
-refreshPendingBtn.addEventListener("click", async () => {
-  await loadPendingDocuments();
-});
-
 for (const link of navLinks) {
-  link.addEventListener("click", () => {
+  link.addEventListener("click", async () => {
     const targetId = link.dataset.target;
     const target = document.getElementById(targetId);
     if (!target) {
@@ -281,6 +266,17 @@ for (const link of navLinks) {
     }
     setActiveView(targetId);
     setActiveNav(targetId);
+    if (targetId === "section-docs") {
+      await loadDocumentsList();
+      return;
+    }
+    if (targetId === "section-tags") {
+      await loadTagStats();
+      return;
+    }
+    if (targetId === "section-pending") {
+      await loadPendingDocuments();
+    }
   });
 }
 
