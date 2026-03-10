@@ -1,6 +1,6 @@
 VENV ?= .venv
 PYTHON ?= python3.13
-ACTIVATE = . $(VENV)/bin/activate
+VENV_PYTHON = $(VENV)/bin/python
 RUN_DIR ?= .run
 LOG_DIR ?= .logs
 BACKEND_PID_FILE ?= $(RUN_DIR)/backend.pid
@@ -12,8 +12,8 @@ WORKER_LOG ?= $(LOG_DIR)/worker.log
 
 setup:
 	$(PYTHON) -m venv $(VENV)
-	$(ACTIVATE) && pip install --upgrade pip
-	$(ACTIVATE) && pip install -e .[dev]
+	$(VENV_PYTHON) -m pip install --upgrade pip
+	$(VENV_PYTHON) -m pip install -e .[dev]
 
 deps-up:
 	docker compose -f infra/docker-compose.yml up -d
@@ -22,12 +22,12 @@ deps-down:
 	docker compose -f infra/docker-compose.yml down
 
 backend:
-	$(ACTIVATE) && uvicorn paperwise.api.main:app --reload
+	$(VENV_PYTHON) -m uvicorn paperwise.api.main:app --reload
 
 api: backend
 
 worker:
-	$(ACTIVATE) && celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO
+	$(VENV_PYTHON) -m celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO
 
 backend-bg:
 	@mkdir -p $(RUN_DIR) $(LOG_DIR)
@@ -36,7 +36,7 @@ backend-bg:
 	else \
 		rm -f "$(BACKEND_PID_FILE)"; \
 		echo "starting backend..."; \
-		nohup sh -c '$(ACTIVATE) && uvicorn paperwise.api.main:app --reload' > "$(BACKEND_LOG)" 2>&1 & echo $$! > "$(BACKEND_PID_FILE)"; \
+		nohup sh -c '$(VENV_PYTHON) -m uvicorn paperwise.api.main:app --reload' > "$(BACKEND_LOG)" 2>&1 & echo $$! > "$(BACKEND_PID_FILE)"; \
 		echo "backend started (pid=$$(cat "$(BACKEND_PID_FILE)")) log=$(BACKEND_LOG)"; \
 	fi
 
@@ -47,7 +47,7 @@ worker-bg:
 	else \
 		rm -f "$(WORKER_PID_FILE)"; \
 		echo "starting worker..."; \
-		nohup sh -c '$(ACTIVATE) && celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO' > "$(WORKER_LOG)" 2>&1 & echo $$! > "$(WORKER_PID_FILE)"; \
+		nohup sh -c '$(VENV_PYTHON) -m celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO' > "$(WORKER_LOG)" 2>&1 & echo $$! > "$(WORKER_PID_FILE)"; \
 		echo "worker started (pid=$$(cat "$(WORKER_PID_FILE)")) log=$(WORKER_LOG)"; \
 	fi
 
@@ -100,7 +100,7 @@ dev-status:
 	@docker compose -f infra/docker-compose.yml ps
 
 test:
-	$(ACTIVATE) && pytest
+	$(VENV_PYTHON) -m pytest
 
 smoke-llm:
-	$(ACTIVATE) && python scripts/smoke_llm.py
+	$(VENV_PYTHON) scripts/smoke_llm.py
