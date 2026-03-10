@@ -24,10 +24,10 @@ const views = [...document.querySelectorAll(".view")];
 
 let currentDocumentId = "";
 const docsFilters = {
-  tag: [],
-  correspondent: [],
-  document_type: [],
-  status: [],
+  tag: "",
+  correspondent: "",
+  document_type: "",
+  status: "",
 };
 
 function formatStatus(value) {
@@ -72,17 +72,6 @@ function sortValues(values) {
   return [...values].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
-function getSelectedValues(selectEl) {
-  return [...selectEl.selectedOptions].map((option) => option.value);
-}
-
-function setSelectedValues(selectEl, values) {
-  const allowed = new Set(values);
-  for (const option of selectEl.options) {
-    option.selected = allowed.has(option.value);
-  }
-}
-
 function getFilterKey(selectEl) {
   if (selectEl === filterTag) {
     return "tag";
@@ -97,31 +86,37 @@ function getFilterKey(selectEl) {
 }
 
 function applyFiltersToControls() {
-  setSelectedValues(filterTag, docsFilters.tag);
-  setSelectedValues(filterCorrespondent, docsFilters.correspondent);
-  setSelectedValues(filterType, docsFilters.document_type);
-  setSelectedValues(filterStatus, docsFilters.status);
+  filterTag.value = docsFilters.tag;
+  filterCorrespondent.value = docsFilters.correspondent;
+  filterType.value = docsFilters.document_type;
+  filterStatus.value = docsFilters.status;
 }
 
-function setSelectOptions(selectEl, values) {
-  const selectedValues = docsFilters[getFilterKey(selectEl)] || [];
-  const selected = new Set(selectedValues);
-  const mergedValues = sortValues(unique([...values, ...selectedValues]));
+function setSelectOptions(selectEl, values, placeholderLabel) {
+  const key = getFilterKey(selectEl);
+  const selectedValue = docsFilters[key] || "";
+  const mergedValues = sortValues(unique([...values, ...(selectedValue ? [selectedValue] : [])]));
   selectEl.innerHTML = "";
+
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = placeholderLabel;
+  selectEl.appendChild(placeholder);
+
   for (const value of mergedValues) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = value;
-    option.selected = selected.has(value);
     selectEl.appendChild(option);
   }
+  selectEl.value = selectedValue;
 }
 
 function readFiltersFromControls() {
-  docsFilters.tag = unique(getSelectedValues(filterTag));
-  docsFilters.correspondent = unique(getSelectedValues(filterCorrespondent));
-  docsFilters.document_type = filterType.value ? [filterType.value] : [];
-  docsFilters.status = unique(getSelectedValues(filterStatus));
+  docsFilters.tag = filterTag.value;
+  docsFilters.correspondent = filterCorrespondent.value;
+  docsFilters.document_type = filterType.value;
+  docsFilters.status = filterStatus.value;
 }
 
 function refreshFilterOptionsFromDocuments(documents) {
@@ -131,7 +126,9 @@ function refreshFilterOptionsFromDocuments(documents) {
   const statuses = new Set();
 
   for (const doc of documents) {
-    statuses.add(doc.status);
+    if (doc.status) {
+      statuses.add(doc.status);
+    }
     const metadata = doc.llm_metadata;
     if (!metadata) {
       continue;
@@ -149,10 +146,10 @@ function refreshFilterOptionsFromDocuments(documents) {
     }
   }
 
-  setSelectOptions(filterTag, [...tags]);
-  setSelectOptions(filterCorrespondent, [...correspondents]);
-  setSelectOptions(filterType, [...documentTypes]);
-  setSelectOptions(filterStatus, [...statuses]);
+  setSelectOptions(filterTag, [...tags], "All Tags");
+  setSelectOptions(filterCorrespondent, [...correspondents], "All Correspondents");
+  setSelectOptions(filterType, [...documentTypes], "All Types");
+  setSelectOptions(filterStatus, [...statuses], "All Statuses");
 }
 
 function syncUrlFromFilters() {
@@ -162,28 +159,29 @@ function syncUrlFromFilters() {
   url.searchParams.delete("document_type");
   url.searchParams.delete("status");
 
-  for (const value of docsFilters.tag) {
-    url.searchParams.append("tag", value);
+  if (docsFilters.tag) {
+    url.searchParams.set("tag", docsFilters.tag);
   }
-  for (const value of docsFilters.correspondent) {
-    url.searchParams.append("correspondent", value);
+  if (docsFilters.correspondent) {
+    url.searchParams.set("correspondent", docsFilters.correspondent);
   }
-  for (const value of docsFilters.document_type) {
-    url.searchParams.append("document_type", value);
+  if (docsFilters.document_type) {
+    url.searchParams.set("document_type", docsFilters.document_type);
   }
-  for (const value of docsFilters.status) {
-    url.searchParams.append("status", value);
+  if (docsFilters.status) {
+    url.searchParams.set("status", docsFilters.status);
   }
 
-  window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`);
+  const qs = url.searchParams.toString();
+  window.history.replaceState(null, "", qs ? `${url.pathname}?${qs}` : url.pathname);
 }
 
 function readFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  docsFilters.tag = unique(params.getAll("tag"));
-  docsFilters.correspondent = unique(params.getAll("correspondent"));
-  docsFilters.document_type = unique(params.getAll("document_type")).slice(0, 1);
-  docsFilters.status = unique(params.getAll("status"));
+  docsFilters.tag = params.get("tag") || "";
+  docsFilters.correspondent = params.get("correspondent") || "";
+  docsFilters.document_type = params.get("document_type") || "";
+  docsFilters.status = params.get("status") || "";
 }
 
 async function applyFiltersFromControls() {
@@ -285,15 +283,16 @@ function renderTagsList(tagStats) {
     const countCell = document.createElement("td");
     countCell.textContent = String(stat.document_count);
     const actionCell = document.createElement("td");
+
     const viewBtn = document.createElement("button");
     viewBtn.className = "btn";
     viewBtn.type = "button";
     viewBtn.textContent = "View Docs";
     viewBtn.addEventListener("click", async () => {
-      docsFilters.tag = [stat.tag];
-      docsFilters.correspondent = [];
-      docsFilters.document_type = [];
-      docsFilters.status = [];
+      docsFilters.tag = stat.tag;
+      docsFilters.correspondent = "";
+      docsFilters.document_type = "";
+      docsFilters.status = "";
       applyFiltersToControls();
       syncUrlFromFilters();
       setActiveView("section-docs");
@@ -301,6 +300,7 @@ function renderTagsList(tagStats) {
       await loadDocumentsList();
       logActivity(`Filtered documents by tag: ${stat.tag}`);
     });
+
     actionCell.appendChild(viewBtn);
     row.appendChild(tagCell);
     row.appendChild(countCell);
@@ -361,17 +361,17 @@ function renderPendingList(documents) {
 
 async function loadDocumentsList() {
   const query = new URLSearchParams({ limit: "200" });
-  for (const value of docsFilters.tag) {
-    query.append("tag", value);
+  if (docsFilters.tag) {
+    query.set("tag", docsFilters.tag);
   }
-  for (const value of docsFilters.correspondent) {
-    query.append("correspondent", value);
+  if (docsFilters.correspondent) {
+    query.set("correspondent", docsFilters.correspondent);
   }
-  for (const value of docsFilters.document_type) {
-    query.append("document_type", value);
+  if (docsFilters.document_type) {
+    query.set("document_type", docsFilters.document_type);
   }
-  for (const value of docsFilters.status) {
-    query.append("status", value);
+  if (docsFilters.status) {
+    query.set("status", docsFilters.status);
   }
 
   const response = await fetch(`/documents?${query.toString()}`);
@@ -509,10 +509,10 @@ for (const selectEl of [filterTag, filterCorrespondent, filterType, filterStatus
 }
 
 clearFiltersBtn.addEventListener("click", async () => {
-  docsFilters.tag = [];
-  docsFilters.correspondent = [];
-  docsFilters.document_type = [];
-  docsFilters.status = [];
+  docsFilters.tag = "";
+  docsFilters.correspondent = "";
+  docsFilters.document_type = "";
+  docsFilters.status = "";
   applyFiltersToControls();
   syncUrlFromFilters();
   await loadDocumentsList();

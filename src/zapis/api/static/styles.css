@@ -238,10 +238,6 @@ input[type="file"] {
   font-family: var(--sans);
 }
 
-.filters-grid select.multi-select {
-  min-height: 132px;
-}
-
 .filters-grid .actions {
   margin: 0;
 }
