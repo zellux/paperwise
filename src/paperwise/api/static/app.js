@@ -13,6 +13,10 @@ const docsTotalLabel = document.getElementById("docsTotalLabel");
 const settingsForm = document.getElementById("settingsForm");
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
 const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
+const settingsLlmProviderSelect = document.getElementById("settingsLlmProviderSelect");
+const settingsLlmModelInput = document.getElementById("settingsLlmModelInput");
+const settingsLlmBaseUrlInput = document.getElementById("settingsLlmBaseUrlInput");
+const settingsLlmApiKeyInput = document.getElementById("settingsLlmApiKeyInput");
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
 const signInForm = document.getElementById("signInForm");
@@ -98,6 +102,13 @@ let currentUser = null;
 let userPreferenceSaveTimer = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember"];
 let currentTheme = "atlas";
+const SUPPORTED_LLM_PROVIDERS = ["default", "openai", "simple"];
+let llmSettings = {
+  provider: "default",
+  model: "",
+  base_url: "",
+  api_key: "",
+};
 let docsFilters = {
   q: "",
   tag: [],
@@ -156,6 +167,14 @@ function normalizeThemeName(value) {
   return "atlas";
 }
 
+function normalizeLlmProvider(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (SUPPORTED_LLM_PROVIDERS.includes(normalized)) {
+    return normalized;
+  }
+  return "default";
+}
+
 function applyTheme(themeName) {
   currentTheme = normalizeThemeName(themeName);
   const classNames = SUPPORTED_THEMES.map((name) => `theme-${name}`);
@@ -172,6 +191,18 @@ function renderSettingsForm() {
   }
   if (settingsPageSizeSelect && settingsPageSizeSelect.value !== String(docsPageSize)) {
     settingsPageSizeSelect.value = String(docsPageSize);
+  }
+  if (settingsLlmProviderSelect && settingsLlmProviderSelect.value !== llmSettings.provider) {
+    settingsLlmProviderSelect.value = llmSettings.provider;
+  }
+  if (settingsLlmModelInput && settingsLlmModelInput.value !== llmSettings.model) {
+    settingsLlmModelInput.value = llmSettings.model;
+  }
+  if (settingsLlmBaseUrlInput && settingsLlmBaseUrlInput.value !== llmSettings.base_url) {
+    settingsLlmBaseUrlInput.value = llmSettings.base_url;
+  }
+  if (settingsLlmApiKeyInput && settingsLlmApiKeyInput.value !== llmSettings.api_key) {
+    settingsLlmApiKeyInput.value = llmSettings.api_key;
   }
 }
 
@@ -203,6 +234,10 @@ async function saveUserPreferences() {
       last_view: currentViewId,
       ui_theme: currentTheme,
       docs_page_size: docsPageSize,
+      llm_provider: llmSettings.provider,
+      llm_model: llmSettings.model,
+      llm_base_url: llmSettings.base_url,
+      llm_api_key: llmSettings.api_key,
     },
   };
   try {
@@ -254,6 +289,12 @@ function applyUserPreferences(preferences, options = {}) {
   if (preferences.docs_page_size !== undefined) {
     docsPageSize = normalizePageSize(preferences.docs_page_size);
   }
+  llmSettings = {
+    provider: normalizeLlmProvider(preferences.llm_provider),
+    model: String(preferences.llm_model || "").trim(),
+    base_url: String(preferences.llm_base_url || "").trim(),
+    api_key: String(preferences.llm_api_key || "").trim(),
+  };
 }
 
 async function hydrateUserPreferencesForSession() {
@@ -524,6 +565,12 @@ function renderSessionState() {
 function clearSession() {
   persistSession("", null);
   applyTheme("atlas");
+  llmSettings = {
+    provider: "default",
+    model: "",
+    base_url: "",
+    api_key: "",
+  };
   docsPage = 1;
   docsPageSize = 20;
   docsFilters = sanitizeDocsFilters({
@@ -1643,6 +1690,12 @@ settingsForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const nextTheme = normalizeThemeName(settingsThemeSelect?.value || currentTheme);
   const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || docsPageSize);
+  llmSettings = {
+    provider: normalizeLlmProvider(settingsLlmProviderSelect?.value || llmSettings.provider),
+    model: String(settingsLlmModelInput?.value || "").trim(),
+    base_url: String(settingsLlmBaseUrlInput?.value || "").trim(),
+    api_key: String(settingsLlmApiKeyInput?.value || "").trim(),
+  };
   applyTheme(nextTheme);
   docsPageSize = nextPageSize;
   docsPage = 1;

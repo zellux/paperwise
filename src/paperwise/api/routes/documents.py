@@ -44,6 +44,8 @@ from paperwise.domain.models import (
     User,
 )
 from paperwise.infrastructure.config import get_settings
+from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
+from paperwise.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 settings = get_settings()
@@ -299,6 +301,40 @@ def _sanitize_filename(value: str) -> str:
     if not cleaned:
         return "uploaded-document.bin"
     return cleaned
+
+
+def _resolve_llm_provider_for_user(
+    *,
+    repository: DocumentRepository,
+    current_user: User,
+    default_llm_provider: LLMProvider,
+) -> LLMProvider:
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    provider_name = str(preferences.get("llm_provider", "default")).strip().lower()
+    if provider_name in {"", "default"}:
+        return default_llm_provider
+    if provider_name == "simple":
+        return SimpleLLMProvider()
+    if provider_name == "openai":
+        configured_key = str(preferences.get("llm_api_key", "")).strip()
+        api_key = configured_key or (settings.openai_api_key or "")
+        if not api_key:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="OpenAI provider requires an API key in Settings.",
+            )
+        model = str(preferences.get("llm_model", "")).strip() or settings.openai_model
+        base_url = str(preferences.get("llm_base_url", "")).strip() or settings.openai_base_url
+        return OpenAILLMProvider(
+            api_key=api_key,
+            model=model,
+            base_url=base_url,
+        )
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail=f"Unsupported LLM provider: {provider_name}",
+    )
 
 
 def _resolve_file_path_from_uri(blob_uri: str) -> Path | None:
@@ -811,13 +847,18 @@ def get_parse_document_endpoint(
 def llm_parse_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
-    llm_provider: LLMProvider = Depends(llm_provider_dependency),
+    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> LLMParseResultResponse:
     document = _get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
+    )
+    llm_provider = _resolve_llm_provider_for_user(
+        repository=repository,
+        current_user=current_user,
+        default_llm_provider=default_llm_provider,
     )
     try:
         parse_result = repository.get_parse_result(document_id)

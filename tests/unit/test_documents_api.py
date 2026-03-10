@@ -14,9 +14,11 @@ from paperwise.api.dependencies import (
 )
 from paperwise.api.main import app
 from paperwise.domain.models import LLMParseResult, User
+from paperwise.domain.models import UserPreference
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
+from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 from paperwise.infrastructure.storage.local_storage import LocalStorageAdapter
 
 
@@ -1043,5 +1045,39 @@ def test_document_type_stats_only_include_current_user_documents() -> None:
         type_names = {item["document_type"] for item in type_stats_response.json()}
         assert "Private Type" not in type_names
         assert "Credit Report" in type_names
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_parse_uses_simple_provider_from_user_preferences() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: MissingOpenAIProvider()
+
+    try:
+        repository.save_user_preference(
+            UserPreference(
+                user_id=TEST_USER.id,
+                preferences={"llm_provider": "simple"},
+            )
+        )
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={"file": ("credit.pdf", b"%PDF-1.7\ncredit", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        document_id = create_response.json()["id"]
+
+        parse_response = client.post(f"/documents/{document_id}/llm-parse")
+        assert parse_response.status_code == 200
+        payload = parse_response.json()
+        assert payload["document_type"] == "Credit Report"
     finally:
         app.dependency_overrides.clear()

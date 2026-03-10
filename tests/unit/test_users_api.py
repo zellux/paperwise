@@ -140,6 +140,10 @@ def test_user_preferences_round_trip() -> None:
                     "last_view": "section-tags",
                     "ui_theme": "ledger",
                     "docs_page_size": 50,
+                    "llm_provider": "openai",
+                    "llm_model": "gpt-4.1-mini",
+                    "llm_base_url": "https://api.openai.com/v1",
+                    "llm_api_key": "sk-test",
                     "docs_filters": {
                         "tag": ["Credit"],
                         "correspondent": [],
@@ -153,12 +157,16 @@ def test_user_preferences_round_trip() -> None:
         assert put_response.json()["preferences"]["last_view"] == "section-tags"
         assert put_response.json()["preferences"]["ui_theme"] == "ledger"
         assert put_response.json()["preferences"]["docs_page_size"] == 50
+        assert put_response.json()["preferences"]["llm_provider"] == "openai"
+        assert put_response.json()["preferences"]["llm_model"] == "gpt-4.1-mini"
 
         get_saved = client.get("/users/me/preferences", headers=headers)
         assert get_saved.status_code == 200
         assert get_saved.json()["preferences"]["last_view"] == "section-tags"
         assert get_saved.json()["preferences"]["ui_theme"] == "ledger"
         assert get_saved.json()["preferences"]["docs_page_size"] == 50
+        assert get_saved.json()["preferences"]["llm_provider"] == "openai"
+        assert get_saved.json()["preferences"]["llm_model"] == "gpt-4.1-mini"
         assert get_saved.json()["preferences"]["docs_filters"]["tag"] == ["Credit"]
     finally:
         app.dependency_overrides.clear()
