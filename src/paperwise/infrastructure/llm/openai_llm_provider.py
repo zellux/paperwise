@@ -37,14 +37,19 @@ class OpenAILLMProvider(LLMProvider):
         system_prompt = (
             "You extract metadata for scanned documents. "
             "Return strict JSON with keys: suggested_title, document_date, "
-            "correspondent, document_type, tags. "
+            "correspondent, document_type, tags, language. "
             "document_date must be YYYY-MM-DD or null. "
+            "If multiple dates are present, select the date most relevant to the document itself "
+            "(typically issue/statement date over due/payment dates unless context strongly indicates otherwise). "
+            "language must be a BCP-47 style language code such as 'en' or 'de'; use 'und' if unclear. "
             "correspondent must be the sender/issuer of the document "
             "(for example bank, utility, insurer, lab, credit bureau, clinic), "
             "not the recipient/customer. "
             "If sender is ambiguous, choose the strongest issuer signal from letterhead, "
             "logo, signature block, or footer and avoid generic placeholders. "
-            "tags must be an array of strings. "
+            "Correspondent must use the shortest clear organization form "
+            "(for example 'Amazon' instead of long legal entity suffixes). "
+            "tags must be an array of 1 to 5 strings and prioritize existing tags when relevant. "
             "Use natural casing: title case for normal words, but preserve acronyms in uppercase "
             "(for example: PPMG Pediatrics, IRS Notice). "
             "Keep original casing when already meaningful; only normalize when text is all lowercase. "
@@ -59,11 +64,14 @@ class OpenAILLMProvider(LLMProvider):
             "guidance": (
                 "Prefer existing taxonomy names when appropriate. "
                 "Only propose new names when no existing option is a good match. "
+                "Return 1 to 5 tags maximum. "
                 "Use title case for normal words in document_type/tags, "
                 "but keep acronyms uppercase (for example: PPMG Pediatrics, IRS). "
                 "Keep original casing when already meaningful; only normalize casing when all words are lowercase. "
                 "For correspondent: normalize punctuation/suffixes (e.g. 'Experian.' -> 'Experian'), "
-                "prefer organization names over department names, and never return the document owner."
+                "prefer the shortest organization name over legal suffixes/departments, "
+                "and never return the document owner. "
+                "For document_date: choose the most document-relevant date when multiple are present."
             ),
         }
 
