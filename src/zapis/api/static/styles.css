@@ -227,13 +227,16 @@ input[type="file"] {
 
 .filters-grid select {
   width: 100%;
-  min-height: 132px;
   border: 1px solid var(--stroke);
   border-radius: 10px;
   padding: 10px 11px;
   background: rgba(255, 255, 255, 0.88);
   color: var(--ink);
   font-family: var(--sans);
+}
+
+.filters-grid select.multi-select {
+  min-height: 132px;
 }
 
 .filters-grid .actions {

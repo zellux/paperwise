@@ -120,7 +120,7 @@ function setSelectOptions(selectEl, values) {
 function readFiltersFromControls() {
   docsFilters.tag = unique(getSelectedValues(filterTag));
   docsFilters.correspondent = unique(getSelectedValues(filterCorrespondent));
-  docsFilters.document_type = unique(getSelectedValues(filterType));
+  docsFilters.document_type = filterType.value ? [filterType.value] : [];
   docsFilters.status = unique(getSelectedValues(filterStatus));
 }
 
@@ -182,7 +182,7 @@ function readFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
   docsFilters.tag = unique(params.getAll("tag"));
   docsFilters.correspondent = unique(params.getAll("correspondent"));
-  docsFilters.document_type = unique(params.getAll("document_type"));
+  docsFilters.document_type = unique(params.getAll("document_type")).slice(0, 1);
   docsFilters.status = unique(params.getAll("status"));
 }
 
