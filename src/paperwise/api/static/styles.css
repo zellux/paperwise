@@ -436,7 +436,7 @@ input[type="password"],
 
 input[type="date"] {
   min-height: 42px;
-  padding-right: 8px;
+  padding-right: 34px;
 }
 
 input[type="text"]:focus-visible,
@@ -451,10 +451,15 @@ input[type="password"]:focus-visible,
 
 input[type="date"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
-  opacity: 0.75;
-  padding: 4px;
+  opacity: 1;
+  padding: 3px;
   border-radius: 6px;
-  background: rgba(199, 214, 209, 0.8);
+  background: rgba(177, 198, 191, 0.95);
+}
+
+#metaDate {
+  width: min(220px, 100%);
+  justify-self: start;
 }
 
 .upload-dropzone {
