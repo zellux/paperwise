@@ -260,13 +260,17 @@
             <label class="label" for="metaTags">Tags (comma separated)</label>
             <input id="metaTags" name="metaTags" type="text" />
 
-            <div class="actions">
-              <button id="saveMetadataBtn" type="submit" class="btn btn-primary">Save Metadata</button>
-              <button id="viewDocumentFileBtn" type="button" class="btn btn-muted">View File</button>
-              <button id="reprocessDocumentBtn" type="button" class="btn btn-muted">
-                Reprocess Document
-              </button>
-              <button id="backToDocsBtn" type="button" class="btn">Back to Documents</button>
+            <div class="actions document-actions">
+              <div class="document-actions-left">
+                <button id="saveMetadataBtn" type="submit" class="btn btn-primary">Save Metadata</button>
+                <button id="viewDocumentFileBtn" type="button" class="btn btn-muted">View File</button>
+                <button id="backToDocsBtn" type="button" class="btn">Back to Documents</button>
+              </div>
+              <div class="document-actions-right">
+                <button id="reprocessDocumentBtn" type="button" class="btn btn-muted">
+                  Reprocess Document
+                </button>
+              </div>
             </div>
           </form>
           <section class="document-history-card">

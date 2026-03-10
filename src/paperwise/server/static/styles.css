@@ -565,6 +565,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin-bottom: 10px;
 }
 
+.document-actions {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.document-actions-left,
+.document-actions-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
 .document-detail-card {
   border: 1px solid var(--stroke-soft);
   border-radius: 12px;
@@ -1213,6 +1226,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 
   .filter-select {
+    width: 100%;
+  }
+
+  .document-actions {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .document-actions-left,
+  .document-actions-right {
     width: 100%;
   }
 
