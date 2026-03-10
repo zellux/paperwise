@@ -240,6 +240,58 @@ def _normalized_values(values: list[str] | None) -> set[str]:
     return normalized
 
 
+def _matches_text_query(
+    *,
+    query: str | None,
+    document: Document,
+    llm_result: LLMParseResult | None,
+) -> bool:
+    normalized_query = " ".join(str(query or "").strip().casefold().split())
+    if not normalized_query:
+        return True
+
+    candidates = [document.filename]
+    if llm_result is not None:
+        candidates.extend(
+            [
+                llm_result.suggested_title,
+                llm_result.correspondent,
+                llm_result.document_type,
+                llm_result.document_date or "",
+                " ".join(llm_result.tags),
+            ]
+        )
+
+    haystack = " ".join(" ".join(str(value).split()) for value in candidates).casefold()
+    return normalized_query in haystack
+
+
+def _matches_document_filters(
+    *,
+    document: Document,
+    llm_result: LLMParseResult | None,
+    normalized_tags: set[str],
+    normalized_correspondents: set[str],
+    normalized_document_types: set[str],
+    normalized_statuses: set[str],
+    query: str | None,
+) -> bool:
+    if normalized_statuses and _normalize_name(document.status.value) not in normalized_statuses:
+        return False
+    if normalized_tags:
+        if llm_result is None or not normalized_tags.intersection({_normalize_name(item) for item in llm_result.tags}):
+            return False
+    if normalized_correspondents:
+        if llm_result is None or _normalize_name(llm_result.correspondent) not in normalized_correspondents:
+            return False
+    if normalized_document_types:
+        if llm_result is None or _normalize_name(llm_result.document_type) not in normalized_document_types:
+            return False
+    if not _matches_text_query(query=query, document=document, llm_result=llm_result):
+        return False
+    return True
+
+
 def _sanitize_filename(value: str) -> str:
     cleaned = Path(value).name.strip()
     cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", cleaned)
@@ -458,6 +510,7 @@ def create_document_endpoint(
 def list_documents_endpoint(
     limit: int = 100,
     offset: int = Query(0, ge=0),
+    q: str | None = Query(None),
     tag: list[str] | None = Query(None),
     correspondent: list[str] | None = Query(None),
     document_type: list[str] | None = Query(None),
@@ -478,21 +531,16 @@ def list_documents_endpoint(
         if document.owner_id != current_user.id:
             continue
         llm_result = repository.get_llm_parse_result(document.id)
-        if normalized_statuses and _normalize_name(document.status.value) not in normalized_statuses:
+        if not _matches_document_filters(
+            document=document,
+            llm_result=llm_result,
+            normalized_tags=normalized_tags,
+            normalized_correspondents=normalized_correspondents,
+            normalized_document_types=normalized_document_types,
+            normalized_statuses=normalized_statuses,
+            query=q,
+        ):
             continue
-        if normalized_tags:
-            if llm_result is None or not normalized_tags.intersection(
-                {
-                _normalize_name(item) for item in llm_result.tags
-                }
-            ):
-                continue
-        if normalized_correspondents:
-            if llm_result is None or _normalize_name(llm_result.correspondent) not in normalized_correspondents:
-                continue
-        if normalized_document_types:
-            if llm_result is None or _normalize_name(llm_result.document_type) not in normalized_document_types:
-                continue
         results.append(
             _to_list_item_response(
                 document=document,
@@ -504,6 +552,7 @@ def list_documents_endpoint(
 
 @router.get("/count", response_model=CountResponse)
 def count_documents_endpoint(
+    q: str | None = Query(None),
     tag: list[str] | None = Query(None),
     correspondent: list[str] | None = Query(None),
     document_type: list[str] | None = Query(None),
@@ -529,19 +578,16 @@ def count_documents_endpoint(
             if document.owner_id != current_user.id:
                 continue
             llm_result = repository.get_llm_parse_result(document.id)
-            if normalized_statuses and _normalize_name(document.status.value) not in normalized_statuses:
+            if not _matches_document_filters(
+                document=document,
+                llm_result=llm_result,
+                normalized_tags=normalized_tags,
+                normalized_correspondents=normalized_correspondents,
+                normalized_document_types=normalized_document_types,
+                normalized_statuses=normalized_statuses,
+                query=q,
+            ):
                 continue
-            if normalized_tags:
-                if llm_result is None or not normalized_tags.intersection(
-                    {_normalize_name(item) for item in llm_result.tags}
-                ):
-                    continue
-            if normalized_correspondents:
-                if llm_result is None or _normalize_name(llm_result.correspondent) not in normalized_correspondents:
-                    continue
-            if normalized_document_types:
-                if llm_result is None or _normalize_name(llm_result.document_type) not in normalized_document_types:
-                    continue
             total += 1
         if len(documents) < batch_size:
             break

@@ -695,6 +695,23 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   min-height: 48px;
 }
 
+.filter-chip-search {
+  min-width: 280px;
+  flex: 1 1 340px;
+}
+
+.filter-chip-search input[type="text"] {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-size: 0.92rem;
+}
+
+.filter-chip-search input[type="text"]:focus-visible {
+  outline: none;
+  border: 0;
+}
+
 .chip-prefix {
   font-weight: 700;
   font-size: 0.9rem;

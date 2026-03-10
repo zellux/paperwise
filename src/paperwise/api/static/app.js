@@ -43,6 +43,7 @@ const filterTag = document.getElementById("filterTag");
 const filterCorrespondent = document.getElementById("filterCorrespondent");
 const filterType = document.getElementById("filterType");
 const filterStatus = document.getElementById("filterStatus");
+const filterQuery = document.getElementById("filterQuery");
 const filterSelects = [filterTag, filterCorrespondent, filterType, filterStatus];
 
 const activityOutput = document.getElementById("activityOutput");
@@ -98,6 +99,7 @@ let userPreferenceSaveTimer = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember"];
 let currentTheme = "atlas";
 let docsFilters = {
+  q: "",
   tag: [],
   correspondent: [],
   document_type: [],
@@ -117,6 +119,7 @@ function normalizePageSize(value) {
 
 function cloneDocsFilters(filters) {
   return {
+    q: String(filters?.q || "").trim(),
     tag: [...(filters?.tag || [])],
     correspondent: [...(filters?.correspondent || [])],
     document_type: [...(filters?.document_type || [])],
@@ -823,6 +826,9 @@ function setupFilterDropdown(selectEl) {
 }
 
 function applyFiltersToControls() {
+  if (filterQuery) {
+    filterQuery.value = docsFilters.q || "";
+  }
   setSelectedValues(filterTag, docsFilters.tag);
   setSelectedValues(filterCorrespondent, docsFilters.correspondent);
   setSelectedValues(filterType, docsFilters.document_type);
@@ -849,6 +855,7 @@ function setSelectOptions(selectEl, values) {
 }
 
 function readFiltersFromControls() {
+  docsFilters.q = String(filterQuery?.value || "").trim();
   docsFilters.tag = getSelectedValues(filterTag);
   docsFilters.correspondent = getSelectedValues(filterCorrespondent);
   docsFilters.document_type = getSelectedValues(filterType);
@@ -890,6 +897,7 @@ function refreshFilterOptionsFromDocuments(documents) {
 
 function syncUrlFromFilters() {
   const url = new URL(window.location.href);
+  url.searchParams.delete("q");
   url.searchParams.delete("tag");
   url.searchParams.delete("correspondent");
   url.searchParams.delete("document_type");
@@ -898,6 +906,9 @@ function syncUrlFromFilters() {
   url.searchParams.delete("page");
   url.searchParams.delete("page_size");
 
+  if (docsFilters.q) {
+    url.searchParams.set("q", docsFilters.q);
+  }
   for (const value of docsFilters.tag) {
     url.searchParams.append("tag", value);
   }
@@ -928,6 +939,7 @@ function syncUrlFromFilters() {
 
 function readFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
+  docsFilters.q = String(params.get("q") || "").trim();
   docsFilters.tag = unique(params.getAll("tag"));
   docsFilters.correspondent = unique(params.getAll("correspondent"));
   docsFilters.document_type = unique(params.getAll("document_type"));
@@ -1367,6 +1379,9 @@ async function loadDocumentsList() {
     limit: String(docsPageSize),
     offset: String((docsPage - 1) * docsPageSize),
   });
+  if (docsFilters.q) {
+    query.set("q", docsFilters.q);
+  }
   for (const value of docsFilters.tag) {
     query.append("tag", value);
   }
@@ -1836,6 +1851,7 @@ document.addEventListener("keydown", (event) => {
 });
 
 clearFiltersBtn.addEventListener("click", async () => {
+  docsFilters.q = "";
   docsFilters.tag = [];
   docsFilters.correspondent = [];
   docsFilters.document_type = [];
@@ -1844,6 +1860,10 @@ clearFiltersBtn.addEventListener("click", async () => {
   applyFiltersToControls();
   syncUrlFromFilters();
   await loadDocumentsList();
+});
+
+filterQuery?.addEventListener("input", async () => {
+  await applyFiltersFromControls();
 });
 
 pagePrevBtn?.addEventListener("click", async () => {

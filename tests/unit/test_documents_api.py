@@ -256,6 +256,14 @@ def test_count_documents_with_filters() -> None:
         tag_count_response = client.get("/documents/count?status=ready&tag=Credit")
         assert tag_count_response.status_code == 200
         assert tag_count_response.json()["total"] == 1
+
+        search_count_response = client.get("/documents/count?status=ready&q=Experian")
+        assert search_count_response.status_code == 200
+        assert search_count_response.json()["total"] == 1
+
+        search_list_response = client.get("/documents?status=ready&q=Credit%20Report")
+        assert search_list_response.status_code == 200
+        assert len(search_list_response.json()) == 1
     finally:
         app.dependency_overrides.clear()
 
