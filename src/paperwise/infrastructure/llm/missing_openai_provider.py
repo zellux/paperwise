@@ -4,6 +4,20 @@ from paperwise.application.interfaces import LLMProvider
 
 
 class MissingOpenAIProvider(LLMProvider):
+    def extract_ocr_text(
+        self,
+        *,
+        filename: str,
+        content_type: str,
+        text_preview: str,
+    ) -> str:
+        del filename
+        del content_type
+        del text_preview
+        raise RuntimeError(
+            "LLM OCR requires a configured provider. Set LLM provider and API key in Settings."
+        )
+
     def suggest_metadata(
         self,
         *,

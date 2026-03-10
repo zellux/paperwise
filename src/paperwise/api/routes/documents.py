@@ -949,6 +949,7 @@ def reprocess_document_endpoint(
 def parse_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
+    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> ParseResultResponse:
     document = _get_owned_document_or_404(
@@ -970,6 +971,7 @@ def parse_document_endpoint(
             document_id=document.id,
             blob_uri=document.blob_uri,
             ocr_provider=ocr_provider,
+            llm_provider=default_llm_provider,
         )
         repository.save_parse_result(result)
     except Exception:
@@ -1030,6 +1032,7 @@ def llm_parse_document_endpoint(
                 document_id=document.id,
                 blob_uri=document.blob_uri,
                 ocr_provider=ocr_provider,
+                llm_provider=llm_provider,
             )
             repository.save_parse_result(parse_result)
         else:

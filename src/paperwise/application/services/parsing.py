@@ -3,6 +3,7 @@ from html import unescape
 import re
 from zipfile import BadZipFile, ZipFile
 
+from paperwise.application.interfaces import LLMProvider
 from paperwise.domain.models import ParseResult
 from paperwise.infrastructure.config import get_settings
 from paperwise.application.services.storage_paths import blob_ref_to_path
@@ -33,6 +34,7 @@ def parse_document_blob(
     blob_uri: str,
     *,
     ocr_provider: str = "llm",
+    llm_provider: LLMProvider | None = None,
 ) -> ParseResult:
     """Stub parser for local blob content until real OCR/extract pipeline lands."""
     settings = get_settings()
@@ -72,6 +74,19 @@ def parse_document_blob(
     else:
         text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
         page_count = 1
+
+    if normalized_ocr in {"llm", "llm_separate"} and llm_provider is not None and text_preview.strip():
+        try:
+            ocr_text = llm_provider.extract_ocr_text(
+                filename=blob_path.name,
+                content_type="application/pdf" if is_pdf else "text/plain",
+                text_preview=text_preview,
+            )
+            if isinstance(ocr_text, str) and ocr_text.strip():
+                text_preview = ocr_text.strip()
+        except Exception:
+            # OCR should degrade gracefully to local extraction when provider call fails.
+            pass
 
     parser_name = "stub-local"
     if normalized_ocr == "llm":

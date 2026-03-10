@@ -99,6 +99,7 @@ def parse_document_task(
             document_id=document_id,
             blob_uri=blob_uri,
             ocr_provider=ocr_provider,
+            llm_provider=llm_provider,
         )
         repository.save_parse_result(parsed)
         parse_with_llm(

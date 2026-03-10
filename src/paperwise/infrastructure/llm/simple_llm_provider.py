@@ -8,6 +8,17 @@ from paperwise.application.interfaces import LLMProvider
 class SimpleLLMProvider(LLMProvider):
     """Deterministic local provider used until remote LLM integration is wired."""
 
+    def extract_ocr_text(
+        self,
+        *,
+        filename: str,
+        content_type: str,
+        text_preview: str,
+    ) -> str:
+        del filename
+        del content_type
+        return " ".join(text_preview.split())
+
     def suggest_metadata(
         self,
         *,

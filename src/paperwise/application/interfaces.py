@@ -21,6 +21,15 @@ class EmbeddingProvider(Protocol):
 
 
 class LLMProvider(Protocol):
+    def extract_ocr_text(
+        self,
+        *,
+        filename: str,
+        content_type: str,
+        text_preview: str,
+    ) -> str:
+        """Extract OCR text from a document preview using OCR-specific prompting."""
+
     def suggest_metadata(
         self,
         *,

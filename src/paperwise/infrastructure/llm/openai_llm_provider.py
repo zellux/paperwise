@@ -10,6 +10,11 @@ from paperwise.infrastructure.llm.metadata_prompt import (
     build_user_prompt,
     extract_metadata_result,
 )
+from paperwise.infrastructure.llm.ocr_prompt import (
+    OCR_SYSTEM_PROMPT,
+    build_ocr_user_prompt,
+    extract_ocr_text_result,
+)
 
 
 class OpenAILLMProvider(LLMProvider):
@@ -98,3 +103,60 @@ class OpenAILLMProvider(LLMProvider):
             result["llm_total_tokens"] = total_tokens
 
         return result
+
+    def extract_ocr_text(
+        self,
+        *,
+        filename: str,
+        content_type: str,
+        text_preview: str,
+    ) -> str:
+        user_prompt = build_ocr_user_prompt(
+            filename=filename,
+            content_type=content_type,
+            text_preview=text_preview,
+        )
+        request_payload = {
+            "model": self._model,
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": OCR_SYSTEM_PROMPT},
+                {"role": "user", "content": json.dumps(user_prompt)},
+            ],
+        }
+        response: httpx.Response | None = None
+        response_payload: Any = None
+
+        try:
+            response = self._client.post("/chat/completions", json=request_payload)
+            try:
+                response_payload = response.json()
+            except ValueError:
+                response_payload = {"raw_text": getattr(response, "text", "")}
+        except Exception as exc:
+            log_llm_exchange(
+                provider="openai",
+                endpoint="/chat/completions",
+                request_payload=request_payload,
+                error=str(exc),
+            )
+            raise
+
+        log_llm_exchange(
+            provider="openai",
+            endpoint="/chat/completions",
+            request_payload=request_payload,
+            response_status=getattr(response, "status_code", None),
+            response_payload=response_payload,
+        )
+        response.raise_for_status()
+        payload = response_payload if isinstance(response_payload, dict) else response.json()
+        content = str(payload["choices"][0]["message"]["content"]).strip()
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            return content
+
+        extracted = extract_ocr_text_result(parsed)
+        return extracted or content
