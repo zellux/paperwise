@@ -179,7 +179,8 @@ h1 {
 }
 
 input[type="text"],
-input[type="file"] {
+input[type="file"],
+input[type="date"] {
   width: 100%;
   border: 1px solid var(--stroke);
   border-radius: 10px;
@@ -187,6 +188,27 @@ input[type="file"] {
   background: rgba(255, 255, 255, 0.88);
   color: var(--ink);
   font-family: var(--sans);
+}
+
+input[type="date"] {
+  min-height: 42px;
+  padding-right: 8px;
+}
+
+input[type="text"]:focus-visible,
+input[type="file"]:focus-visible,
+input[type="date"]:focus-visible {
+  outline: 2px solid rgba(29, 106, 85, 0.35);
+  outline-offset: 1px;
+  border-color: #5a8378;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.75;
+  padding: 4px;
+  border-radius: 6px;
+  background: rgba(199, 214, 209, 0.8);
 }
 
 .btn {
