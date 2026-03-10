@@ -473,6 +473,20 @@ def _resolve_ocr_provider_for_user(
     return "llm"
 
 
+def _resolve_ocr_auto_switch_for_user(
+    *,
+    repository: DocumentRepository,
+    current_user: User,
+) -> bool:
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    raw = preferences.get("ocr_auto_switch", False)
+    if isinstance(raw, bool):
+        return raw
+    normalized = str(raw).strip().lower()
+    return normalized in {"true", "1", "on", "yes"}
+
+
 def _resolve_file_path_from_uri(blob_uri: str) -> Path | None:
     resolved = blob_ref_to_path(blob_uri, settings.object_store_root)
     if resolved is None:
@@ -592,6 +606,7 @@ def _run_parse_document_blob_or_400(
     blob_uri: str,
     ocr_provider: str,
     llm_provider: LLMProvider | None,
+    ocr_auto_switch: bool = False,
 ) -> ParseResult:
     try:
         return parse_document_blob(
@@ -599,6 +614,7 @@ def _run_parse_document_blob_or_400(
             blob_uri=blob_uri,
             ocr_provider=ocr_provider,
             llm_provider=llm_provider,
+            ocr_auto_switch=ocr_auto_switch,
         )
     except RuntimeError as exc:
         raise HTTPException(
@@ -1047,6 +1063,10 @@ def parse_document_endpoint(
         repository=repository,
         current_user=current_user,
     )
+    ocr_auto_switch = _resolve_ocr_auto_switch_for_user(
+        repository=repository,
+        current_user=current_user,
+    )
     ocr_llm_provider: LLMProvider | None = None
     if ocr_provider == "llm":
         try:
@@ -1071,6 +1091,7 @@ def parse_document_endpoint(
         blob_uri=document.blob_uri,
         ocr_provider=ocr_provider,
         llm_provider=ocr_llm_provider,
+        ocr_auto_switch=ocr_auto_switch,
     )
     repository.save_parse_result(result)
     return _to_parse_response(result)
@@ -1117,6 +1138,10 @@ def llm_parse_document_endpoint(
         repository=repository,
         current_user=current_user,
     )
+    ocr_auto_switch = _resolve_ocr_auto_switch_for_user(
+        repository=repository,
+        current_user=current_user,
+    )
     ocr_llm_provider: LLMProvider | None = None
     if ocr_provider == "llm":
         ocr_llm_provider = llm_provider
@@ -1142,6 +1167,7 @@ def llm_parse_document_endpoint(
                 blob_uri=document.blob_uri,
                 ocr_provider=ocr_provider,
                 llm_provider=ocr_llm_provider,
+                ocr_auto_switch=ocr_auto_switch,
             )
             repository.save_parse_result(parse_result)
         else:

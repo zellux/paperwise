@@ -459,6 +459,12 @@
                 </select>
                 <span id="settingsOcrStatus" class="settings-inline-status" aria-live="polite"></span>
 
+                <label class="label" for="settingsOcrAutoSwitchSelect">OCR Strategy</label>
+                <select id="settingsOcrAutoSwitchSelect" name="settingsOcrAutoSwitchSelect">
+                  <option value="off">Always use selected OCR provider</option>
+                  <option value="on">Auto switch: prefer local extraction when text quality is high</option>
+                </select>
+
                 <label class="label ocr-separate-only" for="settingsOcrLlmProviderSelect">OCR LLM Provider (separate mode)</label>
                 <select
                   id="settingsOcrLlmProviderSelect"

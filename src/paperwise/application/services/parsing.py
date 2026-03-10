@@ -87,6 +87,17 @@ def _extract_pdf_text(
     return "", page_count
 
 
+def _is_high_quality_extracted_text(text: str) -> bool:
+    cleaned = " ".join(str(text or "").split())
+    if len(cleaned) < 900:
+        return False
+    letters = sum(ch.isalpha() for ch in cleaned)
+    if letters < 400:
+        return False
+    ratio = letters / max(len(cleaned), 1)
+    return ratio >= 0.45
+
+
 def _extract_with_local_tesseract(
     *,
     blob_path,
@@ -153,6 +164,7 @@ def parse_document_blob(
     *,
     ocr_provider: str = "llm",
     llm_provider: LLMProvider | None = None,
+    ocr_auto_switch: bool = False,
 ) -> ParseResult:
     """Stub parser for local blob content until real OCR/extract pipeline lands."""
     settings = get_settings()
@@ -206,6 +218,17 @@ def parse_document_blob(
         page_count = 1
 
     if normalized_ocr in {"llm", "llm_separate"}:
+        if ocr_auto_switch and _is_high_quality_extracted_text(text_preview):
+            parser_name = "auto-local-extract"
+            return ParseResult(
+                document_id=document_id,
+                parser=parser_name,
+                status="parsed",
+                size_bytes=len(raw),
+                page_count=page_count,
+                text_preview=text_preview,
+                created_at=datetime.now(UTC),
+            )
         extract_method = getattr(llm_provider, "extract_ocr_text", None) if llm_provider is not None else None
         if callable(extract_method):
             if not text_preview.strip():

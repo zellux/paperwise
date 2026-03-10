@@ -52,6 +52,16 @@ def _resolve_ocr_provider_for_owner(repository: DocumentRepository, owner_id: st
     return "llm"
 
 
+def _resolve_ocr_auto_switch_for_owner(repository: DocumentRepository, owner_id: str) -> bool:
+    preference = repository.get_user_preference(owner_id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    raw = preferences.get("ocr_auto_switch", False)
+    if isinstance(raw, bool):
+        return raw
+    normalized = str(raw).strip().lower()
+    return normalized in {"true", "1", "on", "yes"}
+
+
 def _resolve_llm_provider_from_preferences(
     *,
     preferences: dict[str, str],
@@ -198,6 +208,7 @@ def parse_document_task(
         repository.save(document)
 
         ocr_provider = _resolve_ocr_provider_for_owner(repository, document.owner_id)
+        ocr_auto_switch = _resolve_ocr_auto_switch_for_owner(repository, document.owner_id)
         metadata_llm_provider = _resolve_metadata_llm_provider_for_owner(
             repository=repository,
             owner_id=document.owner_id,
@@ -214,6 +225,7 @@ def parse_document_task(
             blob_uri=blob_uri,
             ocr_provider=ocr_provider,
             llm_provider=ocr_llm_provider,
+            ocr_auto_switch=ocr_auto_switch,
         )
         repository.save_parse_result(parsed)
         parse_with_llm(

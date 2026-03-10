@@ -21,6 +21,7 @@ const settingsTestLlmBtn = document.getElementById("settingsTestLlmBtn");
 const settingsLlmTestStatus = document.getElementById("settingsLlmTestStatus");
 const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
 const settingsOcrStatus = document.getElementById("settingsOcrStatus");
+const settingsOcrAutoSwitchSelect = document.getElementById("settingsOcrAutoSwitchSelect");
 const settingsOcrLlmProviderSelect = document.getElementById("settingsOcrLlmProviderSelect");
 const settingsOcrLlmModelInput = document.getElementById("settingsOcrLlmModelInput");
 const settingsOcrLlmBaseUrlInput = document.getElementById("settingsOcrLlmBaseUrlInput");
@@ -145,6 +146,7 @@ let ocrLlmSettings = {
   base_url: "",
   api_key: "",
 };
+let ocrAutoSwitch = false;
 let ocrStatusRequestSeq = 0;
 let docsFilters = {
   q: "",
@@ -228,6 +230,14 @@ function normalizeOcrProvider(value) {
   return "llm";
 }
 
+function normalizeOcrAutoSwitch(value) {
+  if (typeof value === "boolean") {
+    return value;
+  }
+  const normalized = String(value || "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "on" || normalized === "yes";
+}
+
 function applyTheme(themeName) {
   currentTheme = normalizeThemeName(themeName);
   const classNames = SUPPORTED_THEMES.map((name) => `theme-${name}`);
@@ -274,6 +284,9 @@ function renderSettingsForm() {
   }
   if (settingsOcrLlmApiKeyInput && settingsOcrLlmApiKeyInput.value !== ocrLlmSettings.api_key) {
     settingsOcrLlmApiKeyInput.value = ocrLlmSettings.api_key;
+  }
+  if (settingsOcrAutoSwitchSelect) {
+    settingsOcrAutoSwitchSelect.value = ocrAutoSwitch ? "on" : "off";
   }
   syncOcrSeparateSettingsVisibility();
   refreshLocalOcrStatus().catch(() => {});
@@ -472,6 +485,7 @@ async function saveUserPreferences() {
       llm_base_url: llmSettings.base_url,
       llm_api_key: llmSettings.api_key,
       ocr_provider: ocrProvider,
+      ocr_auto_switch: ocrAutoSwitch,
       ocr_llm_provider: ocrLlmSettings.provider,
       ocr_llm_model: ocrLlmSettings.model,
       ocr_llm_base_url: ocrLlmSettings.base_url,
@@ -543,6 +557,7 @@ function applyUserPreferences(preferences, options = {}) {
     }
   }
   ocrProvider = normalizeOcrProvider(preferences.ocr_provider);
+  ocrAutoSwitch = normalizeOcrAutoSwitch(preferences.ocr_auto_switch);
   ocrLlmSettings = {
     provider: normalizeLlmProvider(preferences.ocr_llm_provider),
     model: String(preferences.ocr_llm_model || "").trim(),
@@ -835,6 +850,7 @@ function clearSession() {
     api_key: "",
   };
   ocrProvider = "llm";
+  ocrAutoSwitch = false;
   ocrLlmSettings = {
     provider: "",
     model: "",
@@ -1967,6 +1983,7 @@ settingsForm?.addEventListener("submit", async (event) => {
   const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || docsPageSize);
   llmSettings = readLlmSettingsFromControls();
   ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
+  ocrAutoSwitch = normalizeOcrAutoSwitch(settingsOcrAutoSwitchSelect?.value || ocrAutoSwitch);
   ocrLlmSettings = readOcrLlmSettingsFromControls();
   syncUploadAvailability();
   applyTheme(nextTheme);

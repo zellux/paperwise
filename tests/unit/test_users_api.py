@@ -145,6 +145,7 @@ def test_user_preferences_round_trip() -> None:
                     "llm_base_url": "https://api.openai.com/v1",
                     "llm_api_key": "sk-test",
                     "ocr_provider": "llm_separate",
+                    "ocr_auto_switch": True,
                     "ocr_llm_provider": "gemini",
                     "ocr_llm_model": "gemini-2.0-flash",
                     "ocr_llm_base_url": "https://generativelanguage.googleapis.com/v1beta",
@@ -165,6 +166,7 @@ def test_user_preferences_round_trip() -> None:
         assert put_response.json()["preferences"]["llm_provider"] == "openai"
         assert put_response.json()["preferences"]["llm_model"] == "gpt-4.1-mini"
         assert put_response.json()["preferences"]["ocr_provider"] == "llm_separate"
+        assert put_response.json()["preferences"]["ocr_auto_switch"] is True
         assert put_response.json()["preferences"]["ocr_llm_provider"] == "gemini"
         assert put_response.json()["preferences"]["ocr_llm_model"] == "gemini-2.0-flash"
 
@@ -176,6 +178,7 @@ def test_user_preferences_round_trip() -> None:
         assert get_saved.json()["preferences"]["llm_provider"] == "openai"
         assert get_saved.json()["preferences"]["llm_model"] == "gpt-4.1-mini"
         assert get_saved.json()["preferences"]["ocr_provider"] == "llm_separate"
+        assert get_saved.json()["preferences"]["ocr_auto_switch"] is True
         assert get_saved.json()["preferences"]["ocr_llm_provider"] == "gemini"
         assert get_saved.json()["preferences"]["ocr_llm_model"] == "gemini-2.0-flash"
         assert get_saved.json()["preferences"]["docs_filters"]["tag"] == ["Credit"]
