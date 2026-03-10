@@ -379,184 +379,188 @@
         <article id="section-settings" class="panel panel-section view view-hidden">
           <h2>Settings</h2>
           <form id="settingsForm" class="stack settings-form">
-            <section class="settings-group">
-              <h3 class="settings-group-title">Display</h3>
-              <p class="settings-group-note">Visual theme and list density.</p>
-              <div class="settings-group-fields">
-                <label class="label" for="settingsThemeSelect">Theme</label>
-                <select id="settingsThemeSelect" name="settingsThemeSelect">
-                  <option value="atlas">Atlas</option>
-                  <option value="ledger">Ledger</option>
-                  <option value="moss">Moss</option>
-                  <option value="ember">Ember</option>
-                </select>
+            <div class="settings-column">
+              <section class="settings-group">
+                <h3 class="settings-group-title">Display</h3>
+                <p class="settings-group-note">Visual theme and list density.</p>
+                <div class="settings-group-fields">
+                  <label class="label" for="settingsThemeSelect">Theme</label>
+                  <select id="settingsThemeSelect" name="settingsThemeSelect">
+                    <option value="atlas">Atlas</option>
+                    <option value="ledger">Ledger</option>
+                    <option value="moss">Moss</option>
+                    <option value="ember">Ember</option>
+                  </select>
 
-                <label class="label" for="settingsPageSizeSelect">Documents per page</label>
-                <select id="settingsPageSizeSelect" name="settingsPageSizeSelect">
-                  <option value="10">10</option>
-                  <option value="20">20</option>
-                  <option value="50">50</option>
-                  <option value="100">100</option>
-                </select>
-              </div>
-            </section>
+                  <label class="label" for="settingsPageSizeSelect">Documents per page</label>
+                  <select id="settingsPageSizeSelect" name="settingsPageSizeSelect">
+                    <option value="10">10</option>
+                    <option value="20">20</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                  </select>
+                </div>
+              </section>
 
-            <section class="settings-group">
-              <h3 class="settings-group-title">LLM</h3>
-              <p class="settings-group-note">Provider selection and model connection settings (user-managed API credentials).</p>
-              <div class="settings-group-fields">
-                <label class="label" for="settingsLlmProviderSelect">LLM Provider</label>
-                <select id="settingsLlmProviderSelect" name="settingsLlmProviderSelect">
-                  <option value="">Select provider</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="gemini">Gemini</option>
-                  <option value="custom">Custom (OpenAI-Compatible)</option>
-                </select>
+              <section class="settings-group">
+                <h3 class="settings-group-title">OCR</h3>
+                <p class="settings-group-note">
+                  Select how OCR is handled.
+                  <code>LLM</code> mode sends rendered document images to the model for image-to-text transcription.
+                  <code>Local Tesseract</code> runs OCR locally using system tools (<code>tesseract</code> and <code>pdftoppm</code>).
+                  When auto-switch is enabled, the app tries local OCR first and only calls LLM OCR if local output is not good enough.
+                  For cost estimation, refer to
+                  <a href="https://developers.openai.com/api/docs/guides/images-vision/" target="_blank" rel="noopener noreferrer">this reference page</a>.
+                </p>
+                <div class="settings-group-fields">
+                  <label class="label" for="settingsOcrProviderSelect">OCR Provider</label>
+                  <select id="settingsOcrProviderSelect" name="settingsOcrProviderSelect">
+                    <option value="llm">Use Same LLM</option>
+                    <option value="llm_separate">Use Separate LLM For OCR</option>
+                    <option value="tesseract">Local Tesseract</option>
+                  </select>
+                  <span id="settingsOcrStatus" class="settings-inline-status" aria-live="polite"></span>
 
-                <label class="label" for="settingsLlmModelInput">LLM Model</label>
-                <input
-                  id="settingsLlmModelInput"
-                  name="settingsLlmModelInput"
-                  type="text"
-                  placeholder="e.g. gpt-4.1-mini"
-                />
+                  <label class="settings-checkbox-row" for="settingsOcrAutoSwitchCheckbox">
+                    <input
+                      id="settingsOcrAutoSwitchCheckbox"
+                      name="settingsOcrAutoSwitchCheckbox"
+                      type="checkbox"
+                    />
+                    <span>Auto switch to local extraction when text quality is high</span>
+                  </label>
 
-                <label class="label" for="settingsLlmBaseUrlInput">LLM Base URL</label>
-                <input
-                  id="settingsLlmBaseUrlInput"
-                  name="settingsLlmBaseUrlInput"
-                  type="text"
-                  placeholder="https://api.openai.com/v1"
-                />
+                  <label class="label" for="settingsOcrImageDetailSelect">OCR Image Detail</label>
+                  <select id="settingsOcrImageDetailSelect" name="settingsOcrImageDetailSelect">
+                    <option value="auto">Auto</option>
+                    <option value="low">Low</option>
+                    <option value="high">High</option>
+                  </select>
 
-                <label class="label" for="settingsLlmApiKeyInput">LLM API Key</label>
-                <input
-                  id="settingsLlmApiKeyInput"
-                  name="settingsLlmApiKeyInput"
-                  type="password"
-                  placeholder="sk-..."
-                />
-              </div>
-              <div class="actions">
-                <button id="settingsTestLlmBtn" type="button" class="btn btn-muted">Test LLM API</button>
-                <span id="settingsLlmTestStatus" class="settings-inline-status" aria-live="polite"></span>
-              </div>
-            </section>
+                  <label class="label ocr-separate-only" for="settingsOcrLlmProviderSelect">OCR LLM Provider (separate mode)</label>
+                  <select
+                    id="settingsOcrLlmProviderSelect"
+                    name="settingsOcrLlmProviderSelect"
+                    class="ocr-separate-only"
+                  >
+                    <option value="">Select provider</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="custom">Custom (OpenAI-Compatible)</option>
+                  </select>
 
-            <section class="settings-group">
-              <h3 class="settings-group-title">OCR</h3>
-              <p class="settings-group-note">
-                Select how OCR is handled.
-                <code>LLM</code> mode sends rendered document images to the model for image-to-text transcription.
-                <code>Local Tesseract</code> runs OCR locally using system tools (<code>tesseract</code> and <code>pdftoppm</code>).
-                When auto-switch is enabled, the app tries local OCR first and only calls LLM OCR if local output is not good enough.
-                For cost estimation, refer to
-                <a href="https://developers.openai.com/api/docs/guides/images-vision/" target="_blank" rel="noopener noreferrer">this reference page</a>.
-              </p>
-              <div class="settings-group-fields">
-                <label class="label" for="settingsOcrProviderSelect">OCR Provider</label>
-                <select id="settingsOcrProviderSelect" name="settingsOcrProviderSelect">
-                  <option value="llm">Use Same LLM</option>
-                  <option value="llm_separate">Use Separate LLM For OCR</option>
-                  <option value="tesseract">Local Tesseract</option>
-                </select>
-                <span id="settingsOcrStatus" class="settings-inline-status" aria-live="polite"></span>
-
-                <label class="settings-checkbox-row" for="settingsOcrAutoSwitchCheckbox">
+                  <label class="label ocr-separate-only" for="settingsOcrLlmModelInput">OCR LLM Model</label>
                   <input
-                    id="settingsOcrAutoSwitchCheckbox"
-                    name="settingsOcrAutoSwitchCheckbox"
-                    type="checkbox"
+                    class="ocr-separate-only"
+                    id="settingsOcrLlmModelInput"
+                    name="settingsOcrLlmModelInput"
+                    type="text"
+                    placeholder="e.g. gpt-4.1-nano"
                   />
-                  <span>Auto switch to local extraction when text quality is high</span>
-                </label>
 
-                <label class="label" for="settingsOcrImageDetailSelect">OCR Image Detail</label>
-                <select id="settingsOcrImageDetailSelect" name="settingsOcrImageDetailSelect">
-                  <option value="auto">Auto</option>
-                  <option value="low">Low</option>
-                  <option value="high">High</option>
-                </select>
+                  <label class="label ocr-separate-only" for="settingsOcrLlmBaseUrlInput">OCR LLM Base URL</label>
+                  <input
+                    class="ocr-separate-only"
+                    id="settingsOcrLlmBaseUrlInput"
+                    name="settingsOcrLlmBaseUrlInput"
+                    type="text"
+                    placeholder="https://api.openai.com/v1"
+                  />
 
-                <label class="label ocr-separate-only" for="settingsOcrLlmProviderSelect">OCR LLM Provider (separate mode)</label>
-                <select
-                  id="settingsOcrLlmProviderSelect"
-                  name="settingsOcrLlmProviderSelect"
-                  class="ocr-separate-only"
-                >
-                  <option value="">Select provider</option>
-                  <option value="openai">OpenAI</option>
-                  <option value="gemini">Gemini</option>
-                  <option value="custom">Custom (OpenAI-Compatible)</option>
-                </select>
+                  <label class="label ocr-separate-only" for="settingsOcrLlmApiKeyInput">OCR LLM API Key</label>
+                  <input
+                    class="ocr-separate-only"
+                    id="settingsOcrLlmApiKeyInput"
+                    name="settingsOcrLlmApiKeyInput"
+                    type="password"
+                    placeholder="sk-..."
+                  />
+                </div>
+              </section>
+            </div>
 
-                <label class="label ocr-separate-only" for="settingsOcrLlmModelInput">OCR LLM Model</label>
-                <input
-                  class="ocr-separate-only"
-                  id="settingsOcrLlmModelInput"
-                  name="settingsOcrLlmModelInput"
-                  type="text"
-                  placeholder="e.g. gpt-4.1-nano"
-                />
+            <div class="settings-column">
+              <section class="settings-group">
+                <h3 class="settings-group-title">LLM</h3>
+                <p class="settings-group-note">Provider selection and model connection settings (user-managed API credentials).</p>
+                <div class="settings-group-fields">
+                  <label class="label" for="settingsLlmProviderSelect">LLM Provider</label>
+                  <select id="settingsLlmProviderSelect" name="settingsLlmProviderSelect">
+                    <option value="">Select provider</option>
+                    <option value="openai">OpenAI</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="custom">Custom (OpenAI-Compatible)</option>
+                  </select>
 
-                <label class="label ocr-separate-only" for="settingsOcrLlmBaseUrlInput">OCR LLM Base URL</label>
-                <input
-                  class="ocr-separate-only"
-                  id="settingsOcrLlmBaseUrlInput"
-                  name="settingsOcrLlmBaseUrlInput"
-                  type="text"
-                  placeholder="https://api.openai.com/v1"
-                />
+                  <label class="label" for="settingsLlmModelInput">LLM Model</label>
+                  <input
+                    id="settingsLlmModelInput"
+                    name="settingsLlmModelInput"
+                    type="text"
+                    placeholder="e.g. gpt-4.1-mini"
+                  />
 
-                <label class="label ocr-separate-only" for="settingsOcrLlmApiKeyInput">OCR LLM API Key</label>
-                <input
-                  class="ocr-separate-only"
-                  id="settingsOcrLlmApiKeyInput"
-                  name="settingsOcrLlmApiKeyInput"
-                  type="password"
-                  placeholder="sk-..."
-                />
-              </div>
-            </section>
+                  <label class="label" for="settingsLlmBaseUrlInput">LLM Base URL</label>
+                  <input
+                    id="settingsLlmBaseUrlInput"
+                    name="settingsLlmBaseUrlInput"
+                    type="text"
+                    placeholder="https://api.openai.com/v1"
+                  />
 
-            <section class="settings-group">
-              <h3 class="settings-group-title">Security</h3>
-              <p class="settings-group-note">Update your account password.</p>
-              <div class="settings-group-fields">
-                <label class="label" for="settingsCurrentPasswordInput">Current Password</label>
-                <input
-                  id="settingsCurrentPasswordInput"
-                  name="settingsCurrentPasswordInput"
-                  type="password"
-                  autocomplete="current-password"
-                  placeholder="Current password"
-                />
+                  <label class="label" for="settingsLlmApiKeyInput">LLM API Key</label>
+                  <input
+                    id="settingsLlmApiKeyInput"
+                    name="settingsLlmApiKeyInput"
+                    type="password"
+                    placeholder="sk-..."
+                  />
+                </div>
+                <div class="actions">
+                  <button id="settingsTestLlmBtn" type="button" class="btn btn-muted">Test LLM API</button>
+                  <span id="settingsLlmTestStatus" class="settings-inline-status" aria-live="polite"></span>
+                </div>
+              </section>
 
-                <label class="label" for="settingsNewPasswordInput">New Password</label>
-                <input
-                  id="settingsNewPasswordInput"
-                  name="settingsNewPasswordInput"
-                  type="password"
-                  autocomplete="new-password"
-                  placeholder="New password (min 8 chars)"
-                />
+              <section class="settings-group">
+                <h3 class="settings-group-title">Security</h3>
+                <p class="settings-group-note">Update your account password.</p>
+                <div class="settings-group-fields">
+                  <label class="label" for="settingsCurrentPasswordInput">Current Password</label>
+                  <input
+                    id="settingsCurrentPasswordInput"
+                    name="settingsCurrentPasswordInput"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="Current password"
+                  />
 
-                <label class="label" for="settingsConfirmPasswordInput">Confirm New Password</label>
-                <input
-                  id="settingsConfirmPasswordInput"
-                  name="settingsConfirmPasswordInput"
-                  type="password"
-                  autocomplete="new-password"
-                  placeholder="Confirm new password"
-                />
-              </div>
-              <div class="actions">
-                <button id="settingsChangePasswordBtn" type="button" class="btn btn-muted">
-                  Change Password
-                </button>
-                <span id="settingsPasswordStatus" class="settings-inline-status" aria-live="polite"></span>
-              </div>
-            </section>
+                  <label class="label" for="settingsNewPasswordInput">New Password</label>
+                  <input
+                    id="settingsNewPasswordInput"
+                    name="settingsNewPasswordInput"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder="New password (min 8 chars)"
+                  />
+
+                  <label class="label" for="settingsConfirmPasswordInput">Confirm New Password</label>
+                  <input
+                    id="settingsConfirmPasswordInput"
+                    name="settingsConfirmPasswordInput"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder="Confirm new password"
+                  />
+                </div>
+                <div class="actions">
+                  <button id="settingsChangePasswordBtn" type="button" class="btn btn-muted">
+                    Change Password
+                  </button>
+                  <span id="settingsPasswordStatus" class="settings-inline-status" aria-live="polite"></span>
+                </div>
+              </section>
+            </div>
 
             <div class="actions settings-form-actions">
               <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>

@@ -732,6 +732,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   align-items: start;
 }
 
+.settings-column {
+  display: grid;
+  gap: 0;
+  align-content: start;
+}
+
 .settings-group {
   border: 1px solid var(--stroke-soft);
   border-radius: 12px;
@@ -786,6 +792,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 @media (max-width: 960px) {
   .settings-form {
     grid-template-columns: 1fr;
+  }
+
+  .settings-column {
+    gap: 0;
   }
 }
 
