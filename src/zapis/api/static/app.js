@@ -97,6 +97,27 @@ function formatBytes(value) {
   return `${mb.toFixed(2)} MB`;
 }
 
+function toRelativeBlobPath(blobUri) {
+  if (!blobUri) {
+    return "-";
+  }
+  try {
+    const url = new URL(blobUri);
+    if (url.protocol !== "file:") {
+      return blobUri;
+    }
+    const absolutePath = decodeURIComponent(url.pathname);
+    const marker = "/local/object-store/";
+    const idx = absolutePath.indexOf(marker);
+    if (idx >= 0) {
+      return absolutePath.slice(idx + marker.length);
+    }
+    return absolutePath.replace(/^\/+/, "");
+  } catch {
+    return blobUri;
+  }
+}
+
 function logActivity(message) {
   const now = new Date().toLocaleTimeString();
   activityOutput.textContent = `[${now}] ${message}\n${activityOutput.textContent}`;
@@ -728,7 +749,8 @@ async function openDocumentView(documentId) {
   detailContentType.textContent = doc.content_type || "-";
   detailSizeBytes.textContent = `${formatBytes(doc.size_bytes)} (${doc.size_bytes || 0} bytes)`;
   detailChecksum.textContent = doc.checksum_sha256 || "-";
-  detailBlobUri.textContent = doc.blob_uri || "-";
+  detailBlobUri.textContent = toRelativeBlobPath(doc.blob_uri);
+  detailBlobUri.title = doc.blob_uri || "";
 
   setActiveView("section-document");
   setActiveNav("section-document");
