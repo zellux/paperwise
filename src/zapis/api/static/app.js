@@ -79,8 +79,8 @@ function formatStatus(value) {
   }
   return value
     .split("_")
-    .map((chunk) => chunk.charAt(0).toUpperCase() + chunk.slice(1))
-    .join(" ");
+    .join(" ")
+    .toUpperCase();
 }
 
 function formatBytes(value) {
