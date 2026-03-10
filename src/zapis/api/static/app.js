@@ -14,6 +14,7 @@ const filterTag = document.getElementById("filterTag");
 const filterCorrespondent = document.getElementById("filterCorrespondent");
 const filterType = document.getElementById("filterType");
 const filterStatus = document.getElementById("filterStatus");
+const filterSelects = [filterTag, filterCorrespondent, filterType, filterStatus];
 
 const activityOutput = document.getElementById("activityOutput");
 const docsTableBody = document.getElementById("docsTableBody");
@@ -21,6 +22,8 @@ const tagsTableBody = document.getElementById("tagsTableBody");
 const pendingTableBody = document.getElementById("pendingTableBody");
 const navLinks = [...document.querySelectorAll(".nav-link")];
 const views = [...document.querySelectorAll(".view")];
+const filterDropdownState = new Map();
+let activeFilterDropdown = null;
 
 let currentDocumentId = "";
 const docsFilters = {
@@ -96,11 +99,206 @@ function setSelectedValues(selectEl, values) {
   }
 }
 
+function summarizeSelectedValues(selectedValues) {
+  if (!selectedValues.length) {
+    return "Any";
+  }
+  if (selectedValues.length === 1) {
+    return selectedValues[0];
+  }
+  return `${selectedValues.length} selected`;
+}
+
+function closeFilterDropdown(selectEl) {
+  const state = filterDropdownState.get(selectEl);
+  if (!state) {
+    return;
+  }
+  state.panel.hidden = true;
+  state.trigger.setAttribute("aria-expanded", "false");
+  state.chip.classList.remove("is-open");
+  if (activeFilterDropdown === selectEl) {
+    activeFilterDropdown = null;
+  }
+}
+
+function openFilterDropdown(selectEl) {
+  if (activeFilterDropdown && activeFilterDropdown !== selectEl) {
+    closeFilterDropdown(activeFilterDropdown);
+  }
+  const state = filterDropdownState.get(selectEl);
+  if (!state) {
+    return;
+  }
+  state.panel.hidden = false;
+  state.trigger.setAttribute("aria-expanded", "true");
+  state.chip.classList.add("is-open");
+  activeFilterDropdown = selectEl;
+  state.search.focus();
+}
+
+async function toggleFilterOption(selectEl, value) {
+  for (const option of selectEl.options) {
+    if (option.value === value) {
+      option.selected = !option.selected;
+      break;
+    }
+  }
+  await applyFiltersFromControls();
+}
+
+function renderFilterDropdownOptions(selectEl) {
+  const state = filterDropdownState.get(selectEl);
+  if (!state) {
+    return;
+  }
+
+  const query = state.search.value.trim().toLowerCase();
+  const options = [...selectEl.options].filter((option) => {
+    if (!query) {
+      return true;
+    }
+    return option.textContent.toLowerCase().includes(query);
+  });
+
+  state.options.innerHTML = "";
+
+  if (!options.length) {
+    const empty = document.createElement("div");
+    empty.className = "filter-dropdown-empty";
+    empty.textContent = "No matches.";
+    state.options.appendChild(empty);
+    return;
+  }
+
+  for (const option of options) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = "filter-dropdown-option";
+    row.dataset.value = option.value;
+    row.setAttribute("aria-pressed", option.selected ? "true" : "false");
+    if (option.selected) {
+      row.classList.add("is-selected");
+    }
+
+    const check = document.createElement("span");
+    check.className = "filter-dropdown-check";
+    check.textContent = option.selected ? "x" : "";
+
+    const label = document.createElement("span");
+    label.className = "filter-dropdown-option-label";
+    label.textContent = option.textContent;
+
+    row.appendChild(check);
+    row.appendChild(label);
+    state.options.appendChild(row);
+  }
+}
+
+function renderFilterDropdown(selectEl) {
+  const state = filterDropdownState.get(selectEl);
+  if (!state) {
+    return;
+  }
+  const selectedValues = getSelectedValues(selectEl);
+  state.value.textContent = summarizeSelectedValues(selectedValues);
+  renderFilterDropdownOptions(selectEl);
+}
+
+function setupFilterDropdown(selectEl) {
+  if (!selectEl || filterDropdownState.has(selectEl)) {
+    return;
+  }
+
+  const chip = selectEl.closest(".filter-chip");
+  if (!chip) {
+    return;
+  }
+
+  const labelText = chip.querySelector(".chip-prefix")?.textContent?.trim() || "Filter";
+  selectEl.classList.add("filter-select-native");
+
+  const dropdown = document.createElement("div");
+  dropdown.className = "filter-dropdown";
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "filter-dropdown-trigger";
+  trigger.setAttribute("aria-expanded", "false");
+
+  const triggerValue = document.createElement("span");
+  triggerValue.className = "filter-dropdown-value";
+  triggerValue.textContent = "Any";
+
+  const triggerCaret = document.createElement("span");
+  triggerCaret.className = "filter-dropdown-caret";
+  triggerCaret.textContent = "▾";
+
+  trigger.appendChild(triggerValue);
+  trigger.appendChild(triggerCaret);
+
+  const panel = document.createElement("div");
+  panel.className = "filter-dropdown-panel";
+  panel.hidden = true;
+
+  const search = document.createElement("input");
+  search.type = "search";
+  search.className = "filter-dropdown-search";
+  search.placeholder = `Filter ${labelText.toLowerCase()}`;
+
+  const options = document.createElement("div");
+  options.className = "filter-dropdown-options";
+
+  panel.appendChild(search);
+  panel.appendChild(options);
+  dropdown.appendChild(trigger);
+  dropdown.appendChild(panel);
+  chip.appendChild(dropdown);
+
+  filterDropdownState.set(selectEl, {
+    chip,
+    trigger,
+    panel,
+    search,
+    options,
+    value: triggerValue,
+  });
+
+  trigger.addEventListener("click", () => {
+    if (panel.hidden) {
+      openFilterDropdown(selectEl);
+      renderFilterDropdownOptions(selectEl);
+      return;
+    }
+    closeFilterDropdown(selectEl);
+  });
+
+  search.addEventListener("input", () => {
+    renderFilterDropdownOptions(selectEl);
+  });
+
+  options.addEventListener("click", async (event) => {
+    const button = event.target.closest(".filter-dropdown-option");
+    if (!button) {
+      return;
+    }
+    const value = button.dataset.value;
+    if (!value) {
+      return;
+    }
+    await toggleFilterOption(selectEl, value);
+    renderFilterDropdown(selectEl);
+  });
+}
+
 function applyFiltersToControls() {
   setSelectedValues(filterTag, docsFilters.tag);
   setSelectedValues(filterCorrespondent, docsFilters.correspondent);
   setSelectedValues(filterType, docsFilters.document_type);
   setSelectedValues(filterStatus, docsFilters.status);
+  for (const selectEl of filterSelects) {
+    renderFilterDropdown(selectEl);
+  }
 }
 
 function setSelectOptions(selectEl, values) {
@@ -116,6 +314,7 @@ function setSelectOptions(selectEl, values) {
     selectEl.appendChild(option);
   }
   setSelectedValues(selectEl, selectedValues);
+  renderFilterDropdown(selectEl);
 }
 
 function readFiltersFromControls() {
@@ -520,11 +719,34 @@ docsFilterForm.addEventListener("submit", (event) => {
   event.preventDefault();
 });
 
-for (const selectEl of [filterTag, filterCorrespondent, filterType, filterStatus]) {
+for (const selectEl of filterSelects) {
   selectEl.addEventListener("change", async () => {
     await applyFiltersFromControls();
   });
 }
+
+for (const selectEl of filterSelects) {
+  setupFilterDropdown(selectEl);
+}
+
+document.addEventListener("click", (event) => {
+  if (!activeFilterDropdown) {
+    return;
+  }
+  const state = filterDropdownState.get(activeFilterDropdown);
+  if (!state) {
+    return;
+  }
+  if (!state.chip.contains(event.target)) {
+    closeFilterDropdown(activeFilterDropdown);
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && activeFilterDropdown) {
+    closeFilterDropdown(activeFilterDropdown);
+  }
+});
 
 clearFiltersBtn.addEventListener("click", async () => {
   docsFilters.tag = [];
