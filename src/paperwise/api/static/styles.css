@@ -730,6 +730,21 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .settings-group .actions {
   margin-top: 10px;
   margin-bottom: 0;
+  align-items: center;
+}
+
+.settings-inline-status {
+  font-size: 0.84rem;
+  color: var(--ink-soft);
+  min-height: 1.1em;
+}
+
+.settings-inline-status.is-success {
+  color: #1d6a55;
+}
+
+.settings-inline-status.is-error {
+  color: #9f3f1d;
 }
 
 .filter-chip {

@@ -18,6 +18,7 @@ const settingsLlmModelInput = document.getElementById("settingsLlmModelInput");
 const settingsLlmBaseUrlInput = document.getElementById("settingsLlmBaseUrlInput");
 const settingsLlmApiKeyInput = document.getElementById("settingsLlmApiKeyInput");
 const settingsTestLlmBtn = document.getElementById("settingsTestLlmBtn");
+const settingsLlmTestStatus = document.getElementById("settingsLlmTestStatus");
 const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
@@ -248,6 +249,19 @@ function getLlmUploadBlockReasonForSettings(candidateSettings) {
 
 function getLlmUploadBlockReason() {
   return getLlmUploadBlockReasonForSettings(llmSettings);
+}
+
+function setSettingsLlmTestStatus(message, tone = "") {
+  if (!settingsLlmTestStatus) {
+    return;
+  }
+  settingsLlmTestStatus.textContent = message || "";
+  settingsLlmTestStatus.classList.remove("is-success", "is-error");
+  if (tone === "success") {
+    settingsLlmTestStatus.classList.add("is-success");
+  } else if (tone === "error") {
+    settingsLlmTestStatus.classList.add("is-error");
+  }
 }
 
 function syncUploadAvailability(options = {}) {
@@ -1794,6 +1808,7 @@ settingsTestLlmBtn?.addEventListener("click", async () => {
   const candidateSettings = readLlmSettingsFromControls();
   const reason = getLlmUploadBlockReasonForSettings(candidateSettings);
   if (reason) {
+    setSettingsLlmTestStatus(reason, "error");
     logActivity(`LLM API test blocked: ${reason}`);
     return;
   }
@@ -1801,6 +1816,7 @@ settingsTestLlmBtn?.addEventListener("click", async () => {
   const previousText = settingsTestLlmBtn.textContent;
   settingsTestLlmBtn.disabled = true;
   settingsTestLlmBtn.textContent = "Testing...";
+  setSettingsLlmTestStatus("Testing...", "");
   logActivity("Testing LLM API connection...");
   try {
     const response = await apiFetch("/documents/llm/test", {
@@ -1815,11 +1831,14 @@ settingsTestLlmBtn?.addEventListener("click", async () => {
     });
     const payload = await response.json();
     if (!response.ok) {
+      setSettingsLlmTestStatus(payload.detail || response.statusText, "error");
       logActivity(`LLM API test failed: ${payload.detail || response.statusText}`);
       return;
     }
+    setSettingsLlmTestStatus(`Success (${payload.provider} / ${payload.model})`, "success");
     logActivity(`LLM API test passed (${payload.provider} / ${payload.model}).`);
   } catch (error) {
+    setSettingsLlmTestStatus(error.message, "error");
     logActivity(`LLM API test failed: ${error.message}`);
   } finally {
     settingsTestLlmBtn.disabled = false;
