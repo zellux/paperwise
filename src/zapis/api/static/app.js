@@ -26,6 +26,17 @@ const views = [...document.querySelectorAll(".view")];
 const filterDropdownState = new Map();
 let activeFilterDropdown = null;
 let currentViewId = "section-docs";
+const VIEW_ID_TO_PARAM = {
+  "section-docs": "docs",
+  "section-document": "document",
+  "section-tags": "tags",
+  "section-pending": "pending",
+  "section-upload": "upload",
+  "section-activity": "activity",
+};
+const VIEW_PARAM_TO_ID = Object.fromEntries(
+  Object.entries(VIEW_ID_TO_PARAM).map(([viewId, param]) => [param, viewId])
+);
 
 let currentDocumentId = "";
 const docsFilters = {
@@ -383,7 +394,7 @@ function syncUrlFromFilters() {
   for (const value of docsFilters.status) {
     url.searchParams.append("status", value);
   }
-  url.searchParams.set("view", currentViewId);
+  url.searchParams.set("view", VIEW_ID_TO_PARAM[currentViewId] || "docs");
 
   const qs = url.searchParams.toString();
   window.history.replaceState(null, "", qs ? `${url.pathname}?${qs}` : url.pathname);
@@ -396,8 +407,11 @@ function readFiltersFromUrl() {
   docsFilters.document_type = unique(params.getAll("document_type"));
   docsFilters.status = unique(params.getAll("status"));
   const viewFromUrl = params.get("view");
-  if (viewFromUrl && views.some((view) => view.id === viewFromUrl)) {
-    currentViewId = viewFromUrl;
+  const mappedViewId = viewFromUrl
+    ? (VIEW_PARAM_TO_ID[viewFromUrl] || viewFromUrl)
+    : "";
+  if (mappedViewId && views.some((view) => view.id === mappedViewId)) {
+    currentViewId = mappedViewId;
   } else {
     currentViewId = "section-docs";
   }
