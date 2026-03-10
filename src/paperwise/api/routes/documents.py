@@ -398,6 +398,10 @@ def _resolve_llm_provider_from_preferences(
             detail=missing_api_key_detail,
         )
 
+    ocr_image_detail = str(preferences.get("ocr_image_detail", "auto")).strip().lower()
+    if ocr_image_detail not in {"auto", "low", "high"}:
+        ocr_image_detail = "auto"
+
     if provider_name == "openai":
         configured_key = str(preferences.get(api_key_key, "")).strip()
         api_key = configured_key
@@ -407,6 +411,7 @@ def _resolve_llm_provider_from_preferences(
             api_key=api_key,
             model=model,
             base_url=base_url,
+            vision_image_detail=ocr_image_detail,
         )
     if provider_name == "gemini":
         model = str(preferences.get(model_key, "")).strip() or "gemini-2.0-flash"
@@ -428,6 +433,7 @@ def _resolve_llm_provider_from_preferences(
             api_key=configured_key,
             model=model,
             base_url=base_url,
+            vision_image_detail=ocr_image_detail,
         )
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,

@@ -86,6 +86,10 @@ def _resolve_llm_provider_from_preferences(
     if not configured_key:
         raise RuntimeError(f"missing API key setting: {api_key_key}")
 
+    ocr_image_detail = str(preferences.get("ocr_image_detail", "auto")).strip().lower()
+    if ocr_image_detail not in {"auto", "low", "high"}:
+        ocr_image_detail = "auto"
+
     if provider_name == "openai":
         model = str(preferences.get(model_key, "")).strip() or settings.openai_model
         base_url = str(preferences.get(base_url_key, "")).strip() or settings.openai_base_url
@@ -93,6 +97,7 @@ def _resolve_llm_provider_from_preferences(
             api_key=configured_key,
             model=model,
             base_url=base_url,
+            vision_image_detail=ocr_image_detail,
         )
     if provider_name == "gemini":
         model = str(preferences.get(model_key, "")).strip() or "gemini-2.0-flash"
@@ -111,6 +116,7 @@ def _resolve_llm_provider_from_preferences(
             api_key=configured_key,
             model=model,
             base_url=base_url,
+            vision_image_detail=ocr_image_detail,
         )
     raise RuntimeError(f"unsupported provider: {provider_name}")
 

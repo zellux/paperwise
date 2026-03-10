@@ -22,6 +22,7 @@ const settingsLlmTestStatus = document.getElementById("settingsLlmTestStatus");
 const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
 const settingsOcrStatus = document.getElementById("settingsOcrStatus");
 const settingsOcrAutoSwitchCheckbox = document.getElementById("settingsOcrAutoSwitchCheckbox");
+const settingsOcrImageDetailSelect = document.getElementById("settingsOcrImageDetailSelect");
 const settingsOcrLlmProviderSelect = document.getElementById("settingsOcrLlmProviderSelect");
 const settingsOcrLlmModelInput = document.getElementById("settingsOcrLlmModelInput");
 const settingsOcrLlmBaseUrlInput = document.getElementById("settingsOcrLlmBaseUrlInput");
@@ -136,6 +137,7 @@ let llmSettings = {
 };
 const SUPPORTED_OCR_PROVIDERS = ["tesseract", "llm", "llm_separate"];
 let ocrProvider = "llm";
+let ocrImageDetail = "auto";
 let ocrLlmSettings = {
   provider: "",
   model: "",
@@ -226,6 +228,14 @@ function normalizeOcrProvider(value) {
   return "llm";
 }
 
+function normalizeOcrImageDetail(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (["auto", "low", "high"].includes(normalized)) {
+    return normalized;
+  }
+  return "auto";
+}
+
 function normalizeOcrAutoSwitch(value) {
   if (typeof value === "boolean") {
     return value;
@@ -283,6 +293,9 @@ function renderSettingsForm() {
   }
   if (settingsOcrAutoSwitchCheckbox) {
     settingsOcrAutoSwitchCheckbox.checked = ocrAutoSwitch;
+  }
+  if (settingsOcrImageDetailSelect && settingsOcrImageDetailSelect.value !== ocrImageDetail) {
+    settingsOcrImageDetailSelect.value = ocrImageDetail;
   }
   syncOcrSeparateSettingsVisibility();
   refreshLocalOcrStatus().catch(() => {});
@@ -482,6 +495,7 @@ async function saveUserPreferences() {
       llm_api_key: llmSettings.api_key,
       ocr_provider: ocrProvider,
       ocr_auto_switch: ocrAutoSwitch,
+      ocr_image_detail: ocrImageDetail,
       ocr_llm_provider: ocrLlmSettings.provider,
       ocr_llm_model: ocrLlmSettings.model,
       ocr_llm_base_url: ocrLlmSettings.base_url,
@@ -554,6 +568,7 @@ function applyUserPreferences(preferences, options = {}) {
   }
   ocrProvider = normalizeOcrProvider(preferences.ocr_provider);
   ocrAutoSwitch = normalizeOcrAutoSwitch(preferences.ocr_auto_switch);
+  ocrImageDetail = normalizeOcrImageDetail(preferences.ocr_image_detail);
   ocrLlmSettings = {
     provider: normalizeLlmProvider(preferences.ocr_llm_provider),
     model: String(preferences.ocr_llm_model || "").trim(),
@@ -847,6 +862,7 @@ function clearSession() {
   };
   ocrProvider = "llm";
   ocrAutoSwitch = false;
+  ocrImageDetail = "auto";
   ocrLlmSettings = {
     provider: "",
     model: "",
@@ -2000,6 +2016,7 @@ settingsForm?.addEventListener("submit", async (event) => {
   llmSettings = readLlmSettingsFromControls();
   ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
   ocrAutoSwitch = Boolean(settingsOcrAutoSwitchCheckbox?.checked);
+  ocrImageDetail = normalizeOcrImageDetail(settingsOcrImageDetailSelect?.value || ocrImageDetail);
   ocrLlmSettings = readOcrLlmSettingsFromControls();
   syncUploadAvailability();
   applyTheme(nextTheme);

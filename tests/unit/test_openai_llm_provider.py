@@ -184,7 +184,11 @@ def test_openai_provider_uses_image_ocr_payload(monkeypatch) -> None:
     assert result == "Detected page text from image"
     user_content = captured_request["payload"]["messages"][1]["content"]
     assert isinstance(user_content, list)
-    assert any(item.get("type") == "image_url" for item in user_content if isinstance(item, dict))
+    image_items = [
+        item for item in user_content if isinstance(item, dict) and item.get("type") == "image_url"
+    ]
+    assert image_items
+    assert image_items[0]["image_url"]["detail"] == "auto"
 
 
 def test_openai_provider_image_ocr_calls_each_page_and_combines(monkeypatch) -> None:

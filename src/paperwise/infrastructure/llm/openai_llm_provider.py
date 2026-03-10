@@ -25,8 +25,11 @@ class OpenAILLMProvider(LLMProvider):
         model: str,
         base_url: str = "https://api.openai.com/v1",
         timeout_seconds: float = 30.0,
+        vision_image_detail: str = "auto",
     ) -> None:
         self._model = model
+        normalized_detail = str(vision_image_detail).strip().lower()
+        self._vision_image_detail = normalized_detail if normalized_detail in {"auto", "low", "high"} else "auto"
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             timeout=timeout_seconds,
@@ -210,7 +213,10 @@ class OpenAILLMProvider(LLMProvider):
                             },
                             {
                                 "type": "image_url",
-                                "image_url": {"url": image_url},
+                                "image_url": {
+                                    "url": image_url,
+                                    "detail": self._vision_image_detail,
+                                },
                             },
                         ],
                     },
