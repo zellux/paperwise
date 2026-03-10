@@ -1676,6 +1676,7 @@ function renderPendingList(documents) {
   pendingTableBody.innerHTML = "";
   for (const doc of documents) {
     const row = document.createElement("tr");
+    row.dataset.pendingDocId = doc.id || "";
 
     const titleCell = document.createElement("td");
     titleCell.setAttribute("data-label", "Title");
@@ -1786,6 +1787,18 @@ function setRestartPendingButtonEnabled(enabled) {
   restartPendingBtn.disabled = !enabled;
 }
 
+function isRestartablePendingDocument(doc) {
+  const status = String(doc?.status || "").trim().toLowerCase();
+  return status.length > 0 && status !== "ready";
+}
+
+function getVisiblePendingRowCount() {
+  if (!pendingTableBody) {
+    return 0;
+  }
+  return pendingTableBody.querySelectorAll("tr[data-pending-doc-id]").length;
+}
+
 async function loadDocumentsList() {
   const query = new URLSearchParams({
     limit: String(docsPageSize),
@@ -1851,12 +1864,14 @@ async function loadPendingDocuments() {
   const response = await apiFetch("/documents/pending?limit=200");
   const payload = await response.json();
   if (!response.ok) {
-    setRestartPendingButtonEnabled(false);
+    // Keep restart enabled if the UI still has visible pending rows.
+    setRestartPendingButtonEnabled(getVisiblePendingRowCount() > 0);
     logActivity(`Pending list failed: ${payload.detail || response.statusText}`);
     return;
   }
   renderPendingList(payload);
-  setRestartPendingButtonEnabled(payload.length > 0);
+  const hasRestartable = Array.isArray(payload) && payload.some((doc) => isRestartablePendingDocument(doc));
+  setRestartPendingButtonEnabled(hasRestartable);
   logActivity(`Loaded ${payload.length} pending document(s)`);
 }
 
