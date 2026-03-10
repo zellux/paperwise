@@ -30,6 +30,8 @@ class OpenAILLMProvider(LLMProvider):
         *,
         filename: str,
         text_preview: str,
+        current_correspondent: str | None,
+        current_document_type: str | None,
         existing_correspondents: list[str],
         existing_document_types: list[str],
         existing_tags: list[str],
@@ -49,6 +51,9 @@ class OpenAILLMProvider(LLMProvider):
             "logo, signature block, or footer and avoid generic placeholders. "
             "Correspondent must use the shortest clear organization form "
             "(for example 'Amazon' instead of long legal entity suffixes). "
+            "If a current correspondent/document_type is already provided and is plausible, "
+            "keep it unchanged. Only update when it is clearly wrong, contradicts the document, "
+            "or is an unknown placeholder (for example: Unknown Sender, Unknown, General Document). "
             "tags must be an array of 1 to 5 strings and prioritize existing tags when relevant. "
             "Use natural casing: title case for normal words, but preserve acronyms in uppercase "
             "(for example: PPMG Pediatrics, IRS Notice). "
@@ -58,6 +63,8 @@ class OpenAILLMProvider(LLMProvider):
         user_prompt = {
             "filename": filename,
             "text_preview": text_preview,
+            "current_correspondent": current_correspondent,
+            "current_document_type": current_document_type,
             "existing_correspondents": existing_correspondents,
             "existing_document_types": existing_document_types,
             "existing_tags": existing_tags,
@@ -65,6 +72,9 @@ class OpenAILLMProvider(LLMProvider):
                 "Prefer existing taxonomy names when appropriate. "
                 "Only propose new names when no existing option is a good match. "
                 "Return 1 to 5 tags maximum. "
+                "For correspondent/document_type, keep current values by default. "
+                "Change only when clearly incorrect or when current values are unknown placeholders "
+                "(for example 'Unknown Sender', 'Unknown', 'General Document'). "
                 "Use title case for normal words in document_type/tags, "
                 "but keep acronyms uppercase (for example: PPMG Pediatrics, IRS). "
                 "Keep original casing when already meaningful; only normalize casing when all words are lowercase. "

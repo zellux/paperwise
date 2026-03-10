@@ -7,6 +7,8 @@ class BaseLLMAdapter(LLMProvider):
         *,
         filename: str,
         text_preview: str,
+        current_correspondent: str | None,
+        current_document_type: str | None,
         existing_correspondents: list[str],
         existing_document_types: list[str],
         existing_tags: list[str],

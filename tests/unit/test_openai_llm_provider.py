@@ -41,6 +41,8 @@ def test_openai_provider_parses_json_response(monkeypatch) -> None:
     result = provider.suggest_metadata(
         filename="credit.pdf",
         text_preview="sample",
+        current_correspondent="Experian",
+        current_document_type="Credit Report",
         existing_correspondents=["Experian"],
         existing_document_types=["Credit Report"],
         existing_tags=["credit"],
@@ -87,6 +89,8 @@ def test_openai_provider_omits_missing_keys(monkeypatch) -> None:
     result = provider.suggest_metadata(
         filename="credit.pdf",
         text_preview="sample",
+        current_correspondent=None,
+        current_document_type=None,
         existing_correspondents=["Experian"],
         existing_document_types=["Credit Report"],
         existing_tags=["credit"],

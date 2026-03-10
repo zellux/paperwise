@@ -41,12 +41,16 @@ class FakeLLMProvider:
         *,
         filename: str,
         text_preview: str,
+        current_correspondent: str | None,
+        current_document_type: str | None,
         existing_correspondents: list[str],
         existing_document_types: list[str],
         existing_tags: list[str],
     ) -> dict:
         del filename
         del text_preview
+        del current_correspondent
+        del current_document_type
         del existing_correspondents
         del existing_document_types
         del existing_tags

@@ -114,6 +114,8 @@ def parse_with_llm(
     raw = llm_provider.suggest_metadata(
         filename=document.filename,
         text_preview=parse_result.text_preview,
+        current_correspondent=previous.correspondent if previous is not None else None,
+        current_document_type=previous.document_type if previous is not None else None,
         existing_correspondents=correspondents,
         existing_document_types=document_types,
         existing_tags=tags,
