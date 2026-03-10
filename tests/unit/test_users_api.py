@@ -162,3 +162,48 @@ def test_user_preferences_round_trip() -> None:
         assert get_saved.json()["preferences"]["docs_filters"]["tag"] == ["Credit"]
     finally:
         app.dependency_overrides.clear()
+
+
+def test_user_preferences_put_merges_without_dropping_existing_keys() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "prefs-merge@example.com",
+                "full_name": "Prefs Merge",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "prefs-merge@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+        token = login_response.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        seed_response = client.put(
+            "/users/me/preferences",
+            headers=headers,
+            json={"preferences": {"llm_total_tokens_processed": 1234}},
+        )
+        assert seed_response.status_code == 200
+        assert seed_response.json()["preferences"]["llm_total_tokens_processed"] == 1234
+
+        update_response = client.put(
+            "/users/me/preferences",
+            headers=headers,
+            json={"preferences": {"last_view": "section-settings"}},
+        )
+        assert update_response.status_code == 200
+        payload = update_response.json()["preferences"]
+        assert payload["last_view"] == "section-settings"
+        assert payload["llm_total_tokens_processed"] == 1234
+    finally:
+        app.dependency_overrides.clear()

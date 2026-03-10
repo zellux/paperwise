@@ -157,6 +157,9 @@ def put_me_preferences_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> UserPreferenceResponse:
-    preference = UserPreference(user_id=current_user.id, preferences=dict(payload.preferences))
+    existing = repository.get_user_preference(current_user.id)
+    merged_preferences = dict(existing.preferences) if existing is not None else {}
+    merged_preferences.update(dict(payload.preferences))
+    preference = UserPreference(user_id=current_user.id, preferences=merged_preferences)
     repository.save_user_preference(preference)
     return UserPreferenceResponse(preferences=dict(preference.preferences))
