@@ -1,6 +1,7 @@
 from celery.utils.log import get_task_logger
 
 from zapis.application.interfaces import DocumentRepository, LLMProvider
+from zapis.application.services.file_relocation import move_blob_to_processed
 from zapis.application.services.llm_parsing import parse_with_llm
 from zapis.application.services.parsing import parse_document_blob
 from zapis.domain.models import DocumentStatus
@@ -87,6 +88,15 @@ def parse_document_task(
             parse_result=parsed,
             repository=repository,
             llm_provider=llm_provider,
+        )
+        document.blob_uri = move_blob_to_processed(
+            blob_uri=document.blob_uri,
+            object_store_root=settings.object_store_root,
+            document_id=document.id,
+            original_filename=document.filename,
+            content_type=document.content_type,
+            checksum_sha256=document.checksum_sha256,
+            size_bytes=document.size_bytes,
         )
         document.status = DocumentStatus.READY
         repository.save(document)

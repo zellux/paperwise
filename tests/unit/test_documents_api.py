@@ -160,6 +160,7 @@ def test_list_documents_includes_llm_metadata_when_available() -> None:
         get_response = client.get(f"/documents/{doc_id}")
         assert get_response.status_code == 200
         assert get_response.json()["status"] == "ready"
+        assert "/processed/" in get_response.json()["blob_uri"]
 
         list_response = client.get("/documents")
         assert list_response.status_code == 200
@@ -493,6 +494,7 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         get_response = client.get(f"/documents/{doc_id}")
         assert get_response.status_code == 200
         assert get_response.json()["status"] == "ready"
+        assert "/processed/" in get_response.json()["blob_uri"]
 
         fetch_response = client.get(f"/documents/{doc_id}/llm-parse")
         assert fetch_response.status_code == 200

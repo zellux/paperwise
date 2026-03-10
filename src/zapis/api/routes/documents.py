@@ -21,11 +21,14 @@ from zapis.application.interfaces import (
     StorageProvider,
 )
 from zapis.application.services.documents import CreateDocumentCommand, create_document, get_document
+from zapis.application.services.file_relocation import move_blob_to_processed
 from zapis.application.services.llm_parsing import parse_with_llm
 from zapis.application.services.parsing import parse_document_blob
 from zapis.domain.models import Document, DocumentStatus, LLMParseResult, ParseResult
+from zapis.infrastructure.config import get_settings
 
 router = APIRouter(prefix="/documents", tags=["documents"])
+settings = get_settings()
 
 
 class CreateDocumentResponse(BaseModel):
@@ -573,6 +576,16 @@ def llm_parse_document_endpoint(
         repository=repository,
         status_value=DocumentStatus.READY,
     )
+    document.blob_uri = move_blob_to_processed(
+        blob_uri=document.blob_uri,
+        object_store_root=settings.object_store_root,
+        document_id=document.id,
+        original_filename=document.filename,
+        content_type=document.content_type,
+        checksum_sha256=document.checksum_sha256,
+        size_bytes=document.size_bytes,
+    )
+    repository.save(document)
     return _to_llm_parse_response(result)
 
 

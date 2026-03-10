@@ -79,6 +79,8 @@ Uploaded files are stored under:
 ```text
 local/object-store/incoming/YYYY/MM/DD/<storage_token>_<sanitized_filename>
 local/object-store/incoming/YYYY/MM/DD/<storage_token>.metadata.json
+local/object-store/processed/<doc_id>/<doc_id>_<sanitized_filename>
+local/object-store/processed/<doc_id>/<doc_id>_<sanitized_filename>.metadata.json
 ```
 
 Each metadata sidecar JSON includes the original filename, content type, checksum, and size.
