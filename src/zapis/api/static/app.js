@@ -625,13 +625,63 @@ function openDocumentFile(documentId) {
   window.open(`/documents/${documentId}/file`, "_blank", "noopener,noreferrer");
 }
 
+function createActionIcon(name) {
+  const ns = "http://www.w3.org/2000/svg";
+  const svg = document.createElementNS(ns, "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("fill", "none");
+  svg.setAttribute("stroke", "currentColor");
+  svg.setAttribute("stroke-width", "2");
+  svg.setAttribute("stroke-linecap", "round");
+  svg.setAttribute("stroke-linejoin", "round");
+  svg.classList.add("action-icon-svg");
+
+  const addPath = (d) => {
+    const path = document.createElementNS(ns, "path");
+    path.setAttribute("d", d);
+    svg.appendChild(path);
+  };
+  const addLine = (x1, y1, x2, y2) => {
+    const line = document.createElementNS(ns, "line");
+    line.setAttribute("x1", x1);
+    line.setAttribute("y1", y1);
+    line.setAttribute("x2", x2);
+    line.setAttribute("y2", y2);
+    svg.appendChild(line);
+  };
+  const addPolyline = (points) => {
+    const polyline = document.createElementNS(ns, "polyline");
+    polyline.setAttribute("points", points);
+    svg.appendChild(polyline);
+  };
+
+  if (name === "external-link") {
+    addPath("M15 3h6v6");
+    addPath("M10 14 21 3");
+    addPath("M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6");
+    return svg;
+  }
+  if (name === "file-text") {
+    addPath("M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z");
+    addPolyline("14 2 14 8 20 8");
+    addLine("16", "13", "8", "13");
+    addLine("16", "17", "8", "17");
+    addPolyline("10 9 9 9 8 9");
+    return svg;
+  }
+
+  addPath("M12 5v14");
+  addPath("M5 12h14");
+  return svg;
+}
+
 function createIconActionButton({ icon, label, onClick }) {
   const button = document.createElement("button");
   button.className = "action-icon-btn";
   button.type = "button";
-  button.textContent = icon;
   button.title = label;
   button.setAttribute("aria-label", label);
+  button.appendChild(createActionIcon(icon));
   button.addEventListener("click", onClick);
   return button;
 }
@@ -711,14 +761,14 @@ function renderDocsList(documents) {
     actionsWrap.className = "table-actions";
     actionsWrap.appendChild(
       createIconActionButton({
-        icon: "↗",
+        icon: "external-link",
         label: "Open document",
         onClick: () => navigateToDocument(doc.id),
       })
     );
     actionsWrap.appendChild(
       createIconActionButton({
-        icon: "◫",
+        icon: "file-text",
         label: "View file",
         onClick: () => openDocumentFile(doc.id),
       })

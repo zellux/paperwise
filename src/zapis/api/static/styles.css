@@ -662,11 +662,18 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: rgba(247, 248, 246, 0.95);
   color: #2a3a35;
   cursor: pointer;
-  font-size: 0.95rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  padding: 0;
+}
+
+.action-icon-svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  pointer-events: none;
 }
 
 .action-icon-btn:hover {
