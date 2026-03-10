@@ -327,6 +327,11 @@
                 <option value="">All Documents</option>
               </select>
             </div>
+            <div class="actions search-scope-actions">
+              <button id="searchUseAllScopeBtn" type="button" class="btn btn-muted">
+                Use All Documents
+              </button>
+            </div>
             <p id="searchResultsMeta" class="search-hint">Ready. Scope: All Documents</p>
           </div>
 
@@ -414,6 +419,7 @@
           <section id="search-section-keyword" class="search-subsection view-hidden">
             <section class="search-card">
               <h3>Keyword Search</h3>
+              <p class="search-hint">Works without collections. Keep scope on <strong>All Documents</strong>.</p>
               <form id="searchKeywordForm" class="stack">
                 <label class="label" for="searchKeywordInput">Query</label>
                 <input
@@ -460,6 +466,7 @@
           <section id="search-section-ask" class="search-subsection view-hidden">
             <section class="search-card">
               <h3>Grounded Q&amp;A</h3>
+              <p class="search-hint">Ask against all documents or narrow to one collection.</p>
               <form id="searchAskForm" class="stack">
                 <label class="label" for="searchAskQuestion">Question</label>
                 <textarea

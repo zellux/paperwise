@@ -887,6 +887,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin: 0 0 10px;
 }
 
+.search-scope-actions {
+  margin-bottom: 8px;
+}
+
 @media (max-width: 960px) {
   .settings-form {
     grid-template-columns: 1fr;

@@ -16,6 +16,7 @@ const searchCollectionNameInput = document.getElementById("searchCollectionName"
 const searchCollectionDescriptionInput = document.getElementById("searchCollectionDescription");
 const searchRefreshCollectionsBtn = document.getElementById("searchRefreshCollectionsBtn");
 const searchScopeSelect = document.getElementById("searchScopeSelect");
+const searchUseAllScopeBtn = document.getElementById("searchUseAllScopeBtn");
 const collectionsTableBody = document.getElementById("collectionsTableBody");
 const searchCollectionDocsLabel = document.getElementById("searchCollectionDocsLabel");
 const searchCollectionDocsCount = document.getElementById("searchCollectionDocsCount");
@@ -1894,6 +1895,9 @@ function renderSearchScopeOptions() {
     searchScopeSelect.appendChild(option);
   }
   searchScopeSelect.value = searchSelectedCollectionId;
+  if (searchUseAllScopeBtn) {
+    searchUseAllScopeBtn.disabled = !searchSelectedCollectionId;
+  }
 }
 
 function renderCollectionsTable() {
@@ -2890,6 +2894,14 @@ searchRefreshCollectionsBtn?.addEventListener("click", async () => {
 searchScopeSelect?.addEventListener("change", async () => {
   searchSelectedCollectionId = String(searchScopeSelect.value || "");
   await loadSearchCollectionDocuments(searchSelectedCollectionId);
+});
+
+searchUseAllScopeBtn?.addEventListener("click", async () => {
+  searchSelectedCollectionId = "";
+  renderSearchScopeOptions();
+  await loadSearchCollectionDocuments("");
+  renderSearchResultsMeta("Scope set to All Documents.");
+  logActivity("Search scope set to all documents.");
 });
 
 searchCollectionDocFilter?.addEventListener("input", () => {
