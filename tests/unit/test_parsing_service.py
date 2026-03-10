@@ -51,6 +51,18 @@ class TimeoutOCRLLM:
         raise RuntimeError("The read operation timed out")
 
 
+class TimeoutImageOCRLLM:
+    def extract_ocr_text_from_images(
+        self,
+        *,
+        filename: str,
+        image_data_urls: list[str],
+    ) -> str:
+        del filename
+        del image_data_urls
+        raise RuntimeError("The read operation timed out")
+
+
 class TextOnlyOCRLLM:
     def extract_ocr_text(
         self,
@@ -234,3 +246,28 @@ def test_parse_document_blob_auto_switch_off_pdf_uses_image_ocr_path(tmp_path, m
     assert llm.calls == 0
     assert result.parser == "stub-llm-ocr"
     assert result.text_preview == "Vision OCR output used"
+
+
+def test_parse_document_blob_image_ocr_timeout_falls_back_to_extracted_text(
+    tmp_path, monkeypatch
+) -> None:
+    blob = tmp_path / "vision-timeout.pdf"
+    blob.write_bytes(b"%PDF-1.7\nReadable sample OCR text\n/Type /Page")
+    llm = TimeoutImageOCRLLM()
+
+    monkeypatch.setattr(
+        parsing_module,
+        "_render_pdf_pages_to_data_urls",
+        lambda **kwargs: ["data:image/png;base64,abc"],
+    )
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        ocr_provider="llm",
+        llm_provider=llm,
+        ocr_auto_switch=False,
+    )
+
+    assert result.parser == "stub-llm-ocr"
+    assert "Readable sample OCR text" in result.text_preview

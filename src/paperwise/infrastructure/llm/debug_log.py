@@ -46,6 +46,11 @@ def _redact(value: Any) -> Any:
         return redacted
     if isinstance(value, list):
         return [_redact(item) for item in value]
+    if isinstance(value, str):
+        if value.startswith("data:image/"):
+            return f"***DATA_URL_REDACTED(len={len(value)})***"
+        if len(value) > 4000:
+            return value[:500] + f"...<truncated len={len(value)}>"
     return value
 
 

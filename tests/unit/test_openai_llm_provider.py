@@ -185,3 +185,46 @@ def test_openai_provider_uses_image_ocr_payload(monkeypatch) -> None:
     user_content = captured_request["payload"]["messages"][1]["content"]
     assert isinstance(user_content, list)
     assert any(item.get("type") == "image_url" for item in user_content if isinstance(item, dict))
+
+
+def test_openai_provider_image_ocr_calls_each_page_and_combines(monkeypatch) -> None:
+    captured_requests: list[dict] = []
+
+    class FakeClient:
+        def post(self, _path: str, json: dict):
+            captured_requests.append(json)
+            call_index = len(captured_requests)
+
+            class Response:
+                status_code = 200
+                text = ""
+
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": json_module.dumps(
+                                        {"ocr_text": f"page-{call_index}"}
+                                    )
+                                }
+                            }
+                        ]
+                    }
+
+            return Response()
+
+    json_module = json
+    provider = OpenAILLMProvider(api_key="k", model="m")
+    monkeypatch.setattr(provider, "_client", FakeClient())
+
+    result = provider.extract_ocr_text_from_images(
+        filename="scan.pdf",
+        image_data_urls=["data:image/png;base64,a", "data:image/png;base64,b"],
+    )
+
+    assert result == "page-1\n\npage-2"
+    assert len(captured_requests) == 2

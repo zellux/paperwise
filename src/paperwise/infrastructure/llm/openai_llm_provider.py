@@ -185,65 +185,83 @@ class OpenAILLMProvider(LLMProvider):
     ) -> str:
         if not image_data_urls:
             raise RuntimeError("No images provided for OCR.")
-        request_payload = {
-            "model": self._model,
-            "temperature": 0,
-            "max_tokens": 3000,
-            "response_format": {"type": "json_object"},
-            "messages": [
-                {"role": "system", "content": OCR_SYSTEM_PROMPT},
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": (
-                                "Perform OCR for this document and return strict JSON "
-                                "with key ocr_text. Filename: " + filename
-                            ),
-                        },
-                        *[
+        extracted_pages: list[str] = []
+        last_error: Exception | None = None
+
+        for index, image_url in enumerate(image_data_urls, start=1):
+            request_payload = {
+                "model": self._model,
+                "temperature": 0,
+                "max_tokens": 3000,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": OCR_SYSTEM_PROMPT},
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": (
+                                    "Perform OCR for this document and return strict JSON "
+                                    "with key ocr_text. Filename: "
+                                    + filename
+                                    + f". Page {index} of {len(image_data_urls)}."
+                                ),
+                            },
                             {
                                 "type": "image_url",
                                 "image_url": {"url": image_url},
-                            }
-                            for image_url in image_data_urls
+                            },
                         ],
-                    ],
-                },
-            ],
-        }
-        response: httpx.Response | None = None
-        response_payload: Any = None
+                    },
+                ],
+            }
+            response: httpx.Response | None = None
+            response_payload: Any = None
 
-        try:
-            response = self._client.post("/chat/completions", json=request_payload)
-            try:
-                response_payload = response.json()
-            except ValueError:
-                response_payload = {"raw_text": getattr(response, "text", "")}
-        except Exception as exc:
+            for attempt in range(2):
+                try:
+                    response = self._client.post("/chat/completions", json=request_payload)
+                    try:
+                        response_payload = response.json()
+                    except ValueError:
+                        response_payload = {"raw_text": getattr(response, "text", "")}
+                    break
+                except Exception as exc:
+                    last_error = exc
+                    log_llm_exchange(
+                        provider="openai",
+                        endpoint="/chat/completions",
+                        request_payload=request_payload,
+                        error=str(exc),
+                    )
+                    if isinstance(exc, httpx.ReadTimeout) and attempt == 0:
+                        continue
+                    break
+
+            if response is None:
+                continue
+
             log_llm_exchange(
                 provider="openai",
                 endpoint="/chat/completions",
                 request_payload=request_payload,
-                error=str(exc),
+                response_status=getattr(response, "status_code", None),
+                response_payload=response_payload,
             )
-            raise
+            response.raise_for_status()
+            payload = response_payload if isinstance(response_payload, dict) else response.json()
+            content = str(payload["choices"][0]["message"]["content"]).strip()
+            try:
+                parsed = json.loads(content)
+                extracted = extract_ocr_text_result(parsed)
+            except json.JSONDecodeError:
+                extracted = content
+            if extracted and extracted.strip():
+                extracted_pages.append(extracted.strip())
 
-        log_llm_exchange(
-            provider="openai",
-            endpoint="/chat/completions",
-            request_payload=request_payload,
-            response_status=getattr(response, "status_code", None),
-            response_payload=response_payload,
-        )
-        response.raise_for_status()
-        payload = response_payload if isinstance(response_payload, dict) else response.json()
-        content = str(payload["choices"][0]["message"]["content"]).strip()
-        try:
-            parsed = json.loads(content)
-        except json.JSONDecodeError:
-            return content
-        extracted = extract_ocr_text_result(parsed)
-        return extracted or content
+        if extracted_pages:
+            return "\n\n".join(extracted_pages).strip()
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("LLM OCR failed: provider returned empty OCR text.")
