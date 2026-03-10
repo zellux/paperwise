@@ -17,6 +17,7 @@ const settingsLlmProviderSelect = document.getElementById("settingsLlmProviderSe
 const settingsLlmModelInput = document.getElementById("settingsLlmModelInput");
 const settingsLlmBaseUrlInput = document.getElementById("settingsLlmBaseUrlInput");
 const settingsLlmApiKeyInput = document.getElementById("settingsLlmApiKeyInput");
+const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
 const signInForm = document.getElementById("signInForm");
@@ -109,6 +110,8 @@ let llmSettings = {
   base_url: "",
   api_key: "",
 };
+const SUPPORTED_OCR_PROVIDERS = ["tesseract", "llm"];
+let ocrProvider = "tesseract";
 let docsFilters = {
   q: "",
   tag: [],
@@ -175,6 +178,14 @@ function normalizeLlmProvider(value) {
   return "default";
 }
 
+function normalizeOcrProvider(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (SUPPORTED_OCR_PROVIDERS.includes(normalized)) {
+    return normalized;
+  }
+  return "tesseract";
+}
+
 function applyTheme(themeName) {
   currentTheme = normalizeThemeName(themeName);
   const classNames = SUPPORTED_THEMES.map((name) => `theme-${name}`);
@@ -203,6 +214,9 @@ function renderSettingsForm() {
   }
   if (settingsLlmApiKeyInput && settingsLlmApiKeyInput.value !== llmSettings.api_key) {
     settingsLlmApiKeyInput.value = llmSettings.api_key;
+  }
+  if (settingsOcrProviderSelect && settingsOcrProviderSelect.value !== ocrProvider) {
+    settingsOcrProviderSelect.value = ocrProvider;
   }
 }
 
@@ -238,6 +252,7 @@ async function saveUserPreferences() {
       llm_model: llmSettings.model,
       llm_base_url: llmSettings.base_url,
       llm_api_key: llmSettings.api_key,
+      ocr_provider: ocrProvider,
     },
   };
   try {
@@ -295,6 +310,7 @@ function applyUserPreferences(preferences, options = {}) {
     base_url: String(preferences.llm_base_url || "").trim(),
     api_key: String(preferences.llm_api_key || "").trim(),
   };
+  ocrProvider = normalizeOcrProvider(preferences.ocr_provider);
 }
 
 async function hydrateUserPreferencesForSession() {
@@ -571,6 +587,7 @@ function clearSession() {
     base_url: "",
     api_key: "",
   };
+  ocrProvider = "tesseract";
   docsPage = 1;
   docsPageSize = 20;
   docsFilters = sanitizeDocsFilters({
@@ -1696,6 +1713,7 @@ settingsForm?.addEventListener("submit", async (event) => {
     base_url: String(settingsLlmBaseUrlInput?.value || "").trim(),
     api_key: String(settingsLlmApiKeyInput?.value || "").trim(),
   };
+  ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
   applyTheme(nextTheme);
   docsPageSize = nextPageSize;
   docsPage = 1;

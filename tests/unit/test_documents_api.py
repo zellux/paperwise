@@ -366,6 +366,39 @@ def test_upload_and_parse_docx_document() -> None:
         app.dependency_overrides.clear()
 
 
+def test_parse_uses_llm_ocr_mode_from_user_preferences() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        repository.save_user_preference(
+            UserPreference(
+                user_id=TEST_USER.id,
+                preferences={"ocr_provider": "llm"},
+            )
+        )
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={"file": ("llm-ocr.pdf", b"%PDF-1.7\nsample", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        doc_id = create_response.json()["id"]
+
+        parse_response = client.post(f"/documents/{doc_id}/parse")
+        assert parse_response.status_code == 200
+        payload = parse_response.json()
+        assert payload["parser"] == "stub-llm-ocr"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_document_endpoints_require_authentication() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository

@@ -11,6 +11,8 @@ from paperwise.application.services.storage_paths import blob_ref_to_path
 def parse_document_blob(
     document_id: str,
     blob_uri: str,
+    *,
+    ocr_provider: str = "tesseract",
 ) -> ParseResult:
     """Stub parser for local blob content until real OCR/extract pipeline lands."""
     settings = get_settings()
@@ -46,9 +48,13 @@ def parse_document_blob(
         text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
         page_count = 1
 
+    parser_name = "stub-local"
+    if str(ocr_provider).strip().lower() == "llm":
+        parser_name = "stub-llm-ocr"
+
     return ParseResult(
         document_id=document_id,
-        parser="stub-local",
+        parser=parser_name,
         status="parsed",
         size_bytes=len(raw),
         page_count=page_count,

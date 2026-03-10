@@ -418,6 +418,12 @@
               placeholder="sk-..."
             />
 
+            <label class="label" for="settingsOcrProviderSelect">OCR Provider</label>
+            <select id="settingsOcrProviderSelect" name="settingsOcrProviderSelect">
+              <option value="tesseract">Local Tesseract</option>
+              <option value="llm">Use Same LLM</option>
+            </select>
+
             <div class="actions">
               <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>
             </div>

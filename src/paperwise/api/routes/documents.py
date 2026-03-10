@@ -337,6 +337,19 @@ def _resolve_llm_provider_for_user(
     )
 
 
+def _resolve_ocr_provider_for_user(
+    *,
+    repository: DocumentRepository,
+    current_user: User,
+) -> str:
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    provider_name = str(preferences.get("ocr_provider", "tesseract")).strip().lower()
+    if provider_name in {"tesseract", "llm"}:
+        return provider_name
+    return "tesseract"
+
+
 def _resolve_file_path_from_uri(blob_uri: str) -> Path | None:
     resolved = blob_ref_to_path(blob_uri, settings.object_store_root)
     if resolved is None:
@@ -815,8 +828,16 @@ def parse_document_endpoint(
         repository=repository,
         status_value=DocumentStatus.PROCESSING,
     )
+    ocr_provider = _resolve_ocr_provider_for_user(
+        repository=repository,
+        current_user=current_user,
+    )
     try:
-        result = parse_document_blob(document_id=document.id, blob_uri=document.blob_uri)
+        result = parse_document_blob(
+            document_id=document.id,
+            blob_uri=document.blob_uri,
+            ocr_provider=ocr_provider,
+        )
         repository.save_parse_result(result)
     except Exception:
         raise
@@ -860,6 +881,10 @@ def llm_parse_document_endpoint(
         current_user=current_user,
         default_llm_provider=default_llm_provider,
     )
+    ocr_provider = _resolve_ocr_provider_for_user(
+        repository=repository,
+        current_user=current_user,
+    )
     try:
         parse_result = repository.get_parse_result(document_id)
         if parse_result is None:
@@ -868,7 +893,11 @@ def llm_parse_document_endpoint(
                 repository=repository,
                 status_value=DocumentStatus.PROCESSING,
             )
-            parse_result = parse_document_blob(document_id=document.id, blob_uri=document.blob_uri)
+            parse_result = parse_document_blob(
+                document_id=document.id,
+                blob_uri=document.blob_uri,
+                ocr_provider=ocr_provider,
+            )
             repository.save_parse_result(parse_result)
         else:
             _set_document_status(
