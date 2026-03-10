@@ -117,15 +117,11 @@ let currentUser = null;
 let userPreferenceSaveTimer = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember"];
 let currentTheme = "atlas";
-const SUPPORTED_LLM_PROVIDERS = ["openai", "claude", "gemini", "custom"];
+const SUPPORTED_LLM_PROVIDERS = ["openai", "gemini", "custom"];
 const LLM_PROVIDER_DEFAULTS = {
   openai: {
     model: "gpt-4.1-mini",
     base_url: "https://api.openai.com/v1",
-  },
-  claude: {
-    model: "claude-3-5-sonnet-latest",
-    base_url: "https://api.anthropic.com",
   },
   gemini: {
     model: "gemini-2.0-flash",

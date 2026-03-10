@@ -10,7 +10,6 @@ from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.domain.models import DocumentStatus, HistoryActorType
 from paperwise.infrastructure.config import get_settings
-from paperwise.infrastructure.llm.anthropic_llm_provider import AnthropicLLMProvider
 from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
@@ -76,7 +75,7 @@ def _resolve_llm_provider_from_preferences(
     # Preserve worker testability when a fake provider is injected.
     if not isinstance(
         default_llm_provider,
-        (MissingOpenAIProvider, OpenAILLMProvider, AnthropicLLMProvider, GeminiLLMProvider, SimpleLLMProvider),
+        (MissingOpenAIProvider, OpenAILLMProvider, GeminiLLMProvider, SimpleLLMProvider),
     ):
         return default_llm_provider
 
@@ -91,14 +90,6 @@ def _resolve_llm_provider_from_preferences(
         model = str(preferences.get(model_key, "")).strip() or settings.openai_model
         base_url = str(preferences.get(base_url_key, "")).strip() or settings.openai_base_url
         return OpenAILLMProvider(
-            api_key=configured_key,
-            model=model,
-            base_url=base_url,
-        )
-    if provider_name == "claude":
-        model = str(preferences.get(model_key, "")).strip() or "claude-3-5-sonnet-latest"
-        base_url = str(preferences.get(base_url_key, "")).strip() or "https://api.anthropic.com"
-        return AnthropicLLMProvider(
             api_key=configured_key,
             model=model,
             base_url=base_url,

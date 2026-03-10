@@ -45,7 +45,6 @@ from paperwise.domain.models import (
     User,
 )
 from paperwise.infrastructure.config import get_settings
-from paperwise.infrastructure.llm.anthropic_llm_provider import AnthropicLLMProvider
 from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 from paperwise.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
@@ -382,7 +381,7 @@ def _resolve_llm_provider_from_preferences(
     # Preserve testability when a fake provider is injected via dependency override.
     if not isinstance(
         default_llm_provider,
-        (MissingOpenAIProvider, OpenAILLMProvider, AnthropicLLMProvider, GeminiLLMProvider, SimpleLLMProvider),
+        (MissingOpenAIProvider, OpenAILLMProvider, GeminiLLMProvider, SimpleLLMProvider),
     ):
         return default_llm_provider
 
@@ -406,14 +405,6 @@ def _resolve_llm_provider_from_preferences(
         base_url = str(preferences.get(base_url_key, "")).strip() or settings.openai_base_url
         return OpenAILLMProvider(
             api_key=api_key,
-            model=model,
-            base_url=base_url,
-        )
-    if provider_name == "claude":
-        model = str(preferences.get(model_key, "")).strip() or "claude-3-5-sonnet-latest"
-        base_url = str(preferences.get(base_url_key, "")).strip() or "https://api.anthropic.com"
-        return AnthropicLLMProvider(
-            api_key=configured_key,
             model=model,
             base_url=base_url,
         )
