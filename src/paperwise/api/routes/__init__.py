@@ -1,2 +1,1 @@
-"""API routes."""
-
+"""Backward-compatible route package exports."""

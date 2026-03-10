@@ -4,7 +4,7 @@ AI-native document management platform (Python-first).
 
 ## Repository Layout
 
-- `src/paperwise/api` - FastAPI entrypoint and HTTP routes.
+- `src/paperwise/server` - FastAPI entrypoint and HTTP routes.
 - `src/paperwise/workers` - Celery app and async/background tasks.
 - `src/paperwise/domain` - core domain models and invariants.
 - `src/paperwise/application` - use cases and provider interfaces.

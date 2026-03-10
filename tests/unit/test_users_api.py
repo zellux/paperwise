@@ -1,7 +1,7 @@
 from fastapi.testclient import TestClient
 
-from paperwise.api.dependencies import document_repository_dependency
-from paperwise.api.main import app
+from paperwise.server.dependencies import document_repository_dependency
+from paperwise.server.main import app
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )

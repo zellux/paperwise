@@ -22,7 +22,7 @@ deps-down:
 	docker compose -f infra/docker-compose.yml down
 
 backend:
-	$(VENV_PYTHON) -m uvicorn paperwise.api.main:app --reload
+	$(VENV_PYTHON) -m uvicorn paperwise.server.main:app --reload
 
 api: backend
 
@@ -36,7 +36,7 @@ backend-bg:
 	else \
 		rm -f "$(BACKEND_PID_FILE)"; \
 		echo "starting backend..."; \
-		nohup sh -c '$(VENV_PYTHON) -m uvicorn paperwise.api.main:app --reload' > "$(BACKEND_LOG)" 2>&1 & echo $$! > "$(BACKEND_PID_FILE)"; \
+		nohup sh -c '$(VENV_PYTHON) -m uvicorn paperwise.server.main:app --reload' > "$(BACKEND_LOG)" 2>&1 & echo $$! > "$(BACKEND_PID_FILE)"; \
 		echo "backend started (pid=$$(cat "$(BACKEND_PID_FILE)")) log=$(BACKEND_LOG)"; \
 	fi
 

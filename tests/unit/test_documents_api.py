@@ -5,15 +5,15 @@ from zipfile import ZipFile
 
 from fastapi.testclient import TestClient
 
-from paperwise.api.routes import documents as documents_routes
-from paperwise.api.dependencies import (
+from paperwise.server.routes import documents as documents_routes
+from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
     ingestion_dispatcher_dependency,
     llm_provider_dependency,
     storage_dependency,
 )
-from paperwise.api.main import app
+from paperwise.server.main import app
 from paperwise.domain.models import LLMParseResult, User
 from paperwise.domain.models import UserPreference
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
