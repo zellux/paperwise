@@ -327,6 +327,26 @@
                 <option value="">All Documents</option>
               </select>
             </div>
+            <div class="search-scope-filters">
+              <div class="search-scope-row">
+                <label class="label" for="searchScopeTagsInput">Tags Filter (optional)</label>
+                <input
+                  id="searchScopeTagsInput"
+                  name="searchScopeTagsInput"
+                  type="text"
+                  placeholder="Comma separated, e.g. Medical, Finance"
+                />
+              </div>
+              <div class="search-scope-row">
+                <label class="label" for="searchScopeTypesInput">Document Types Filter (optional)</label>
+                <input
+                  id="searchScopeTypesInput"
+                  name="searchScopeTypesInput"
+                  type="text"
+                  placeholder="Comma separated, e.g. Invoice, Contract"
+                />
+              </div>
+            </div>
             <div class="actions search-scope-actions">
               <button id="searchUseAllScopeBtn" type="button" class="btn btn-muted">
                 Use All Documents

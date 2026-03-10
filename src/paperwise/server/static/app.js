@@ -17,6 +17,8 @@ const searchCollectionDescriptionInput = document.getElementById("searchCollecti
 const searchRefreshCollectionsBtn = document.getElementById("searchRefreshCollectionsBtn");
 const searchScopeSelect = document.getElementById("searchScopeSelect");
 const searchUseAllScopeBtn = document.getElementById("searchUseAllScopeBtn");
+const searchScopeTagsInput = document.getElementById("searchScopeTagsInput");
+const searchScopeTypesInput = document.getElementById("searchScopeTypesInput");
 const collectionsTableBody = document.getElementById("collectionsTableBody");
 const searchCollectionDocsLabel = document.getElementById("searchCollectionDocsLabel");
 const searchCollectionDocsCount = document.getElementById("searchCollectionDocsCount");
@@ -1872,6 +1874,43 @@ function getSearchScopeLabel() {
   return selected.name;
 }
 
+function parseScopeList(value) {
+  const seen = new Set();
+  const output = [];
+  for (const part of String(value || "").split(",")) {
+    const cleaned = part.trim();
+    if (!cleaned) {
+      continue;
+    }
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    output.push(cleaned);
+  }
+  return output;
+}
+
+function readSearchScopeFilters() {
+  return {
+    tag: parseScopeList(searchScopeTagsInput?.value || ""),
+    document_type: parseScopeList(searchScopeTypesInput?.value || ""),
+  };
+}
+
+function formatSearchScopeSummary() {
+  const filters = readSearchScopeFilters();
+  const parts = [`Scope: ${getSearchScopeLabel()}`];
+  if (filters.tag.length) {
+    parts.push(`Tags: ${filters.tag.join(", ")}`);
+  }
+  if (filters.document_type.length) {
+    parts.push(`Types: ${filters.document_type.join(", ")}`);
+  }
+  return parts.join(" | ");
+}
+
 function getSearchCatalogTitle(doc) {
   if (doc.llm_metadata && doc.llm_metadata.suggested_title) {
     return doc.llm_metadata.suggested_title;
@@ -2233,7 +2272,7 @@ async function loadSearchCollections() {
   renderSearchScopeOptions();
   renderCollectionsTable();
   renderSearchCollectionDocumentsTable();
-  renderSearchResultsMeta(`Collection scope: ${getSearchScopeLabel()}`);
+  renderSearchResultsMeta(formatSearchScopeSummary());
 }
 
 async function loadSearchDocumentsCatalog() {
@@ -2383,8 +2422,9 @@ async function runScopedKeywordSearch() {
     return;
   }
   const limit = Math.max(1, Math.min(100, Number(searchKeywordLimitSelect?.value || 20)));
+  const filters = readSearchScopeFilters();
   renderTableLoading(searchResultsTableBody, 6, "Searching...");
-  renderSearchResultsMeta(`Searching ${getSearchScopeLabel()}...`);
+  renderSearchResultsMeta(`Searching... ${formatSearchScopeSummary()}`);
   setButtonBusy(searchKeywordForm?.querySelector("button[type='submit']"), true, "Searching...");
   try {
     const path = searchSelectedCollectionId
@@ -2393,7 +2433,7 @@ async function runScopedKeywordSearch() {
     const response = await apiFetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, limit }),
+      body: JSON.stringify({ query, limit, ...filters }),
     });
     const payload = await response.json();
     if (!response.ok) {
@@ -2404,7 +2444,7 @@ async function runScopedKeywordSearch() {
     }
     renderSearchResultsTable(payload);
     const totalHits = Number(payload.total_hits || 0);
-    renderSearchResultsMeta(`Found ${totalHits} result(s) in ${getSearchScopeLabel()}.`);
+    renderSearchResultsMeta(`Found ${totalHits} result(s). ${formatSearchScopeSummary()}`);
     logActivity(`Search completed: ${totalHits} result(s).`);
   } finally {
     setButtonBusy(searchKeywordForm?.querySelector("button[type='submit']"), false);
@@ -2422,8 +2462,9 @@ async function runScopedAsk() {
     return;
   }
   const topK = Math.max(3, Math.min(60, Number(searchAskTopKInput?.value || 18)));
+  const filters = readSearchScopeFilters();
   renderSearchAskAnswer({
-    answer: `Querying ${getSearchScopeLabel()}...`,
+    answer: `Querying... ${formatSearchScopeSummary()}`,
     insufficient_evidence: false,
     citations: [],
   });
@@ -2435,7 +2476,7 @@ async function runScopedAsk() {
     const response = await apiFetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, top_k_chunks: topK }),
+      body: JSON.stringify({ question, top_k_chunks: topK, ...filters }),
     });
     const payload = await response.json();
     if (!response.ok) {
@@ -2462,7 +2503,7 @@ async function initializeSearchView() {
   } else {
     renderSearchCollectionDocumentsTable();
   }
-  renderSearchResultsMeta(`Ready. Scope: ${getSearchScopeLabel()}`);
+  renderSearchResultsMeta(`Ready. ${formatSearchScopeSummary()}`);
 }
 
 function setRestartPendingButtonEnabled(enabled) {
@@ -2900,8 +2941,16 @@ searchUseAllScopeBtn?.addEventListener("click", async () => {
   searchSelectedCollectionId = "";
   renderSearchScopeOptions();
   await loadSearchCollectionDocuments("");
-  renderSearchResultsMeta("Scope set to All Documents.");
+  renderSearchResultsMeta(`Scope set. ${formatSearchScopeSummary()}`);
   logActivity("Search scope set to all documents.");
+});
+
+searchScopeTagsInput?.addEventListener("input", () => {
+  renderSearchResultsMeta(formatSearchScopeSummary());
+});
+
+searchScopeTypesInput?.addEventListener("input", () => {
+  renderSearchResultsMeta(formatSearchScopeSummary());
 });
 
 searchCollectionDocFilter?.addEventListener("input", () => {

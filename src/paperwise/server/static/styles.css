@@ -839,6 +839,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin-bottom: 12px;
 }
 
+.search-scope-filters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .search-subsection.view-hidden {
   display: none;
 }
@@ -906,6 +912,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .search-tabs {
     flex-direction: column;
+  }
+
+  .search-scope-filters {
+    grid-template-columns: 1fr;
   }
 }
 

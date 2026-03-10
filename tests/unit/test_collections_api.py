@@ -55,6 +55,8 @@ def _save_document(
     filename: str,
     text_preview: str,
     title: str,
+    document_type: str = "Memo",
+    tags: list[str] | None = None,
 ) -> None:
     now = datetime.now(UTC)
     repository.save(
@@ -92,8 +94,8 @@ def _save_document(
             suggested_title=title,
             document_date="2026-03-10",
             correspondent="Example Corp",
-            document_type="Memo",
-            tags=["Research"],
+            document_type=document_type,
+            tags=list(tags or ["Research"]),
             created_correspondent=False,
             created_document_type=False,
             created_tags=[],
@@ -240,5 +242,97 @@ def test_ask_collection_uses_scoped_chunks_only() -> None:
         assert payload["insufficient_evidence"] is False
         assert payload["citations"]
         assert payload["citations"][0]["document_id"] == "doc-a"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_global_search_supports_tag_and_document_type_filters_without_collection() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-finance",
+        owner_id=TEST_USER.id,
+        filename="finance.pdf",
+        text_preview="Annual statement with account balances and transactions.",
+        title="Finance Statement",
+        document_type="Statement",
+        tags=["Finance"],
+    )
+    _save_document(
+        repository,
+        doc_id="doc-medical",
+        owner_id=TEST_USER.id,
+        filename="medical.pdf",
+        text_preview="Lab report and treatment notes for pediatric visit.",
+        title="Medical Report",
+        document_type="Report",
+        tags=["Medical"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/collections/search",
+            json={
+                "query": "report",
+                "limit": 10,
+                "tag": ["Medical"],
+                "document_type": ["Report"],
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["total_hits"] == 1
+        assert payload["hits"][0]["document_id"] == "doc-medical"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_global_ask_supports_tag_and_document_type_filters_without_collection() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-contract",
+        owner_id=TEST_USER.id,
+        filename="contract.pdf",
+        text_preview="Service agreement terms and renewal clauses.",
+        title="Service Contract",
+        document_type="Contract",
+        tags=["Legal"],
+    )
+    _save_document(
+        repository,
+        doc_id="doc-invoice",
+        owner_id=TEST_USER.id,
+        filename="invoice.pdf",
+        text_preview="Invoice items and payable amount details.",
+        title="Invoice Doc",
+        document_type="Invoice",
+        tags=["Finance"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeGroundedLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/collections/ask",
+            json={
+                "question": "What do the terms say?",
+                "top_k_chunks": 10,
+                "tag": ["Legal"],
+                "document_type": ["Contract"],
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["insufficient_evidence"] is False
+        assert payload["citations"]
+        assert payload["citations"][0]["document_id"] == "doc-contract"
     finally:
         app.dependency_overrides.clear()

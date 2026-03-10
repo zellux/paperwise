@@ -43,6 +43,8 @@ class CollectionDocumentIdsResponse(BaseModel):
 class SearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=500)
     limit: int = Field(default=20, ge=1, le=100)
+    tag: list[str] = Field(default_factory=list)
+    document_type: list[str] = Field(default_factory=list)
 
 
 class SearchHitResponse(BaseModel):
@@ -67,6 +69,8 @@ class SearchResponse(BaseModel):
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
     top_k_chunks: int = Field(default=18, ge=3, le=60)
+    tag: list[str] = Field(default_factory=list)
+    document_type: list[str] = Field(default_factory=list)
 
 
 class AskCitationResponse(BaseModel):
@@ -156,6 +160,70 @@ def _build_search_response(
         if len(items) >= max(1, limit):
             break
     return SearchResponse(query=query, total_hits=len(items), hits=items)
+
+
+def _normalize_name(value: str) -> str:
+    cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
+    return " ".join(cleaned.split())
+
+
+def _normalized_values(values: list[str] | None) -> set[str]:
+    normalized: set[str] = set()
+    for value in values or []:
+        for part in value.split(","):
+            item = _normalize_name(part)
+            if item:
+                normalized.add(item)
+    return normalized
+
+
+def _resolve_metadata_scoped_document_ids(
+    *,
+    repository: DocumentRepository,
+    current_user: User,
+    base_document_ids: list[str] | None,
+    tag_filters: list[str] | None,
+    document_type_filters: list[str] | None,
+) -> list[str] | None:
+    normalized_tags = _normalized_values(tag_filters)
+    normalized_document_types = _normalized_values(document_type_filters)
+    if not normalized_tags and not normalized_document_types:
+        if base_document_ids is None:
+            return None
+        return sorted(set(base_document_ids))
+
+    scoped_ids = set(base_document_ids) if base_document_ids is not None else None
+    matched_ids: list[str] = []
+    seen_ids: set[str] = set()
+    batch_size = 1000
+    offset = 0
+    while True:
+        documents = repository.list_documents(limit=batch_size, offset=offset)
+        if not documents:
+            break
+        for document in documents:
+            if document.owner_id != current_user.id:
+                continue
+            if scoped_ids is not None and document.id not in scoped_ids:
+                continue
+            llm_result = repository.get_llm_parse_result(document.id)
+            if llm_result is None:
+                continue
+            if normalized_tags:
+                doc_tags = {_normalize_name(tag) for tag in llm_result.tags}
+                if not normalized_tags.intersection(doc_tags):
+                    continue
+            if normalized_document_types:
+                if _normalize_name(llm_result.document_type) not in normalized_document_types:
+                    continue
+            if document.id in seen_ids:
+                continue
+            seen_ids.add(document.id)
+            matched_ids.append(document.id)
+        if len(documents) < batch_size:
+            break
+        offset += batch_size
+    return sorted(matched_ids)
 
 
 def _build_qa_contexts(
@@ -382,11 +450,18 @@ def search_all_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> SearchResponse:
+    scoped_ids = _resolve_metadata_scoped_document_ids(
+        repository=repository,
+        current_user=current_user,
+        base_document_ids=None,
+        tag_filters=payload.tag,
+        document_type_filters=payload.document_type,
+    )
     hits = repository.search_document_chunks(
         owner_id=current_user.id,
         query=payload.query,
         limit=max(payload.limit * 4, payload.limit),
-        document_ids=None,
+        document_ids=scoped_ids,
     )
     return _build_search_response(repository=repository, query=payload.query, limit=payload.limit, hits=hits)
 
@@ -403,7 +478,14 @@ def search_collection_documents_endpoint(
         repository=repository,
         current_user=current_user,
     )
-    scoped_ids = repository.list_collection_document_ids(collection_id)
+    collection_doc_ids = repository.list_collection_document_ids(collection_id)
+    scoped_ids = _resolve_metadata_scoped_document_ids(
+        repository=repository,
+        current_user=current_user,
+        base_document_ids=collection_doc_ids,
+        tag_filters=payload.tag,
+        document_type_filters=payload.document_type,
+    )
     hits = repository.search_document_chunks(
         owner_id=current_user.id,
         query=payload.query,
@@ -425,13 +507,20 @@ def ask_all_documents_endpoint(
         current_user=current_user,
         default_llm_provider=default_llm_provider,
     )
+    scoped_ids = _resolve_metadata_scoped_document_ids(
+        repository=repository,
+        current_user=current_user,
+        base_document_ids=None,
+        tag_filters=payload.tag,
+        document_type_filters=payload.document_type,
+    )
     return _ask_grounded(
         repository=repository,
         llm_provider=llm_provider,
         owner_id=current_user.id,
         question=payload.question,
         top_k_chunks=payload.top_k_chunks,
-        document_ids=None,
+        document_ids=scoped_ids,
     )
 
 
@@ -453,7 +542,14 @@ def ask_collection_documents_endpoint(
         current_user=current_user,
         default_llm_provider=default_llm_provider,
     )
-    scoped_ids = repository.list_collection_document_ids(collection_id)
+    collection_doc_ids = repository.list_collection_document_ids(collection_id)
+    scoped_ids = _resolve_metadata_scoped_document_ids(
+        repository=repository,
+        current_user=current_user,
+        base_document_ids=collection_doc_ids,
+        tag_filters=payload.tag,
+        document_type_filters=payload.document_type,
+    )
     return _ask_grounded(
         repository=repository,
         llm_provider=llm_provider,
