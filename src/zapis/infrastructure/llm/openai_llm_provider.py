@@ -39,6 +39,11 @@ class OpenAILLMProvider(LLMProvider):
             "Return strict JSON with keys: suggested_title, document_date, "
             "correspondent, document_type, tags. "
             "document_date must be YYYY-MM-DD or null. "
+            "correspondent must be the sender/issuer of the document "
+            "(for example bank, utility, insurer, lab, credit bureau, clinic), "
+            "not the recipient/customer. "
+            "If sender is ambiguous, choose the strongest issuer signal from letterhead, "
+            "logo, signature block, or footer and avoid generic placeholders. "
             "tags must be an array of strings in Title Case (for example: Credit Report). "
             "When reusing existing taxonomy names, copy the existing names exactly."
         )
@@ -51,7 +56,9 @@ class OpenAILLMProvider(LLMProvider):
             "guidance": (
                 "Prefer existing taxonomy names when appropriate. "
                 "Only propose new names when no existing option is a good match. "
-                "Use Title Case for document_type and every tag (for example: Credit Report)."
+                "Use Title Case for document_type and every tag (for example: Credit Report). "
+                "For correspondent: normalize punctuation/suffixes (e.g. 'Experian.' -> 'Experian'), "
+                "prefer organization names over department names, and never return the document owner."
             ),
         }
 
