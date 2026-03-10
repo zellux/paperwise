@@ -298,7 +298,7 @@ h1 {
 
 .nav-link-settings {
   position: relative;
-  margin-top: 18px;
+  margin-top: 20px;
 }
 
 .nav-link-settings::before {
@@ -306,7 +306,7 @@ h1 {
   position: absolute;
   left: 8px;
   right: 8px;
-  top: -10px;
+  top: -11px;
   height: 2px;
   border-radius: 999px;
   background: linear-gradient(
