@@ -8,7 +8,7 @@ WORKER_PID_FILE ?= $(RUN_DIR)/worker.pid
 BACKEND_LOG ?= $(LOG_DIR)/backend.log
 WORKER_LOG ?= $(LOG_DIR)/worker.log
 
-.PHONY: setup deps-up deps-down backend api worker worker-bg backend-bg dev-up dev-stop dev-restart test smoke-llm
+.PHONY: setup deps-up deps-down backend api worker worker-bg backend-bg dev-up dev-stop dev-restart dev-status test smoke-llm
 
 setup:
 	$(PYTHON) -m venv $(VENV)
@@ -72,6 +72,32 @@ dev-stop:
 	fi
 
 dev-restart: dev-stop dev-up
+
+dev-status:
+	@echo "== Backend =="
+	@if [ -f "$(BACKEND_PID_FILE)" ]; then \
+		pid="$$(cat "$(BACKEND_PID_FILE)")"; \
+		if kill -0 "$$pid" 2>/dev/null; then \
+			echo "running (pid=$$pid) log=$(BACKEND_LOG)"; \
+		else \
+			echo "not running (stale pid file: $$pid)"; \
+		fi; \
+	else \
+		echo "not running"; \
+	fi
+	@echo "== Worker =="
+	@if [ -f "$(WORKER_PID_FILE)" ]; then \
+		pid="$$(cat "$(WORKER_PID_FILE)")"; \
+		if kill -0 "$$pid" 2>/dev/null; then \
+			echo "running (pid=$$pid) log=$(WORKER_LOG)"; \
+		else \
+			echo "not running (stale pid file: $$pid)"; \
+		fi; \
+	else \
+		echo "not running"; \
+	fi
+	@echo "== Dependencies (docker compose) =="
+	@docker compose -f infra/docker-compose.yml ps
 
 test:
 	$(ACTIVATE) && pytest

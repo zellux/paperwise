@@ -46,6 +46,7 @@ If `PAPERWISE_OPENAI_API_KEY` is unset, `llm-parse` is disabled.
 - `make dev-up` - start deps + backend + worker in background (recommended).
 - `make dev-stop` - stop background backend/worker started by `make dev-up`.
 - `make dev-restart` - restart deps + backend + worker after code changes.
+- `make dev-status` - show backend/worker pid status and docker dependency status.
 - `make backend` - run FastAPI backend from local virtualenv.
 - `make api` - alias for `make backend` (kept for backward compatibility).
 - `make worker` - run Celery worker from local virtualenv.
