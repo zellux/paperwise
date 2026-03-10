@@ -296,6 +296,12 @@ h1 {
   border-color: transparent;
 }
 
+.nav-link-settings {
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--stroke-soft);
+}
+
 .content-pane {
   display: grid;
   gap: 14px;
