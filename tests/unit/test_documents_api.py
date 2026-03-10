@@ -11,7 +11,7 @@ from paperwise.api.dependencies import (
     storage_dependency,
 )
 from paperwise.api.main import app
-from paperwise.domain.models import User
+from paperwise.domain.models import LLMParseResult, User
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -680,5 +680,69 @@ def test_metadata_update_preserves_acronyms_in_correspondent_and_tags() -> None:
         payload = update_response.json()
         assert payload["correspondent"] == "PPMG Pediatrics"
         assert payload["tags"] == ["PPMG", "Abc Store"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_tag_stats_only_include_current_user_documents() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
+
+    try:
+        client = TestClient(app)
+        own_doc_response = client.post(
+            "/documents",
+            data={"owner_id": TEST_USER.id},
+            files={"file": ("own.pdf", b"%PDF-1.7\nown", "application/pdf")},
+        )
+        assert own_doc_response.status_code == 201
+        own_doc_id = own_doc_response.json()["id"]
+        own_llm = client.post(f"/documents/{own_doc_id}/llm-parse")
+        assert own_llm.status_code == 200
+
+        # Create another owner's document directly in repository to simulate cross-user data.
+        other_doc_response = client.post(
+            "/documents",
+            data={"owner_id": TEST_USER.id},
+            files={"file": ("other.pdf", b"%PDF-1.7\nother", "application/pdf")},
+        )
+        assert other_doc_response.status_code == 201
+        other_doc_id = other_doc_response.json()["id"]
+        other_doc = repository.get(other_doc_id)
+        assert other_doc is not None
+        other_doc.owner_id = "different-user-id"
+        repository.save(other_doc)
+        other_llm = client.post(f"/documents/{other_doc_id}/llm-parse")
+        assert other_llm.status_code == 404
+
+        # Inject other user's metadata directly (avoids auth boundary in endpoint tests).
+        repository.save_llm_parse_result(
+            LLMParseResult(
+                document_id=other_doc_id,
+                suggested_title="Other User Doc",
+                document_date="2026-03-01",
+                correspondent="Other Corp",
+                document_type="Statement",
+                tags=["PrivateTag"],
+                created_correspondent=True,
+                created_document_type=True,
+                created_tags=["PrivateTag"],
+                created_at=datetime.now(UTC),
+            )
+        )
+
+        tag_stats_response = client.get("/documents/metadata/tag-stats")
+        assert tag_stats_response.status_code == 200
+        tag_names = {item["tag"] for item in tag_stats_response.json()}
+        assert "PrivateTag" not in tag_names
+        assert "Credit" in tag_names
+        assert "Identity" in tag_names
     finally:
         app.dependency_overrides.clear()

@@ -888,8 +888,31 @@ def get_tag_stats_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[TagStatResponse]:
-    del current_user
+    counts: dict[str, int] = {}
+    display_name_by_key: dict[str, str] = {}
+    documents = repository.list_documents(limit=10_000)
+    for document in documents:
+        if document.owner_id != current_user.id:
+            continue
+        llm_result = repository.get_llm_parse_result(document.id)
+        if llm_result is None:
+            continue
+        seen_tags: set[str] = set()
+        for tag in llm_result.tags:
+            cleaned = str(tag).strip()
+            if not cleaned:
+                continue
+            key = cleaned.casefold()
+            if key in seen_tags:
+                continue
+            seen_tags.add(key)
+            if key not in display_name_by_key:
+                display_name_by_key[key] = _to_title_case(cleaned)
+            counts[key] = counts.get(key, 0) + 1
     return [
-        TagStatResponse(tag=tag, document_count=document_count)
-        for tag, document_count in repository.list_tag_stats()
+        TagStatResponse(tag=display_name_by_key[key], document_count=count)
+        for key, count in sorted(
+            counts.items(),
+            key=lambda item: (-item[1], display_name_by_key[item[0]].casefold()),
+        )
     ]
