@@ -102,29 +102,12 @@ def test_parse_document_blob_llm_timeout_falls_back_to_extracted_text(tmp_path) 
     assert "Readable sample OCR text" in result.text_preview
 
 
-def test_parse_document_blob_auto_switch_skips_llm_for_high_quality_text(tmp_path) -> None:
-    blob = tmp_path / "high-quality.pdf"
-    long_text = ("This is a clean extracted legal paragraph with complete sentences and strong readability. " * 20)
-    blob.write_bytes(f"%PDF-1.7\n{long_text}\n/Type /Page".encode("utf-8"))
-    llm = RecordingOCRLLM("LLM OCR output that should be skipped")
-
-    result = parse_document_blob(
-        document_id="doc-1",
-        blob_uri=blob.as_uri(),
-        ocr_provider="llm",
-        llm_provider=llm,
-        ocr_auto_switch=True,
-    )
-
-    assert llm.calls == 0
-    assert result.parser == "auto-local-extract"
-    assert "clean extracted legal paragraph" in result.text_preview
-
-
-def test_parse_document_blob_auto_switch_uses_llm_for_low_quality_text(tmp_path) -> None:
+def test_parse_document_blob_auto_switch_uses_llm_for_low_quality_text(tmp_path, monkeypatch) -> None:
     blob = tmp_path / "low-quality.pdf"
     blob.write_bytes(b"%PDF-1.7\nshort\n/Type /Page")
     llm = RecordingOCRLLM("LLM OCR output used")
+
+    monkeypatch.setattr(parsing_module, "_extract_with_local_tesseract", lambda **kwargs: "tiny")
 
     result = parse_document_blob(
         document_id="doc-1",
@@ -162,3 +145,29 @@ def test_parse_document_blob_auto_switch_uses_good_local_ocr_and_skips_llm(
     assert llm.calls == 0
     assert result.parser == "auto-local-tesseract"
     assert result.text_preview == local_text
+
+
+def test_parse_document_blob_auto_switch_off_does_not_run_local_ocr(tmp_path, monkeypatch) -> None:
+    blob = tmp_path / "manual-llm.pdf"
+    blob.write_bytes(b"%PDF-1.7\nshort\n/Type /Page")
+    llm = RecordingOCRLLM("LLM OCR output used")
+    local_calls = {"count": 0}
+
+    def _fake_local_ocr(**kwargs):
+        del kwargs
+        local_calls["count"] += 1
+        return "Strong local OCR text that should not be used"
+
+    monkeypatch.setattr(parsing_module, "_extract_with_local_tesseract", _fake_local_ocr)
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        ocr_provider="llm",
+        llm_provider=llm,
+        ocr_auto_switch=False,
+    )
+
+    assert local_calls["count"] == 0
+    assert llm.calls == 1
+    assert result.parser == "stub-llm-ocr"

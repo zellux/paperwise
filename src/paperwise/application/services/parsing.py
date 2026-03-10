@@ -192,18 +192,22 @@ def parse_document_blob(
 
     is_pdf = raw.startswith(b"%PDF") or suffix == ".pdf"
     if is_pdf:
-        # Keep a higher preview limit for LLM-driven OCR mode.
-        is_llm_ocr = normalized_ocr in {"llm", "llm_separate"}
-        preview_limit = 8000 if is_llm_ocr else 6000
-        text_preview, page_count = _extract_pdf_text(
-            blob_path=blob_path,
-            raw=raw,
-            max_chars=preview_limit,
-        )
-        if normalized_ocr == "tesseract" and not text_preview.strip():
+        if normalized_ocr == "tesseract":
+            page_count = raw.count(b"/Type /Page")
+            if page_count == 0:
+                page_count = 1
             text_preview = _extract_with_local_tesseract(
                 blob_path=blob_path,
                 is_pdf=True,
+                max_chars=6000,
+            )
+        else:
+            # Keep a higher preview limit for LLM-driven OCR mode.
+            is_llm_ocr = normalized_ocr in {"llm", "llm_separate"}
+            preview_limit = 8000 if is_llm_ocr else 6000
+            text_preview, page_count = _extract_pdf_text(
+                blob_path=blob_path,
+                raw=raw,
                 max_chars=preview_limit,
             )
     elif suffix in {".txt", ".md", ".markdown"}:
@@ -233,17 +237,6 @@ def parse_document_blob(
         page_count = 1
 
     if normalized_ocr in {"llm", "llm_separate"}:
-        if ocr_auto_switch and _is_high_quality_extracted_text(text_preview):
-            parser_name = "auto-local-extract"
-            return ParseResult(
-                document_id=document_id,
-                parser=parser_name,
-                status="parsed",
-                size_bytes=len(raw),
-                page_count=page_count,
-                text_preview=text_preview,
-                created_at=datetime.now(UTC),
-            )
         if ocr_auto_switch:
             try:
                 local_ocr_text = _extract_with_local_tesseract(
