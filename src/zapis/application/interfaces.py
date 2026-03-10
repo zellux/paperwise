@@ -67,6 +67,9 @@ class DocumentRepository(Protocol):
     def list_tags(self) -> list[str]:
         """Return known tag names."""
 
+    def list_tag_stats(self) -> list[tuple[str, int]]:
+        """Return tag usage counts as (tag_name, document_count)."""
+
     def add_correspondent(self, name: str) -> None:
         """Add a correspondent if missing."""
 

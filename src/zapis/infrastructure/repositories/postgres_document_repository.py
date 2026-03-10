@@ -153,6 +153,29 @@ class PostgresDocumentRepository(DocumentRepository):
             rows = session.scalars(select(TagRow).order_by(TagRow.name)).all()
             return [row.name for row in rows]
 
+    def list_tag_stats(self) -> list[tuple[str, int]]:
+        with self._session_factory() as session:
+            rows = session.scalars(select(LLMParseResultRow)).all()
+            counts: dict[str, int] = {}
+            display_name_by_key: dict[str, str] = {}
+            for row in rows:
+                seen: set[str] = set()
+                for tag in list(row.tags or []):
+                    cleaned = str(tag).strip()
+                    if not cleaned:
+                        continue
+                    key = cleaned.casefold()
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    if key not in display_name_by_key:
+                        display_name_by_key[key] = cleaned
+                    counts[key] = counts.get(key, 0) + 1
+            return sorted(
+                [(display_name_by_key[key], count) for key, count in counts.items()],
+                key=lambda item: (-item[1], item[0].casefold()),
+            )
+
     def add_correspondent(self, name: str) -> None:
         cleaned = name.strip()
         if not cleaned:

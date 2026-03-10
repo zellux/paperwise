@@ -270,6 +270,12 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         assert "Experian" in taxonomy["correspondents"]
         assert "Credit Report" in taxonomy["document_types"]
         assert "Identity" in taxonomy["tags"]
+
+        tag_stats_response = client.get("/documents/metadata/tag-stats")
+        assert tag_stats_response.status_code == 200
+        tag_stats = tag_stats_response.json()
+        assert {"tag": "Credit", "document_count": 1} in tag_stats
+        assert {"tag": "Identity", "document_count": 1} in tag_stats
     finally:
         app.dependency_overrides.clear()
 

@@ -85,6 +85,11 @@ class TaxonomyResponse(BaseModel):
     tags: list[str]
 
 
+class TagStatResponse(BaseModel):
+    tag: str
+    document_count: int
+
+
 def _to_response(document: Document) -> DocumentResponse:
     return DocumentResponse(
         id=document.id,
@@ -363,3 +368,13 @@ def get_taxonomy_endpoint(
         document_types=repository.list_document_types(),
         tags=repository.list_tags(),
     )
+
+
+@router.get("/metadata/tag-stats", response_model=list[TagStatResponse])
+def get_tag_stats_endpoint(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> list[TagStatResponse]:
+    return [
+        TagStatResponse(tag=tag, document_count=document_count)
+        for tag, document_count in repository.list_tag_stats()
+    ]

@@ -59,6 +59,29 @@ class InMemoryDocumentRepository(DocumentRepository):
         with self._lock:
             return sorted(self._tags)
 
+    def list_tag_stats(self) -> list[tuple[str, int]]:
+        with self._lock:
+            counts: dict[str, int] = {}
+            display_name_by_key: dict[str, str] = {}
+            for result in self._llm_parse_results.values():
+                seen: set[str] = set()
+                for tag in result.tags:
+                    cleaned = tag.strip()
+                    if not cleaned:
+                        continue
+                    # Count each document at most once per tag.
+                    key = cleaned.casefold()
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    if key not in display_name_by_key:
+                        display_name_by_key[key] = cleaned
+                    counts[key] = counts.get(key, 0) + 1
+            return sorted(
+                [(display_name_by_key[key], count) for key, count in counts.items()],
+                key=lambda item: (-item[1], item[0].casefold()),
+            )
+
     def add_correspondent(self, name: str) -> None:
         with self._lock:
             self._correspondents.add(name.strip())

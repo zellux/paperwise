@@ -24,6 +24,7 @@
         <p class="subhead">Two-pane workspace for ingest, review, parse, and metadata ops.</p>
         <nav class="nav">
           <button class="nav-link active" data-target="section-docs" type="button">Documents</button>
+          <button class="nav-link" data-target="section-tags" type="button">Tags</button>
           <button class="nav-link" data-target="section-upload" type="button">Upload</button>
           <button class="nav-link" data-target="section-parse" type="button">Parse</button>
           <button class="nav-link" data-target="section-llm" type="button">LLM Parse</button>
@@ -68,6 +69,28 @@
             <button type="submit" class="btn">Load</button>
           </form>
           <pre id="docOutput" class="output">No document loaded yet.</pre>
+        </article>
+
+        <article id="section-tags" class="panel panel-section view view-hidden">
+          <h2>Tags</h2>
+          <div class="actions">
+            <button id="refreshTagsBtn" class="btn" type="button">Refresh Tags</button>
+          </div>
+          <div class="docs-table-wrap">
+            <table class="docs-table tags-table">
+              <thead>
+                <tr>
+                  <th>Tag</th>
+                  <th>Documents</th>
+                </tr>
+              </thead>
+              <tbody id="tagsTableBody">
+                <tr>
+                  <td colspan="2">No tags loaded.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </article>
 
         <article id="section-upload" class="panel panel-section view view-hidden">

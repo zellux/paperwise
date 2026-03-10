@@ -6,6 +6,7 @@ const llmParseBtn = document.getElementById("llmParseBtn");
 const llmFetchBtn = document.getElementById("llmFetchBtn");
 const taxonomyBtn = document.getElementById("taxonomyBtn");
 const refreshDocsBtn = document.getElementById("refreshDocsBtn");
+const refreshTagsBtn = document.getElementById("refreshTagsBtn");
 
 const docIdInput = document.getElementById("docIdInput");
 const docOutput = document.getElementById("docOutput");
@@ -13,6 +14,7 @@ const parseOutput = document.getElementById("parseOutput");
 const llmOutput = document.getElementById("llmOutput");
 const activityOutput = document.getElementById("activityOutput");
 const docsTableBody = document.getElementById("docsTableBody");
+const tagsTableBody = document.getElementById("tagsTableBody");
 const navLinks = [...document.querySelectorAll(".nav-link")];
 const views = [...document.querySelectorAll(".view")];
 
@@ -110,6 +112,24 @@ function renderDocsList(documents) {
   }
 }
 
+function renderTagsList(tagStats) {
+  if (!tagStats.length) {
+    tagsTableBody.innerHTML = '<tr><td colspan="2">No tags found.</td></tr>';
+    return;
+  }
+  tagsTableBody.innerHTML = "";
+  for (const stat of tagStats) {
+    const row = document.createElement("tr");
+    const tagCell = document.createElement("td");
+    tagCell.textContent = stat.tag;
+    const countCell = document.createElement("td");
+    countCell.textContent = String(stat.document_count);
+    row.appendChild(tagCell);
+    row.appendChild(countCell);
+    tagsTableBody.appendChild(row);
+  }
+}
+
 function setActiveNav(targetId) {
   for (const link of navLinks) {
     link.classList.toggle("active", link.dataset.target === targetId);
@@ -131,6 +151,17 @@ async function loadDocumentsList() {
   }
   renderDocsList(payload);
   logActivity(`Loaded ${payload.length} document(s)`);
+}
+
+async function loadTagStats() {
+  const response = await fetch("/documents/metadata/tag-stats");
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Tag stats load failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+  renderTagsList(payload);
+  logActivity(`Loaded ${payload.length} tag(s)`);
 }
 
 uploadForm.addEventListener("submit", async (event) => {
@@ -228,6 +259,8 @@ llmParseBtn.addEventListener("click", async () => {
   }
   llmOutput.textContent = pretty(payload);
   logActivity(`LLM parse completed for ${documentId}`);
+  await loadDocumentsList();
+  await loadTagStats();
 });
 
 llmFetchBtn.addEventListener("click", async () => {
@@ -261,6 +294,10 @@ refreshDocsBtn.addEventListener("click", async () => {
   await loadDocumentsList();
 });
 
+refreshTagsBtn.addEventListener("click", async () => {
+  await loadTagStats();
+});
+
 for (const link of navLinks) {
   link.addEventListener("click", () => {
     const targetId = link.dataset.target;
@@ -277,4 +314,8 @@ setActiveView("section-docs");
 
 loadDocumentsList().catch((error) => {
   logActivity(`Initial document list failed: ${error.message}`);
+});
+
+loadTagStats().catch((error) => {
+  logActivity(`Initial tag stats failed: ${error.message}`);
 });

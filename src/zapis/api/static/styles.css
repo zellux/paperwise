@@ -232,6 +232,10 @@ input[type="file"] {
   min-width: 860px;
 }
 
+.tags-table {
+  min-width: 360px;
+}
+
 .docs-table th,
 .docs-table td {
   border-bottom: 1px solid rgba(0, 0, 0, 0.08);
