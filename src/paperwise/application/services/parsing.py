@@ -98,6 +98,21 @@ def _is_high_quality_extracted_text(text: str) -> bool:
     return ratio >= 0.45
 
 
+def _is_good_local_ocr_text(candidate: str, baseline: str) -> bool:
+    normalized_candidate = " ".join(str(candidate or "").split())
+    if not normalized_candidate:
+        return False
+    if _is_high_quality_extracted_text(normalized_candidate):
+        return True
+
+    candidate_letters = sum(ch.isalpha() for ch in normalized_candidate)
+    candidate_ratio = candidate_letters / max(len(normalized_candidate), 1)
+    normalized_baseline = " ".join(str(baseline or "").split())
+    baseline_len = len(normalized_baseline)
+    candidate_len = len(normalized_candidate)
+    return candidate_len >= max(300, int(baseline_len * 1.5)) and candidate_ratio >= 0.35
+
+
 def _extract_with_local_tesseract(
     *,
     blob_path,
@@ -229,6 +244,26 @@ def parse_document_blob(
                 text_preview=text_preview,
                 created_at=datetime.now(UTC),
             )
+        if ocr_auto_switch:
+            try:
+                local_ocr_text = _extract_with_local_tesseract(
+                    blob_path=blob_path,
+                    is_pdf=is_pdf,
+                    max_chars=8000 if is_pdf else 4000,
+                )
+            except Exception:
+                local_ocr_text = ""
+            if _is_good_local_ocr_text(local_ocr_text, text_preview):
+                parser_name = "auto-local-tesseract"
+                return ParseResult(
+                    document_id=document_id,
+                    parser=parser_name,
+                    status="parsed",
+                    size_bytes=len(raw),
+                    page_count=page_count,
+                    text_preview=local_ocr_text,
+                    created_at=datetime.now(UTC),
+                )
         extract_method = getattr(llm_provider, "extract_ocr_text", None) if llm_provider is not None else None
         if callable(extract_method):
             if not text_preview.strip():
