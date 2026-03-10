@@ -1,18 +1,18 @@
 :root {
-  --bg-main: linear-gradient(140deg, #f4f1e8, #ebf2ea 50%, #f5ece6);
-  --bg-panel: rgba(255, 255, 255, 0.78);
-  --stroke: rgba(21, 33, 27, 0.18);
-  --stroke-soft: rgba(21, 33, 27, 0.1);
-  --ink: #15211b;
-  --ink-soft: #4b5a4f;
-  --accent: #146f52;
-  --accent-soft: rgba(20, 111, 82, 0.12);
+  --bg-main: linear-gradient(140deg, #edf0ea, #e9eee8 55%, #eef2ed);
+  --bg-panel: rgba(242, 244, 240, 0.9);
+  --stroke: rgba(116, 128, 122, 0.32);
+  --stroke-soft: rgba(116, 128, 122, 0.2);
+  --ink: #1f2b27;
+  --ink-soft: #4f5b57;
+  --accent: #1d6a55;
+  --accent-soft: rgba(199, 214, 209, 0.9);
   --accent-2: #bf5e25;
   --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
   --sans: "Manrope", "Avenir Next", "Segoe UI", sans-serif;
   --serif: "Newsreader", Georgia, serif;
-  --shadow: 0 12px 28px rgba(20, 38, 30, 0.12);
-  --link: #0b6e4f;
+  --shadow: 0 6px 16px rgba(38, 53, 46, 0.08);
+  --link: #1a7b64;
 }
 
 * {
@@ -31,19 +31,15 @@ body {
 .bg-grid {
   position: fixed;
   inset: 0;
-  background-image: linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  background-image: linear-gradient(rgba(84, 102, 93, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(84, 102, 93, 0.07) 1px, transparent 1px);
   background-size: 30px 30px;
   pointer-events: none;
   z-index: 0;
 }
 
 .bg-orb {
-  position: fixed;
-  border-radius: 999px;
-  filter: blur(44px);
-  z-index: 0;
-  pointer-events: none;
+  display: none;
 }
 
 .bg-orb-a {
@@ -78,7 +74,7 @@ body {
   background: var(--bg-panel);
   border: 1px solid var(--stroke);
   box-shadow: var(--shadow);
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(4px);
   border-radius: 16px;
 }
 
@@ -119,7 +115,7 @@ h1 {
 .nav-link {
   text-align: left;
   border: 1px solid var(--stroke);
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(247, 248, 246, 0.9);
   color: var(--ink);
   border-radius: 10px;
   padding: 10px 12px;
@@ -130,7 +126,7 @@ h1 {
 
 .nav-link.active {
   background: var(--accent-soft);
-  color: #15523d;
+  color: #1f5f4c;
   border-color: transparent;
 }
 
@@ -184,7 +180,7 @@ input[type="file"] {
 .btn {
   border: 1px solid var(--stroke);
   border-radius: 10px;
-  background: #ffffff;
+  background: rgba(247, 248, 246, 0.95);
   color: var(--ink);
   padding: 10px 14px;
   cursor: pointer;
@@ -194,7 +190,7 @@ input[type="file"] {
 
 .btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 12px rgba(46, 57, 52, 0.12);
 }
 
 .btn-primary {
@@ -233,32 +229,32 @@ input[type="file"] {
   display: flex;
   align-items: center;
   gap: 8px;
-  border: 2px solid var(--accent);
+  border: 1px solid var(--stroke);
   border-radius: 10px;
   padding: 0 8px 0 12px;
-  background: rgba(255, 255, 255, 0.88);
+  background: rgba(247, 248, 246, 0.9);
   min-height: 48px;
 }
 
 .chip-prefix {
   font-weight: 700;
   font-size: 0.9rem;
-  color: #15523d;
+  color: #2a3a35;
   white-space: nowrap;
 }
 
 .filter-select {
   border: 0;
   background: transparent;
-  color: #15523d;
+  color: #25342f;
   font-family: var(--sans);
   font-size: 0.95rem;
   padding: 0 28px 0 0;
   min-width: 130px;
   appearance: none;
   -webkit-appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, #15523d 50%),
-    linear-gradient(135deg, #15523d 50%, transparent 50%);
+  background-image: linear-gradient(45deg, transparent 50%, #4e5d58 50%),
+    linear-gradient(135deg, #4e5d58 50%, transparent 50%);
   background-position: calc(100% - 14px) calc(50% - 3px), calc(100% - 8px) calc(50% - 3px);
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
@@ -270,9 +266,9 @@ input[type="file"] {
 }
 
 .btn-muted {
-  background: #eff1f1;
-  color: #5f6667;
-  border-color: #aab1b5;
+  background: #e8ebea;
+  color: #5a6467;
+  border-color: #8f989d;
 }
 
 .btn-muted:hover {
@@ -305,7 +301,7 @@ input[type="file"] {
   padding: 12px;
   border-radius: 10px;
   border: 1px solid var(--stroke-soft);
-  background: rgba(255, 255, 255, 0.78);
+  background: rgba(247, 248, 246, 0.88);
   min-height: 150px;
   font-family: var(--mono);
   font-size: 0.78rem;
@@ -317,7 +313,7 @@ input[type="file"] {
   border: 1px solid var(--stroke);
   border-radius: 12px;
   overflow: auto;
-  background: rgba(255, 255, 255, 0.82);
+  background: rgba(246, 247, 245, 0.92);
   margin-bottom: 10px;
 }
 
@@ -347,15 +343,15 @@ input[type="file"] {
 .docs-table th {
   position: sticky;
   top: 0;
-  background: var(--accent-soft);
-  color: #15523d;
+  background: #c8d7d2;
+  color: #1f5d4a;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   font-size: 0.72rem;
 }
 
 .docs-table tbody tr:hover {
-  background: rgba(20, 111, 82, 0.06);
+  background: rgba(202, 214, 209, 0.5);
 }
 
 @keyframes rise-in {
