@@ -225,6 +225,7 @@ input[type="file"] {
 
 .filters-grid select {
   width: 100%;
+  min-height: 132px;
   border: 1px solid var(--stroke);
   border-radius: 10px;
   padding: 10px 11px;

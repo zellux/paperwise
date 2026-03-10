@@ -3,7 +3,7 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from pydantic import BaseModel
 
 from zapis.api.dependencies import (
@@ -160,6 +160,16 @@ def _resolve_tags(candidate_tags: list[str], existing_tags: list[str]) -> tuple[
     return resolved, created
 
 
+def _normalized_values(values: list[str] | None) -> set[str]:
+    normalized: set[str] = set()
+    for value in values or []:
+        for part in value.split(","):
+            item = _normalize_name(part)
+            if item:
+                normalized.add(item)
+    return normalized
+
+
 def _to_response(document: Document) -> DocumentResponse:
     return DocumentResponse(
         id=document.id,
@@ -305,33 +315,35 @@ def create_document_endpoint(
 @router.get("", response_model=list[DocumentListItemResponse])
 def list_documents_endpoint(
     limit: int = 100,
-    tag: str | None = None,
-    correspondent: str | None = None,
-    document_type: str | None = None,
-    status: str | None = None,
+    tag: list[str] | None = Query(None),
+    correspondent: list[str] | None = Query(None),
+    document_type: list[str] | None = Query(None),
+    status: list[str] | None = Query(None),
     repository: DocumentRepository = Depends(document_repository_dependency),
 ) -> list[DocumentListItemResponse]:
     documents = repository.list_documents(limit=limit)
-    normalized_tag = _normalize_name(tag or "")
-    normalized_correspondent = _normalize_name(correspondent or "")
-    normalized_document_type = _normalize_name(document_type or "")
-    normalized_status = _normalize_name(status or "")
+    normalized_tags = _normalized_values(tag)
+    normalized_correspondents = _normalized_values(correspondent)
+    normalized_document_types = _normalized_values(document_type)
+    normalized_statuses = _normalized_values(status)
 
     results: list[DocumentListItemResponse] = []
     for document in documents:
         llm_result = repository.get_llm_parse_result(document.id)
-        if normalized_status and _normalize_name(document.status.value) != normalized_status:
+        if normalized_statuses and _normalize_name(document.status.value) not in normalized_statuses:
             continue
-        if normalized_tag:
-            if llm_result is None or normalized_tag not in {
+        if normalized_tags:
+            if llm_result is None or not normalized_tags.intersection(
+                {
                 _normalize_name(item) for item in llm_result.tags
-            }:
+                }
+            ):
                 continue
-        if normalized_correspondent:
-            if llm_result is None or _normalize_name(llm_result.correspondent) != normalized_correspondent:
+        if normalized_correspondents:
+            if llm_result is None or _normalize_name(llm_result.correspondent) not in normalized_correspondents:
                 continue
-        if normalized_document_type:
-            if llm_result is None or _normalize_name(llm_result.document_type) != normalized_document_type:
+        if normalized_document_types:
+            if llm_result is None or _normalize_name(llm_result.document_type) not in normalized_document_types:
                 continue
         results.append(
             _to_list_item_response(

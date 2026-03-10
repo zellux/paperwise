@@ -226,6 +226,12 @@ def test_list_documents_supports_metadata_filters() -> None:
         by_status_ids = {item["id"] for item in by_status.json()}
         assert pending_id in by_status_ids
         assert ready_id not in by_status_ids
+
+        by_multi = client.get("/documents?status=received&status=ready")
+        assert by_multi.status_code == 200
+        by_multi_ids = {item["id"] for item in by_multi.json()}
+        assert pending_id in by_multi_ids
+        assert ready_id in by_multi_ids
     finally:
         app.dependency_overrides.clear()
 

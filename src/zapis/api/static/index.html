@@ -36,17 +36,16 @@
         <article id="section-docs" class="panel panel-section view">
           <h2>Documents</h2>
           <form id="docsFilterForm" class="filters-grid">
-            <select id="filterTag" name="filterTag">
+            <select id="filterTag" name="filterTag" multiple size="4">
               <option value="">All Tags</option>
             </select>
-            <select id="filterCorrespondent" name="filterCorrespondent">
+            <select id="filterCorrespondent" name="filterCorrespondent" multiple size="4">
               <option value="">All Correspondents</option>
             </select>
-            <select id="filterType" name="filterType">
+            <select id="filterType" name="filterType" multiple size="4">
               <option value="">All Types</option>
             </select>
-            <select id="filterStatus" name="filterStatus">
-              <option value="">All Statuses</option>
+            <select id="filterStatus" name="filterStatus" multiple size="4">
               <option value="received">Received</option>
               <option value="parsing">Parsing</option>
               <option value="parsed">Parsed</option>
@@ -55,7 +54,6 @@
               <option value="failed">Failed</option>
             </select>
             <div class="actions">
-              <button type="submit" class="btn">Apply Filters</button>
               <button id="clearFiltersBtn" type="button" class="btn">Clear</button>
             </div>
           </form>

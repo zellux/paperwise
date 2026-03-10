@@ -24,10 +24,10 @@ const views = [...document.querySelectorAll(".view")];
 
 let currentDocumentId = "";
 const docsFilters = {
-  tag: "",
-  correspondent: "",
-  document_type: "",
-  status: "",
+  tag: [],
+  correspondent: [],
+  document_type: [],
+  status: [],
 };
 
 function formatStatus(value) {
@@ -64,20 +64,90 @@ function splitTags(value) {
     .filter((part) => part.length > 0);
 }
 
-function setSelectOptions(selectEl, values, placeholderLabel) {
-  const previous = selectEl.value;
+function unique(values) {
+  return [...new Set(values.filter((item) => item && item.trim()))];
+}
+
+function getSelectedValues(selectEl) {
+  return [...selectEl.selectedOptions].map((option) => option.value);
+}
+
+function setSelectedValues(selectEl, values) {
+  const allowed = new Set(values);
+  for (const option of selectEl.options) {
+    option.selected = allowed.has(option.value);
+  }
+}
+
+function applyFiltersToControls() {
+  setSelectedValues(filterTag, docsFilters.tag);
+  setSelectedValues(filterCorrespondent, docsFilters.correspondent);
+  setSelectedValues(filterType, docsFilters.document_type);
+  setSelectedValues(filterStatus, docsFilters.status);
+}
+
+function setSelectOptions(selectEl, values) {
+  const selected = new Set(
+    selectEl === filterTag
+      ? docsFilters.tag
+      : selectEl === filterCorrespondent
+        ? docsFilters.correspondent
+        : selectEl === filterType
+          ? docsFilters.document_type
+          : docsFilters.status,
+  );
   selectEl.innerHTML = "";
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = placeholderLabel;
-  selectEl.appendChild(placeholder);
   for (const value of values) {
     const option = document.createElement("option");
     option.value = value;
     option.textContent = value;
+    option.selected = selected.has(value);
     selectEl.appendChild(option);
   }
-  selectEl.value = values.includes(previous) ? previous : "";
+}
+
+function readFiltersFromControls() {
+  docsFilters.tag = unique(getSelectedValues(filterTag));
+  docsFilters.correspondent = unique(getSelectedValues(filterCorrespondent));
+  docsFilters.document_type = unique(getSelectedValues(filterType));
+  docsFilters.status = unique(getSelectedValues(filterStatus));
+}
+
+function syncUrlFromFilters() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete("tag");
+  url.searchParams.delete("correspondent");
+  url.searchParams.delete("document_type");
+  url.searchParams.delete("status");
+
+  for (const value of docsFilters.tag) {
+    url.searchParams.append("tag", value);
+  }
+  for (const value of docsFilters.correspondent) {
+    url.searchParams.append("correspondent", value);
+  }
+  for (const value of docsFilters.document_type) {
+    url.searchParams.append("document_type", value);
+  }
+  for (const value of docsFilters.status) {
+    url.searchParams.append("status", value);
+  }
+
+  window.history.replaceState(null, "", `${url.pathname}?${url.searchParams.toString()}`);
+}
+
+function readFiltersFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  docsFilters.tag = unique(params.getAll("tag"));
+  docsFilters.correspondent = unique(params.getAll("correspondent"));
+  docsFilters.document_type = unique(params.getAll("document_type"));
+  docsFilters.status = unique(params.getAll("status"));
+}
+
+async function applyFiltersFromControls() {
+  readFiltersFromControls();
+  syncUrlFromFilters();
+  await loadDocumentsList();
 }
 
 function getSuggestedTitle(doc) {
@@ -178,14 +248,12 @@ function renderTagsList(tagStats) {
     viewBtn.type = "button";
     viewBtn.textContent = "View Docs";
     viewBtn.addEventListener("click", async () => {
-      docsFilters.tag = stat.tag;
-      docsFilters.correspondent = "";
-      docsFilters.document_type = "";
-      docsFilters.status = "";
-      filterTag.value = stat.tag;
-      filterCorrespondent.value = "";
-      filterType.value = "";
-      filterStatus.value = "";
+      docsFilters.tag = [stat.tag];
+      docsFilters.correspondent = [];
+      docsFilters.document_type = [];
+      docsFilters.status = [];
+      applyFiltersToControls();
+      syncUrlFromFilters();
       setActiveView("section-docs");
       setActiveNav("section-docs");
       await loadDocumentsList();
@@ -251,17 +319,17 @@ function renderPendingList(documents) {
 
 async function loadDocumentsList() {
   const query = new URLSearchParams({ limit: "200" });
-  if (docsFilters.tag) {
-    query.set("tag", docsFilters.tag);
+  for (const value of docsFilters.tag) {
+    query.append("tag", value);
   }
-  if (docsFilters.correspondent) {
-    query.set("correspondent", docsFilters.correspondent);
+  for (const value of docsFilters.correspondent) {
+    query.append("correspondent", value);
   }
-  if (docsFilters.document_type) {
-    query.set("document_type", docsFilters.document_type);
+  for (const value of docsFilters.document_type) {
+    query.append("document_type", value);
   }
-  if (docsFilters.status) {
-    query.set("status", docsFilters.status);
+  for (const value of docsFilters.status) {
+    query.append("status", value);
   }
 
   const response = await fetch(`/documents?${query.toString()}`);
@@ -303,9 +371,10 @@ async function loadFilterOptions() {
     logActivity(`Filter options load failed: ${payload.detail || response.statusText}`);
     return;
   }
-  setSelectOptions(filterTag, payload.tags || [], "All Tags");
-  setSelectOptions(filterCorrespondent, payload.correspondents || [], "All Correspondents");
-  setSelectOptions(filterType, payload.document_types || [], "All Types");
+  setSelectOptions(filterTag, payload.tags || []);
+  setSelectOptions(filterCorrespondent, payload.correspondents || []);
+  setSelectOptions(filterType, payload.document_types || []);
+  applyFiltersToControls();
 }
 
 async function openDocumentView(documentId) {
@@ -401,24 +470,23 @@ backToDocsBtn.addEventListener("click", () => {
   setActiveNav("section-docs");
 });
 
-docsFilterForm.addEventListener("submit", async (event) => {
+docsFilterForm.addEventListener("submit", (event) => {
   event.preventDefault();
-  docsFilters.tag = filterTag.value;
-  docsFilters.correspondent = filterCorrespondent.value;
-  docsFilters.document_type = filterType.value;
-  docsFilters.status = filterStatus.value;
-  await loadDocumentsList();
 });
 
+for (const selectEl of [filterTag, filterCorrespondent, filterType, filterStatus]) {
+  selectEl.addEventListener("change", async () => {
+    await applyFiltersFromControls();
+  });
+}
+
 clearFiltersBtn.addEventListener("click", async () => {
-  docsFilters.tag = "";
-  docsFilters.correspondent = "";
-  docsFilters.document_type = "";
-  docsFilters.status = "";
-  filterTag.value = "";
-  filterCorrespondent.value = "";
-  filterType.value = "";
-  filterStatus.value = "";
+  docsFilters.tag = [];
+  docsFilters.correspondent = [];
+  docsFilters.document_type = [];
+  docsFilters.status = [];
+  applyFiltersToControls();
+  syncUrlFromFilters();
   await loadDocumentsList();
 });
 
@@ -450,8 +518,16 @@ for (const link of navLinks) {
   });
 }
 
+window.addEventListener("popstate", async () => {
+  readFiltersFromUrl();
+  await loadFilterOptions();
+  await loadDocumentsList();
+});
+
 setActiveView("section-docs");
 setActiveNav("section-docs");
+
+readFiltersFromUrl();
 
 loadFilterOptions().catch((error) => {
   logActivity(`Initial filter options failed: ${error.message}`);
