@@ -324,6 +324,46 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: rgba(199, 214, 209, 0.8);
 }
 
+.upload-dropzone {
+  border: 1px dashed #6f8f85;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 18px 14px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone:focus-visible,
+.upload-dropzone.is-drag-over {
+  background: rgba(215, 233, 225, 0.45);
+  border-color: #3d7a67;
+  outline: none;
+}
+
+.upload-dropzone-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.upload-dropzone-subtitle {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+#fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .btn {
   border: 1px solid var(--stroke);
   border-radius: 10px;

@@ -284,10 +284,23 @@
         <article id="section-upload" class="panel panel-section view view-hidden">
           <h2>Upload Document</h2>
           <form id="uploadForm" class="stack">
-            <label class="label" for="fileInput">PDF file</label>
-            <input id="fileInput" name="fileInput" type="file" accept="application/pdf" required />
+            <label class="label" for="fileInput">PDF files</label>
+            <div id="uploadDropzone" class="upload-dropzone" role="button" tabindex="0">
+              <p class="upload-dropzone-title">Drag and drop PDF files here</p>
+              <p id="uploadSelectionLabel" class="upload-dropzone-subtitle">
+                or click to select one or more files
+              </p>
+              <input
+                id="fileInput"
+                name="fileInput"
+                type="file"
+                accept="application/pdf,.pdf"
+                multiple
+                required
+              />
+            </div>
 
-            <button type="submit" class="btn btn-primary">Upload</button>
+            <button type="submit" class="btn btn-primary">Upload Selected Files</button>
           </form>
         </article>
 

@@ -13,6 +13,9 @@ const registerForm = document.getElementById("registerForm");
 const authMessage = document.getElementById("authMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const sessionUserLabel = document.getElementById("sessionUserLabel");
+const fileInput = document.getElementById("fileInput");
+const uploadDropzone = document.getElementById("uploadDropzone");
+const uploadSelectionLabel = document.getElementById("uploadSelectionLabel");
 
 const metaTitleInput = document.getElementById("metaTitle");
 const metaDateInput = document.getElementById("metaDate");
@@ -255,6 +258,52 @@ function delay(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
+}
+
+function collectPdfFiles(fileList) {
+  return [...(fileList || [])].filter((file) => {
+    const name = (file.name || "").toLowerCase();
+    return file.type === "application/pdf" || name.endsWith(".pdf");
+  });
+}
+
+function updateSelectedFilesLabel() {
+  if (!uploadSelectionLabel || !fileInput) {
+    return;
+  }
+  const files = fileInput.files ? [...fileInput.files] : [];
+  if (!files.length) {
+    uploadSelectionLabel.textContent = "or click to select one or more files";
+    return;
+  }
+  if (files.length === 1) {
+    uploadSelectionLabel.textContent = `Selected: ${files[0].name}`;
+    return;
+  }
+  uploadSelectionLabel.textContent = `Selected ${files.length} files`;
+}
+
+function setSelectedFiles(files) {
+  if (!fileInput) {
+    return;
+  }
+  const data = new DataTransfer();
+  for (const file of files) {
+    data.items.add(file);
+  }
+  fileInput.files = data.files;
+  updateSelectedFilesLabel();
+}
+
+async function uploadDocumentFile(file) {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await apiFetch("/documents", { method: "POST", body: form });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.detail || response.statusText);
+  }
+  return payload;
 }
 
 function setAuthMessage(message, isError = false) {
@@ -1166,26 +1215,81 @@ signOutBtn?.addEventListener("click", () => {
 uploadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  const fileInput = document.getElementById("fileInput");
-  const file = fileInput.files && fileInput.files[0];
-  if (!file) {
-    logActivity("Upload blocked: file is required.");
+  const files = collectPdfFiles(fileInput?.files || []);
+  if (!files.length) {
+    logActivity("Upload blocked: at least one PDF file is required.");
     return;
   }
 
-  const form = new FormData();
-  form.append("file", file);
-
-  logActivity(`Uploading ${file.name}...`);
-  const response = await apiFetch("/documents", { method: "POST", body: form });
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Upload failed: ${payload.detail || response.statusText}`);
-    return;
+  const uploadedIds = [];
+  for (const file of files) {
+    logActivity(`Uploading ${file.name}...`);
+    try {
+      const payload = await uploadDocumentFile(file);
+      uploadedIds.push(payload.id);
+      logActivity(`Uploaded ${file.name} => document ${payload.id}`);
+    } catch (error) {
+      logActivity(`Upload failed for ${file.name}: ${error.message}`);
+    }
   }
 
-  logActivity(`Uploaded ${file.name} => document ${payload.id}`);
-  navigateToDocument(payload.id);
+  updateSelectedFilesLabel();
+  if (!uploadedIds.length) {
+    return;
+  }
+  if (uploadedIds.length === 1) {
+    navigateToDocument(uploadedIds[0]);
+    return;
+  }
+  logActivity(`Uploaded ${uploadedIds.length} files.`);
+  setActiveView("section-docs");
+  setActiveNav("section-docs");
+  syncUrlFromFilters();
+  await loadDocumentsList();
+  await loadPendingDocuments();
+});
+
+fileInput?.addEventListener("change", () => {
+  updateSelectedFilesLabel();
+});
+
+uploadDropzone?.addEventListener("click", (event) => {
+  if (event.target === fileInput) {
+    return;
+  }
+  fileInput?.click();
+});
+
+uploadDropzone?.addEventListener("keydown", (event) => {
+  if (event.key !== "Enter" && event.key !== " ") {
+    return;
+  }
+  event.preventDefault();
+  fileInput?.click();
+});
+
+["dragenter", "dragover"].forEach((eventName) => {
+  uploadDropzone?.addEventListener(eventName, (event) => {
+    event.preventDefault();
+    uploadDropzone.classList.add("is-drag-over");
+  });
+});
+
+["dragleave", "drop"].forEach((eventName) => {
+  uploadDropzone?.addEventListener(eventName, (event) => {
+    event.preventDefault();
+    uploadDropzone.classList.remove("is-drag-over");
+  });
+});
+
+uploadDropzone?.addEventListener("drop", (event) => {
+  const dropped = collectPdfFiles(event.dataTransfer?.files || []);
+  if (!dropped.length) {
+    logActivity("Drop ignored: only PDF files are supported.");
+    return;
+  }
+  setSelectedFiles(dropped);
+  logActivity(`Ready to upload ${dropped.length} file(s).`);
 });
 
 documentMetaForm.addEventListener("submit", async (event) => {
