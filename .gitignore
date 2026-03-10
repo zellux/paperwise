@@ -20,6 +20,9 @@ dist/
 build/
 coverage.xml
 .coverage
+.run/
+.logs/
+*.log
 
 # Editor temp files
 *.swp
