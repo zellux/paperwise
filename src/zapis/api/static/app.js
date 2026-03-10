@@ -1,8 +1,14 @@
 const uploadForm = document.getElementById("uploadForm");
-const docLookupForm = document.getElementById("docLookupForm");
+const documentMetaForm = document.getElementById("documentMetaForm");
+const backToDocsBtn = document.getElementById("backToDocsBtn");
 
-const docIdInput = document.getElementById("docIdInput");
-const docOutput = document.getElementById("docOutput");
+const metaTitleInput = document.getElementById("metaTitle");
+const metaDateInput = document.getElementById("metaDate");
+const metaCorrespondentInput = document.getElementById("metaCorrespondent");
+const metaTypeInput = document.getElementById("metaType");
+const metaTagsInput = document.getElementById("metaTags");
+const documentSummary = document.getElementById("documentSummary");
+
 const activityOutput = document.getElementById("activityOutput");
 const docsTableBody = document.getElementById("docsTableBody");
 const tagsTableBody = document.getElementById("tagsTableBody");
@@ -11,10 +17,6 @@ const navLinks = [...document.querySelectorAll(".nav-link")];
 const views = [...document.querySelectorAll(".view")];
 
 let currentDocumentId = "";
-
-function pretty(data) {
-  return JSON.stringify(data, null, 2);
-}
 
 function formatStatus(value) {
   if (!value) {
@@ -31,16 +33,30 @@ function logActivity(message) {
   activityOutput.textContent = `[${now}] ${message}\n${activityOutput.textContent}`;
 }
 
-async function loadDocument(documentId) {
-  const response = await fetch(`/documents/${documentId}`);
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.detail || "Failed to load document");
+function setActiveNav(targetId) {
+  for (const link of navLinks) {
+    link.classList.toggle("active", link.dataset.target === targetId);
   }
-  docOutput.textContent = pretty(payload);
-  currentDocumentId = documentId;
-  docIdInput.value = documentId;
-  logActivity(`Loaded document ${documentId}`);
+}
+
+function setActiveView(targetId) {
+  for (const view of views) {
+    view.classList.toggle("view-hidden", view.id !== targetId);
+  }
+}
+
+function splitTags(value) {
+  return value
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+}
+
+function getSuggestedTitle(doc) {
+  if (doc.llm_metadata && doc.llm_metadata.suggested_title) {
+    return doc.llm_metadata.suggested_title;
+  }
+  return "(Pending title)";
 }
 
 function renderDocsList(documents) {
@@ -73,12 +89,13 @@ function renderDocsList(documents) {
     titleButton.textContent = suggestedTitle;
     titleButton.addEventListener("click", async () => {
       try {
-        await loadDocument(doc.id);
+        await openDocumentView(doc.id);
       } catch (error) {
         logActivity(error.message);
       }
     });
     titleCell.appendChild(titleButton);
+
     const typeCell = document.createElement("td");
     typeCell.textContent = documentType;
     const correspondentCell = document.createElement("td");
@@ -97,7 +114,7 @@ function renderDocsList(documents) {
     button.textContent = "Open";
     button.addEventListener("click", async () => {
       try {
-        await loadDocument(doc.id);
+        await openDocumentView(doc.id);
       } catch (error) {
         logActivity(error.message);
       }
@@ -133,13 +150,6 @@ function renderTagsList(tagStats) {
   }
 }
 
-function getSuggestedTitle(doc) {
-  if (doc.llm_metadata && doc.llm_metadata.suggested_title) {
-    return doc.llm_metadata.suggested_title;
-  }
-  return "(Pending title)";
-}
-
 function renderPendingList(documents) {
   if (!documents.length) {
     pendingTableBody.innerHTML = '<tr><td colspan="4">No pending documents.</td></tr>';
@@ -150,7 +160,19 @@ function renderPendingList(documents) {
     const row = document.createElement("tr");
 
     const titleCell = document.createElement("td");
-    titleCell.textContent = getSuggestedTitle(doc);
+    const titleButton = document.createElement("button");
+    titleButton.className = "link-button";
+    titleButton.type = "button";
+    titleButton.textContent = getSuggestedTitle(doc);
+    titleButton.addEventListener("click", async () => {
+      try {
+        await openDocumentView(doc.id);
+      } catch (error) {
+        logActivity(error.message);
+      }
+    });
+    titleCell.appendChild(titleButton);
+
     const statusCell = document.createElement("td");
     statusCell.textContent = formatStatus(doc.status);
     const createdCell = document.createElement("td");
@@ -163,7 +185,7 @@ function renderPendingList(documents) {
     button.textContent = "Open";
     button.addEventListener("click", async () => {
       try {
-        await loadDocument(doc.id);
+        await openDocumentView(doc.id);
       } catch (error) {
         logActivity(error.message);
       }
@@ -175,18 +197,6 @@ function renderPendingList(documents) {
     row.appendChild(createdCell);
     row.appendChild(actionCell);
     pendingTableBody.appendChild(row);
-  }
-}
-
-function setActiveNav(targetId) {
-  for (const link of navLinks) {
-    link.classList.toggle("active", link.dataset.target === targetId);
-  }
-}
-
-function setActiveView(targetId) {
-  for (const view of views) {
-    view.classList.toggle("view-hidden", view.id !== targetId);
   }
 }
 
@@ -223,6 +233,30 @@ async function loadTagStats() {
   logActivity(`Loaded ${payload.length} tag(s)`);
 }
 
+async function openDocumentView(documentId) {
+  const response = await fetch(`/documents/${documentId}/detail`);
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.detail || "Failed to load document detail");
+  }
+
+  const doc = payload.document;
+  const metadata = payload.llm_metadata;
+  currentDocumentId = doc.id;
+
+  metaTitleInput.value = metadata?.suggested_title || doc.filename;
+  metaDateInput.value = metadata?.document_date || "";
+  metaCorrespondentInput.value = metadata?.correspondent || "";
+  metaTypeInput.value = metadata?.document_type || "";
+  metaTagsInput.value = metadata?.tags?.join(", ") || "";
+
+  documentSummary.textContent = `ID: ${doc.id} | File: ${doc.filename} | Status: ${formatStatus(doc.status)} | Created: ${new Date(doc.created_at).toLocaleString()}`;
+
+  setActiveView("section-document");
+  setActiveNav("section-document");
+  logActivity(`Opened document ${documentId}`);
+}
+
 uploadForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -247,25 +281,47 @@ uploadForm.addEventListener("submit", async (event) => {
   }
 
   logActivity(`Uploaded ${file.name} => document ${payload.id}`);
-  await loadDocument(payload.id);
   await loadDocumentsList();
   await loadPendingDocuments();
   await loadTagStats();
+  await openDocumentView(payload.id);
   logActivity("Automatic analysis queued (parse + LLM enrichment).");
 });
 
-docLookupForm.addEventListener("submit", async (event) => {
+documentMetaForm.addEventListener("submit", async (event) => {
   event.preventDefault();
-  const documentId = docIdInput.value.trim();
-  if (!documentId) {
+  if (!currentDocumentId) {
+    logActivity("No document selected.");
     return;
   }
 
-  try {
-    await loadDocument(documentId);
-  } catch (error) {
-    logActivity(error.message);
+  const response = await fetch(`/documents/${currentDocumentId}/metadata`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      suggested_title: metaTitleInput.value.trim(),
+      document_date: metaDateInput.value || null,
+      correspondent: metaCorrespondentInput.value.trim(),
+      document_type: metaTypeInput.value.trim(),
+      tags: splitTags(metaTagsInput.value),
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Metadata save failed: ${payload.detail || response.statusText}`);
+    return;
   }
+
+  logActivity(`Saved metadata for ${currentDocumentId}`);
+  await openDocumentView(currentDocumentId);
+  await loadDocumentsList();
+  await loadPendingDocuments();
+  await loadTagStats();
+});
+
+backToDocsBtn.addEventListener("click", () => {
+  setActiveView("section-docs");
+  setActiveNav("section-docs");
 });
 
 for (const link of navLinks) {
@@ -287,11 +343,16 @@ for (const link of navLinks) {
     }
     if (targetId === "section-pending") {
       await loadPendingDocuments();
+      return;
+    }
+    if (targetId === "section-document" && currentDocumentId) {
+      await openDocumentView(currentDocumentId);
     }
   });
 }
 
 setActiveView("section-docs");
+setActiveNav("section-docs");
 
 loadDocumentsList().catch((error) => {
   logActivity(`Initial document list failed: ${error.message}`);

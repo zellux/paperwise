@@ -24,6 +24,7 @@
         <p class="subhead">Two-pane workspace for ingest, review, parse, and metadata ops.</p>
         <nav class="nav">
           <button class="nav-link active" data-target="section-docs" type="button">Documents</button>
+          <button class="nav-link" data-target="section-document" type="button">Document</button>
           <button class="nav-link" data-target="section-tags" type="button">Tags</button>
           <button class="nav-link" data-target="section-pending" type="button">Pending Analysis</button>
           <button class="nav-link" data-target="section-upload" type="button">Upload</button>
@@ -54,17 +55,32 @@
               </tbody>
             </table>
           </div>
-          <form id="docLookupForm" class="inline-form">
-            <input
-              id="docIdInput"
-              name="docIdInput"
-              type="text"
-              placeholder="Paste document ID"
-              required
-            />
-            <button type="submit" class="btn">Load</button>
+        </article>
+
+        <article id="section-document" class="panel panel-section view view-hidden">
+          <h2>Document</h2>
+          <p id="documentSummary" class="subhead">No document selected.</p>
+          <form id="documentMetaForm" class="stack">
+            <label class="label" for="metaTitle">Title</label>
+            <input id="metaTitle" name="metaTitle" type="text" required />
+
+            <label class="label" for="metaDate">Date</label>
+            <input id="metaDate" name="metaDate" type="date" />
+
+            <label class="label" for="metaCorrespondent">Correspondent</label>
+            <input id="metaCorrespondent" name="metaCorrespondent" type="text" required />
+
+            <label class="label" for="metaType">Document Type</label>
+            <input id="metaType" name="metaType" type="text" required />
+
+            <label class="label" for="metaTags">Tags (comma separated)</label>
+            <input id="metaTags" name="metaTags" type="text" />
+
+            <div class="actions">
+              <button id="saveMetadataBtn" type="submit" class="btn btn-primary">Save Metadata</button>
+              <button id="backToDocsBtn" type="button" class="btn">Back to Documents</button>
+            </div>
           </form>
-          <pre id="docOutput" class="output">No document loaded yet.</pre>
         </article>
 
         <article id="section-tags" class="panel panel-section view view-hidden">

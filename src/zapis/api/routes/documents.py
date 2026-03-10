@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
@@ -90,6 +90,19 @@ class TagStatResponse(BaseModel):
     document_count: int
 
 
+class DocumentDetailResponse(BaseModel):
+    document: DocumentResponse
+    llm_metadata: DocumentListMetadata | None = None
+
+
+class MetadataUpdateRequest(BaseModel):
+    suggested_title: str
+    document_date: str | None = None
+    correspondent: str
+    document_type: str
+    tags: list[str]
+
+
 PENDING_STATUSES = {
     DocumentStatus.RECEIVED,
     DocumentStatus.PARSING,
@@ -97,6 +110,54 @@ PENDING_STATUSES = {
     DocumentStatus.ENRICHING,
     DocumentStatus.PROCESSING,
 }
+
+
+def _normalize_name(value: str) -> str:
+    cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
+    return " ".join(cleaned.split())
+
+
+def _to_title_case(value: str) -> str:
+    cleaned = " ".join(value.strip().split())
+    return cleaned.title()
+
+
+def _resolve_existing_name(candidate: str, existing: list[str], fallback: str) -> tuple[str, bool]:
+    normalized_candidate = _normalize_name(candidate)
+    if not normalized_candidate:
+        return fallback, False
+    for name in existing:
+        if _normalize_name(name) == normalized_candidate:
+            return name, False
+    return _to_title_case(candidate), True
+
+
+def _validate_date(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
+    except ValueError:
+        return None
+
+
+def _resolve_tags(candidate_tags: list[str], existing_tags: list[str]) -> tuple[list[str], list[str]]:
+    existing_by_norm = {_normalize_name(tag): tag for tag in existing_tags}
+    resolved: list[str] = []
+    created: list[str] = []
+    seen: set[str] = set()
+    for tag in candidate_tags:
+        normalized = _normalize_name(tag)
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        if normalized in existing_by_norm:
+            resolved.append(existing_by_norm[normalized])
+            continue
+        created_tag = _to_title_case(tag)
+        resolved.append(created_tag)
+        created.append(created_tag)
+    return resolved, created
 
 
 def _to_response(document: Document) -> DocumentResponse:
@@ -137,6 +198,26 @@ def _to_list_item_response(
         status=document.status.value,
         created_at=document.created_at,
         llm_metadata=metadata,
+    )
+
+
+def _to_detail_response(
+    document: Document,
+    llm_result: LLMParseResult | None,
+) -> DocumentDetailResponse:
+    return DocumentDetailResponse(
+        document=_to_response(document),
+        llm_metadata=(
+            DocumentListMetadata(
+                suggested_title=llm_result.suggested_title,
+                document_date=llm_result.document_date,
+                correspondent=llm_result.correspondent,
+                document_type=llm_result.document_type,
+                tags=llm_result.tags,
+            )
+            if llm_result is not None
+            else None
+        ),
     )
 
 
@@ -266,6 +347,21 @@ def get_document_endpoint(
     return _to_response(document)
 
 
+@router.get("/{document_id}/detail", response_model=DocumentDetailResponse)
+def get_document_detail_endpoint(
+    document_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> DocumentDetailResponse:
+    document = get_document(document_id=document_id, repository=repository)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+    llm_result = repository.get_llm_parse_result(document_id)
+    return _to_detail_response(document=document, llm_result=llm_result)
+
+
 @router.post("/{document_id}/parse", response_model=ParseResultResponse)
 def parse_document_endpoint(
     document_id: str,
@@ -381,6 +477,63 @@ def get_llm_parse_document_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="LLM parse result not found",
         )
+    return _to_llm_parse_response(result)
+
+
+@router.patch("/{document_id}/metadata", response_model=LLMParseResultResponse)
+def update_document_metadata_endpoint(
+    document_id: str,
+    payload: MetadataUpdateRequest,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> LLMParseResultResponse:
+    document = get_document(document_id=document_id, repository=repository)
+    if document is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    correspondents = repository.list_correspondents()
+    document_types = repository.list_document_types()
+    existing_tags = repository.list_tags()
+
+    correspondent, created_correspondent = _resolve_existing_name(
+        payload.correspondent,
+        correspondents,
+        fallback="Unknown Sender",
+    )
+    document_type, created_document_type = _resolve_existing_name(
+        payload.document_type,
+        document_types,
+        fallback="General Document",
+    )
+    tags, created_tags = _resolve_tags(payload.tags, existing_tags)
+
+    if created_correspondent:
+        repository.add_correspondent(correspondent)
+    if created_document_type:
+        repository.add_document_type(document_type)
+    if created_tags:
+        repository.add_tags(created_tags)
+
+    result = LLMParseResult(
+        document_id=document_id,
+        suggested_title=payload.suggested_title.strip() or document.filename,
+        document_date=_validate_date(payload.document_date),
+        correspondent=correspondent,
+        document_type=document_type,
+        tags=tags,
+        created_correspondent=created_correspondent,
+        created_document_type=created_document_type,
+        created_tags=created_tags,
+        created_at=datetime.now(UTC),
+    )
+    repository.save_llm_parse_result(result)
+    _set_document_status(
+        document=document,
+        repository=repository,
+        status_value=DocumentStatus.READY,
+    )
     return _to_llm_parse_response(result)
 
 

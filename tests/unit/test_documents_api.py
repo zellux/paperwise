@@ -213,6 +213,56 @@ def test_list_pending_documents_excludes_ready() -> None:
         app.dependency_overrides.clear()
 
 
+def test_update_document_metadata_upserts_and_updates_taxonomy() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    repository.add_correspondent("Experian")
+    repository.add_document_type("Credit Report")
+    repository.add_tags(["Credit"])
+
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            data={"owner_id": "user-edit"},
+            files={"file": ("statement.pdf", b"%PDF-1.7\nstatement", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        doc_id = create_response.json()["id"]
+
+        update_response = client.patch(
+            f"/documents/{doc_id}/metadata",
+            json={
+                "suggested_title": "March Statement",
+                "document_date": "2026-03-05",
+                "correspondent": "experian",
+                "document_type": "credit report",
+                "tags": ["credit", "financial"],
+            },
+        )
+        assert update_response.status_code == 200
+        payload = update_response.json()
+        assert payload["suggested_title"] == "March Statement"
+        assert payload["correspondent"] == "Experian"
+        assert payload["document_type"] == "Credit Report"
+        assert payload["tags"] == ["Credit", "Financial"]
+        assert payload["created_tags"] == ["Financial"]
+
+        detail_response = client.get(f"/documents/{doc_id}/detail")
+        assert detail_response.status_code == 200
+        detail = detail_response.json()
+        assert detail["llm_metadata"]["suggested_title"] == "March Statement"
+        assert detail["document"]["status"] == "ready"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_parse_document_roundtrip() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()
