@@ -11,6 +11,7 @@ from paperwise.domain.models import (
     HistoryEventType,
     LLMParseResult,
     ParseResult,
+    UserPreference,
     User,
 )
 from paperwise.infrastructure.db import Base, build_engine, build_session_factory
@@ -22,6 +23,7 @@ from paperwise.infrastructure.repositories.postgres_models import (
     LLMParseResultRow,
     ParseResultRow,
     TagRow,
+    UserPreferenceRow,
     UserRow,
 )
 
@@ -413,3 +415,22 @@ class PostgresDocumentRepository(DocumentRepository):
                 )
                 for row in rows
             ]
+
+    def save_user_preference(self, preference: UserPreference) -> None:
+        with self._session_factory() as session:
+            row = session.get(UserPreferenceRow, preference.user_id)
+            if row is None:
+                row = UserPreferenceRow(user_id=preference.user_id)
+                session.add(row)
+            row.preferences = dict(preference.preferences or {})
+            session.commit()
+
+    def get_user_preference(self, user_id: str) -> UserPreference | None:
+        with self._session_factory() as session:
+            row = session.get(UserPreferenceRow, user_id)
+            if row is None:
+                return None
+            return UserPreference(
+                user_id=row.user_id,
+                preferences=dict(row.preferences or {}),
+            )

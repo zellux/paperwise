@@ -82,3 +82,9 @@ class User:
     password_hash: str
     is_active: bool
     created_at: datetime
+
+
+@dataclass(slots=True)
+class UserPreference:
+    user_id: str
+    preferences: dict[str, Any]

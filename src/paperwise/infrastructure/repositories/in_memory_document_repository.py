@@ -1,7 +1,14 @@
 from threading import RLock
 
 from paperwise.application.interfaces import DocumentRepository
-from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult, ParseResult, User
+from paperwise.domain.models import (
+    Document,
+    DocumentHistoryEvent,
+    LLMParseResult,
+    ParseResult,
+    UserPreference,
+    User,
+)
 
 
 def _normalize_name(value: str) -> str:
@@ -44,6 +51,7 @@ class InMemoryDocumentRepository(DocumentRepository):
         self._documents: dict[str, Document] = {}
         self._users: dict[str, User] = {}
         self._users_by_email: dict[str, User] = {}
+        self._user_preferences: dict[str, UserPreference] = {}
         self._parse_results: dict[str, ParseResult] = {}
         self._llm_parse_results: dict[str, LLMParseResult] = {}
         self._history: dict[str, list[DocumentHistoryEvent]] = {}
@@ -204,3 +212,20 @@ class InMemoryDocumentRepository(DocumentRepository):
                 reverse=True,
             )
             return users[:limit]
+
+    def save_user_preference(self, preference: UserPreference) -> None:
+        with self._lock:
+            self._user_preferences[preference.user_id] = UserPreference(
+                user_id=preference.user_id,
+                preferences=dict(preference.preferences or {}),
+            )
+
+    def get_user_preference(self, user_id: str) -> UserPreference | None:
+        with self._lock:
+            preference = self._user_preferences.get(user_id)
+            if preference is None:
+                return None
+            return UserPreference(
+                user_id=preference.user_id,
+                preferences=dict(preference.preferences or {}),
+            )

@@ -5,6 +5,7 @@ from paperwise.domain.models import (
     DocumentHistoryEvent,
     LLMParseResult,
     ParseResult,
+    UserPreference,
     User,
 )
 
@@ -107,6 +108,12 @@ class DocumentRepository(Protocol):
 
     def list_users(self, limit: int = 100) -> list[User]:
         """List users ordered newest-first."""
+
+    def save_user_preference(self, preference: UserPreference) -> None:
+        """Persist user preferences payload."""
+
+    def get_user_preference(self, user_id: str) -> UserPreference | None:
+        """Load user preferences by user ID."""
 
 
 class IngestionDispatcher(Protocol):

@@ -82,12 +82,124 @@ const VIEW_ID_TO_PATH = {
 let currentDocumentId = "";
 let authToken = window.localStorage.getItem("paperwise.auth.token") || "";
 let currentUser = null;
-const docsFilters = {
+let userPreferenceSaveTimer = null;
+let docsFilters = {
   tag: [],
   correspondent: [],
   document_type: [],
   status: ["ready"],
 };
+
+function cloneDocsFilters(filters) {
+  return {
+    tag: [...(filters?.tag || [])],
+    correspondent: [...(filters?.correspondent || [])],
+    document_type: [...(filters?.document_type || [])],
+    status: [...(filters?.status || ["ready"])],
+  };
+}
+
+function sanitizeDocsFilters(filters) {
+  const normalized = cloneDocsFilters(filters);
+  normalized.tag = unique(normalized.tag);
+  normalized.correspondent = unique(normalized.correspondent);
+  normalized.document_type = unique(normalized.document_type);
+  normalized.status = unique(normalized.status);
+  if (!normalized.status.length) {
+    normalized.status = ["ready"];
+  }
+  return normalized;
+}
+
+function hasExplicitNavigationState() {
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
+  const params = new URLSearchParams(window.location.search);
+  if (params.toString()) {
+    return true;
+  }
+  return path !== "/" && path !== "/ui/documents";
+}
+
+async function loadUserPreferences() {
+  if (!authToken || !currentUser) {
+    return {};
+  }
+  try {
+    const response = await apiFetch("/users/me/preferences");
+    const payload = await response.json();
+    if (!response.ok) {
+      logActivity(`Preference load failed: ${payload.detail || response.statusText}`);
+      return {};
+    }
+    return payload.preferences || {};
+  } catch (error) {
+    logActivity(`Preference load failed: ${error.message}`);
+    return {};
+  }
+}
+
+async function saveUserPreferences() {
+  if (!authToken || !currentUser) {
+    return;
+  }
+  const payload = {
+    preferences: {
+      docs_filters: sanitizeDocsFilters(docsFilters),
+      last_view: currentViewId,
+    },
+  };
+  try {
+    const response = await apiFetch("/users/me/preferences", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      logActivity(`Preference save failed: ${body.detail || response.statusText}`);
+    }
+  } catch (error) {
+    logActivity(`Preference save failed: ${error.message}`);
+  }
+}
+
+function scheduleUserPreferenceSave() {
+  if (!authToken || !currentUser) {
+    return;
+  }
+  if (userPreferenceSaveTimer) {
+    window.clearTimeout(userPreferenceSaveTimer);
+  }
+  userPreferenceSaveTimer = window.setTimeout(() => {
+    userPreferenceSaveTimer = null;
+    saveUserPreferences().catch(() => {});
+  }, 250);
+}
+
+function applyUserPreferences(preferences) {
+  if (!preferences || typeof preferences !== "object") {
+    return;
+  }
+  if (preferences.docs_filters && typeof preferences.docs_filters === "object") {
+    docsFilters = sanitizeDocsFilters(preferences.docs_filters);
+  }
+  if (
+    typeof preferences.last_view === "string" &&
+    views.some((view) => view.id === preferences.last_view)
+  ) {
+    currentViewId = preferences.last_view;
+  }
+}
+
+async function hydrateUserPreferencesForSession() {
+  if (hasExplicitNavigationState()) {
+    readFiltersFromUrl();
+    return;
+  }
+  const preferences = await loadUserPreferences();
+  applyUserPreferences(preferences);
+  syncUrlFromFilters();
+}
 
 // Avoid auth-gate flash on page load when we already have a stored token.
 if (authToken && authGate && appShell) {
@@ -344,6 +456,13 @@ function renderSessionState() {
 
 function clearSession() {
   persistSession("", null);
+  docsFilters = sanitizeDocsFilters({
+    tag: [],
+    correspondent: [],
+    document_type: [],
+    status: ["ready"],
+  });
+  currentViewId = "section-docs";
   renderSessionState();
 }
 
@@ -727,6 +846,7 @@ function syncUrlFromFilters() {
 
   const qs = url.searchParams.toString();
   window.history.replaceState(null, "", qs ? `${url.pathname}?${qs}` : url.pathname);
+  scheduleUserPreferenceSave();
 }
 
 function readFiltersFromUrl() {
@@ -1225,6 +1345,10 @@ signInForm?.addEventListener("submit", async (event) => {
   persistSession(payload.access_token, payload.user);
   renderSessionState();
   setAuthMessage(`Signed in as ${payload.user.email}.`);
+  await hydrateUserPreferencesForSession();
+  applyFiltersToControls();
+  setActiveView(currentViewId);
+  setActiveNav(currentViewId);
   await loadDocumentsList();
   await loadTagStats();
   await loadDocumentTypeStats();
@@ -1263,6 +1387,10 @@ registerForm?.addEventListener("submit", async (event) => {
   persistSession(loginPayload.access_token, loginPayload.user);
   renderSessionState();
   setAuthMessage(`Registered ${registerPayload.email}.`);
+  await hydrateUserPreferencesForSession();
+  applyFiltersToControls();
+  setActiveView(currentViewId);
+  setActiveNav(currentViewId);
   await loadDocumentsList();
   await loadTagStats();
   await loadDocumentTypeStats();
@@ -1541,7 +1669,7 @@ async function initializeApp() {
     return;
   }
 
-  readFiltersFromUrl();
+  await hydrateUserPreferencesForSession();
   applyFiltersToControls();
   setActiveView(currentViewId);
   setActiveNav(currentViewId);

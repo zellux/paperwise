@@ -85,3 +85,10 @@ class UserRow(Base):
     password_hash: Mapped[str] = mapped_column(String(512))
     is_active: Mapped[bool]
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class UserPreferenceRow(Base):
+    __tablename__ = "user_preferences"
+
+    user_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    preferences: Mapped[dict] = mapped_column(JSON)

@@ -102,3 +102,57 @@ def test_login_user_success_and_failure() -> None:
         assert me_response.json()["email"] == "login@example.com"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_user_preferences_round_trip() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "prefs@example.com",
+                "full_name": "Prefs User",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "prefs@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+        token = login_response.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        get_empty = client.get("/users/me/preferences", headers=headers)
+        assert get_empty.status_code == 200
+        assert get_empty.json()["preferences"] == {}
+
+        put_response = client.put(
+            "/users/me/preferences",
+            headers=headers,
+            json={
+                "preferences": {
+                    "last_view": "section-tags",
+                    "docs_filters": {
+                        "tag": ["Credit"],
+                        "correspondent": [],
+                        "document_type": [],
+                        "status": ["ready"],
+                    },
+                }
+            },
+        )
+        assert put_response.status_code == 200
+        assert put_response.json()["preferences"]["last_view"] == "section-tags"
+
+        get_saved = client.get("/users/me/preferences", headers=headers)
+        assert get_saved.status_code == 200
+        assert get_saved.json()["preferences"]["last_view"] == "section-tags"
+        assert get_saved.json()["preferences"]["docs_filters"]["tag"] == ["Credit"]
+    finally:
+        app.dependency_overrides.clear()

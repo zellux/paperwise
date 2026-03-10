@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -16,6 +17,7 @@ from paperwise.application.services.users import (
     create_user,
 )
 from paperwise.domain.models import User
+from paperwise.domain.models import UserPreference
 from paperwise.infrastructure.config import Settings
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -44,6 +46,14 @@ class LoginResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     user: UserResponse
+
+
+class UserPreferenceRequest(BaseModel):
+    preferences: dict[str, Any]
+
+
+class UserPreferenceResponse(BaseModel):
+    preferences: dict[str, Any]
 
 
 def _to_user_response(user: User) -> UserResponse:
@@ -130,3 +140,23 @@ def login_user_endpoint(
         ttl_seconds=settings.auth_token_ttl_seconds,
     )
     return LoginResponse(access_token=token, user=_to_user_response(user))
+
+
+@router.get("/me/preferences", response_model=UserPreferenceResponse)
+def get_me_preferences_endpoint(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> UserPreferenceResponse:
+    preference = repository.get_user_preference(current_user.id)
+    return UserPreferenceResponse(preferences=dict(preference.preferences) if preference else {})
+
+
+@router.put("/me/preferences", response_model=UserPreferenceResponse)
+def put_me_preferences_endpoint(
+    payload: UserPreferenceRequest,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> UserPreferenceResponse:
+    preference = UserPreference(user_id=current_user.id, preferences=dict(payload.preferences))
+    repository.save_user_preference(preference)
+    return UserPreferenceResponse(preferences=dict(preference.preferences))
