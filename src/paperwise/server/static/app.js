@@ -1498,6 +1498,14 @@ function createActionIcon(name) {
     addPath("M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z");
     return svg;
   }
+  if (name === "trash") {
+    addPath("M3 6h18");
+    addPath("M8 6V4h8v2");
+    addPath("M19 6l-1 14H6L5 6");
+    addLine("10", "11", "10", "17");
+    addLine("14", "11", "14", "17");
+    return svg;
+  }
 
   addPath("M12 5v14");
   addPath("M5 12h14");
@@ -1915,7 +1923,7 @@ function renderCollectionsTable() {
     );
     actionsWrap.appendChild(
       createIconActionButton({
-        icon: "external-link",
+        icon: "trash",
         label: `Delete collection ${collection.name}`,
         onClick: async () => {
           const confirmed = window.confirm(`Delete collection "${collection.name}"?`);
@@ -2001,7 +2009,7 @@ function renderSearchCollectionDocumentsTable() {
     actionsWrap.className = "table-actions";
     actionsWrap.appendChild(
       createIconActionButton({
-        icon: "external-link",
+        icon: "trash",
         label: "Remove from collection",
         onClick: async () => {
           await removeDocumentFromSearchCollection(searchSelectedCollectionId, documentId);
@@ -2114,6 +2122,45 @@ function renderSearchAskAnswer(payload) {
   }
 }
 
+function setButtonBusy(button, busy, busyLabel = "Loading...") {
+  if (!button) {
+    return;
+  }
+  if (busy) {
+    if (!button.dataset.originalLabel) {
+      button.dataset.originalLabel = button.textContent || "";
+    }
+    button.textContent = busyLabel;
+    button.disabled = true;
+    return;
+  }
+  button.disabled = false;
+  if (button.dataset.originalLabel) {
+    button.textContent = button.dataset.originalLabel;
+  }
+}
+
+async function fetchAllDocumentsForSearchCatalog() {
+  const limit = 200;
+  const maxDocuments = 5000;
+  let offset = 0;
+  let allDocuments = [];
+  while (offset < maxDocuments) {
+    const response = await apiFetch(`/documents?limit=${limit}&offset=${offset}`);
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload.detail || response.statusText);
+    }
+    const page = Array.isArray(payload) ? payload : [];
+    allDocuments = allDocuments.concat(page);
+    if (page.length < limit) {
+      break;
+    }
+    offset += limit;
+  }
+  return allDocuments.slice(0, maxDocuments);
+}
+
 async function loadSearchCollections() {
   const requestSeq = ++searchCollectionsRequestSeq;
   renderTableLoading(collectionsTableBody, 3, "Loading collections...");
@@ -2146,21 +2193,19 @@ async function loadSearchDocumentsCatalog() {
     searchCollectionDocPicker.innerHTML = "";
     searchCollectionDocPicker.disabled = true;
   }
-  const response = await apiFetch("/documents?limit=2000&offset=0");
-  if (requestSeq !== searchDocsCatalogRequestSeq) {
-    return;
-  }
-  const payload = await response.json();
-  if (requestSeq !== searchDocsCatalogRequestSeq) {
-    return;
-  }
-  if (!response.ok) {
-    logActivity(`Search document catalog load failed: ${payload.detail || response.statusText}`);
+  try {
+    const payload = await fetchAllDocumentsForSearchCatalog();
+    if (requestSeq !== searchDocsCatalogRequestSeq) {
+      return;
+    }
+    searchDocsCatalog = payload;
+  } catch (error) {
+    if (requestSeq !== searchDocsCatalogRequestSeq) {
+      return;
+    }
+    logActivity(`Search document catalog load failed: ${error.message}`);
     searchDocsCatalog = [];
-    renderSearchCollectionDocPicker();
-    return;
   }
-  searchDocsCatalog = Array.isArray(payload) ? payload : [];
   renderSearchCollectionDocPicker();
 }
 
@@ -2200,26 +2245,31 @@ async function createSearchCollection() {
     logActivity("Collection name is required.");
     return;
   }
-  const response = await apiFetch("/collections", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, description }),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Collection create failed: ${payload.detail || response.statusText}`);
-    return;
+  setButtonBusy(searchCollectionCreateForm?.querySelector("button[type='submit']"), true, "Creating...");
+  try {
+    const response = await apiFetch("/collections", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      logActivity(`Collection create failed: ${payload.detail || response.statusText}`);
+      return;
+    }
+    if (searchCollectionNameInput) {
+      searchCollectionNameInput.value = "";
+    }
+    if (searchCollectionDescriptionInput) {
+      searchCollectionDescriptionInput.value = "";
+    }
+    searchSelectedCollectionId = payload.id || "";
+    await loadSearchCollections();
+    await loadSearchCollectionDocuments(searchSelectedCollectionId);
+    logActivity(`Created collection: ${payload.name}`);
+  } finally {
+    setButtonBusy(searchCollectionCreateForm?.querySelector("button[type='submit']"), false);
   }
-  if (searchCollectionNameInput) {
-    searchCollectionNameInput.value = "";
-  }
-  if (searchCollectionDescriptionInput) {
-    searchCollectionDescriptionInput.value = "";
-  }
-  searchSelectedCollectionId = payload.id || "";
-  await loadSearchCollections();
-  await loadSearchCollectionDocuments(searchSelectedCollectionId);
-  logActivity(`Created collection: ${payload.name}`);
 }
 
 async function deleteSearchCollection(collectionId) {
@@ -2286,25 +2336,30 @@ async function runScopedKeywordSearch() {
   const limit = Math.max(1, Math.min(100, Number(searchKeywordLimitSelect?.value || 20)));
   renderTableLoading(searchResultsTableBody, 6, "Searching...");
   renderSearchResultsMeta(`Searching ${getSearchScopeLabel()}...`);
-  const path = searchSelectedCollectionId
-    ? `/collections/${searchSelectedCollectionId}/search`
-    : "/collections/search";
-  const response = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, limit }),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Search failed: ${payload.detail || response.statusText}`);
-    renderSearchResultsTable({ hits: [] });
-    renderSearchResultsMeta("Search failed.");
-    return;
+  setButtonBusy(searchKeywordForm?.querySelector("button[type='submit']"), true, "Searching...");
+  try {
+    const path = searchSelectedCollectionId
+      ? `/collections/${searchSelectedCollectionId}/search`
+      : "/collections/search";
+    const response = await apiFetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, limit }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      logActivity(`Search failed: ${payload.detail || response.statusText}`);
+      renderSearchResultsTable({ hits: [] });
+      renderSearchResultsMeta("Search failed.");
+      return;
+    }
+    renderSearchResultsTable(payload);
+    const totalHits = Number(payload.total_hits || 0);
+    renderSearchResultsMeta(`Found ${totalHits} result(s) in ${getSearchScopeLabel()}.`);
+    logActivity(`Search completed: ${totalHits} result(s).`);
+  } finally {
+    setButtonBusy(searchKeywordForm?.querySelector("button[type='submit']"), false);
   }
-  renderSearchResultsTable(payload);
-  const totalHits = Number(payload.total_hits || 0);
-  renderSearchResultsMeta(`Found ${totalHits} result(s) in ${getSearchScopeLabel()}.`);
-  logActivity(`Search completed: ${totalHits} result(s).`);
 }
 
 async function runScopedAsk() {
@@ -2323,26 +2378,31 @@ async function runScopedAsk() {
     insufficient_evidence: false,
     citations: [],
   });
-  const path = searchSelectedCollectionId
-    ? `/collections/${searchSelectedCollectionId}/ask`
-    : "/collections/ask";
-  const response = await apiFetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, top_k_chunks: topK }),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    renderSearchAskAnswer({
-      answer: payload.detail || response.statusText,
-      insufficient_evidence: true,
-      citations: [],
+  setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), true, "Asking...");
+  try {
+    const path = searchSelectedCollectionId
+      ? `/collections/${searchSelectedCollectionId}/ask`
+      : "/collections/ask";
+    const response = await apiFetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question, top_k_chunks: topK }),
     });
-    logActivity(`Ask failed: ${payload.detail || response.statusText}`);
-    return;
+    const payload = await response.json();
+    if (!response.ok) {
+      renderSearchAskAnswer({
+        answer: payload.detail || response.statusText,
+        insufficient_evidence: true,
+        citations: [],
+      });
+      logActivity(`Ask failed: ${payload.detail || response.statusText}`);
+      return;
+    }
+    renderSearchAskAnswer(payload);
+    logActivity(`Grounded ask completed in ${getSearchScopeLabel()}.`);
+  } finally {
+    setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), false);
   }
-  renderSearchAskAnswer(payload);
-  logActivity(`Grounded ask completed in ${getSearchScopeLabel()}.`);
 }
 
 async function initializeSearchView() {
