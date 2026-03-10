@@ -31,19 +31,19 @@ class SimpleLLMProvider(LLMProvider):
         if "credit" in text or "experian" in text:
             document_type = "Credit Report"
             correspondent = "Experian"
-            tags = ["credit", "report"]
+            tags = ["Credit", "Report"]
         elif "invoice" in text:
             document_type = "Invoice"
             correspondent = "Unknown Vendor"
-            tags = ["invoice"]
+            tags = ["Invoice"]
         elif "vaccine" in text or "immunization" in text:
             document_type = "Medical Record"
             correspondent = "Healthcare Provider"
-            tags = ["medical", "health"]
+            tags = ["Medical", "Health"]
         else:
             document_type = "General Document"
             correspondent = "Unknown Sender"
-            tags = ["document"]
+            tags = ["Document"]
 
         return {
             "suggested_title": title,

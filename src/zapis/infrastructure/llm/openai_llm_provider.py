@@ -38,7 +38,9 @@ class OpenAILLMProvider(LLMProvider):
             "You extract metadata for scanned documents. "
             "Return strict JSON with keys: suggested_title, document_date, "
             "correspondent, document_type, tags. "
-            "document_date must be YYYY-MM-DD or null. tags must be an array of strings."
+            "document_date must be YYYY-MM-DD or null. "
+            "tags must be an array of strings in Title Case (for example: Credit Report). "
+            "When reusing existing taxonomy names, copy the existing names exactly."
         )
         user_prompt = {
             "filename": filename,
@@ -49,7 +51,7 @@ class OpenAILLMProvider(LLMProvider):
             "guidance": (
                 "Prefer existing taxonomy names when appropriate. "
                 "Only propose new names when no existing option is a good match. "
-                "Prefer Title Case for new document_type and tag names."
+                "Use Title Case for document_type and every tag (for example: Credit Report)."
             ),
         }
 
