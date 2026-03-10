@@ -420,6 +420,8 @@ def list_documents_endpoint(
     normalized_correspondents = _normalized_values(correspondent)
     normalized_document_types = _normalized_values(document_type)
     normalized_statuses = _normalized_values(status)
+    if not normalized_statuses:
+        normalized_statuses = {_normalize_name(DocumentStatus.READY.value)}
 
     results: list[DocumentListItemResponse] = []
     for document in documents:

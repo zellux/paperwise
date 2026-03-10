@@ -143,13 +143,19 @@ def test_list_documents() -> None:
             )
             assert create_response.status_code == 201
 
+        # Default list is constrained to ready documents.
         list_response = client.get("/documents")
         assert list_response.status_code == 200
         payload = list_response.json()
-        assert len(payload) >= 2
-        assert payload[0]["filename"] in {"a.pdf", "b.pdf"}
-        assert "llm_metadata" in payload[0]
-        assert payload[0]["llm_metadata"] is None
+        assert payload == []
+
+        processing_list_response = client.get("/documents?status=processing")
+        assert processing_list_response.status_code == 200
+        processing_payload = processing_list_response.json()
+        assert len(processing_payload) >= 2
+        assert processing_payload[0]["filename"] in {"a.pdf", "b.pdf"}
+        assert "llm_metadata" in processing_payload[0]
+        assert processing_payload[0]["llm_metadata"] is None
     finally:
         app.dependency_overrides.clear()
 

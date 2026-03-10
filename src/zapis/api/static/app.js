@@ -70,7 +70,7 @@ const docsFilters = {
   tag: [],
   correspondent: [],
   document_type: [],
-  status: [],
+  status: ["ready"],
 };
 
 function formatStatus(value) {
@@ -557,7 +557,7 @@ function refreshFilterOptionsFromDocuments(documents) {
   setSelectOptions(filterTag, [...tags]);
   setSelectOptions(filterCorrespondent, [...correspondents]);
   setSelectOptions(filterType, [...documentTypes]);
-  setSelectOptions(filterStatus, [...statuses]);
+  setSelectOptions(filterStatus, ["received", "processing", "ready", ...statuses]);
 }
 
 function syncUrlFromFilters() {
@@ -594,7 +594,8 @@ function readFiltersFromUrl() {
   docsFilters.tag = unique(params.getAll("tag"));
   docsFilters.correspondent = unique(params.getAll("correspondent"));
   docsFilters.document_type = unique(params.getAll("document_type"));
-  docsFilters.status = unique(params.getAll("status"));
+  const statusValues = unique(params.getAll("status"));
+  docsFilters.status = statusValues.length ? statusValues : ["ready"];
   const viewFromUrl = params.get("view");
   const mappedViewId = viewFromUrl ? (VIEW_PARAM_TO_ID[viewFromUrl] || viewFromUrl) : "";
   const pathViewId = getCurrentPathViewId();
@@ -1081,7 +1082,7 @@ clearFiltersBtn.addEventListener("click", async () => {
   docsFilters.tag = [];
   docsFilters.correspondent = [];
   docsFilters.document_type = [];
-  docsFilters.status = [];
+  docsFilters.status = ["ready"];
   applyFiltersToControls();
   syncUrlFromFilters();
   await loadDocumentsList();
