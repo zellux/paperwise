@@ -1806,6 +1806,8 @@ function getVisiblePendingRowCount() {
 
 async function loadDocumentsList() {
   const requestSeq = ++docsListRequestSeq;
+  renderTableLoading(docsTableBody, 7, "Loading documents...");
+  renderPaginationControls(0, { hasExactTotal: false });
   const query = new URLSearchParams({
     limit: String(docsPageSize),
     offset: String((docsPage - 1) * docsPageSize),
