@@ -20,14 +20,7 @@ AI-native document management platform (Python-first).
 ```bash
 cp .env.example .env.local
 make setup
-make deps-up
-make backend
-```
-
-In another shell:
-
-```bash
-make worker
+make dev-up
 ```
 
 Open [http://localhost:8000](http://localhost:8000) for the initial web UI.
@@ -50,6 +43,9 @@ If `PAPERWISE_OPENAI_API_KEY` is unset, `llm-parse` is disabled.
 - `make setup PYTHON=python3.13` - explicitly use Python 3.13 if needed.
 - `make deps-up` - start local dependency services (Redis + Postgres).
 - `make deps-down` - stop local dependency services.
+- `make dev-up` - start deps + backend + worker in background (recommended).
+- `make dev-stop` - stop background backend/worker started by `make dev-up`.
+- `make dev-restart` - restart deps + backend + worker after code changes.
 - `make backend` - run FastAPI backend from local virtualenv.
 - `make api` - alias for `make backend` (kept for backward compatibility).
 - `make worker` - run Celery worker from local virtualenv.
