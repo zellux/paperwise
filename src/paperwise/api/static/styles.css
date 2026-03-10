@@ -13,6 +13,13 @@
   --serif: "Newsreader", Georgia, serif;
   --shadow: 0 6px 16px rgba(38, 53, 46, 0.08);
   --link: #1a7b64;
+  --table-bg: rgba(246, 247, 245, 0.92);
+  --table-head-bg: #c8d7d2;
+  --table-head-ink: #1f5d4a;
+  --table-row-hover: rgba(202, 214, 209, 0.5);
+  --table-pill-bg: #d7e1dd;
+  --table-pill-border: #b8c6c0;
+  --table-pill-ink: #2e4d43;
 }
 
 body.theme-atlas {
@@ -27,6 +34,13 @@ body.theme-atlas {
   --accent-2: #bf5e25;
   --shadow: 0 6px 16px rgba(38, 53, 46, 0.08);
   --link: #1a7b64;
+  --table-bg: rgba(246, 247, 245, 0.92);
+  --table-head-bg: #c8d7d2;
+  --table-head-ink: #1f5d4a;
+  --table-row-hover: rgba(202, 214, 209, 0.5);
+  --table-pill-bg: #d7e1dd;
+  --table-pill-border: #b8c6c0;
+  --table-pill-ink: #2e4d43;
 }
 
 body.theme-ledger {
@@ -41,6 +55,13 @@ body.theme-ledger {
   --accent-2: #da7a22;
   --shadow: 0 8px 18px rgba(35, 60, 99, 0.09);
   --link: #1b5dc8;
+  --table-bg: rgba(243, 247, 253, 0.94);
+  --table-head-bg: #d4e1f4;
+  --table-head-ink: #214d86;
+  --table-row-hover: rgba(188, 209, 238, 0.42);
+  --table-pill-bg: #d8e5f7;
+  --table-pill-border: #b5c9e8;
+  --table-pill-ink: #2a4c80;
 }
 
 body.theme-moss {
@@ -55,6 +76,13 @@ body.theme-moss {
   --accent-2: #9c6a1f;
   --shadow: 0 7px 16px rgba(55, 62, 42, 0.1);
   --link: #4a6f2a;
+  --table-bg: rgba(247, 248, 241, 0.92);
+  --table-head-bg: #d6dec4;
+  --table-head-ink: #435b2a;
+  --table-row-hover: rgba(211, 223, 186, 0.44);
+  --table-pill-bg: #dbe5cb;
+  --table-pill-border: #becdaf;
+  --table-pill-ink: #3f5a2b;
 }
 
 body.theme-ember {
@@ -69,6 +97,13 @@ body.theme-ember {
   --accent-2: #3d7a66;
   --shadow: 0 8px 17px rgba(90, 62, 49, 0.1);
   --link: #9f4a28;
+  --table-bg: rgba(252, 245, 240, 0.92);
+  --table-head-bg: #e8d3c6;
+  --table-head-ink: #7a3e26;
+  --table-row-hover: rgba(235, 204, 186, 0.42);
+  --table-pill-bg: #edd8cd;
+  --table-pill-border: #dfbfad;
+  --table-pill-ink: #74412b;
 }
 
 * {
@@ -822,7 +857,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border: 1px solid var(--stroke);
   border-radius: 12px;
   overflow: auto;
-  background: rgba(246, 247, 245, 0.92);
+  background: var(--table-bg);
   margin-bottom: 10px;
 }
 
@@ -856,15 +891,15 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .docs-table th {
   position: sticky;
   top: 0;
-  background: #c8d7d2;
-  color: #1f5d4a;
+  background: var(--table-head-bg);
+  color: var(--table-head-ink);
   letter-spacing: 0.03em;
   text-transform: uppercase;
   font-size: 0.72rem;
 }
 
 .docs-table tbody tr:hover {
-  background: rgba(202, 214, 209, 0.5);
+  background: var(--table-row-hover);
 }
 
 .tag-pills {
@@ -880,9 +915,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   padding: 2px 10px;
   font-size: 0.74rem;
   line-height: 1.3;
-  background: #d7e1dd;
-  border: 1px solid #b8c6c0;
-  color: #2e4d43;
+  background: var(--table-pill-bg);
+  border: 1px solid var(--table-pill-border);
+  color: var(--table-pill-ink);
   white-space: nowrap;
 }
 
