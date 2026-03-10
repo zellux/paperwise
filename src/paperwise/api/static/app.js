@@ -21,7 +21,7 @@ const settingsTestLlmBtn = document.getElementById("settingsTestLlmBtn");
 const settingsLlmTestStatus = document.getElementById("settingsLlmTestStatus");
 const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
 const settingsOcrStatus = document.getElementById("settingsOcrStatus");
-const settingsOcrAutoSwitchSelect = document.getElementById("settingsOcrAutoSwitchSelect");
+const settingsOcrAutoSwitchCheckbox = document.getElementById("settingsOcrAutoSwitchCheckbox");
 const settingsOcrLlmProviderSelect = document.getElementById("settingsOcrLlmProviderSelect");
 const settingsOcrLlmModelInput = document.getElementById("settingsOcrLlmModelInput");
 const settingsOcrLlmBaseUrlInput = document.getElementById("settingsOcrLlmBaseUrlInput");
@@ -285,8 +285,8 @@ function renderSettingsForm() {
   if (settingsOcrLlmApiKeyInput && settingsOcrLlmApiKeyInput.value !== ocrLlmSettings.api_key) {
     settingsOcrLlmApiKeyInput.value = ocrLlmSettings.api_key;
   }
-  if (settingsOcrAutoSwitchSelect) {
-    settingsOcrAutoSwitchSelect.value = ocrAutoSwitch ? "on" : "off";
+  if (settingsOcrAutoSwitchCheckbox) {
+    settingsOcrAutoSwitchCheckbox.checked = ocrAutoSwitch;
   }
   syncOcrSeparateSettingsVisibility();
   refreshLocalOcrStatus().catch(() => {});
@@ -1983,7 +1983,7 @@ settingsForm?.addEventListener("submit", async (event) => {
   const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || docsPageSize);
   llmSettings = readLlmSettingsFromControls();
   ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
-  ocrAutoSwitch = normalizeOcrAutoSwitch(settingsOcrAutoSwitchSelect?.value || ocrAutoSwitch);
+  ocrAutoSwitch = Boolean(settingsOcrAutoSwitchCheckbox?.checked);
   ocrLlmSettings = readOcrLlmSettingsFromControls();
   syncUploadAvailability();
   applyTheme(nextTheme);

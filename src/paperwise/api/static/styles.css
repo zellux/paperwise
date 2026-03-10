@@ -752,6 +752,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   gap: 8px;
 }
 
+.settings-checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+  color: var(--ink);
+}
+
+.settings-checkbox-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
 .settings-group .actions {
   margin-top: 10px;
   margin-bottom: 0;
