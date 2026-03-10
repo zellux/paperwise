@@ -78,6 +78,7 @@ def parse_with_llm(
     correspondents = repository.list_correspondents()
     document_types = repository.list_document_types()
     tags = repository.list_tags()
+    previous = repository.get_llm_parse_result(document.id)
 
     raw = llm_provider.suggest_metadata(
         filename=document.filename,
@@ -87,13 +88,36 @@ def parse_with_llm(
         existing_tags=tags,
     )
 
-    candidate_correspondent = str(raw.get("correspondent", "Unknown Sender"))
-    candidate_document_type = str(raw.get("document_type", "General Document"))
-    candidate_tags = [str(t) for t in raw.get("tags", []) if str(t).strip()]
+    if "correspondent" in raw and str(raw.get("correspondent") or "").strip():
+        candidate_correspondent = str(raw.get("correspondent", "Unknown Sender"))
+        correspondent, created_correspondent = _resolve_name(candidate_correspondent, correspondents)
+    elif previous is not None:
+        correspondent = previous.correspondent
+        created_correspondent = False
+    else:
+        correspondent = "Unknown Sender"
+        created_correspondent = False
 
-    correspondent, created_correspondent = _resolve_name(candidate_correspondent, correspondents)
-    document_type, created_document_type = _resolve_name(candidate_document_type, document_types)
-    resolved_tags, created_tags = _resolve_tags(candidate_tags, tags)
+    if "document_type" in raw and str(raw.get("document_type") or "").strip():
+        candidate_document_type = str(raw.get("document_type", "General Document"))
+        document_type, created_document_type = _resolve_name(candidate_document_type, document_types)
+    elif previous is not None:
+        document_type = previous.document_type
+        created_document_type = False
+    else:
+        document_type = "General Document"
+        created_document_type = False
+
+    if "tags" in raw:
+        raw_tags = raw.get("tags")
+        candidate_tags = [str(t) for t in raw_tags if str(t).strip()] if isinstance(raw_tags, list) else []
+        resolved_tags, created_tags = _resolve_tags(candidate_tags, tags)
+    elif previous is not None:
+        resolved_tags = list(previous.tags)
+        created_tags = []
+    else:
+        resolved_tags = []
+        created_tags = []
 
     if created_correspondent:
         repository.add_correspondent(correspondent)
@@ -101,12 +125,25 @@ def parse_with_llm(
         repository.add_document_type(document_type)
     if created_tags:
         repository.add_tags(created_tags)
+    if "suggested_title" in raw and str(raw.get("suggested_title") or "").strip():
+        suggested_title = str(raw.get("suggested_title", document.filename)).strip()
+    elif previous is not None:
+        suggested_title = previous.suggested_title
+    else:
+        suggested_title = document.filename
 
-    previous = repository.get_llm_parse_result(document.id)
+    if "document_date" in raw:
+        raw_date = raw.get("document_date")
+        document_date = _validate_date(raw_date) if isinstance(raw_date, str) else None
+    elif previous is not None:
+        document_date = previous.document_date
+    else:
+        document_date = None
+
     result = LLMParseResult(
         document_id=document.id,
-        suggested_title=str(raw.get("suggested_title", document.filename)).strip() or document.filename,
-        document_date=_validate_date(raw.get("document_date") if isinstance(raw.get("document_date"), str) else None),
+        suggested_title=suggested_title,
+        document_date=document_date,
         correspondent=correspondent,
         document_type=document_type,
         tags=resolved_tags,
