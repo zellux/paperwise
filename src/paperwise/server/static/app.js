@@ -173,6 +173,10 @@ let docsPage = 1;
 let docsPageSize = 20;
 let docsTotalCount = 0;
 let docsListRequestSeq = 0;
+let pendingDocsRequestSeq = 0;
+let processedActivityRequestSeq = 0;
+let tagStatsRequestSeq = 0;
+let documentTypeStatsRequestSeq = 0;
 
 function normalizePageSize(value) {
   const size = Number(value);
@@ -1892,8 +1896,15 @@ function renderPaginationControls(currentCount, options = {}) {
 }
 
 async function loadPendingDocuments() {
+  const requestSeq = ++pendingDocsRequestSeq;
   const response = await apiFetch("/documents/pending?limit=200");
+  if (requestSeq !== pendingDocsRequestSeq) {
+    return;
+  }
   const payload = await response.json();
+  if (requestSeq !== pendingDocsRequestSeq) {
+    return;
+  }
   if (!response.ok) {
     // Keep restart enabled if the UI still has visible pending rows.
     setRestartPendingButtonEnabled(getVisiblePendingRowCount() > 0);
@@ -1914,24 +1925,50 @@ function renderActivityTokenTotal(totalTokens) {
   activityTokenTotal.textContent = `LLM tokens processed: ${value.toLocaleString()}`;
 }
 
+function renderActivityTokenLoading() {
+  if (!activityTokenTotal) {
+    return;
+  }
+  activityTokenTotal.textContent = "LLM tokens processed: loading...";
+}
+
 async function loadProcessedDocumentsActivity() {
+  const requestSeq = ++processedActivityRequestSeq;
   const limit = Math.max(1, normalizePageSize(docsPageSize));
+  renderActivityTokenLoading();
+  const preferencesPromise = loadUserPreferences().catch(() => ({}));
   const response = await apiFetch(`/documents?status=ready&limit=${limit}&offset=0`);
+  if (requestSeq !== processedActivityRequestSeq) {
+    return;
+  }
   const payload = await response.json();
+  if (requestSeq !== processedActivityRequestSeq) {
+    return;
+  }
   if (!response.ok) {
     logActivity(`Processed documents load failed: ${payload.detail || response.statusText}`);
     return;
   }
   renderProcessedDocsActivity(payload);
-  const preferences = await loadUserPreferences();
+  const preferences = await preferencesPromise;
+  if (requestSeq !== processedActivityRequestSeq) {
+    return;
+  }
   const totalTokens = Number(preferences.llm_total_tokens_processed || 0);
   renderActivityTokenTotal(totalTokens);
   logActivity(`Loaded ${payload.length} latest processed document(s).`);
 }
 
 async function loadTagStats() {
+  const requestSeq = ++tagStatsRequestSeq;
   const response = await apiFetch("/documents/metadata/tag-stats");
+  if (requestSeq !== tagStatsRequestSeq) {
+    return;
+  }
   const payload = await response.json();
+  if (requestSeq !== tagStatsRequestSeq) {
+    return;
+  }
   if (!response.ok) {
     logActivity(`Tag stats load failed: ${payload.detail || response.statusText}`);
     return;
@@ -1941,8 +1978,15 @@ async function loadTagStats() {
 }
 
 async function loadDocumentTypeStats() {
+  const requestSeq = ++documentTypeStatsRequestSeq;
   const response = await apiFetch("/documents/metadata/document-type-stats");
+  if (requestSeq !== documentTypeStatsRequestSeq) {
+    return;
+  }
   const payload = await response.json();
+  if (requestSeq !== documentTypeStatsRequestSeq) {
+    return;
+  }
   if (!response.ok) {
     logActivity(`Document type stats load failed: ${payload.detail || response.statusText}`);
     return;
