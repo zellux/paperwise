@@ -105,9 +105,6 @@ class MetadataUpdateRequest(BaseModel):
 
 PENDING_STATUSES = {
     DocumentStatus.RECEIVED,
-    DocumentStatus.PARSING,
-    DocumentStatus.PARSED,
-    DocumentStatus.ENRICHING,
     DocumentStatus.PROCESSING,
 }
 
@@ -413,24 +410,13 @@ def parse_document_endpoint(
     _set_document_status(
         document=document,
         repository=repository,
-        status_value=DocumentStatus.PARSING,
+        status_value=DocumentStatus.PROCESSING,
     )
     try:
         result = parse_document_blob(document_id=document.id, blob_uri=document.blob_uri)
         repository.save_parse_result(result)
     except Exception:
-        _set_document_status(
-            document=document,
-            repository=repository,
-            status_value=DocumentStatus.FAILED,
-        )
         raise
-
-    _set_document_status(
-        document=document,
-        repository=repository,
-        status_value=DocumentStatus.PARSED,
-    )
     return _to_parse_response(result)
 
 
@@ -466,21 +452,16 @@ def llm_parse_document_endpoint(
             _set_document_status(
                 document=document,
                 repository=repository,
-                status_value=DocumentStatus.PARSING,
+                status_value=DocumentStatus.PROCESSING,
             )
             parse_result = parse_document_blob(document_id=document.id, blob_uri=document.blob_uri)
             repository.save_parse_result(parse_result)
+        else:
             _set_document_status(
                 document=document,
                 repository=repository,
-                status_value=DocumentStatus.PARSED,
+                status_value=DocumentStatus.PROCESSING,
             )
-
-        _set_document_status(
-            document=document,
-            repository=repository,
-            status_value=DocumentStatus.ENRICHING,
-        )
         result = parse_with_llm(
             document=document,
             parse_result=parse_result,
@@ -488,11 +469,6 @@ def llm_parse_document_endpoint(
             llm_provider=llm_provider,
         )
     except Exception:
-        _set_document_status(
-            document=document,
-            repository=repository,
-            status_value=DocumentStatus.FAILED,
-        )
         raise
 
     _set_document_status(

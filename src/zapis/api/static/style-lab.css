@@ -193,7 +193,7 @@ td a {
   color: var(--status-ready-text);
 }
 
-.status.parsing {
+.status.processing {
   background: var(--status-progress-bg);
   color: var(--status-progress-text);
 }

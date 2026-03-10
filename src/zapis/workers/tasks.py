@@ -79,16 +79,11 @@ def parse_document_task(
         return {"document_id": document_id, "status": "not_found"}
 
     try:
-        document.status = DocumentStatus.PARSING
+        document.status = DocumentStatus.PROCESSING
         repository.save(document)
 
         parsed = parse_document_blob(document_id=document_id, blob_uri=blob_uri)
         repository.save_parse_result(parsed)
-        document.status = DocumentStatus.PARSED
-        repository.save(document)
-
-        document.status = DocumentStatus.ENRICHING
-        repository.save(document)
         parse_with_llm(
             document=document,
             parse_result=parsed,
@@ -98,8 +93,6 @@ def parse_document_task(
         document.status = DocumentStatus.READY
         repository.save(document)
     except Exception:
-        document.status = DocumentStatus.FAILED
-        repository.save(document)
         logger.exception("analysis pipeline failed for document_id=%s", document_id)
         raise
 

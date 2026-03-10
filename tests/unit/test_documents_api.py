@@ -78,7 +78,7 @@ def test_create_and_get_document() -> None:
         assert create_response.status_code == 201
 
         payload = create_response.json()
-        assert payload["status"] == "received"
+        assert payload["status"] == "processing"
         assert payload["job_id"] == "job-test-1"
 
         get_response = client.get(f"/documents/{payload['id']}")
@@ -221,13 +221,13 @@ def test_list_documents_supports_metadata_filters() -> None:
         assert ready_id in by_type_ids
         assert pending_id not in by_type_ids
 
-        by_status = client.get("/documents?status=received")
+        by_status = client.get("/documents?status=processing")
         assert by_status.status_code == 200
         by_status_ids = {item["id"] for item in by_status.json()}
         assert pending_id in by_status_ids
         assert ready_id not in by_status_ids
 
-        by_multi = client.get("/documents?status=received&status=ready")
+        by_multi = client.get("/documents?status=processing&status=ready")
         assert by_multi.status_code == 200
         by_multi_ids = {item["id"] for item in by_multi.json()}
         assert pending_id in by_multi_ids
@@ -353,7 +353,7 @@ def test_parse_document_roundtrip() -> None:
 
         get_response = client.get(f"/documents/{doc_id}")
         assert get_response.status_code == 200
-        assert get_response.json()["status"] == "parsed"
+        assert get_response.json()["status"] == "processing"
 
         get_parse_response = client.get(f"/documents/{doc_id}/parse")
         assert get_parse_response.status_code == 200

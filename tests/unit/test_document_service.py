@@ -64,7 +64,7 @@ def test_create_document_persists_and_enqueues() -> None:
             "content_type": "application/pdf",
         }
     ]
-    assert document.status == DocumentStatus.RECEIVED
+    assert document.status == DocumentStatus.PROCESSING
     assert document.blob_uri == "file:///tmp/invoice.pdf"
     assert isinstance(document.created_at, datetime)
     assert document.created_at.tzinfo == UTC

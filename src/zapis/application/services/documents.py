@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from zapis.application.interfaces import DocumentRepository, IngestionDispatcher
 from zapis.application.use_cases import CreateDocumentInput, initialize_document
-from zapis.domain.models import Document
+from zapis.domain.models import Document, DocumentStatus
 
 
 @dataclass(slots=True)
@@ -21,7 +21,7 @@ def create_document(
     repository: DocumentRepository,
     dispatcher: IngestionDispatcher,
 ) -> tuple[Document, str]:
-    """Create a document aggregate and enqueue ingestion."""
+    """Create a document aggregate, then move it to processing once queued."""
     doc_id = str(uuid4())
     document = initialize_document(
         doc_id=doc_id,
@@ -41,6 +41,8 @@ def create_document(
         filename=document.filename,
         content_type=document.content_type,
     )
+    document.status = DocumentStatus.PROCESSING
+    repository.save(document)
     return document, job_id
 
 
