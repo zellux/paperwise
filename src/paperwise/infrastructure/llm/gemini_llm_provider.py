@@ -4,6 +4,7 @@ from typing import Any
 import httpx
 
 from paperwise.application.interfaces import LLMProvider
+from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 from paperwise.infrastructure.llm.metadata_prompt import (
     SYSTEM_PROMPT,
     build_user_prompt,
@@ -48,22 +49,44 @@ class GeminiLLMProvider(LLMProvider):
             existing_document_types=existing_document_types,
             existing_tags=existing_tags,
         )
+        endpoint = f"/models/{self._model}:generateContent?key={self._api_key}"
+        request_payload = {
+            "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": json.dumps(user_prompt)}],
+                }
+            ],
+            "generationConfig": {"temperature": 0},
+        }
+        response: httpx.Response | None = None
+        response_payload: Any = None
 
-        response = self._client.post(
-            f"/models/{self._model}:generateContent?key={self._api_key}",
-            json={
-                "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
-                "contents": [
-                    {
-                        "role": "user",
-                        "parts": [{"text": json.dumps(user_prompt)}],
-                    }
-                ],
-                "generationConfig": {"temperature": 0},
-            },
+        try:
+            response = self._client.post(endpoint, json=request_payload)
+            try:
+                response_payload = response.json()
+            except ValueError:
+                response_payload = {"raw_text": getattr(response, "text", "")}
+        except Exception as exc:
+            log_llm_exchange(
+                provider="gemini",
+                endpoint=f"/models/{self._model}:generateContent",
+                request_payload=request_payload,
+                error=str(exc),
+            )
+            raise
+
+        log_llm_exchange(
+            provider="gemini",
+            endpoint=f"/models/{self._model}:generateContent",
+            request_payload=request_payload,
+            response_status=getattr(response, "status_code", None),
+            response_payload=response_payload,
         )
         response.raise_for_status()
-        payload = response.json()
+        payload = response_payload if isinstance(response_payload, dict) else response.json()
         candidates = payload.get("candidates", [])
         candidate = candidates[0] if candidates else {}
         content = candidate.get("content", {}) if isinstance(candidate, dict) else {}

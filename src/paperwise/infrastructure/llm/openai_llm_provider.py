@@ -4,6 +4,7 @@ from typing import Any
 import httpx
 
 from paperwise.application.interfaces import LLMProvider
+from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 from paperwise.infrastructure.llm.metadata_prompt import (
     SYSTEM_PROMPT,
     build_user_prompt,
@@ -50,21 +51,42 @@ class OpenAILLMProvider(LLMProvider):
             existing_document_types=existing_document_types,
             existing_tags=existing_tags,
         )
+        request_payload = {
+            "model": self._model,
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": json.dumps(user_prompt)},
+            ],
+        }
+        response: httpx.Response | None = None
+        response_payload: Any = None
 
-        response = self._client.post(
-            "/chat/completions",
-            json={
-                "model": self._model,
-                "temperature": 0,
-                "response_format": {"type": "json_object"},
-                "messages": [
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": json.dumps(user_prompt)},
-                ],
-            },
+        try:
+            response = self._client.post("/chat/completions", json=request_payload)
+            try:
+                response_payload = response.json()
+            except ValueError:
+                response_payload = {"raw_text": getattr(response, "text", "")}
+        except Exception as exc:
+            log_llm_exchange(
+                provider="openai",
+                endpoint="/chat/completions",
+                request_payload=request_payload,
+                error=str(exc),
+            )
+            raise
+
+        log_llm_exchange(
+            provider="openai",
+            endpoint="/chat/completions",
+            request_payload=request_payload,
+            response_status=getattr(response, "status_code", None),
+            response_payload=response_payload,
         )
         response.raise_for_status()
-        payload = response.json()
+        payload = response_payload if isinstance(response_payload, dict) else response.json()
         content = payload["choices"][0]["message"]["content"]
         parsed = json.loads(content)
         usage = payload.get("usage", {})
