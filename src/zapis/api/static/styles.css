@@ -122,6 +122,18 @@ h1 {
   font-family: var(--sans);
   font-weight: 600;
   cursor: pointer;
+  display: block;
+  text-decoration: none;
+}
+
+.nav-link:visited {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.nav-link:hover,
+.nav-link:focus-visible {
+  text-decoration: none;
 }
 
 .nav-link.active {
