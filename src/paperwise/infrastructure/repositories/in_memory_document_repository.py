@@ -68,14 +68,16 @@ class InMemoryDocumentRepository(DocumentRepository):
         with self._lock:
             return self._documents.get(document_id)
 
-    def list_documents(self, limit: int = 100) -> list[Document]:
+    def list_documents(self, limit: int = 100, *, offset: int = 0) -> list[Document]:
         with self._lock:
             docs = sorted(
                 self._documents.values(),
                 key=lambda d: d.created_at,
                 reverse=True,
             )
-            return docs[:limit]
+            start = max(0, offset)
+            end = start + max(0, limit)
+            return docs[start:end]
 
     def save_parse_result(self, result: ParseResult) -> None:
         with self._lock:

@@ -50,7 +50,7 @@ class DocumentRepository(Protocol):
     def get(self, document_id: str) -> Document | None:
         """Load a document by ID."""
 
-    def list_documents(self, limit: int = 100) -> list[Document]:
+    def list_documents(self, limit: int = 100, *, offset: int = 0) -> list[Document]:
         """List recent documents."""
 
     def save_parse_result(self, result: ParseResult) -> None:

@@ -115,10 +115,13 @@ class PostgresDocumentRepository(DocumentRepository):
                 created_at=row.created_at,
             )
 
-    def list_documents(self, limit: int = 100) -> list[Document]:
+    def list_documents(self, limit: int = 100, *, offset: int = 0) -> list[Document]:
         with self._session_factory() as session:
             rows = session.scalars(
-                select(DocumentRow).order_by(DocumentRow.created_at.desc()).limit(limit)
+                select(DocumentRow)
+                .order_by(DocumentRow.created_at.desc())
+                .offset(max(0, offset))
+                .limit(limit)
             ).all()
             return [
                 Document(

@@ -148,6 +148,22 @@
             </div>
             <button id="clearFiltersBtn" type="button" class="btn btn-muted">Reset Filters</button>
           </form>
+          <div class="pagination-toolbar">
+            <label class="pagination-size-control" for="pageSizeSelect">
+              <span>Rows per page</span>
+              <select id="pageSizeSelect" name="pageSizeSelect">
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </label>
+            <div class="pagination-controls">
+              <button id="pagePrevBtn" type="button" class="btn btn-muted">Prev</button>
+              <span id="pageIndicator" class="page-indicator">Page 1</span>
+              <button id="pageNextBtn" type="button" class="btn btn-muted">Next</button>
+            </div>
+          </div>
           <div class="docs-table-wrap">
             <table class="docs-table">
               <thead>

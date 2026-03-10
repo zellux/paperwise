@@ -165,6 +165,39 @@ def test_get_document_not_found() -> None:
         app.dependency_overrides.clear()
 
 
+def test_list_documents_supports_offset_pagination() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        for name in ("first.pdf", "second.pdf", "third.pdf"):
+            response = client.post(
+                "/documents",
+                files={"file": (name, b"%PDF-1.7\nsample", "application/pdf")},
+            )
+            assert response.status_code == 201
+
+        full_response = client.get("/documents?limit=3&status=processing")
+        assert full_response.status_code == 200
+        full_payload = full_response.json()
+        assert len(full_payload) == 3
+
+        paged_response = client.get("/documents?limit=1&offset=1&status=processing")
+        assert paged_response.status_code == 200
+        paged_payload = paged_response.json()
+        assert len(paged_payload) == 1
+        assert paged_payload[0]["id"] == full_payload[1]["id"]
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_upload_and_parse_text_document() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()

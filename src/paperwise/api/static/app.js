@@ -6,6 +6,10 @@ const viewDocumentFileBtn = document.getElementById("viewDocumentFileBtn");
 const docsFilterForm = document.getElementById("docsFilterForm");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 const restartPendingBtn = document.getElementById("restartPendingBtn");
+const pageSizeSelect = document.getElementById("pageSizeSelect");
+const pagePrevBtn = document.getElementById("pagePrevBtn");
+const pageNextBtn = document.getElementById("pageNextBtn");
+const pageIndicator = document.getElementById("pageIndicator");
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
 const signInForm = document.getElementById("signInForm");
@@ -92,6 +96,16 @@ let docsFilters = {
   document_type: [],
   status: ["ready"],
 };
+let docsPage = 1;
+let docsPageSize = 20;
+
+function normalizePageSize(value) {
+  const size = Number(value);
+  if (!Number.isInteger(size) || size <= 0) {
+    return 20;
+  }
+  return size;
+}
 
 function cloneDocsFilters(filters) {
   return {
@@ -168,6 +182,7 @@ async function saveUserPreferences() {
       docs_filters: sanitizeDocsFilters(docsFilters),
       last_view: currentViewId,
       ui_theme: currentTheme,
+      docs_page_size: docsPageSize,
     },
   };
   try {
@@ -213,6 +228,9 @@ function applyUserPreferences(preferences) {
   }
   if (typeof preferences.ui_theme === "string") {
     applyTheme(preferences.ui_theme);
+  }
+  if (preferences.docs_page_size !== undefined) {
+    docsPageSize = normalizePageSize(preferences.docs_page_size);
   }
 }
 
@@ -482,6 +500,8 @@ function renderSessionState() {
 function clearSession() {
   persistSession("", null);
   applyTheme("atlas");
+  docsPage = 1;
+  docsPageSize = 20;
   docsFilters = sanitizeDocsFilters({
     tag: [],
     correspondent: [],
@@ -852,6 +872,8 @@ function syncUrlFromFilters() {
   url.searchParams.delete("document_type");
   url.searchParams.delete("status");
   url.searchParams.delete("view");
+  url.searchParams.delete("page");
+  url.searchParams.delete("page_size");
 
   for (const value of docsFilters.tag) {
     url.searchParams.append("tag", value);
@@ -864,6 +886,12 @@ function syncUrlFromFilters() {
   }
   for (const value of docsFilters.status) {
     url.searchParams.append("status", value);
+  }
+  if (docsPage > 1) {
+    url.searchParams.set("page", String(docsPage));
+  }
+  if (docsPageSize !== 20) {
+    url.searchParams.set("page_size", String(docsPageSize));
   }
   const viewPath = VIEW_ID_TO_PATH[currentViewId];
   if (viewPath) {
@@ -882,6 +910,10 @@ function readFiltersFromUrl() {
   docsFilters.document_type = unique(params.getAll("document_type"));
   const statusValues = unique(params.getAll("status"));
   docsFilters.status = statusValues.length ? statusValues : ["ready"];
+  const pageValue = Number(params.get("page") || "1");
+  docsPage = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
+  const pageSizeValue = params.get("page_size") || String(docsPageSize || 20);
+  docsPageSize = normalizePageSize(pageSizeValue);
   const viewFromUrl = params.get("view");
   const mappedViewId = viewFromUrl ? (VIEW_PARAM_TO_ID[viewFromUrl] || viewFromUrl) : "";
   const pathViewId = getCurrentPathViewId();
@@ -897,6 +929,7 @@ function readFiltersFromUrl() {
 
 async function applyFiltersFromControls() {
   readFiltersFromControls();
+  docsPage = 1;
   syncUrlFromFilters();
   await loadDocumentsList();
 }
@@ -1122,6 +1155,7 @@ function renderTagsList(tagStats) {
       docsFilters.correspondent = [];
       docsFilters.document_type = [];
       docsFilters.status = [];
+      docsPage = 1;
       applyFiltersToControls();
       setActiveView("section-docs");
       setActiveNav("section-docs");
@@ -1164,6 +1198,7 @@ function renderDocumentTypesList(typeStats) {
       docsFilters.correspondent = [];
       docsFilters.document_type = [stat.document_type];
       docsFilters.status = [];
+      docsPage = 1;
       applyFiltersToControls();
       setActiveView("section-docs");
       setActiveNav("section-docs");
@@ -1234,7 +1269,10 @@ function setRestartPendingButtonEnabled(enabled) {
 }
 
 async function loadDocumentsList() {
-  const query = new URLSearchParams({ limit: "200" });
+  const query = new URLSearchParams({
+    limit: String(docsPageSize),
+    offset: String((docsPage - 1) * docsPageSize),
+  });
   for (const value of docsFilters.tag) {
     query.append("tag", value);
   }
@@ -1256,7 +1294,23 @@ async function loadDocumentsList() {
   }
   renderDocsList(payload);
   refreshFilterOptionsFromDocuments(payload);
+  renderPaginationControls(payload.length);
   logActivity(`Loaded ${payload.length} document(s)`);
+}
+
+function renderPaginationControls(currentCount) {
+  if (pageIndicator) {
+    pageIndicator.textContent = `Page ${docsPage}`;
+  }
+  if (pageSizeSelect && pageSizeSelect.value !== String(docsPageSize)) {
+    pageSizeSelect.value = String(docsPageSize);
+  }
+  if (pagePrevBtn) {
+    pagePrevBtn.disabled = docsPage <= 1;
+  }
+  if (pageNextBtn) {
+    pageNextBtn.disabled = currentCount < docsPageSize;
+  }
 }
 
 async function loadPendingDocuments() {
@@ -1634,7 +1688,30 @@ clearFiltersBtn.addEventListener("click", async () => {
   docsFilters.correspondent = [];
   docsFilters.document_type = [];
   docsFilters.status = ["ready"];
+  docsPage = 1;
   applyFiltersToControls();
+  syncUrlFromFilters();
+  await loadDocumentsList();
+});
+
+pageSizeSelect?.addEventListener("change", async () => {
+  docsPageSize = normalizePageSize(pageSizeSelect.value);
+  docsPage = 1;
+  syncUrlFromFilters();
+  await loadDocumentsList();
+});
+
+pagePrevBtn?.addEventListener("click", async () => {
+  if (docsPage <= 1) {
+    return;
+  }
+  docsPage -= 1;
+  syncUrlFromFilters();
+  await loadDocumentsList();
+});
+
+pageNextBtn?.addEventListener("click", async () => {
+  docsPage += 1;
   syncUrlFromFilters();
   await loadDocumentsList();
 });

@@ -446,6 +446,7 @@ def create_document_endpoint(
 @router.get("", response_model=list[DocumentListItemResponse])
 def list_documents_endpoint(
     limit: int = 100,
+    offset: int = Query(0, ge=0),
     tag: list[str] | None = Query(None),
     correspondent: list[str] | None = Query(None),
     document_type: list[str] | None = Query(None),
@@ -453,7 +454,7 @@ def list_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentListItemResponse]:
-    documents = repository.list_documents(limit=limit)
+    documents = repository.list_documents(limit=limit, offset=offset)
     normalized_tags = _normalized_values(tag)
     normalized_correspondents = _normalized_values(correspondent)
     normalized_document_types = _normalized_values(document_type)
