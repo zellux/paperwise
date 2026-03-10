@@ -40,6 +40,15 @@ def _build_llm_provider() -> LLMProvider:
     return MissingOpenAIProvider()
 
 
+def _resolve_ocr_provider_for_owner(repository: DocumentRepository, owner_id: str) -> str:
+    preference = repository.get_user_preference(owner_id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    provider_name = str(preferences.get("ocr_provider", "llm")).strip().lower()
+    if provider_name in {"tesseract", "llm"}:
+        return provider_name
+    return "llm"
+
+
 @celery_app.task(name="paperwise.tasks.healthcheck")
 def healthcheck_task() -> str:
     logger.info("worker healthcheck task executed")
@@ -85,7 +94,12 @@ def parse_document_task(
         document.status = DocumentStatus.PROCESSING
         repository.save(document)
 
-        parsed = parse_document_blob(document_id=document_id, blob_uri=blob_uri)
+        ocr_provider = _resolve_ocr_provider_for_owner(repository, document.owner_id)
+        parsed = parse_document_blob(
+            document_id=document_id,
+            blob_uri=blob_uri,
+            ocr_provider=ocr_provider,
+        )
         repository.save_parse_result(parsed)
         parse_with_llm(
             document=document,
