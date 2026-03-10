@@ -415,6 +415,7 @@ input[type="text"],
 input[type="file"],
 input[type="date"],
 input[type="password"],
+textarea,
 .settings-form select {
   width: 100%;
   border: 1px solid var(--stroke);
@@ -451,10 +452,16 @@ input[type="text"]:focus-visible,
 input[type="file"]:focus-visible,
 input[type="date"]:focus-visible,
 input[type="password"]:focus-visible,
+textarea:focus-visible,
 .settings-form select:focus-visible {
   outline: 2px solid rgba(29, 106, 85, 0.35);
   outline-offset: 1px;
   border-color: #5a8378;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 110px;
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator {
@@ -806,6 +813,50 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   grid-column: 1 / -1;
 }
 
+.search-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.search-card {
+  border: 1px solid var(--stroke-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.58);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.search-card h3 {
+  margin: 0 0 10px;
+  font-size: 0.96rem;
+  font-family: var(--serif);
+}
+
+.search-card select {
+  width: 100%;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 10px 11px;
+  min-height: 44px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  font-family: var(--sans);
+}
+
+.search-hint {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+}
+
+.search-scope-row {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 10px;
+}
+
 @media (max-width: 960px) {
   .settings-form {
     grid-template-columns: 1fr;
@@ -813,6 +864,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .settings-column {
     gap: 12px;
+  }
+
+  .search-layout {
+    grid-template-columns: 1fr;
   }
 }
 

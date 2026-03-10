@@ -34,6 +34,11 @@ def document_types_page() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
 
 
+@router.get("/ui/search", include_in_schema=False)
+def search_page() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
 @router.get("/ui/pending", include_in_schema=False)
 def pending_page() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")

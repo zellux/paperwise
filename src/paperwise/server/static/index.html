@@ -93,6 +93,7 @@
       <aside class="sidebar">
         <nav class="nav">
           <a class="nav-link active" data-target="section-docs" href="/ui/documents">Documents</a>
+          <a class="nav-link" data-target="section-search" href="/ui/search">Search</a>
           <a class="nav-link" data-target="section-tags" href="/ui/tags">Tags</a>
           <a class="nav-link" data-target="section-document-types" href="/ui/document-types">Document Types</a>
           <a class="nav-link" data-target="section-pending" href="/ui/pending">Processing Queue</a>
@@ -277,6 +278,164 @@
             <h3 class="document-history-title">Edit History</h3>
             <div id="documentHistoryList" class="document-history-list">
               <p class="document-history-empty">No history entries yet.</p>
+            </div>
+          </section>
+        </article>
+
+        <article id="section-search" class="panel panel-section view view-hidden">
+          <h2>Search</h2>
+          <div class="search-layout">
+            <section class="search-card">
+              <h3>Collections</h3>
+              <form id="searchCollectionCreateForm" class="stack">
+                <label class="label" for="searchCollectionName">Collection Name</label>
+                <input id="searchCollectionName" name="searchCollectionName" type="text" maxlength="256" required />
+
+                <label class="label" for="searchCollectionDescription">Description</label>
+                <input
+                  id="searchCollectionDescription"
+                  name="searchCollectionDescription"
+                  type="text"
+                  maxlength="2000"
+                  placeholder="Optional"
+                />
+
+                <div class="actions">
+                  <button id="searchCreateCollectionBtn" type="submit" class="btn btn-primary">
+                    Create Collection
+                  </button>
+                  <button id="searchRefreshCollectionsBtn" type="button" class="btn btn-muted">
+                    Refresh Collections
+                  </button>
+                </div>
+              </form>
+              <div class="search-scope-row">
+                <label class="label" for="searchScopeSelect">Search Scope</label>
+                <select id="searchScopeSelect" name="searchScopeSelect">
+                  <option value="">All Documents</option>
+                </select>
+              </div>
+              <div class="docs-table-wrap">
+                <table class="docs-table tags-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Documents</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="collectionsTableBody">
+                    <tr>
+                      <td colspan="3">No collections loaded.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="search-card">
+              <h3>Collection Documents</h3>
+              <p id="searchCollectionDocsLabel" class="search-hint">
+                Select a collection to manage document scope.
+              </p>
+              <label class="label" for="searchCollectionDocPicker">Add documents to selected collection</label>
+              <select id="searchCollectionDocPicker" name="searchCollectionDocPicker" multiple size="8"></select>
+              <div class="actions">
+                <button id="searchAddDocsBtn" type="button" class="btn">Add Selected Documents</button>
+              </div>
+              <div class="docs-table-wrap">
+                <table class="docs-table tags-table">
+                  <thead>
+                    <tr>
+                      <th>Document</th>
+                      <th>Action</th>
+                    </tr>
+                  </thead>
+                  <tbody id="searchCollectionDocsTableBody">
+                    <tr>
+                      <td colspan="2">No collection selected.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+
+          <section class="search-card">
+            <h3>Keyword Search</h3>
+            <form id="searchKeywordForm" class="stack">
+              <label class="label" for="searchKeywordInput">Query</label>
+              <input
+                id="searchKeywordInput"
+                name="searchKeywordInput"
+                type="text"
+                placeholder="Ask with keywords, e.g. consulting agreement termination"
+                required
+              />
+              <label class="label" for="searchKeywordLimitSelect">Results Limit</label>
+              <select id="searchKeywordLimitSelect" name="searchKeywordLimitSelect">
+                <option value="10">10</option>
+                <option value="20" selected>20</option>
+                <option value="50">50</option>
+              </select>
+              <div class="actions">
+                <button id="searchKeywordSubmitBtn" type="submit" class="btn btn-primary">Run Search</button>
+              </div>
+            </form>
+            <p id="searchResultsMeta" class="search-hint">No search run yet.</p>
+            <div class="docs-table-wrap">
+              <table class="docs-table">
+                <thead>
+                  <tr>
+                    <th>Title</th>
+                    <th>Type</th>
+                    <th>Correspondent</th>
+                    <th>Tags</th>
+                    <th>Score</th>
+                    <th>Snippet</th>
+                  </tr>
+                </thead>
+                <tbody id="searchResultsTableBody">
+                  <tr>
+                    <td colspan="6">No search results.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section class="search-card">
+            <h3>Grounded Q&amp;A</h3>
+            <form id="searchAskForm" class="stack">
+              <label class="label" for="searchAskQuestion">Question</label>
+              <textarea
+                id="searchAskQuestion"
+                name="searchAskQuestion"
+                rows="4"
+                placeholder="Ask a question and get an answer grounded in selected documents."
+                required
+              ></textarea>
+              <label class="label" for="searchAskTopKInput">Context Chunks</label>
+              <input id="searchAskTopKInput" name="searchAskTopKInput" type="number" min="3" max="60" value="18" />
+              <div class="actions">
+                <button id="searchAskSubmitBtn" type="submit" class="btn btn-primary">Ask</button>
+              </div>
+            </form>
+            <pre id="searchAskAnswer" class="output">No answer yet.</pre>
+            <div class="docs-table-wrap">
+              <table class="docs-table tags-table">
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Quote</th>
+                  </tr>
+                </thead>
+                <tbody id="searchAskCitationsBody">
+                  <tr>
+                    <td colspan="2">No citations.</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </section>
         </article>
