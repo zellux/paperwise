@@ -669,6 +669,11 @@ function createActionIcon(name) {
     addPolyline("10 9 9 9 8 9");
     return svg;
   }
+  if (name === "edit") {
+    addPath("M12 20h9");
+    addPath("M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z");
+    return svg;
+  }
 
   addPath("M12 5v14");
   addPath("M5 12h14");
@@ -761,7 +766,7 @@ function renderDocsList(documents) {
     actionsWrap.className = "table-actions";
     actionsWrap.appendChild(
       createIconActionButton({
-        icon: "external-link",
+        icon: "edit",
         label: "Open document",
         onClick: () => navigateToDocument(doc.id),
       })
