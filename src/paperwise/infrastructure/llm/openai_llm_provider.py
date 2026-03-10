@@ -111,37 +111,53 @@ class OpenAILLMProvider(LLMProvider):
         content_type: str,
         text_preview: str,
     ) -> str:
-        user_prompt = build_ocr_user_prompt(
-            filename=filename,
-            content_type=content_type,
-            text_preview=text_preview,
-        )
-        request_payload = {
-            "model": self._model,
-            "temperature": 0,
-            "response_format": {"type": "json_object"},
-            "messages": [
-                {"role": "system", "content": OCR_SYSTEM_PROMPT},
-                {"role": "user", "content": json.dumps(user_prompt)},
-            ],
-        }
+        preview = text_preview
         response: httpx.Response | None = None
         response_payload: Any = None
+        request_payload: dict[str, Any]
+        last_error: Exception | None = None
 
-        try:
-            response = self._client.post("/chat/completions", json=request_payload)
-            try:
-                response_payload = response.json()
-            except ValueError:
-                response_payload = {"raw_text": getattr(response, "text", "")}
-        except Exception as exc:
-            log_llm_exchange(
-                provider="openai",
-                endpoint="/chat/completions",
-                request_payload=request_payload,
-                error=str(exc),
+        for attempt in range(2):
+            user_prompt = build_ocr_user_prompt(
+                filename=filename,
+                content_type=content_type,
+                text_preview=preview,
             )
-            raise
+            request_payload = {
+                "model": self._model,
+                "temperature": 0,
+                "max_tokens": 3000,
+                "response_format": {"type": "json_object"},
+                "messages": [
+                    {"role": "system", "content": OCR_SYSTEM_PROMPT},
+                    {"role": "user", "content": json.dumps(user_prompt)},
+                ],
+            }
+            try:
+                response = self._client.post("/chat/completions", json=request_payload)
+                try:
+                    response_payload = response.json()
+                except ValueError:
+                    response_payload = {"raw_text": getattr(response, "text", "")}
+                break
+            except Exception as exc:
+                last_error = exc
+                log_llm_exchange(
+                    provider="openai",
+                    endpoint="/chat/completions",
+                    request_payload=request_payload,
+                    error=str(exc),
+                )
+                if isinstance(exc, httpx.ReadTimeout) and attempt == 0 and len(preview) > 2000:
+                    # Retry once with a smaller preview to reduce OCR latency.
+                    preview = preview[: min(3000, len(preview) // 2)]
+                    continue
+                raise
+
+        if response is None:
+            if last_error is not None:
+                raise last_error
+            raise RuntimeError("OCR request failed without a response.")
 
         log_llm_exchange(
             provider="openai",

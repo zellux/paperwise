@@ -224,7 +224,11 @@ def parse_document_blob(
                 else:
                     raise RuntimeError("OCR provider returned empty OCR text.")
             except Exception as exc:
-                raise RuntimeError(f"LLM OCR failed: {exc}") from exc
+                if "timed out" in str(exc).lower():
+                    # Fall back to extracted text to avoid blocking document processing.
+                    logger.warning("LLM OCR timed out for %s; using extracted text fallback.", blob_path)
+                else:
+                    raise RuntimeError(f"LLM OCR failed: {exc}") from exc
 
     parser_name = "stub-local"
     if normalized_ocr == "llm":
