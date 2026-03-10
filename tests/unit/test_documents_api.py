@@ -706,6 +706,7 @@ def test_update_document_metadata_upserts_and_updates_taxonomy() -> None:
         detail = detail_response.json()
         assert detail["llm_metadata"]["suggested_title"] == "March Statement"
         assert detail["document"]["status"] == "ready"
+        assert detail["ocr_provider"] is None
 
         history_response = client.get(f"/documents/{doc_id}/history")
         assert history_response.status_code == 200
@@ -755,6 +756,10 @@ def test_parse_document_roundtrip() -> None:
         get_parse_response = client.get(f"/documents/{doc_id}/parse")
         assert get_parse_response.status_code == 200
         assert get_parse_response.json()["document_id"] == doc_id
+
+        detail_response = client.get(f"/documents/{doc_id}/detail")
+        assert detail_response.status_code == 200
+        assert detail_response.json()["ocr_provider"] == "llm"
     finally:
         app.dependency_overrides.clear()
 

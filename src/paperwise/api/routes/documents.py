@@ -146,6 +146,7 @@ class CountResponse(BaseModel):
 class DocumentDetailResponse(BaseModel):
     document: DocumentResponse
     llm_metadata: DocumentListMetadata | None = None
+    ocr_provider: str | None = None
 
 
 class MetadataUpdateRequest(BaseModel):
@@ -488,6 +489,7 @@ def _to_list_item_response(
 def _to_detail_response(
     document: Document,
     llm_result: LLMParseResult | None,
+    parse_result: ParseResult | None,
 ) -> DocumentDetailResponse:
     return DocumentDetailResponse(
         document=_to_response(document),
@@ -502,7 +504,17 @@ def _to_detail_response(
             if llm_result is not None
             else None
         ),
+        ocr_provider=_infer_ocr_provider_from_parse_result(parse_result),
     )
+
+
+def _infer_ocr_provider_from_parse_result(parse_result: ParseResult | None) -> str | None:
+    if parse_result is None:
+        return None
+    parser_name = str(parse_result.parser or "").strip().lower()
+    if "llm" in parser_name:
+        return "llm"
+    return "tesseract"
 
 
 def _to_parse_response(result: ParseResult) -> ParseResultResponse:
@@ -867,7 +879,8 @@ def get_document_detail_endpoint(
         current_user=current_user,
     )
     llm_result = repository.get_llm_parse_result(document_id)
-    return _to_detail_response(document=document, llm_result=llm_result)
+    parse_result = repository.get_parse_result(document_id)
+    return _to_detail_response(document=document, llm_result=llm_result, parse_result=parse_result)
 
 
 @router.get("/{document_id}/file")
