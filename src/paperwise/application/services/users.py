@@ -96,3 +96,21 @@ def authenticate_user(email: str, password: str, repository: DocumentRepository)
     if not verify_password(password, user.password_hash):
         return None
     return user
+
+
+def change_user_password(
+    *,
+    user: User,
+    current_password: str,
+    new_password: str,
+    repository: DocumentRepository,
+) -> None:
+    if not verify_password(current_password, user.password_hash):
+        raise ValueError("Current password is incorrect")
+    if len(new_password) < 8:
+        raise ValueError("New password must be at least 8 characters")
+    if verify_password(new_password, user.password_hash):
+        raise ValueError("New password must be different from current password")
+
+    user.password_hash = _hash_password(new_password)
+    repository.save_user(user)

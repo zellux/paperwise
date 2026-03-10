@@ -23,6 +23,11 @@ const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSe
 const settingsOcrStatus = document.getElementById("settingsOcrStatus");
 const settingsOcrAutoSwitchCheckbox = document.getElementById("settingsOcrAutoSwitchCheckbox");
 const settingsOcrImageDetailSelect = document.getElementById("settingsOcrImageDetailSelect");
+const settingsCurrentPasswordInput = document.getElementById("settingsCurrentPasswordInput");
+const settingsNewPasswordInput = document.getElementById("settingsNewPasswordInput");
+const settingsConfirmPasswordInput = document.getElementById("settingsConfirmPasswordInput");
+const settingsChangePasswordBtn = document.getElementById("settingsChangePasswordBtn");
+const settingsPasswordStatus = document.getElementById("settingsPasswordStatus");
 const settingsOcrLlmProviderSelect = document.getElementById("settingsOcrLlmProviderSelect");
 const settingsOcrLlmModelInput = document.getElementById("settingsOcrLlmModelInput");
 const settingsOcrLlmBaseUrlInput = document.getElementById("settingsOcrLlmBaseUrlInput");
@@ -299,6 +304,7 @@ function renderSettingsForm() {
   }
   syncOcrSeparateSettingsVisibility();
   refreshLocalOcrStatus().catch(() => {});
+  setSettingsPasswordStatus("");
   syncUploadAvailability();
 }
 
@@ -389,6 +395,19 @@ function setSettingsOcrStatus(message, tone = "") {
     settingsOcrStatus.classList.add("is-success");
   } else if (tone === "error") {
     settingsOcrStatus.classList.add("is-error");
+  }
+}
+
+function setSettingsPasswordStatus(message, tone = "") {
+  if (!settingsPasswordStatus) {
+    return;
+  }
+  settingsPasswordStatus.textContent = message || "";
+  settingsPasswordStatus.classList.remove("is-success", "is-error");
+  if (tone === "success") {
+    settingsPasswordStatus.classList.add("is-success");
+  } else if (tone === "error") {
+    settingsPasswordStatus.classList.add("is-error");
   }
 }
 
@@ -2100,6 +2119,55 @@ settingsTestLlmBtn?.addEventListener("click", async () => {
   } finally {
     settingsTestLlmBtn.disabled = false;
     settingsTestLlmBtn.textContent = previousText || "Test LLM API";
+  }
+});
+
+settingsChangePasswordBtn?.addEventListener("click", async () => {
+  const currentPassword = String(settingsCurrentPasswordInput?.value || "");
+  const newPassword = String(settingsNewPasswordInput?.value || "");
+  const confirmPassword = String(settingsConfirmPasswordInput?.value || "");
+
+  if (!currentPassword) {
+    setSettingsPasswordStatus("Enter your current password.", "error");
+    return;
+  }
+  if (newPassword.length < 8) {
+    setSettingsPasswordStatus("New password must be at least 8 characters.", "error");
+    return;
+  }
+  if (newPassword !== confirmPassword) {
+    setSettingsPasswordStatus("New password and confirmation do not match.", "error");
+    return;
+  }
+
+  setSettingsPasswordStatus("Updating password...");
+  try {
+    const response = await apiFetch("/users/me/password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        current_password: currentPassword,
+        new_password: newPassword,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setSettingsPasswordStatus(payload.detail || response.statusText, "error");
+      return;
+    }
+    if (settingsCurrentPasswordInput) {
+      settingsCurrentPasswordInput.value = "";
+    }
+    if (settingsNewPasswordInput) {
+      settingsNewPasswordInput.value = "";
+    }
+    if (settingsConfirmPasswordInput) {
+      settingsConfirmPasswordInput.value = "";
+    }
+    setSettingsPasswordStatus(payload.message || "Password updated successfully.", "success");
+    logActivity("Password updated successfully.");
+  } catch (error) {
+    setSettingsPasswordStatus(error.message || "Failed to update password.", "error");
   }
 });
 

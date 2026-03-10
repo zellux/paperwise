@@ -14,6 +14,7 @@ from paperwise.application.services.auth_tokens import create_access_token
 from paperwise.application.services.users import (
     CreateUserCommand,
     authenticate_user,
+    change_user_password,
     create_user,
 )
 from paperwise.domain.models import User
@@ -54,6 +55,15 @@ class UserPreferenceRequest(BaseModel):
 
 class UserPreferenceResponse(BaseModel):
     preferences: dict[str, Any]
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(min_length=1, max_length=256)
+    new_password: str = Field(min_length=8, max_length=256)
+
+
+class ChangePasswordResponse(BaseModel):
+    message: str
 
 
 def _to_user_response(user: User) -> UserResponse:
@@ -163,3 +173,25 @@ def put_me_preferences_endpoint(
     preference = UserPreference(user_id=current_user.id, preferences=merged_preferences)
     repository.save_user_preference(preference)
     return UserPreferenceResponse(preferences=dict(preference.preferences))
+
+
+@router.post("/me/password", response_model=ChangePasswordResponse)
+def change_password_endpoint(
+    payload: ChangePasswordRequest,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> ChangePasswordResponse:
+    try:
+        change_user_password(
+            user=current_user,
+            current_password=payload.current_password,
+            new_password=payload.new_password,
+            repository=repository,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+
+    return ChangePasswordResponse(message="Password updated successfully.")

@@ -104,6 +104,67 @@ def test_login_user_success_and_failure() -> None:
         app.dependency_overrides.clear()
 
 
+def test_change_password_success_and_requires_current_password() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "password@example.com",
+                "full_name": "Password User",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "password@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+        token = login_response.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        bad_change = client.post(
+            "/users/me/password",
+            headers=headers,
+            json={
+                "current_password": "wrong-pass",
+                "new_password": "new-pass-123",
+            },
+        )
+        assert bad_change.status_code == 400
+        assert bad_change.json()["detail"] == "Current password is incorrect"
+
+        change_response = client.post(
+            "/users/me/password",
+            headers=headers,
+            json={
+                "current_password": "strong-pass-123",
+                "new_password": "new-pass-123",
+            },
+        )
+        assert change_response.status_code == 200
+        assert change_response.json()["message"] == "Password updated successfully."
+
+        old_login = client.post(
+            "/users/login",
+            json={"email": "password@example.com", "password": "strong-pass-123"},
+        )
+        assert old_login.status_code == 401
+
+        new_login = client.post(
+            "/users/login",
+            json={"email": "password@example.com", "password": "new-pass-123"},
+        )
+        assert new_login.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_user_preferences_round_trip() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository
