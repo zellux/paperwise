@@ -513,7 +513,7 @@ function setSelectOptions(selectEl, values) {
   for (const value of mergedValues) {
     const option = document.createElement("option");
     option.value = value;
-    option.textContent = value;
+    option.textContent = key === "status" ? formatStatus(value) : value;
     selectEl.appendChild(option);
   }
   setSelectedValues(selectEl, selectedValues);
