@@ -1915,11 +1915,7 @@ function getCollectionById(collectionId) {
 }
 
 function getSearchScopeLabel() {
-  const selected = getCollectionById(searchSelectedCollectionId);
-  if (!selected) {
-    return "All Documents";
-  }
-  return selected.name;
+  return "All Documents";
 }
 
 function parseScopeList(value) {
@@ -1941,22 +1937,11 @@ function parseScopeList(value) {
 }
 
 function readSearchScopeFilters() {
-  return {
-    tag: parseScopeList(searchScopeTagsInput?.value || ""),
-    document_type: parseScopeList(searchScopeTypesInput?.value || ""),
-  };
+  return {};
 }
 
 function formatSearchScopeSummary() {
-  const filters = readSearchScopeFilters();
-  const parts = [`Scope: ${getSearchScopeLabel()}`];
-  if (filters.tag.length) {
-    parts.push(`Tags: ${filters.tag.join(", ")}`);
-  }
-  if (filters.document_type.length) {
-    parts.push(`Types: ${filters.document_type.join(", ")}`);
-  }
-  return parts.join(" | ");
+  return "All Documents";
 }
 
 function getSearchCatalogTitle(doc) {
@@ -2637,18 +2622,14 @@ async function runScopedKeywordSearch() {
     return;
   }
   const limit = Math.max(1, Math.min(100, Number(searchKeywordLimitSelect?.value || 20)));
-  const filters = readSearchScopeFilters();
   renderTableLoading(searchResultsTableBody, 6, "Searching...");
-  renderSearchResultsMeta(`Searching... ${formatSearchScopeSummary()}`);
+  renderSearchResultsMeta("Searching...");
   setButtonBusy(searchKeywordForm?.querySelector("button[type='submit']"), true, "Searching...");
   try {
-    const path = searchSelectedCollectionId
-      ? `/collections/${searchSelectedCollectionId}/search`
-      : "/collections/search";
-    const response = await apiFetch(path, {
+    const response = await apiFetch("/collections/search", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, limit, ...filters }),
+      body: JSON.stringify({ query, limit }),
     });
     const payload = await response.json();
     if (!response.ok) {
@@ -2659,7 +2640,7 @@ async function runScopedKeywordSearch() {
     }
     renderSearchResultsTable(payload);
     const totalHits = Number(payload.total_hits || 0);
-    renderSearchResultsMeta(`Found ${totalHits} result(s). ${formatSearchScopeSummary()}`);
+    renderSearchResultsMeta(`Found ${totalHits} result(s).`);
     logActivity(`Search completed: ${totalHits} result(s).`);
   } finally {
     setButtonBusy(searchKeywordForm?.querySelector("button[type='submit']"), false);
@@ -2680,19 +2661,15 @@ async function runScopedAsk() {
   }
   const topK = normalizeGroundedQaTopK(groundedQaTopK);
   const maxDocuments = normalizeGroundedQaMaxDocuments(groundedQaMaxDocuments);
-  const filters = readSearchScopeFilters();
   renderSearchAskAnswer({
-    answer: `Querying... ${formatSearchScopeSummary()}`,
+    answer: "Querying...",
     insufficient_evidence: false,
     citations: [],
   });
   renderSearchAskDebugOutput({ status: "waiting_for_response" }, debugEnabled);
   setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), true, "Asking...");
   try {
-    const path = searchSelectedCollectionId
-      ? `/collections/${searchSelectedCollectionId}/ask`
-      : "/collections/ask";
-    const response = await apiFetch(path, {
+    const response = await apiFetch("/collections/ask", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -2700,7 +2677,6 @@ async function runScopedAsk() {
         top_k_chunks: topK,
         max_documents: maxDocuments,
         debug: debugEnabled,
-        ...filters,
       }),
     });
     const payload = await response.json();
@@ -2716,7 +2692,7 @@ async function runScopedAsk() {
     }
     renderSearchAskAnswer(payload);
     renderSearchAskDebugOutput(payload?.debug || null, debugEnabled);
-    logActivity(`Ask Your Docs completed in ${getSearchScopeLabel()}.`);
+    logActivity("Ask Your Docs completed.");
   } finally {
     setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), false);
   }
@@ -2726,11 +2702,10 @@ async function initializeSearchView() {
   searchCollections = [];
   searchSelectedCollectionId = "";
   searchSelectedCollectionDocumentIds = [];
-  renderSearchScopeOptions();
   await loadSearchDocumentsCatalog();
   setActiveSearchSection(searchActiveSectionId);
   renderSearchCollectionDocumentsTable();
-  renderSearchResultsMeta(`Ready. ${formatSearchScopeSummary()}`);
+  renderSearchResultsMeta("Ready.");
 }
 
 function setRestartPendingButtonEnabled(enabled) {
