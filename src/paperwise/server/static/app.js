@@ -2283,6 +2283,30 @@ function flushMarkdownParagraph(buffer, html) {
   buffer.length = 0;
 }
 
+function splitMarkdownTableRow(line) {
+  const trimmed = String(line || "").trim();
+  const normalized = trimmed.replace(/^\|/, "").replace(/\|$/, "");
+  return normalized.split("|").map((cell) => cell.trim());
+}
+
+function isMarkdownTableSeparator(line) {
+  const cells = splitMarkdownTableRow(line);
+  if (!cells.length) {
+    return false;
+  }
+  return cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
+function renderMarkdownTable(headerLine, bodyLines) {
+  const headers = splitMarkdownTableRow(headerLine);
+  const bodyRows = bodyLines.map((line) => splitMarkdownTableRow(line));
+  const thead = `<thead><tr>${headers.map((cell) => `<th>${renderInlineMarkdown(cell)}</th>`).join("")}</tr></thead>`;
+  const tbody = `<tbody>${bodyRows
+    .map((cells) => `<tr>${cells.map((cell) => `<td>${renderInlineMarkdown(cell)}</td>`).join("")}</tr>`)
+    .join("")}</tbody>`;
+  return `<table>${thead}${tbody}</table>`;
+}
+
 function renderMarkdown(markdown) {
   const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
   const html = [];
@@ -2296,12 +2320,15 @@ function renderMarkdown(markdown) {
     }
   };
 
-  for (const rawLine of lines) {
+  for (let index = 0; index < lines.length; index += 1) {
+    const rawLine = lines[index];
     const line = rawLine.trimEnd();
+    const nextLine = index + 1 < lines.length ? lines[index + 1].trim() : "";
     const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
     const ulMatch = line.match(/^[-*]\s+(.+)$/);
     const olMatch = line.match(/^\d+\.\s+(.+)$/);
     const quoteMatch = line.match(/^>\s+(.+)$/);
+    const looksLikeTable = line.includes("|") && nextLine.includes("|") && isMarkdownTableSeparator(nextLine);
 
     if (!line.trim()) {
       closeList();
@@ -2321,6 +2348,24 @@ function renderMarkdown(markdown) {
       closeList();
       flushMarkdownParagraph(paragraph, html);
       html.push(`<blockquote>${renderInlineMarkdown(quoteMatch[1])}</blockquote>`);
+      continue;
+    }
+
+    if (looksLikeTable) {
+      closeList();
+      flushMarkdownParagraph(paragraph, html);
+      const bodyLines = [];
+      index += 2;
+      while (index < lines.length) {
+        const row = lines[index].trim();
+        if (!row || !row.includes("|")) {
+          index -= 1;
+          break;
+        }
+        bodyLines.push(row);
+        index += 1;
+      }
+      html.push(renderMarkdownTable(line, bodyLines));
       continue;
     }
 
