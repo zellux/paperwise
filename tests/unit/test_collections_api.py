@@ -46,6 +46,33 @@ class FakeGroundedLLM:
     def extract_ocr_text(self, **kwargs):  # pragma: no cover - unused in this test
         raise RuntimeError("unused")
 
+    def rewrite_retrieval_queries(self, *, question: str) -> dict:
+        return {
+            "queries": [question],
+            "must_terms": [],
+            "optional_terms": [],
+        }
+
+
+class FakeAnchoredGroundedLLM(FakeGroundedLLM):
+    def rewrite_retrieval_queries(self, *, question: str) -> dict:
+        del question
+        return {
+            "queries": ["Quincy height measurement history"],
+            "must_terms": ["Quincy", "height", "measurements"],
+            "optional_terms": ["cm", "inches"],
+        }
+
+
+class FakeMassRewriteGroundedLLM(FakeGroundedLLM):
+    def rewrite_retrieval_queries(self, *, question: str) -> dict:
+        del question
+        return {
+            "queries": ["Quincy weight vital signs", "Quincy body weight lb kg"],
+            "must_terms": ["weight"],
+            "optional_terms": ["lb", "kg", "vital signs"],
+        }
+
 
 def _save_document(
     repository: InMemoryDocumentRepository,
@@ -353,7 +380,7 @@ def test_global_ask_query_expansion_handles_measurement_wording() -> None:
 
     app.dependency_overrides[document_repository_dependency] = lambda: repository
     app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
-    app.dependency_overrides[llm_provider_dependency] = lambda: FakeGroundedLLM()
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeMassRewriteGroundedLLM()
 
     try:
         client = TestClient(app)
@@ -408,5 +435,55 @@ def test_global_ask_returns_debug_payload_when_enabled() -> None:
         assert "sources_sent_to_llm" in debug_payload
         assert isinstance(debug_payload["sources_sent_to_llm"], list)
         assert debug_payload["sources_sent_to_llm"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_global_ask_anchor_filter_prefers_chunks_with_must_terms() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-relevant",
+        owner_id=TEST_USER.id,
+        filename="visit-note.pdf",
+        text_preview="Quincy height 110 cm at visit one. Quincy height 115 cm at visit two.",
+        title="Quincy Visit Note",
+        document_type="Visit Note",
+        tags=["Medical"],
+    )
+    _save_document(
+        repository,
+        doc_id="doc-noise",
+        owner_id=TEST_USER.id,
+        filename="credit.pdf",
+        text_preview="Account history and balance records over time with no data and no data.",
+        title="Experian Credit Report",
+        document_type="Credit Report",
+        tags=["Finance"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeAnchoredGroundedLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/collections/ask",
+            json={
+                "question": "History of measurements of Quincy's height",
+                "top_k_chunks": 8,
+                "debug": True,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["citations"]
+        assert payload["citations"][0]["document_id"] == "doc-relevant"
+        debug_payload = payload["debug"]
+        assert debug_payload["retrieval"]["strong_must_terms"] == ["quincy", "height"]
+        assert debug_payload["sources_sent_to_llm"]
+        source_doc_ids = {item["document_id"] for item in debug_payload["sources_sent_to_llm"]}
+        assert source_doc_ids == {"doc-relevant"}
     finally:
         app.dependency_overrides.clear()

@@ -18,6 +18,20 @@ from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
+_RETRIEVAL_GENERIC_TERMS = {
+    "history",
+    "measurement",
+    "measurements",
+    "record",
+    "records",
+    "data",
+    "past",
+    "timeline",
+    "changes",
+    "value",
+    "values",
+}
+
 
 class CollectionCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=256)
@@ -267,28 +281,30 @@ def _build_retrieval_queries_with_llm(
     query: str,
     llm_provider: LLMProvider | None,
     debug: dict[str, Any] | None = None,
-) -> list[str]:
+) -> dict[str, Any]:
     fallback = _build_retrieval_queries_heuristic(query)
     if llm_provider is None:
         if debug is not None:
             debug["rewrite_source"] = "heuristic"
             debug["rewrite_reason"] = "no_llm_provider"
-        return fallback
+        return {"queries": fallback, "must_terms": [], "optional_terms": []}
     rewrite_method = getattr(llm_provider, "rewrite_retrieval_queries", None)
     if not callable(rewrite_method):
         if debug is not None:
             debug["rewrite_source"] = "heuristic"
             debug["rewrite_reason"] = "provider_without_rewrite_method"
-        return fallback
+        return {"queries": fallback, "must_terms": [], "optional_terms": []}
     try:
         rewritten = rewrite_method(question=query)
     except Exception as exc:
         if debug is not None:
             debug["rewrite_source"] = "heuristic"
             debug["rewrite_reason"] = f"llm_rewrite_error:{exc}"
-        return fallback
+        return {"queries": fallback, "must_terms": [], "optional_terms": []}
 
     queries_raw = rewritten.get("queries", []) if isinstance(rewritten, dict) else []
+    must_terms_raw = rewritten.get("must_terms", []) if isinstance(rewritten, dict) else []
+    optional_terms_raw = rewritten.get("optional_terms", []) if isinstance(rewritten, dict) else []
     queries: list[str] = []
     seen: set[str] = set()
     for item in queries_raw if isinstance(queries_raw, list) else []:
@@ -300,15 +316,69 @@ def _build_retrieval_queries_with_llm(
             continue
         seen.add(key)
         queries.append(value)
+    must_terms: list[str] = []
+    seen.clear()
+    for item in must_terms_raw if isinstance(must_terms_raw, list) else []:
+        value = " ".join(str(item or "").split()).strip()
+        if not value:
+            continue
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        must_terms.append(value)
+    optional_terms: list[str] = []
+    seen.clear()
+    for item in optional_terms_raw if isinstance(optional_terms_raw, list) else []:
+        value = " ".join(str(item or "").split()).strip()
+        if not value:
+            continue
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        optional_terms.append(value)
     if not queries:
         if debug is not None:
             debug["rewrite_source"] = "heuristic"
             debug["rewrite_reason"] = "llm_rewrite_empty"
-        return fallback
+        return {
+            "queries": fallback,
+            "must_terms": must_terms[:12],
+            "optional_terms": optional_terms[:18],
+        }
     if debug is not None:
         debug["rewrite_source"] = "llm"
         debug["llm_rewrite"] = rewritten if isinstance(rewritten, dict) else {"raw": rewritten}
-    return queries[:6]
+    return {
+        "queries": queries[:6],
+        "must_terms": must_terms[:12],
+        "optional_terms": optional_terms[:18],
+    }
+
+
+def _term_coverage_count(text: str, terms: list[str]) -> int:
+    lowered = str(text or "").lower()
+    return sum(1 for term in terms if " ".join(str(term or "").lower().split()).strip() in lowered)
+
+
+def _extract_strong_terms(terms: list[str]) -> list[str]:
+    strong_terms: list[str] = []
+    seen: set[str] = set()
+    for term in terms:
+        normalized = " ".join(str(term or "").lower().split()).strip()
+        if not normalized:
+            continue
+        simple = re.sub(r"[^a-z0-9]+", " ", normalized).strip()
+        if not simple or simple in _RETRIEVAL_GENERIC_TERMS:
+            continue
+        if len(simple) < 3 and simple not in {"lb", "kg", "cm", "in"}:
+            continue
+        if simple in seen:
+            continue
+        seen.add(simple)
+        strong_terms.append(simple)
+    return strong_terms
 
 
 def _search_document_chunks_multi_query(
@@ -321,13 +391,20 @@ def _search_document_chunks_multi_query(
     llm_provider: LLMProvider | None = None,
     debug: dict | None = None,
 ) -> list[DocumentChunkSearchHit]:
-    retrieval_queries = _build_retrieval_queries_with_llm(
+    rewrite_payload = _build_retrieval_queries_with_llm(
         query=query,
         llm_provider=llm_provider,
         debug=debug,
     )
+    retrieval_queries = list(rewrite_payload.get("queries", []))
+    must_terms = [str(item) for item in rewrite_payload.get("must_terms", [])]
+    optional_terms = [str(item) for item in rewrite_payload.get("optional_terms", [])]
+    strong_must_terms = _extract_strong_terms(must_terms)
     if debug is not None:
         debug["expanded_queries"] = list(retrieval_queries)
+        debug["must_terms"] = must_terms
+        debug["optional_terms"] = optional_terms
+        debug["strong_must_terms"] = strong_must_terms
         debug["per_query"] = []
     if not retrieval_queries:
         return []
@@ -366,10 +443,43 @@ def _search_document_chunks_multi_query(
                 score=existing.score,
                 matched_terms=merged_terms,
             )
-    merged = sorted(best_by_chunk.values(), key=lambda item: float(item.score), reverse=True)[:limit]
+    merged = sorted(best_by_chunk.values(), key=lambda item: float(item.score), reverse=True)
+    if strong_must_terms:
+        required_count = 2 if len(strong_must_terms) >= 2 else 1
+        anchor_filtered = [
+            item
+            for item in merged
+            if _term_coverage_count(item.chunk.content, strong_must_terms) >= required_count
+        ]
+        if anchor_filtered:
+            merged = anchor_filtered
+            if debug is not None:
+                debug["anchor_filter_applied"] = True
+                debug["anchor_filter_required_count"] = required_count
+        elif debug is not None:
+            debug["anchor_filter_applied"] = False
+            debug["anchor_filter_required_count"] = required_count
+            debug["anchor_filter_fallback"] = "no_chunks_met_anchor_threshold"
+    merged = sorted(
+        merged,
+        key=lambda item: (
+            _term_coverage_count(item.chunk.content, strong_must_terms),
+            _term_coverage_count(item.chunk.content, optional_terms),
+            float(item.score),
+        ),
+        reverse=True,
+    )[:limit]
     if debug is not None:
         debug["merged_hit_count"] = len(merged)
         debug["merged_top_chunk_ids"] = [item.chunk.id for item in merged[:10]]
+        debug["merged_term_coverage"] = [
+            {
+                "chunk_id": item.chunk.id,
+                "strong_must_term_matches": _term_coverage_count(item.chunk.content, strong_must_terms),
+                "optional_term_matches": _term_coverage_count(item.chunk.content, optional_terms),
+            }
+            for item in merged[:10]
+        ]
     return merged
 
 
