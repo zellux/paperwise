@@ -13,6 +13,7 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
 )
 from paperwise.server.routes.documents import _resolve_llm_provider_for_user
+from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
@@ -265,8 +266,12 @@ def _search_document_chunks_multi_query(
     query: str,
     limit: int,
     document_ids: list[str] | None,
+    debug: dict | None = None,
 ) -> list[DocumentChunkSearchHit]:
     retrieval_queries = _build_retrieval_queries(query)
+    if debug is not None:
+        debug["expanded_queries"] = list(retrieval_queries)
+        debug["per_query"] = []
     if not retrieval_queries:
         return []
     best_by_chunk: dict[str, DocumentChunkSearchHit] = {}
@@ -277,6 +282,14 @@ def _search_document_chunks_multi_query(
             limit=limit,
             document_ids=document_ids,
         )
+        if debug is not None:
+            debug["per_query"].append(
+                {
+                    "query": candidate,
+                    "hit_count": len(hits),
+                    "top_chunk_ids": [hit.chunk.id for hit in hits[:5]],
+                }
+            )
         for hit in hits:
             chunk_id = hit.chunk.id
             existing = best_by_chunk.get(chunk_id)
@@ -296,7 +309,11 @@ def _search_document_chunks_multi_query(
                 score=existing.score,
                 matched_terms=merged_terms,
             )
-    return sorted(best_by_chunk.values(), key=lambda item: float(item.score), reverse=True)[:limit]
+    merged = sorted(best_by_chunk.values(), key=lambda item: float(item.score), reverse=True)[:limit]
+    if debug is not None:
+        debug["merged_hit_count"] = len(merged)
+        debug["merged_top_chunk_ids"] = [item.chunk.id for item in merged[:10]]
+    return merged
 
 
 def _build_qa_contexts(
@@ -338,20 +355,53 @@ def _ask_grounded(
     question: str,
     top_k_chunks: int,
     document_ids: list[str] | None,
+    debug_scope: dict[str, object] | None = None,
 ) -> AskResponse:
+    retrieval_debug: dict[str, object] = {}
     chunk_hits = _search_document_chunks_multi_query(
         repository=repository,
         owner_id=owner_id,
         query=question,
         limit=max(top_k_chunks * 3, top_k_chunks),
         document_ids=document_ids,
+        debug=retrieval_debug,
     )
     contexts = _build_qa_contexts(
         repository=repository,
         chunk_hits=chunk_hits,
         top_k_chunks=top_k_chunks,
     )
+    context_debug = [
+        {
+            "chunk_id": ctx.get("chunk_id"),
+            "document_id": ctx.get("document_id"),
+            "title": ctx.get("title"),
+            "content_len": len(str(ctx.get("content", ""))),
+        }
+        for ctx in contexts
+    ]
+
+    request_debug = {
+        "owner_id": owner_id,
+        "question": question,
+        "top_k_chunks": top_k_chunks,
+        "scope": debug_scope or {},
+        "retrieval": retrieval_debug,
+        "selected_contexts": context_debug,
+    }
     if not contexts:
+        response_debug = {
+            "answer": "Not enough evidence in the selected documents.",
+            "insufficient_evidence": True,
+            "citations": [],
+        }
+        log_llm_exchange(
+            provider="grounded_qa",
+            endpoint="/collections/ask",
+            request_payload=request_debug,
+            response_status=200,
+            response_payload=response_debug,
+        )
         return AskResponse(
             question=question,
             answer="Not enough evidence in the selected documents.",
@@ -387,12 +437,34 @@ def _ask_grounded(
     if not citations and not insufficient:
         insufficient = True
         answer = "Not enough evidence in the selected documents."
-    return AskResponse(
+    response_payload = AskResponse(
         question=question,
         answer=answer,
         insufficient_evidence=insufficient,
         citations=citations,
     )
+    response_debug = {
+        "answer": response_payload.answer,
+        "insufficient_evidence": response_payload.insufficient_evidence,
+        "citation_count": len(response_payload.citations),
+        "citations": [
+            {
+                "chunk_id": item.chunk_id,
+                "document_id": item.document_id,
+                "title": item.title,
+                "quote_len": len(item.quote),
+            }
+            for item in response_payload.citations
+        ],
+    }
+    log_llm_exchange(
+        provider="grounded_qa",
+        endpoint="/collections/ask",
+        request_payload=request_debug,
+        response_status=200,
+        response_payload=response_debug,
+    )
+    return response_payload
 
 
 @router.post("", response_model=CollectionResponse, status_code=status.HTTP_201_CREATED)
@@ -597,6 +669,12 @@ def ask_all_documents_endpoint(
         question=payload.question,
         top_k_chunks=payload.top_k_chunks,
         document_ids=scoped_ids,
+        debug_scope={
+            "collection_id": None,
+            "tag": payload.tag,
+            "document_type": payload.document_type,
+            "scoped_document_count": len(scoped_ids) if scoped_ids is not None else None,
+        },
     )
 
 
@@ -633,4 +711,10 @@ def ask_collection_documents_endpoint(
         question=payload.question,
         top_k_chunks=payload.top_k_chunks,
         document_ids=scoped_ids,
+        debug_scope={
+            "collection_id": collection_id,
+            "tag": payload.tag,
+            "document_type": payload.document_type,
+            "scoped_document_count": len(scoped_ids) if scoped_ids is not None else None,
+        },
     )
