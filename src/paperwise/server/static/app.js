@@ -142,7 +142,7 @@ const PATH_TO_VIEW_ID = {
 const VIEW_ID_TO_PATH = {
   "section-docs": "/ui/documents",
   "section-document": "/ui/document",
-  "section-search": "/ui/collections",
+  "section-search": "/ui/search",
   "section-tags": "/ui/tags",
   "section-document-types": "/ui/document-types",
   "section-pending": "/ui/pending",
@@ -220,9 +220,9 @@ let searchCollections = [];
 let searchDocsCatalog = [];
 let searchSelectedCollectionId = "";
 let searchSelectedCollectionDocumentIds = [];
-let searchActiveSectionId = "search-section-collections";
+let searchActiveSectionId = "search-section-keyword";
 const PATH_TO_SEARCH_SECTION_ID = {
-  "/ui/collections": "search-section-collections",
+  "/ui/collections": "search-section-keyword",
   "/ui/search": "search-section-keyword",
   "/ui/grounded-qa": "search-section-ask",
 };
@@ -1028,7 +1028,7 @@ function clearSession() {
   searchDocsCatalog = [];
   searchSelectedCollectionId = "";
   searchSelectedCollectionDocumentIds = [];
-  searchActiveSectionId = "search-section-collections";
+  searchActiveSectionId = "search-section-keyword";
   currentViewId = "section-docs";
   setActiveSearchSection(searchActiveSectionId);
   renderSearchScopeOptions();
@@ -1102,7 +1102,7 @@ function setActiveView(targetId) {
 }
 
 function setActiveSearchSection(sectionId) {
-  const defaultSectionId = "search-section-collections";
+  const defaultSectionId = "search-section-keyword";
   const nextSectionId = searchSubsections.some((section) => section.id === sectionId)
     ? sectionId
     : defaultSectionId;
@@ -2723,13 +2723,13 @@ async function runScopedAsk() {
 }
 
 async function initializeSearchView() {
-  await Promise.all([loadSearchCollections(), loadSearchDocumentsCatalog()]);
+  searchCollections = [];
+  searchSelectedCollectionId = "";
+  searchSelectedCollectionDocumentIds = [];
+  renderSearchScopeOptions();
+  await loadSearchDocumentsCatalog();
   setActiveSearchSection(searchActiveSectionId);
-  if (searchSelectedCollectionId) {
-    await loadSearchCollectionDocuments(searchSelectedCollectionId);
-  } else {
-    renderSearchCollectionDocumentsTable();
-  }
+  renderSearchCollectionDocumentsTable();
   renderSearchResultsMeta(`Ready. ${formatSearchScopeSummary()}`);
 }
 

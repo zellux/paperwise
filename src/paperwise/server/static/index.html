@@ -102,13 +102,6 @@
           <a
             class="nav-link"
             data-target="section-search"
-            data-search-section="search-section-collections"
-            href="/ui/collections"
-            >Collections</a
-          >
-          <a
-            class="nav-link"
-            data-target="section-search"
             data-search-section="search-section-keyword"
             href="/ui/search"
             >Search</a
@@ -342,7 +335,7 @@
             <p id="searchResultsMeta" class="search-hint">Ready. Scope: All Documents</p>
           </div>
 
-          <section id="search-section-collections" class="search-subsection">
+          <section id="search-section-collections" class="search-subsection view-hidden" hidden>
             <div class="search-layout">
               <section class="search-card">
               <h3>Collections</h3>
@@ -473,7 +466,7 @@
           <section id="search-section-ask" class="search-subsection view-hidden">
             <section class="search-card">
               <h3>Grounded Q&amp;A</h3>
-              <p class="search-hint">Ask against all documents or narrow to one collection.</p>
+              <p class="search-hint">Ask against all documents, and narrow with tags or document types if needed.</p>
               <form id="searchAskForm" class="stack">
                 <label class="label" for="searchAskQuestion">Question</label>
                 <textarea
