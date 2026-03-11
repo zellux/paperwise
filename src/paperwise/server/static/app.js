@@ -2206,13 +2206,14 @@ function renderSearchAskAnswer(payload) {
     return;
   }
   if (!payload) {
-    searchAskAnswer.textContent = "No answer yet.";
+    searchAskAnswer.innerHTML = "<p>No answer yet.</p>";
     searchAskCitationsBody.innerHTML = '<tr><td colspan="2">No citations.</td></tr>';
     return;
   }
   const answer = String(payload.answer || "").trim();
-  const note = payload.insufficient_evidence ? "\n\n[Insufficient evidence in selected scope]" : "";
-  searchAskAnswer.textContent = answer ? `${answer}${note}` : "No answer returned.";
+  const note = payload.insufficient_evidence ? "\n\n_Insufficient evidence in selected scope._" : "";
+  const markdown = answer ? `${answer}${note}` : "No answer returned.";
+  searchAskAnswer.innerHTML = renderMarkdown(markdown);
   const citations = Array.isArray(payload.citations) ? payload.citations : [];
   if (!citations.length) {
     searchAskCitationsBody.innerHTML = '<tr><td colspan="2">No citations.</td></tr>';
@@ -2237,6 +2238,106 @@ function renderSearchAskAnswer(payload) {
     row.appendChild(quoteCell);
     searchAskCitationsBody.appendChild(row);
   }
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderInlineMarkdown(text) {
+  let rendered = escapeHtml(text);
+  rendered = rendered.replace(/`([^`]+)`/g, "<code>$1</code>");
+  rendered = rendered.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  rendered = rendered.replace(/(^|[\s(])\*([^*]+)\*(?=$|[\s).,!?;:])/g, "$1<em>$2</em>");
+  return rendered;
+}
+
+function flushMarkdownParagraph(buffer, html) {
+  if (!buffer.length) {
+    return;
+  }
+  html.push(`<p>${buffer.map((line) => renderInlineMarkdown(line)).join("<br>")}</p>`);
+  buffer.length = 0;
+}
+
+function renderMarkdown(markdown) {
+  const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
+  const html = [];
+  const paragraph = [];
+  let listKind = "";
+
+  const closeList = () => {
+    if (listKind) {
+      html.push(listKind === "ol" ? "</ol>" : "</ul>");
+      listKind = "";
+    }
+  };
+
+  for (const rawLine of lines) {
+    const line = rawLine.trimEnd();
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    const ulMatch = line.match(/^[-*]\s+(.+)$/);
+    const olMatch = line.match(/^\d+\.\s+(.+)$/);
+    const quoteMatch = line.match(/^>\s+(.+)$/);
+
+    if (!line.trim()) {
+      closeList();
+      flushMarkdownParagraph(paragraph, html);
+      continue;
+    }
+
+    if (headingMatch) {
+      closeList();
+      flushMarkdownParagraph(paragraph, html);
+      const level = headingMatch[1].length;
+      html.push(`<h${level}>${renderInlineMarkdown(headingMatch[2])}</h${level}>`);
+      continue;
+    }
+
+    if (quoteMatch) {
+      closeList();
+      flushMarkdownParagraph(paragraph, html);
+      html.push(`<blockquote>${renderInlineMarkdown(quoteMatch[1])}</blockquote>`);
+      continue;
+    }
+
+    if (ulMatch) {
+      flushMarkdownParagraph(paragraph, html);
+      if (listKind !== "ul") {
+        closeList();
+        html.push("<ul>");
+        listKind = "ul";
+      }
+      html.push(`<li>${renderInlineMarkdown(ulMatch[1])}</li>`);
+      continue;
+    }
+
+    if (olMatch) {
+      flushMarkdownParagraph(paragraph, html);
+      if (listKind !== "ol") {
+        closeList();
+        html.push("<ol>");
+        listKind = "ol";
+      }
+      html.push(`<li>${renderInlineMarkdown(olMatch[1])}</li>`);
+      continue;
+    }
+
+    closeList();
+    paragraph.push(line);
+  }
+
+  closeList();
+  flushMarkdownParagraph(paragraph, html);
+  if (!html.length) {
+    return "<p>No answer returned.</p>";
+  }
+  return html.join("");
 }
 
 function renderSearchAskDebugOutput(debugPayload, enabled) {

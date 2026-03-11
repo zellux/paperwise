@@ -1143,6 +1143,59 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   word-break: break-word;
 }
 
+.markdown-output {
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.markdown-output p,
+.markdown-output ul,
+.markdown-output ol,
+.markdown-output blockquote {
+  margin: 0 0 10px 0;
+}
+
+.markdown-output h1,
+.markdown-output h2,
+.markdown-output h3 {
+  margin: 0 0 8px 0;
+  font-family: var(--serif);
+  line-height: 1.25;
+}
+
+.markdown-output h1 {
+  font-size: 1.15rem;
+}
+
+.markdown-output h2 {
+  font-size: 1.05rem;
+}
+
+.markdown-output h3 {
+  font-size: 0.98rem;
+}
+
+.markdown-output ul,
+.markdown-output ol {
+  padding-left: 18px;
+}
+
+.markdown-output code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: color-mix(in srgb, var(--accent-soft) 38%, white);
+  border-radius: 5px;
+  padding: 1px 4px;
+}
+
+.markdown-output blockquote {
+  border-left: 3px solid var(--stroke);
+  padding-left: 10px;
+  color: var(--ink-soft);
+}
+
 .docs-table-wrap {
   border: 1px solid var(--stroke);
   border-radius: 12px;

@@ -6,6 +6,7 @@ GROUNDED_QA_SYSTEM_PROMPT = (
     "You are a strict document QA assistant. Answer ONLY from provided context chunks. "
     "Do not use outside knowledge. If evidence is insufficient, set insufficient_evidence=true and explain briefly. "
     "If the user asks to list or extract measurements, return all supported measurements with values/units as a structured list. "
+    "Write `answer` as Markdown (headings, bullets, short tables when useful). "
     "Return strict JSON with keys: answer, insufficient_evidence, citations. "
     "Each citation must include: chunk_id, document_id, title, quote."
 )
@@ -28,7 +29,8 @@ def build_grounded_qa_user_prompt(*, question: str, contexts: list[dict[str, Any
         "instructions": (
             "Use only these contexts. Cite chunk IDs supporting the answer. "
             "If conflicting evidence exists, mention uncertainty and cite both. "
-            "For list/extraction requests, include every supported item across contexts and avoid omitting repeated measurements."
+            "For list/extraction requests, include every supported item across contexts and avoid omitting repeated measurements. "
+            "Format the answer in Markdown."
         ),
     }
 
