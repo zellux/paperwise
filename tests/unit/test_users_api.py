@@ -202,6 +202,7 @@ def test_user_preferences_round_trip() -> None:
                     "ui_theme": "ledger",
                     "docs_page_size": 50,
                     "grounded_qa_top_k_chunks": 24,
+                    "grounded_qa_max_documents": 9,
                     "llm_provider": "openai",
                     "llm_model": "gpt-4.1-mini",
                     "llm_base_url": "https://api.openai.com/v1",
@@ -226,6 +227,7 @@ def test_user_preferences_round_trip() -> None:
         assert put_response.json()["preferences"]["ui_theme"] == "ledger"
         assert put_response.json()["preferences"]["docs_page_size"] == 50
         assert put_response.json()["preferences"]["grounded_qa_top_k_chunks"] == 24
+        assert put_response.json()["preferences"]["grounded_qa_max_documents"] == 9
         assert put_response.json()["preferences"]["llm_provider"] == "openai"
         assert put_response.json()["preferences"]["llm_model"] == "gpt-4.1-mini"
         assert put_response.json()["preferences"]["ocr_provider"] == "llm_separate"
@@ -239,6 +241,7 @@ def test_user_preferences_round_trip() -> None:
         assert get_saved.json()["preferences"]["ui_theme"] == "ledger"
         assert get_saved.json()["preferences"]["docs_page_size"] == 50
         assert get_saved.json()["preferences"]["grounded_qa_top_k_chunks"] == 24
+        assert get_saved.json()["preferences"]["grounded_qa_max_documents"] == 9
         assert get_saved.json()["preferences"]["llm_provider"] == "openai"
         assert get_saved.json()["preferences"]["llm_model"] == "gpt-4.1-mini"
         assert get_saved.json()["preferences"]["ocr_provider"] == "llm_separate"

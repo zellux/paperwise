@@ -3,7 +3,15 @@ from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 
 from paperwise.application.services.chunk_indexing import index_document_chunks
-from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, ParseResult, User
+from paperwise.domain.models import (
+    Document,
+    DocumentChunk,
+    DocumentChunkSearchHit,
+    DocumentStatus,
+    LLMParseResult,
+    ParseResult,
+    User,
+)
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from paperwise.server.dependencies import (
     current_user_dependency,
@@ -11,6 +19,7 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
 )
 from paperwise.server.main import app
+from paperwise.server.routes.collections import _build_qa_contexts
 
 
 TEST_USER = User(
@@ -487,3 +496,77 @@ def test_global_ask_anchor_filter_prefers_chunks_with_must_terms() -> None:
         assert source_doc_ids == {"doc-relevant"}
     finally:
         app.dependency_overrides.clear()
+
+
+def test_build_qa_contexts_limits_unique_documents() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-a",
+        owner_id=TEST_USER.id,
+        filename="doc-a.pdf",
+        text_preview="Doc A text with Quincy weight information.",
+        title="Doc A",
+    )
+    _save_document(
+        repository,
+        doc_id="doc-b",
+        owner_id=TEST_USER.id,
+        filename="doc-b.pdf",
+        text_preview="Doc B text with Quincy weight trend.",
+        title="Doc B",
+    )
+
+    now = datetime.now(UTC)
+    chunk_hits = [
+        DocumentChunkSearchHit(
+            chunk=DocumentChunk(
+                id="doc-a:0",
+                document_id="doc-a",
+                owner_id=TEST_USER.id,
+                chunk_index=0,
+                content="Doc A chunk 0",
+                token_count=4,
+                created_at=now,
+            ),
+            score=0.98,
+            matched_terms=[],
+        ),
+        DocumentChunkSearchHit(
+            chunk=DocumentChunk(
+                id="doc-b:0",
+                document_id="doc-b",
+                owner_id=TEST_USER.id,
+                chunk_index=0,
+                content="Doc B chunk 0",
+                token_count=4,
+                created_at=now,
+            ),
+            score=0.97,
+            matched_terms=[],
+        ),
+        DocumentChunkSearchHit(
+            chunk=DocumentChunk(
+                id="doc-a:1",
+                document_id="doc-a",
+                owner_id=TEST_USER.id,
+                chunk_index=1,
+                content="Doc A chunk 1",
+                token_count=4,
+                created_at=now,
+            ),
+            score=0.96,
+            matched_terms=[],
+        ),
+    ]
+
+    contexts = _build_qa_contexts(
+        repository=repository,
+        chunk_hits=chunk_hits,
+        top_k_chunks=10,
+        max_documents=1,
+    )
+
+    selected_doc_ids = {item["document_id"] for item in contexts}
+    assert selected_doc_ids == {"doc-a"}
+    assert len(contexts) == 2

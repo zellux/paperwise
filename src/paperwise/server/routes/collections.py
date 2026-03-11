@@ -86,6 +86,7 @@ class SearchResponse(BaseModel):
 class AskRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
     top_k_chunks: int = Field(default=18, ge=3, le=60)
+    max_documents: int = Field(default=12, ge=1, le=50)
     tag: list[str] = Field(default_factory=list)
     document_type: list[str] = Field(default_factory=list)
     debug: bool = False
@@ -488,18 +489,23 @@ def _build_qa_contexts(
     repository: DocumentRepository,
     chunk_hits,
     top_k_chunks: int,
+    max_documents: int,
 ) -> list[dict[str, str]]:
     contexts: list[dict[str, str]] = []
     seen_chunk_ids: set[str] = set()
+    selected_document_ids: set[str] = set()
     for hit in chunk_hits:
         chunk = hit.chunk
         if chunk.id in seen_chunk_ids:
+            continue
+        if chunk.document_id not in selected_document_ids and len(selected_document_ids) >= max_documents:
             continue
         seen_chunk_ids.add(chunk.id)
         llm = repository.get_llm_parse_result(chunk.document_id)
         document = repository.get(chunk.document_id)
         if document is None:
             continue
+        selected_document_ids.add(chunk.document_id)
         title = llm.suggested_title if llm is not None and llm.suggested_title else document.filename
         contexts.append(
             {
@@ -521,6 +527,7 @@ def _ask_grounded(
     owner_id: str,
     question: str,
     top_k_chunks: int,
+    max_documents: int,
     document_ids: list[str] | None,
     debug_scope: dict[str, object] | None = None,
     debug_enabled: bool = False,
@@ -539,6 +546,7 @@ def _ask_grounded(
         repository=repository,
         chunk_hits=chunk_hits,
         top_k_chunks=top_k_chunks,
+        max_documents=max_documents,
     )
     context_debug = [
         {
@@ -555,6 +563,7 @@ def _ask_grounded(
         "owner_id": owner_id,
         "question": question,
         "top_k_chunks": top_k_chunks,
+        "max_documents": max_documents,
         "scope": debug_scope or {},
         "retrieval": retrieval_debug,
         "selected_contexts": context_debug,
@@ -859,6 +868,7 @@ def ask_all_documents_endpoint(
         owner_id=current_user.id,
         question=payload.question,
         top_k_chunks=payload.top_k_chunks,
+        max_documents=payload.max_documents,
         document_ids=scoped_ids,
         debug_scope={
             "collection_id": None,
@@ -902,6 +912,7 @@ def ask_collection_documents_endpoint(
         owner_id=current_user.id,
         question=payload.question,
         top_k_chunks=payload.top_k_chunks,
+        max_documents=payload.max_documents,
         document_ids=scoped_ids,
         debug_scope={
             "collection_id": collection_id,

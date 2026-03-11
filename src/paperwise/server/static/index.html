@@ -656,7 +656,7 @@ Debug output disabled.
 
               <section class="settings-group">
                 <h3 class="settings-group-title">Grounded Q&amp;A</h3>
-                <p class="settings-group-note">Control how many retrieved context chunks are packed into each grounded answer.</p>
+                <p class="settings-group-note">Control retrieval context size and how many source documents are sent to the LLM for each answer.</p>
                 <div class="settings-group-fields">
                   <label class="label" for="settingsGroundedQaTopKInput">Context Chunks</label>
                   <input
@@ -666,6 +666,16 @@ Debug output disabled.
                     min="3"
                     max="60"
                     value="18"
+                  />
+
+                  <label class="label" for="settingsGroundedQaMaxDocsInput">Max Source Documents</label>
+                  <input
+                    id="settingsGroundedQaMaxDocsInput"
+                    name="settingsGroundedQaMaxDocsInput"
+                    type="number"
+                    min="1"
+                    max="50"
+                    value="12"
                   />
                 </div>
               </section>
