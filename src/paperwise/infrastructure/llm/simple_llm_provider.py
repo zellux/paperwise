@@ -98,3 +98,27 @@ class SimpleLLMProvider(LLMProvider):
             "insufficient_evidence": True,
             "citations": [],
         }
+
+    def rewrite_retrieval_queries(
+        self,
+        *,
+        question: str,
+    ) -> dict[str, Any]:
+        compact = " ".join(str(question or "").split()).strip()
+        tokens = [token for token in re.findall(r"[A-Za-z0-9]{2,}", compact.lower())]
+        unique: list[str] = []
+        seen: set[str] = set()
+        for token in tokens:
+            if token in seen:
+                continue
+            seen.add(token)
+            unique.append(token)
+        base = compact or "document search"
+        queries = [base]
+        if unique:
+            queries.append(" ".join(unique[:6]))
+        return {
+            "queries": queries[:3],
+            "must_terms": unique[:5],
+            "optional_terms": [],
+        }

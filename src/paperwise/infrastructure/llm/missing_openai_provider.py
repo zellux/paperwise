@@ -51,3 +51,13 @@ class MissingOpenAIProvider(LLMProvider):
         raise RuntimeError(
             "Grounded Q&A requires a configured LLM provider. Set provider and API key in Settings."
         )
+
+    def rewrite_retrieval_queries(
+        self,
+        *,
+        question: str,
+    ) -> dict[str, Any]:
+        del question
+        raise RuntimeError(
+            "Grounded Q&A query rewrite requires a configured LLM provider. Set provider and API key in Settings."
+        )

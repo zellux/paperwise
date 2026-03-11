@@ -231,7 +231,7 @@ def _resolve_metadata_scoped_document_ids(
     return sorted(matched_ids)
 
 
-def _build_retrieval_queries(query: str) -> list[str]:
+def _build_retrieval_queries_heuristic(query: str) -> list[str]:
     compact = " ".join(str(query or "").split()).strip()
     if not compact:
         return []
@@ -262,6 +262,55 @@ def _build_retrieval_queries(query: str) -> list[str]:
     return variants[:6]
 
 
+def _build_retrieval_queries_with_llm(
+    *,
+    query: str,
+    llm_provider: LLMProvider | None,
+    debug: dict[str, Any] | None = None,
+) -> list[str]:
+    fallback = _build_retrieval_queries_heuristic(query)
+    if llm_provider is None:
+        if debug is not None:
+            debug["rewrite_source"] = "heuristic"
+            debug["rewrite_reason"] = "no_llm_provider"
+        return fallback
+    rewrite_method = getattr(llm_provider, "rewrite_retrieval_queries", None)
+    if not callable(rewrite_method):
+        if debug is not None:
+            debug["rewrite_source"] = "heuristic"
+            debug["rewrite_reason"] = "provider_without_rewrite_method"
+        return fallback
+    try:
+        rewritten = rewrite_method(question=query)
+    except Exception as exc:
+        if debug is not None:
+            debug["rewrite_source"] = "heuristic"
+            debug["rewrite_reason"] = f"llm_rewrite_error:{exc}"
+        return fallback
+
+    queries_raw = rewritten.get("queries", []) if isinstance(rewritten, dict) else []
+    queries: list[str] = []
+    seen: set[str] = set()
+    for item in queries_raw if isinstance(queries_raw, list) else []:
+        value = " ".join(str(item or "").split()).strip()
+        if not value:
+            continue
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        queries.append(value)
+    if not queries:
+        if debug is not None:
+            debug["rewrite_source"] = "heuristic"
+            debug["rewrite_reason"] = "llm_rewrite_empty"
+        return fallback
+    if debug is not None:
+        debug["rewrite_source"] = "llm"
+        debug["llm_rewrite"] = rewritten if isinstance(rewritten, dict) else {"raw": rewritten}
+    return queries[:6]
+
+
 def _search_document_chunks_multi_query(
     *,
     repository: DocumentRepository,
@@ -269,9 +318,14 @@ def _search_document_chunks_multi_query(
     query: str,
     limit: int,
     document_ids: list[str] | None,
+    llm_provider: LLMProvider | None = None,
     debug: dict | None = None,
 ) -> list[DocumentChunkSearchHit]:
-    retrieval_queries = _build_retrieval_queries(query)
+    retrieval_queries = _build_retrieval_queries_with_llm(
+        query=query,
+        llm_provider=llm_provider,
+        debug=debug,
+    )
     if debug is not None:
         debug["expanded_queries"] = list(retrieval_queries)
         debug["per_query"] = []
@@ -368,6 +422,7 @@ def _ask_grounded(
         query=question,
         limit=max(top_k_chunks * 3, top_k_chunks),
         document_ids=document_ids,
+        llm_provider=llm_provider,
         debug=retrieval_debug,
     )
     contexts = _build_qa_contexts(

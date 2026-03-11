@@ -56,6 +56,13 @@ class LLMProvider(Protocol):
     ) -> dict[str, Any]:
         """Answer a question strictly from provided contexts with citations."""
 
+    def rewrite_retrieval_queries(
+        self,
+        *,
+        question: str,
+    ) -> dict[str, Any]:
+        """Generate retrieval query variants and anchors for grounded retrieval."""
+
 
 class SearchProvider(Protocol):
     def search(self, query: str, limit: int = 10) -> list[dict]:

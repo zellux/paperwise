@@ -20,6 +20,11 @@ from paperwise.infrastructure.llm.grounded_qa_prompt import (
     build_grounded_qa_user_prompt,
     extract_grounded_qa_result,
 )
+from paperwise.infrastructure.llm.retrieval_query_prompt import (
+    RETRIEVAL_QUERY_SYSTEM_PROMPT,
+    build_retrieval_query_user_prompt,
+    extract_retrieval_query_result,
+)
 
 
 class AnthropicLLMProvider(LLMProvider):
@@ -253,3 +258,56 @@ class AnthropicLLMProvider(LLMProvider):
         if total_tokens > 0:
             result["llm_total_tokens"] = total_tokens
         return result
+
+    def rewrite_retrieval_queries(
+        self,
+        *,
+        question: str,
+    ) -> dict[str, Any]:
+        user_prompt = build_retrieval_query_user_prompt(question=question)
+        request_payload = {
+            "model": self._model,
+            "max_tokens": 800,
+            "temperature": 0,
+            "system": RETRIEVAL_QUERY_SYSTEM_PROMPT,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": json.dumps(user_prompt),
+                }
+            ],
+        }
+        response: httpx.Response | None = None
+        response_payload: Any = None
+        try:
+            response = self._client.post("/v1/messages", json=request_payload)
+            try:
+                response_payload = response.json()
+            except ValueError:
+                response_payload = {"raw_text": getattr(response, "text", "")}
+        except Exception as exc:
+            log_llm_exchange(
+                provider="claude",
+                endpoint="/v1/messages",
+                request_payload=request_payload,
+                error=str(exc),
+            )
+            raise
+
+        log_llm_exchange(
+            provider="claude",
+            endpoint="/v1/messages",
+            request_payload=request_payload,
+            response_status=getattr(response, "status_code", None),
+            response_payload=response_payload,
+        )
+        response.raise_for_status()
+        payload = response_payload if isinstance(response_payload, dict) else response.json()
+        content_blocks = payload.get("content", [])
+        text_chunks = [
+            str(block.get("text", ""))
+            for block in content_blocks
+            if isinstance(block, dict) and block.get("type") == "text"
+        ]
+        parsed = json.loads("".join(text_chunks).strip())
+        return extract_retrieval_query_result(parsed, fallback_question=question)

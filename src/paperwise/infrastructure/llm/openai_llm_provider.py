@@ -22,6 +22,11 @@ from paperwise.infrastructure.llm.grounded_qa_prompt import (
     build_grounded_qa_user_prompt,
     extract_grounded_qa_result,
 )
+from paperwise.infrastructure.llm.retrieval_query_prompt import (
+    RETRIEVAL_QUERY_SYSTEM_PROMPT,
+    build_retrieval_query_user_prompt,
+    extract_retrieval_query_result,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -389,3 +394,47 @@ class OpenAILLMProvider(LLMProvider):
         if isinstance(total_tokens, int) and total_tokens > 0:
             result["llm_total_tokens"] = total_tokens
         return result
+
+    def rewrite_retrieval_queries(
+        self,
+        *,
+        question: str,
+    ) -> dict[str, Any]:
+        user_prompt = build_retrieval_query_user_prompt(question=question)
+        request_payload = {
+            "model": self._model,
+            "temperature": 0,
+            "response_format": {"type": "json_object"},
+            "messages": [
+                {"role": "system", "content": RETRIEVAL_QUERY_SYSTEM_PROMPT},
+                {"role": "user", "content": json.dumps(user_prompt)},
+            ],
+        }
+        response: httpx.Response | None = None
+        response_payload: Any = None
+        try:
+            response = self._client.post("/chat/completions", json=request_payload)
+            try:
+                response_payload = response.json()
+            except ValueError:
+                response_payload = {"raw_text": getattr(response, "text", "")}
+        except Exception as exc:
+            log_llm_exchange(
+                provider="openai",
+                endpoint="/chat/completions",
+                request_payload=request_payload,
+                error=str(exc),
+            )
+            raise
+        log_llm_exchange(
+            provider="openai",
+            endpoint="/chat/completions",
+            request_payload=request_payload,
+            response_status=getattr(response, "status_code", None),
+            response_payload=response_payload,
+        )
+        response.raise_for_status()
+        payload = response_payload if isinstance(response_payload, dict) else response.json()
+        content = str(payload["choices"][0]["message"]["content"]).strip()
+        parsed = json.loads(content)
+        return extract_retrieval_query_result(parsed, fallback_question=question)
