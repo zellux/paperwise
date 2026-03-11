@@ -36,7 +36,6 @@ const searchAskQuestion = document.getElementById("searchAskQuestion");
 const searchAskTopKInput = document.getElementById("searchAskTopKInput");
 const searchAskAnswer = document.getElementById("searchAskAnswer");
 const searchAskCitationsBody = document.getElementById("searchAskCitationsBody");
-const searchTabButtons = [...document.querySelectorAll(".search-tab-btn")];
 const searchSubsections = [...document.querySelectorAll(".search-subsection")];
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
 const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
@@ -127,7 +126,9 @@ const VIEW_PARAM_TO_ID = Object.fromEntries(
 const PATH_TO_VIEW_ID = {
   "/ui/documents": "section-docs",
   "/ui/document": "section-document",
+  "/ui/collections": "section-search",
   "/ui/search": "section-search",
+  "/ui/grounded-qa": "section-search",
   "/ui/tags": "section-tags",
   "/ui/document-types": "section-document-types",
   "/ui/pending": "section-pending",
@@ -138,7 +139,7 @@ const PATH_TO_VIEW_ID = {
 const VIEW_ID_TO_PATH = {
   "section-docs": "/ui/documents",
   "section-document": "/ui/document",
-  "section-search": "/ui/search",
+  "section-search": "/ui/collections",
   "section-tags": "/ui/tags",
   "section-document-types": "/ui/document-types",
   "section-pending": "/ui/pending",
@@ -215,6 +216,11 @@ let searchDocsCatalog = [];
 let searchSelectedCollectionId = "";
 let searchSelectedCollectionDocumentIds = [];
 let searchActiveSectionId = "search-section-collections";
+const PATH_TO_SEARCH_SECTION_ID = {
+  "/ui/collections": "search-section-collections",
+  "/ui/search": "search-section-keyword",
+  "/ui/grounded-qa": "search-section-ask",
+};
 
 function normalizePageSize(value) {
   const size = Number(value);
@@ -1038,8 +1044,15 @@ async function restoreSession() {
 }
 
 function setActiveNav(targetId) {
+  const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
   for (const link of navLinks) {
-    link.classList.toggle("active", link.dataset.target === targetId);
+    const linkTarget = link.dataset.target;
+    if (targetId === "section-search" && linkTarget === "section-search") {
+      const linkPath = (link.getAttribute("href") || "").replace(/\/+$/, "") || "/";
+      link.classList.toggle("active", linkPath === currentPath);
+      continue;
+    }
+    link.classList.toggle("active", linkTarget === targetId);
   }
 }
 
@@ -1061,11 +1074,6 @@ function setActiveSearchSection(sectionId) {
   searchActiveSectionId = nextSectionId;
   for (const section of searchSubsections) {
     section.classList.toggle("view-hidden", section.id !== nextSectionId);
-  }
-  for (const button of searchTabButtons) {
-    const isActive = button.dataset.searchSection === nextSectionId;
-    button.classList.toggle("is-active", isActive);
-    button.setAttribute("aria-selected", isActive ? "true" : "false");
   }
 }
 
@@ -1422,6 +1430,7 @@ function syncUrlFromFilters() {
 
 function readFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
+  const path = window.location.pathname.replace(/\/+$/, "") || "/";
   docsFilters.q = String(params.get("q") || "").trim();
   docsFilters.tag = unique(params.getAll("tag"));
   docsFilters.correspondent = unique(params.getAll("correspondent"));
@@ -1435,6 +1444,7 @@ function readFiltersFromUrl() {
   const viewFromUrl = params.get("view");
   const mappedViewId = viewFromUrl ? (VIEW_PARAM_TO_ID[viewFromUrl] || viewFromUrl) : "";
   const pathViewId = getCurrentPathViewId();
+  const pathSearchSectionId = PATH_TO_SEARCH_SECTION_ID[path];
   if (pathViewId && views.some((view) => view.id === pathViewId)) {
     currentViewId = pathViewId;
   } else if (mappedViewId && views.some((view) => view.id === mappedViewId)) {
@@ -1442,6 +1452,9 @@ function readFiltersFromUrl() {
     currentViewId = mappedViewId;
   } else {
     currentViewId = "section-docs";
+  }
+  if (pathSearchSectionId) {
+    searchActiveSectionId = pathSearchSectionId;
   }
 }
 
@@ -2914,13 +2927,6 @@ signOutBtn?.addEventListener("click", () => {
   clearSession();
   setAuthMessage("Signed out.");
 });
-
-for (const button of searchTabButtons) {
-  button.addEventListener("click", () => {
-    const sectionId = String(button.dataset.searchSection || "").trim();
-    setActiveSearchSection(sectionId);
-  });
-}
 
 searchCollectionCreateForm?.addEventListener("submit", async (event) => {
   event.preventDefault();

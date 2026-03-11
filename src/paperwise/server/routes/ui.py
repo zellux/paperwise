@@ -39,6 +39,16 @@ def search_page() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
 
 
+@router.get("/ui/collections", include_in_schema=False)
+def collections_page() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
+@router.get("/ui/grounded-qa", include_in_schema=False)
+def grounded_qa_page() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
 @router.get("/ui/pending", include_in_schema=False)
 def pending_page() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")

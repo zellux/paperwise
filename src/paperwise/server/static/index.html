@@ -93,12 +93,33 @@
       <aside class="sidebar">
         <nav class="nav">
           <a class="nav-link active" data-target="section-docs" href="/ui/documents">Documents</a>
-          <a class="nav-link" data-target="section-search" href="/ui/search">Search</a>
+          <a
+            class="nav-link"
+            data-target="section-search"
+            data-search-section="search-section-collections"
+            href="/ui/collections"
+            >Collections</a
+          >
+          <a
+            class="nav-link"
+            data-target="section-search"
+            data-search-section="search-section-keyword"
+            href="/ui/search"
+            >Search</a
+          >
+          <a
+            class="nav-link"
+            data-target="section-search"
+            data-search-section="search-section-ask"
+            href="/ui/grounded-qa"
+            >Grounded Q&amp;A</a
+          >
           <a class="nav-link" data-target="section-tags" href="/ui/tags">Tags</a>
           <a class="nav-link" data-target="section-document-types" href="/ui/document-types">Document Types</a>
           <a class="nav-link" data-target="section-pending" href="/ui/pending">Processing Queue</a>
           <a class="nav-link" data-target="section-upload" href="/ui/upload">Upload</a>
           <a class="nav-link" data-target="section-activity" href="/ui/activity">Activity</a>
+          <div class="nav-divider" aria-hidden="true"></div>
           <a class="nav-link nav-link-settings" data-target="section-settings" href="/ui/settings">Settings</a>
         </nav>
       </aside>
@@ -284,41 +305,6 @@
 
         <article id="section-search" class="panel panel-section view view-hidden">
           <h2>Search</h2>
-          <div class="search-tabs" role="tablist" aria-label="Search sections">
-            <button
-              id="searchTabCollections"
-              type="button"
-              class="btn search-tab-btn is-active"
-              data-search-section="search-section-collections"
-              role="tab"
-              aria-selected="true"
-              aria-controls="search-section-collections"
-            >
-              Collection Management
-            </button>
-            <button
-              id="searchTabKeyword"
-              type="button"
-              class="btn search-tab-btn"
-              data-search-section="search-section-keyword"
-              role="tab"
-              aria-selected="false"
-              aria-controls="search-section-keyword"
-            >
-              Search
-            </button>
-            <button
-              id="searchTabAsk"
-              type="button"
-              class="btn search-tab-btn"
-              data-search-section="search-section-ask"
-              role="tab"
-              aria-selected="false"
-              aria-controls="search-section-ask"
-            >
-              Grounded Q&amp;A
-            </button>
-          </div>
 
           <div class="search-shared-scope">
             <div class="search-scope-row">

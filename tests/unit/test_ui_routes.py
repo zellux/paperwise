@@ -8,7 +8,9 @@ def test_ui_routes_serve_index_html() -> None:
     routes = (
         "/ui/documents",
         "/ui/document",
+        "/ui/collections",
         "/ui/search",
+        "/ui/grounded-qa",
         "/ui/tags",
         "/ui/document-types",
         "/ui/pending",

@@ -301,16 +301,11 @@ h1 {
 }
 
 .nav-link-settings {
-  position: relative;
-  margin-top: 20px;
+  margin-top: 0;
 }
 
-.nav-link-settings::before {
-  content: "";
-  position: absolute;
-  left: 8px;
-  right: 8px;
-  top: -15px;
+.nav-divider {
+  margin: 8px 4px 2px;
   height: 2px;
   border-radius: 999px;
   background: linear-gradient(
@@ -813,24 +808,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   grid-column: 1 / -1;
 }
 
-.search-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-}
-
-.search-tab-btn {
-  background: rgba(247, 248, 246, 0.95);
-  color: var(--ink-soft);
-}
-
-.search-tab-btn.is-active {
-  background: var(--accent-soft);
-  color: color-mix(in srgb, var(--accent) 85%, black);
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--stroke));
-}
-
 .search-shared-scope {
   border: 1px solid var(--stroke-soft);
   border-radius: 12px;
@@ -908,10 +885,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   .search-layout {
     grid-template-columns: 1fr;
-  }
-
-  .search-tabs {
-    flex-direction: column;
   }
 
   .search-scope-filters {
