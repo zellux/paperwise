@@ -1066,6 +1066,11 @@ async function hydrateUserPreferencesForSession() {
 
 // Avoid auth-gate flash on page load when we already have a stored token.
 if (authToken && authGate && appShell) {
+  readFiltersFromUrl();
+  setActiveSearchSection(searchActiveSectionId);
+  setActiveSettingsSection(settingsActiveSectionId);
+  setActiveView(currentViewId);
+  setActiveNav(currentViewId);
   authGate.classList.add("view-hidden");
   appShell.classList.remove("view-hidden");
 }
