@@ -409,6 +409,7 @@ h1 {
 input[type="text"],
 input[type="file"],
 input[type="date"],
+input[type="number"],
 input[type="password"],
 textarea,
 .settings-form select {
@@ -446,6 +447,7 @@ input[type="date"] {
 input[type="text"]:focus-visible,
 input[type="file"]:focus-visible,
 input[type="date"]:focus-visible,
+input[type="number"]:focus-visible,
 input[type="password"]:focus-visible,
 textarea:focus-visible,
 .settings-form select:focus-visible {
@@ -794,6 +796,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .settings-compact-field .label {
   margin-bottom: 0;
   font-size: 0.78rem;
+}
+
+.settings-compact-field input[type="number"] {
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-size: 0.9rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-compact-field input[type="number"]::-webkit-outer-spin-button,
+.settings-compact-field input[type="number"]::-webkit-inner-spin-button {
+  margin-left: 4px;
 }
 
 .settings-checkbox-row {
