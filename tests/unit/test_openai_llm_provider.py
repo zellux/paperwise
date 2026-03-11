@@ -239,3 +239,57 @@ def test_openai_provider_image_ocr_calls_each_page_and_combines(monkeypatch) -> 
 
     assert result == "page-1\n\npage-2"
     assert len(captured_requests) == 2
+
+
+def test_openai_provider_grounded_qa_uses_extended_timeout(monkeypatch) -> None:
+    captured_call: dict[str, object] = {}
+
+    class FakeClient:
+        def post(self, _path: str, json: dict, timeout: float | None = None):
+            captured_call["payload"] = json
+            captured_call["timeout"] = timeout
+
+            class Response:
+                status_code = 200
+                text = ""
+
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": json_module.dumps(
+                                        {
+                                            "answer": "The policy rate changed over time.",
+                                            "insufficient_evidence": False,
+                                            "citations": [],
+                                        }
+                                    )
+                                }
+                            }
+                        ]
+                    }
+
+            return Response()
+
+    json_module = json
+    provider = OpenAILLMProvider(api_key="k", model="m")
+    monkeypatch.setattr(provider, "_client", FakeClient())
+
+    result = provider.answer_grounded(
+        question="What is the history of the rate?",
+        contexts=[
+            {
+                "chunk_id": "doc:1",
+                "document_id": "doc",
+                "title": "Sample",
+                "content": "sample context",
+            }
+        ],
+    )
+
+    assert result["answer"] == "The policy rate changed over time."
+    assert captured_call["timeout"] == 120.0
