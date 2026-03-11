@@ -409,8 +409,7 @@ h1 span {
 }
 
 .workflow-panel,
-.workflow-cards,
-.testimonial {
+.workflow-cards {
   background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
@@ -508,33 +507,6 @@ h1 span {
 
 .mini-d {
   background: linear-gradient(145deg, #f0b164, #f6ddb8);
-}
-
-.testimonials-wrap h2 {
-  margin-bottom: 20px;
-}
-
-.testimonial-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-}
-
-.testimonial {
-  padding: 22px;
-}
-
-.testimonial p {
-  margin: 0;
-  color: var(--ink-700);
-  font-size: 1.02rem;
-}
-
-.testimonial span {
-  margin-top: 14px;
-  display: block;
-  font-weight: 700;
-  color: var(--ink-900);
 }
 
 .cta-band {
@@ -658,7 +630,6 @@ h1 span {
   }
 
   .workflow-grid,
-  .testimonial-grid,
   .ask-grid {
     grid-template-columns: 1fr;
   }
