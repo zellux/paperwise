@@ -7,8 +7,9 @@ BACKEND_PID_FILE ?= $(RUN_DIR)/backend.pid
 WORKER_PID_FILE ?= $(RUN_DIR)/worker.pid
 BACKEND_LOG ?= $(LOG_DIR)/backend.log
 WORKER_LOG ?= $(LOG_DIR)/worker.log
+WEBSITE_PORT ?= 8081
 
-.PHONY: setup deps-up deps-down docker-up docker-down docker-logs backend api worker worker-bg backend-bg dev-up dev-stop dev-restart dev-status test smoke-llm
+.PHONY: setup deps-up deps-down docker-up docker-down docker-logs backend api worker worker-bg backend-bg website dev-up dev-stop dev-restart dev-status test smoke-llm
 
 setup:
 	$(PYTHON) -m venv $(VENV)
@@ -37,6 +38,9 @@ api: backend
 
 worker:
 	$(VENV_PYTHON) -m celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO
+
+website:
+	cd website && $(PYTHON) -m http.server $(WEBSITE_PORT)
 
 backend-bg:
 	@mkdir -p $(RUN_DIR) $(LOG_DIR)
