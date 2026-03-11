@@ -17,6 +17,9 @@ def test_ui_routes_serve_index_html() -> None:
         "/ui/upload",
         "/ui/activity",
         "/ui/settings",
+        "/ui/settings/account",
+        "/ui/settings/display",
+        "/ui/settings/models",
     )
     for route in routes:
         response = client.get(route)

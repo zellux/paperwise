@@ -69,6 +69,21 @@ def settings_page() -> FileResponse:
     return FileResponse(_STATIC_DIR / "index.html")
 
 
+@router.get("/ui/settings/account", include_in_schema=False)
+def settings_account_page() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
+@router.get("/ui/settings/display", include_in_schema=False)
+def settings_display_page() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
+@router.get("/ui/settings/models", include_in_schema=False)
+def settings_models_page() -> FileResponse:
+    return FileResponse(_STATIC_DIR / "index.html")
+
+
 @router.get("/style-lab", include_in_schema=False)
 def style_lab() -> FileResponse:
     return FileResponse(_STATIC_DIR / "style-lab.html")

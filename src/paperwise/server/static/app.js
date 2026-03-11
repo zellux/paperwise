@@ -38,18 +38,26 @@ const searchAskAnswer = document.getElementById("searchAskAnswer");
 const searchAskDebugOutput = document.getElementById("searchAskDebugOutput");
 const searchAskCitationsBody = document.getElementById("searchAskCitationsBody");
 const searchSubsections = [...document.querySelectorAll(".search-subsection")];
+const settingsSubsections = [...document.querySelectorAll(".settings-subsection")];
+const settingsSubnavLinks = [...document.querySelectorAll(".settings-subnav-link")];
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
 const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
 const settingsGroundedQaTopKInput = document.getElementById("settingsGroundedQaTopKInput");
 const settingsGroundedQaMaxDocsInput = document.getElementById("settingsGroundedQaMaxDocsInput");
-const settingsLlmProviderSelect = document.getElementById("settingsLlmProviderSelect");
-const settingsLlmModelInput = document.getElementById("settingsLlmModelInput");
-const settingsLlmBaseUrlInput = document.getElementById("settingsLlmBaseUrlInput");
-const settingsLlmApiKeyInput = document.getElementById("settingsLlmApiKeyInput");
-const settingsTestLlmBtn = document.getElementById("settingsTestLlmBtn");
-const settingsLlmTestStatus = document.getElementById("settingsLlmTestStatus");
+const settingsConnectionsList = document.getElementById("settingsConnectionsList");
+const settingsAddConnectionBtn = document.getElementById("settingsAddConnectionBtn");
+const settingsModelSummary = document.getElementById("settingsModelSummary");
+const settingsMetadataRouteFields = document.getElementById("settingsMetadataRouteFields");
+const settingsMetadataConnectionSelect = document.getElementById("settingsMetadataConnectionSelect");
+const settingsMetadataModelInput = document.getElementById("settingsMetadataModelInput");
+const settingsGroundedQaRouteFields = document.getElementById("settingsGroundedQaRouteFields");
+const settingsGroundedQaConnectionSelect = document.getElementById("settingsGroundedQaConnectionSelect");
+const settingsGroundedQaModelInput = document.getElementById("settingsGroundedQaModelInput");
 const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
 const settingsOcrStatus = document.getElementById("settingsOcrStatus");
+const settingsOcrRouteFields = document.getElementById("settingsOcrRouteFields");
+const settingsOcrConnectionSelect = document.getElementById("settingsOcrConnectionSelect");
+const settingsOcrModelInput = document.getElementById("settingsOcrModelInput");
 const settingsOcrAutoSwitchCheckbox = document.getElementById("settingsOcrAutoSwitchCheckbox");
 const settingsOcrImageDetailSelect = document.getElementById("settingsOcrImageDetailSelect");
 const settingsCurrentPasswordInput = document.getElementById("settingsCurrentPasswordInput");
@@ -57,13 +65,6 @@ const settingsNewPasswordInput = document.getElementById("settingsNewPasswordInp
 const settingsConfirmPasswordInput = document.getElementById("settingsConfirmPasswordInput");
 const settingsChangePasswordBtn = document.getElementById("settingsChangePasswordBtn");
 const settingsPasswordStatus = document.getElementById("settingsPasswordStatus");
-const settingsOcrLlmProviderSelect = document.getElementById("settingsOcrLlmProviderSelect");
-const settingsOcrLlmModelInput = document.getElementById("settingsOcrLlmModelInput");
-const settingsOcrLlmBaseUrlInput = document.getElementById("settingsOcrLlmBaseUrlInput");
-const settingsOcrLlmApiKeyInput = document.getElementById("settingsOcrLlmApiKeyInput");
-const settingsOcrSeparateOnlyFields = [
-  ...document.querySelectorAll(".ocr-separate-only"),
-];
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
 const signInForm = document.getElementById("signInForm");
@@ -138,6 +139,9 @@ const PATH_TO_VIEW_ID = {
   "/ui/upload": "section-upload",
   "/ui/activity": "section-activity",
   "/ui/settings": "section-settings",
+  "/ui/settings/account": "section-settings",
+  "/ui/settings/display": "section-settings",
+  "/ui/settings/models": "section-settings",
 };
 const VIEW_ID_TO_PATH = {
   "section-docs": "/ui/documents",
@@ -179,22 +183,17 @@ const OCR_LLM_PROVIDER_DEFAULTS = {
     base_url: "https://generativelanguage.googleapis.com/v1beta",
   },
 };
-let llmSettings = {
-  provider: "",
-  model: "",
-  base_url: "",
-  api_key: "",
-};
-const SUPPORTED_OCR_PROVIDERS = ["tesseract", "llm", "llm_separate"];
+const SUPPORTED_OCR_PROVIDERS = ["tesseract", "llm"];
 let ocrProvider = "llm";
 let ocrImageDetail = "auto";
-let ocrLlmSettings = {
-  provider: "",
-  model: "",
-  base_url: "",
-  api_key: "",
-};
 let ocrAutoSwitch = false;
+let llmConnections = [];
+let llmRouting = {
+  metadata: { connection_id: "", model: "" },
+  grounded_qa: { connection_id: "", model: "" },
+  ocr: { engine: "llm", connection_id: "", model: "" },
+};
+const connectionTestStatuses = new Map();
 let ocrStatusRequestSeq = 0;
 let docsFilters = {
   q: "",
@@ -221,10 +220,22 @@ let searchDocsCatalog = [];
 let searchSelectedCollectionId = "";
 let searchSelectedCollectionDocumentIds = [];
 let searchActiveSectionId = "search-section-keyword";
+let settingsActiveSectionId = "settings-section-account";
 const PATH_TO_SEARCH_SECTION_ID = {
   "/ui/collections": "search-section-keyword",
   "/ui/search": "search-section-keyword",
   "/ui/grounded-qa": "search-section-ask",
+};
+const PATH_TO_SETTINGS_SECTION_ID = {
+  "/ui/settings": "settings-section-account",
+  "/ui/settings/account": "settings-section-account",
+  "/ui/settings/display": "settings-section-display",
+  "/ui/settings/models": "settings-section-models",
+};
+const SETTINGS_SECTION_ID_TO_PATH = {
+  "settings-section-account": "/ui/settings/account",
+  "settings-section-display": "/ui/settings/display",
+  "settings-section-models": "/ui/settings/models",
 };
 
 function normalizePageSize(value) {
@@ -390,35 +401,8 @@ function renderSettingsForm() {
   ) {
     settingsGroundedQaMaxDocsInput.value = String(groundedQaMaxDocuments);
   }
-  if (settingsLlmProviderSelect && settingsLlmProviderSelect.value !== llmSettings.provider) {
-    settingsLlmProviderSelect.value = llmSettings.provider;
-  }
-  if (settingsLlmModelInput && settingsLlmModelInput.value !== llmSettings.model) {
-    settingsLlmModelInput.value = llmSettings.model;
-  }
-  if (settingsLlmBaseUrlInput && settingsLlmBaseUrlInput.value !== llmSettings.base_url) {
-    settingsLlmBaseUrlInput.value = llmSettings.base_url;
-  }
-  if (settingsLlmApiKeyInput && settingsLlmApiKeyInput.value !== llmSettings.api_key) {
-    settingsLlmApiKeyInput.value = llmSettings.api_key;
-  }
   if (settingsOcrProviderSelect && settingsOcrProviderSelect.value !== ocrProvider) {
     settingsOcrProviderSelect.value = ocrProvider;
-  }
-  if (
-    settingsOcrLlmProviderSelect &&
-    settingsOcrLlmProviderSelect.value !== ocrLlmSettings.provider
-  ) {
-    settingsOcrLlmProviderSelect.value = ocrLlmSettings.provider;
-  }
-  if (settingsOcrLlmModelInput && settingsOcrLlmModelInput.value !== ocrLlmSettings.model) {
-    settingsOcrLlmModelInput.value = ocrLlmSettings.model;
-  }
-  if (settingsOcrLlmBaseUrlInput && settingsOcrLlmBaseUrlInput.value !== ocrLlmSettings.base_url) {
-    settingsOcrLlmBaseUrlInput.value = ocrLlmSettings.base_url;
-  }
-  if (settingsOcrLlmApiKeyInput && settingsOcrLlmApiKeyInput.value !== ocrLlmSettings.api_key) {
-    settingsOcrLlmApiKeyInput.value = ocrLlmSettings.api_key;
   }
   if (settingsOcrAutoSwitchCheckbox) {
     settingsOcrAutoSwitchCheckbox.checked = ocrAutoSwitch;
@@ -426,87 +410,455 @@ function renderSettingsForm() {
   if (settingsOcrImageDetailSelect && settingsOcrImageDetailSelect.value !== ocrImageDetail) {
     settingsOcrImageDetailSelect.value = ocrImageDetail;
   }
-  syncOcrSeparateSettingsVisibility();
+  renderConnectionsList();
+  renderTaskRoutingControls();
+  renderModelConfigSummary();
+  syncTaskRoutingVisibility();
+  setActiveSettingsSection(settingsActiveSectionId);
   refreshLocalOcrStatus().catch(() => {});
   setSettingsPasswordStatus("");
   syncUploadAvailability();
 }
 
-function syncOcrSeparateSettingsVisibility() {
-  const selectedProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
-  const showOcrLlmFields = selectedProvider === "llm_separate";
-  settingsOcrSeparateOnlyFields.forEach((element) => {
-    element.hidden = !showOcrLlmFields;
-  });
+function formatModelSummaryRow(label, settings, extra = "") {
+  if (!settings) {
+    return `<tr><td>${escapeHtml(label)}</td><td>-</td><td>Not configured</td></tr>`;
+  }
+  const detail = `${settings.model}${extra ? `, ${extra}` : ""}`;
+  return `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(settings.connection_name)}</td><td>${escapeHtml(detail)}</td></tr>`;
 }
 
-function readLlmSettingsFromControls() {
-  return {
-    provider: normalizeLlmProvider(settingsLlmProviderSelect?.value || llmSettings.provider),
-    model: String(settingsLlmModelInput?.value || "").trim(),
-    base_url: String(settingsLlmBaseUrlInput?.value || "").trim(),
-    api_key: String(settingsLlmApiKeyInput?.value || "").trim(),
-  };
-}
-
-function readOcrLlmSettingsFromControls() {
-  return {
-    provider: normalizeLlmProvider(settingsOcrLlmProviderSelect?.value || ocrLlmSettings.provider),
-    model: String(settingsOcrLlmModelInput?.value || "").trim(),
-    base_url: String(settingsOcrLlmBaseUrlInput?.value || "").trim(),
-    api_key: String(settingsOcrLlmApiKeyInput?.value || "").trim(),
-  };
-}
-
-function applyLlmProviderDefaultsToControls(provider, modelInput, baseUrlInput, options = {}) {
-  const force = options.force === true;
-  const defaults = getLlmProviderDefaults(provider);
-  if (!defaults) {
+function renderModelConfigSummary() {
+  if (!settingsModelSummary) {
     return;
   }
-  if (modelInput) {
-    const currentModel = String(modelInput.value || "").trim();
-    if (force || !currentModel) {
-      modelInput.value = defaults.model;
-    }
+  const metadataSettings = getResolvedTaskSettings("metadata");
+  const groundedSettings = getResolvedTaskSettings("grounded_qa");
+  const ocrSettings = getResolvedTaskSettings("ocr");
+
+  if (ocrProvider === "tesseract") {
+    settingsModelSummary.innerHTML = [
+      formatModelSummaryRow("Metadata Extraction", metadataSettings),
+      formatModelSummaryRow("Search and Ask Your Docs", groundedSettings),
+      "<tr><td>OCR</td><td>Local</td><td>local only</td></tr>",
+    ].join("");
+    return;
   }
-  if (baseUrlInput) {
-    const currentBaseUrl = String(baseUrlInput.value || "").trim();
-    if (force || !currentBaseUrl) {
-      baseUrlInput.value = defaults.base_url;
-    }
-  }
+
+  settingsModelSummary.innerHTML = [
+    formatModelSummaryRow("Metadata Extraction", metadataSettings),
+    formatModelSummaryRow("Search and Ask Your Docs", groundedSettings),
+    formatModelSummaryRow(
+      "OCR",
+      ocrSettings,
+      `auto switch ${ocrAutoSwitch ? "on" : "off"}`
+    ),
+  ].join("");
 }
 
-function getLlmUploadBlockReasonForSettings(candidateSettings) {
-  const provider = normalizeLlmProvider(candidateSettings?.provider);
+function createEmptyConnection(index = llmConnections.length + 1) {
+  return {
+    id: `connection-${Date.now()}-${index}`,
+    name: `Connection ${index}`,
+    provider: "",
+    base_url: "",
+    api_key: "",
+  };
+}
+
+function createDefaultLlmRouting() {
+  return {
+    metadata: { connection_id: "", model: "" },
+    grounded_qa: { connection_id: "", model: "" },
+    ocr: { engine: "llm", connection_id: "", model: "" },
+  };
+}
+
+function normalizeConnection(connection, index = 0) {
+  const provider = normalizeLlmProvider(connection?.provider);
+  const normalized = {
+    id: String(connection?.id || `connection-${index + 1}`).trim() || `connection-${index + 1}`,
+    name: String(connection?.name || "").trim(),
+    provider,
+    base_url: String(connection?.base_url || "").trim(),
+    api_key: String(connection?.api_key || "").trim(),
+    default_model: String(connection?.default_model || "").trim(),
+  };
+  if (
+    !normalized.name &&
+    !normalized.provider &&
+    !normalized.base_url &&
+    !normalized.api_key &&
+    !normalized.default_model
+  ) {
+    return null;
+  }
+  if (!normalized.name) {
+    normalized.name = provider ? provider[0].toUpperCase() + provider.slice(1) : `Connection ${index + 1}`;
+  }
+  return normalized;
+}
+
+function migrateLegacyLlmPreferences(preferences) {
+  const connections = [];
+  const primaryProvider = normalizeLlmProvider(preferences?.llm_provider);
+  const primaryBaseUrl = String(preferences?.llm_base_url || "").trim();
+  const primaryApiKey = String(preferences?.llm_api_key || "").trim();
+  if (primaryProvider || primaryBaseUrl || primaryApiKey) {
+    connections.push({
+      id: "default-connection",
+      name: "Primary Connection",
+      provider: primaryProvider,
+      base_url: primaryBaseUrl,
+      api_key: primaryApiKey,
+      default_model: String(preferences?.llm_model || "").trim(),
+    });
+  }
+  const routing = createDefaultLlmRouting();
+  routing.metadata.connection_id = connections[0]?.id || "";
+  routing.metadata.model = String(preferences?.llm_model || "").trim();
+  routing.grounded_qa.connection_id = connections[0]?.id || "";
+  routing.grounded_qa.model = String(preferences?.llm_model || "").trim();
+  routing.ocr.connection_id = connections[0]?.id || "";
+  routing.ocr.model = String(preferences?.llm_model || "").trim();
+  const legacyOcrProvider = String(preferences?.ocr_provider || "llm").trim().toLowerCase();
+  if (legacyOcrProvider === "tesseract") {
+    routing.ocr.engine = "tesseract";
+  } else if (legacyOcrProvider === "llm_separate") {
+    const ocrProviderName = normalizeLlmProvider(preferences?.ocr_llm_provider);
+    const ocrBaseUrl = String(preferences?.ocr_llm_base_url || "").trim();
+    const ocrApiKey = String(preferences?.ocr_llm_api_key || "").trim();
+    if (ocrProviderName || ocrBaseUrl || ocrApiKey) {
+      const sameAsDefault =
+        connections[0] &&
+        connections[0].provider === ocrProviderName &&
+        connections[0].base_url === ocrBaseUrl &&
+        connections[0].api_key === ocrApiKey;
+      const connectionId = sameAsDefault ? connections[0].id : "ocr-connection";
+      if (!sameAsDefault) {
+        connections.push({
+          id: connectionId,
+          name: "OCR Connection",
+          provider: ocrProviderName,
+          base_url: ocrBaseUrl,
+          api_key: ocrApiKey,
+          default_model: String(preferences?.ocr_llm_model || "").trim(),
+        });
+      }
+      routing.ocr.connection_id = connectionId;
+      routing.ocr.model = String(preferences?.ocr_llm_model || "").trim();
+    }
+  }
+  return { llm_connections: connections, llm_routing: routing };
+}
+
+function normalizeLlmPreferences(preferences) {
+  if (
+    Array.isArray(preferences?.llm_connections) &&
+    preferences?.llm_routing &&
+    typeof preferences.llm_routing === "object"
+  ) {
+    const connections = preferences.llm_connections
+      .map((connection, index) => normalizeConnection(connection, index))
+      .filter(Boolean);
+    const routing = createDefaultLlmRouting();
+    const rawRouting = preferences.llm_routing || {};
+    routing.metadata.connection_id = String(rawRouting.metadata?.connection_id || "").trim();
+    routing.metadata.model = String(rawRouting.metadata?.model || "").trim();
+    routing.grounded_qa.connection_id = String(rawRouting.grounded_qa?.connection_id || "").trim();
+    routing.grounded_qa.model = String(rawRouting.grounded_qa?.model || "").trim();
+    routing.ocr.engine = normalizeOcrProvider(rawRouting.ocr?.engine || "llm");
+    routing.ocr.connection_id = String(rawRouting.ocr?.connection_id || "").trim();
+    routing.ocr.model = String(rawRouting.ocr?.model || "").trim();
+    return { llm_connections: connections, llm_routing: routing };
+  }
+  return migrateLegacyLlmPreferences(preferences || {});
+}
+
+function sanitizeLlmRouting(connections, routing) {
+  const connectionIds = new Set(connections.map((connection) => connection.id));
+  const nextRouting = createDefaultLlmRouting();
+  nextRouting.metadata.connection_id = connectionIds.has(routing?.metadata?.connection_id)
+    ? routing.metadata.connection_id
+    : connections[0]?.id || "";
+  nextRouting.metadata.model = String(routing?.metadata?.model || "").trim();
+  nextRouting.grounded_qa.connection_id = connectionIds.has(routing?.grounded_qa?.connection_id)
+    ? routing.grounded_qa.connection_id
+    : connections[0]?.id || "";
+  nextRouting.grounded_qa.model = String(routing?.grounded_qa?.model || "").trim();
+  nextRouting.ocr.engine = normalizeOcrProvider(routing?.ocr?.engine || "llm");
+  nextRouting.ocr.connection_id = connectionIds.has(routing?.ocr?.connection_id)
+    ? routing.ocr.connection_id
+    : connections[0]?.id || "";
+  nextRouting.ocr.model = String(routing?.ocr?.model || "").trim();
+  return nextRouting;
+}
+
+function getConnectionById(connectionId) {
+  return llmConnections.find((connection) => connection.id === connectionId) || null;
+}
+
+function getResolvedTaskSettings(task) {
+  if (task === "ocr") {
+    if (llmRouting.ocr.engine === "tesseract") {
+      return null;
+    }
+  } else if (!llmRouting[task]) {
+    return null;
+  }
+  const effectiveRoute = llmRouting[task];
+  const connection = getConnectionById(effectiveRoute.connection_id);
+  if (!connection) {
+    return null;
+  }
+  const defaults = task === "ocr"
+    ? getOcrLlmProviderDefaults(connection.provider)
+    : getLlmProviderDefaults(connection.provider);
+  return {
+    connection_id: connection.id,
+    connection_name: connection.name,
+    provider: connection.provider,
+    base_url: connection.base_url || defaults?.base_url || "",
+    api_key: connection.api_key,
+    model: String(effectiveRoute.model || "").trim() || String(connection.default_model || "").trim() || defaults?.model || "",
+  };
+}
+
+function getConnectionValidationError(connection) {
+  const provider = normalizeLlmProvider(connection?.provider);
   if (!provider) {
-    return "configure an LLM provider in Settings.";
+    return "configure a provider.";
   }
-  if (!String(candidateSettings?.api_key || "").trim()) {
-    return "add your LLM API key in Settings.";
+  if (!String(connection?.api_key || "").trim()) {
+    return "add an API key.";
   }
-  if (provider === "custom" && !String(candidateSettings?.base_url || "").trim()) {
-    return "set a custom LLM base URL in Settings.";
+  if (provider === "custom" && !String(connection?.base_url || "").trim()) {
+    return "set a custom base URL.";
   }
   return "";
 }
 
 function getLlmUploadBlockReason() {
-  return getLlmUploadBlockReasonForSettings(llmSettings);
+  const metadataSettings = getResolvedTaskSettings("metadata");
+  if (!metadataSettings) {
+    return "configure a metadata LLM connection in Settings.";
+  }
+  const metadataError = getConnectionValidationError(metadataSettings);
+  if (metadataError) {
+    return `${metadataError} Metadata extraction needs a working LLM connection.`;
+  }
+  if (ocrProvider === "llm") {
+    const ocrSettings = getResolvedTaskSettings("ocr");
+    if (!ocrSettings) {
+      return "configure an OCR LLM connection or switch OCR to Local Tesseract.";
+    }
+    const ocrError = getConnectionValidationError(ocrSettings);
+    if (ocrError) {
+      return `${ocrError} OCR needs a working connection.`;
+    }
+  }
+  return "";
 }
 
-function setSettingsLlmTestStatus(message, tone = "") {
-  if (!settingsLlmTestStatus) {
+function setConnectionTestStatus(connectionId, message, tone = "") {
+  connectionTestStatuses.set(connectionId, { message, tone });
+  renderConnectionsList();
+}
+
+function renderConnectionSelect(selectEl, selectedValue) {
+  if (!selectEl) {
     return;
   }
-  settingsLlmTestStatus.textContent = message || "";
-  settingsLlmTestStatus.classList.remove("is-success", "is-error");
-  if (tone === "success") {
-    settingsLlmTestStatus.classList.add("is-success");
-  } else if (tone === "error") {
-    settingsLlmTestStatus.classList.add("is-error");
+  const options = ["<option value=\"\">Select connection</option>"];
+  for (const connection of llmConnections) {
+    options.push(
+      `<option value="${escapeHtml(connection.id)}"${connection.id === selectedValue ? " selected" : ""}>${escapeHtml(connection.name)}</option>`
+    );
   }
+  selectEl.innerHTML = options.join("");
+}
+
+function syncTaskRoutingVisibility() {
+  const ocrLlmMode = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider) === "llm";
+  if (settingsOcrRouteFields) {
+    settingsOcrRouteFields.hidden = !ocrLlmMode;
+  }
+}
+
+function renderTaskRoutingControls() {
+  renderConnectionSelect(settingsMetadataConnectionSelect, llmRouting.metadata.connection_id);
+  if (settingsMetadataModelInput && settingsMetadataModelInput.value !== llmRouting.metadata.model) {
+    settingsMetadataModelInput.value = llmRouting.metadata.model;
+  }
+
+  renderConnectionSelect(settingsGroundedQaConnectionSelect, llmRouting.grounded_qa.connection_id);
+  if (settingsGroundedQaModelInput && settingsGroundedQaModelInput.value !== llmRouting.grounded_qa.model) {
+    settingsGroundedQaModelInput.value = llmRouting.grounded_qa.model;
+  }
+
+  renderConnectionSelect(settingsOcrConnectionSelect, llmRouting.ocr.connection_id);
+  if (settingsOcrModelInput && settingsOcrModelInput.value !== llmRouting.ocr.model) {
+    settingsOcrModelInput.value = llmRouting.ocr.model;
+  }
+}
+
+function getSuggestedTestModel(connectionId) {
+  const metadataSettings = getResolvedTaskSettings("metadata");
+  if (metadataSettings?.connection_id === connectionId && metadataSettings.model) {
+    return metadataSettings.model;
+  }
+  const groundedSettings = getResolvedTaskSettings("grounded_qa");
+  if (groundedSettings?.connection_id === connectionId && groundedSettings.model) {
+    return groundedSettings.model;
+  }
+  const ocrSettings = getResolvedTaskSettings("ocr");
+  if (ocrSettings?.connection_id === connectionId && ocrSettings.model) {
+    return ocrSettings.model;
+  }
+  const connection = getConnectionById(connectionId);
+  if (!connection) {
+    return "";
+  }
+  return String(connection.default_model || "").trim() || getLlmProviderDefaults(connection.provider)?.model || "";
+}
+
+async function testConnection(connectionId, buttonEl) {
+  const connection = getConnectionById(connectionId);
+  if (!connection) {
+    return;
+  }
+  const reason = getConnectionValidationError(connection);
+  if (reason) {
+    setConnectionTestStatus(connectionId, reason, "error");
+    logActivity(`LLM API test blocked: ${reason}`);
+    return;
+  }
+  const previousText = buttonEl?.textContent;
+  if (buttonEl) {
+    buttonEl.disabled = true;
+    buttonEl.textContent = "Testing...";
+  }
+  setConnectionTestStatus(connectionId, "Testing...", "");
+  try {
+    const response = await apiFetch("/documents/llm/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        connection_name: connection.name,
+        provider: connection.provider,
+        model: getSuggestedTestModel(connectionId),
+        base_url: connection.base_url,
+        api_key: connection.api_key,
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setConnectionTestStatus(connectionId, payload.detail || response.statusText, "error");
+      logActivity(`LLM API test failed: ${payload.detail || response.statusText}`);
+      return;
+    }
+    setConnectionTestStatus(connectionId, `Success (${payload.provider} / ${payload.model})`, "success");
+    logActivity(`LLM API test passed (${payload.provider} / ${payload.model}).`);
+  } catch (error) {
+    setConnectionTestStatus(connectionId, error.message, "error");
+    logActivity(`LLM API test failed: ${error.message}`);
+  } finally {
+    if (buttonEl) {
+      buttonEl.disabled = false;
+      buttonEl.textContent = previousText || "Test";
+    }
+  }
+}
+
+function renderConnectionsList() {
+  if (!settingsConnectionsList) {
+    return;
+  }
+  if (!llmConnections.length) {
+    settingsConnectionsList.innerHTML = "<p class=\"settings-group-note\">No model connections yet. Add one to configure LLM-backed tasks.</p>";
+    return;
+  }
+  settingsConnectionsList.innerHTML = llmConnections
+    .map((connection, index) => {
+      const status = connectionTestStatuses.get(connection.id) || { message: "", tone: "" };
+      return `
+        <section class="settings-connection-card" data-connection-id="${escapeHtml(connection.id)}">
+          <div class="settings-connection-header">
+            <h4 class="settings-task-title">${escapeHtml(connection.name || `Connection ${index + 1}`)}</h4>
+            <button type="button" class="btn btn-muted settings-remove-connection-btn" data-connection-remove="${escapeHtml(connection.id)}">Remove</button>
+          </div>
+          <div class="settings-route-grid">
+            <label class="label" for="settingsConnectionName-${escapeHtml(connection.id)}">Name</label>
+            <input id="settingsConnectionName-${escapeHtml(connection.id)}" data-connection-field="name" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.name)}" placeholder="e.g. OpenAI main" />
+            <label class="label" for="settingsConnectionProvider-${escapeHtml(connection.id)}">Provider</label>
+            <select id="settingsConnectionProvider-${escapeHtml(connection.id)}" data-connection-field="provider" data-connection-id="${escapeHtml(connection.id)}">
+              <option value="">Select provider</option>
+              <option value="openai"${connection.provider === "openai" ? " selected" : ""}>OpenAI</option>
+              <option value="gemini"${connection.provider === "gemini" ? " selected" : ""}>Gemini</option>
+              <option value="custom"${connection.provider === "custom" ? " selected" : ""}>Custom (OpenAI-Compatible)</option>
+            </select>
+            <label class="label" for="settingsConnectionBaseUrl-${escapeHtml(connection.id)}">Base URL</label>
+            <input id="settingsConnectionBaseUrl-${escapeHtml(connection.id)}" data-connection-field="base_url" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.base_url)}" placeholder="https://api.openai.com/v1" />
+            <label class="label" for="settingsConnectionApiKey-${escapeHtml(connection.id)}">API Key</label>
+            <input id="settingsConnectionApiKey-${escapeHtml(connection.id)}" data-connection-field="api_key" data-connection-id="${escapeHtml(connection.id)}" type="password" value="${escapeHtml(connection.api_key)}" placeholder="sk-..." />
+            <label class="label" for="settingsConnectionDefaultModel-${escapeHtml(connection.id)}">Default Model</label>
+            <input id="settingsConnectionDefaultModel-${escapeHtml(connection.id)}" data-connection-field="default_model" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.default_model || "")}" placeholder="e.g. gpt-4.1-mini" />
+          </div>
+          <div class="actions">
+            <button type="button" class="btn btn-muted settings-test-connection-btn" data-connection-test="${escapeHtml(connection.id)}">Test</button>
+            <span class="settings-inline-status ${status.tone === "success" ? "is-success" : status.tone === "error" ? "is-error" : ""}">${escapeHtml(status.message || "")}</span>
+          </div>
+        </section>
+      `;
+    })
+    .join("");
+
+  settingsConnectionsList.querySelectorAll("[data-connection-field]").forEach((element) => {
+    const eventName = element.tagName === "SELECT" ? "change" : "input";
+    element.addEventListener(eventName, () => {
+      const connectionId = element.getAttribute("data-connection-id");
+      const field = element.getAttribute("data-connection-field");
+      const connection = getConnectionById(connectionId);
+      if (!connection || !field) {
+        return;
+      }
+      connection[field] = String(element.value || "");
+      if (field === "provider") {
+        connection.provider = normalizeLlmProvider(connection.provider);
+        const defaults = getLlmProviderDefaults(connection.provider) || getOcrLlmProviderDefaults(connection.provider);
+        if (!connection.base_url && defaults?.base_url) {
+          connection.base_url = defaults.base_url;
+        }
+        if (!connection.default_model && defaults?.model) {
+          connection.default_model = defaults.model;
+        }
+        if (!connection.name || /^Connection \d+$/.test(connection.name)) {
+          connection.name =
+            connection.provider ? `${connection.provider[0].toUpperCase()}${connection.provider.slice(1)} Connection` : connection.name;
+        }
+        renderConnectionsList();
+        renderTaskRoutingControls();
+        syncTaskRoutingVisibility();
+      }
+    });
+  });
+
+  settingsConnectionsList.querySelectorAll("[data-connection-remove]").forEach((buttonEl) => {
+    buttonEl.addEventListener("click", () => {
+      const connectionId = buttonEl.getAttribute("data-connection-remove");
+      llmConnections = llmConnections.filter((connection) => connection.id !== connectionId);
+      connectionTestStatuses.delete(connectionId);
+      llmRouting = sanitizeLlmRouting(llmConnections, llmRouting);
+      renderSettingsForm();
+    });
+  });
+
+  settingsConnectionsList.querySelectorAll("[data-connection-test]").forEach((buttonEl) => {
+    buttonEl.addEventListener("click", async () => {
+      const connectionId = buttonEl.getAttribute("data-connection-test");
+      await testConnection(connectionId, buttonEl);
+    });
+  });
 }
 
 function setSettingsOcrStatus(message, tone = "") {
@@ -634,17 +986,11 @@ async function saveUserPreferences() {
       docs_page_size: docsPageSize,
       grounded_qa_top_k_chunks: groundedQaTopK,
       grounded_qa_max_documents: groundedQaMaxDocuments,
-      llm_provider: llmSettings.provider,
-      llm_model: llmSettings.model,
-      llm_base_url: llmSettings.base_url,
-      llm_api_key: llmSettings.api_key,
+      llm_connections: llmConnections,
+      llm_routing: llmRouting,
       ocr_provider: ocrProvider,
       ocr_auto_switch: ocrAutoSwitch,
       ocr_image_detail: ocrImageDetail,
-      ocr_llm_provider: ocrLlmSettings.provider,
-      ocr_llm_model: ocrLlmSettings.model,
-      ocr_llm_base_url: ocrLlmSettings.base_url,
-      ocr_llm_api_key: ocrLlmSettings.api_key,
     },
   };
   try {
@@ -698,39 +1044,12 @@ function applyUserPreferences(preferences, options = {}) {
   }
   groundedQaTopK = normalizeGroundedQaTopK(preferences.grounded_qa_top_k_chunks);
   groundedQaMaxDocuments = normalizeGroundedQaMaxDocuments(preferences.grounded_qa_max_documents);
-  llmSettings = {
-    provider: normalizeLlmProvider(preferences.llm_provider),
-    model: String(preferences.llm_model || "").trim(),
-    base_url: String(preferences.llm_base_url || "").trim(),
-    api_key: String(preferences.llm_api_key || "").trim(),
-  };
-  const defaults = getLlmProviderDefaults(llmSettings.provider);
-  if (defaults) {
-    if (!llmSettings.model) {
-      llmSettings.model = defaults.model;
-    }
-    if (!llmSettings.base_url) {
-      llmSettings.base_url = defaults.base_url;
-    }
-  }
-  ocrProvider = normalizeOcrProvider(preferences.ocr_provider);
+  const normalizedLlmPreferences = normalizeLlmPreferences(preferences);
+  llmConnections = normalizedLlmPreferences.llm_connections;
+  llmRouting = sanitizeLlmRouting(llmConnections, normalizedLlmPreferences.llm_routing);
+  ocrProvider = llmRouting.ocr.engine === "tesseract" ? "tesseract" : "llm";
   ocrAutoSwitch = normalizeOcrAutoSwitch(preferences.ocr_auto_switch);
   ocrImageDetail = normalizeOcrImageDetail(preferences.ocr_image_detail);
-  ocrLlmSettings = {
-    provider: normalizeLlmProvider(preferences.ocr_llm_provider),
-    model: String(preferences.ocr_llm_model || "").trim(),
-    base_url: String(preferences.ocr_llm_base_url || "").trim(),
-    api_key: String(preferences.ocr_llm_api_key || "").trim(),
-  };
-  const ocrDefaults = getOcrLlmProviderDefaults(ocrLlmSettings.provider);
-  if (ocrDefaults) {
-    if (!ocrLlmSettings.model) {
-      ocrLlmSettings.model = ocrDefaults.model;
-    }
-    if (!ocrLlmSettings.base_url) {
-      ocrLlmSettings.base_url = ocrDefaults.base_url;
-    }
-  }
 }
 
 async function hydrateUserPreferencesForSession() {
@@ -1001,21 +1320,12 @@ function renderSessionState() {
 function clearSession() {
   persistSession("", null);
   applyTheme("atlas");
-  llmSettings = {
-    provider: "",
-    model: "",
-    base_url: "",
-    api_key: "",
-  };
+  llmConnections = [];
+  llmRouting = createDefaultLlmRouting();
   ocrProvider = "llm";
   ocrAutoSwitch = false;
   ocrImageDetail = "auto";
-  ocrLlmSettings = {
-    provider: "",
-    model: "",
-    base_url: "",
-    api_key: "",
-  };
+  connectionTestStatuses.clear();
   docsPage = 1;
   docsPageSize = 20;
   docsFilters = sanitizeDocsFilters({
@@ -1109,6 +1419,20 @@ function setActiveSearchSection(sectionId) {
   searchActiveSectionId = nextSectionId;
   for (const section of searchSubsections) {
     section.classList.toggle("view-hidden", section.id !== nextSectionId);
+  }
+}
+
+function setActiveSettingsSection(sectionId) {
+  const defaultSectionId = "settings-section-account";
+  const nextSectionId = settingsSubsections.some((section) => section.id === sectionId)
+    ? sectionId
+    : defaultSectionId;
+  settingsActiveSectionId = nextSectionId;
+  for (const section of settingsSubsections) {
+    section.classList.toggle("view-hidden", section.id !== nextSectionId);
+  }
+  for (const link of settingsSubnavLinks) {
+    link.classList.toggle("active", link.dataset.settingsSection === nextSectionId);
   }
 }
 
@@ -1453,7 +1777,10 @@ function syncUrlFromFilters() {
   if (docsPageSize !== 20) {
     url.searchParams.set("page_size", String(docsPageSize));
   }
-  const viewPath = VIEW_ID_TO_PATH[currentViewId];
+  let viewPath = VIEW_ID_TO_PATH[currentViewId];
+  if (currentViewId === "section-settings") {
+    viewPath = SETTINGS_SECTION_ID_TO_PATH[settingsActiveSectionId] || "/ui/settings/account";
+  }
   if (viewPath) {
     url.pathname = viewPath;
   }
@@ -1480,6 +1807,7 @@ function readFiltersFromUrl() {
   const mappedViewId = viewFromUrl ? (VIEW_PARAM_TO_ID[viewFromUrl] || viewFromUrl) : "";
   const pathViewId = getCurrentPathViewId();
   const pathSearchSectionId = PATH_TO_SEARCH_SECTION_ID[path];
+  const pathSettingsSectionId = PATH_TO_SETTINGS_SECTION_ID[path];
   if (pathViewId && views.some((view) => view.id === pathViewId)) {
     currentViewId = pathViewId;
   } else if (mappedViewId && views.some((view) => view.id === mappedViewId)) {
@@ -1490,6 +1818,9 @@ function readFiltersFromUrl() {
   }
   if (pathSearchSectionId) {
     searchActiveSectionId = pathSearchSectionId;
+  }
+  if (pathSettingsSectionId) {
+    settingsActiveSectionId = pathSettingsSectionId;
   }
 }
 
@@ -3179,11 +3510,29 @@ settingsForm?.addEventListener("submit", async (event) => {
   groundedQaMaxDocuments = normalizeGroundedQaMaxDocuments(
     settingsGroundedQaMaxDocsInput?.value || groundedQaMaxDocuments
   );
-  llmSettings = readLlmSettingsFromControls();
+  llmConnections = llmConnections
+    .map((connection, index) => normalizeConnection(connection, index))
+    .filter(Boolean);
+  llmRouting = sanitizeLlmRouting(llmConnections, {
+    metadata: {
+      connection_id: String(settingsMetadataConnectionSelect?.value || "").trim(),
+      model: String(settingsMetadataModelInput?.value || "").trim(),
+    },
+    grounded_qa: {
+      connection_id: String(settingsGroundedQaConnectionSelect?.value || "").trim(),
+      model: String(settingsGroundedQaModelInput?.value || "").trim(),
+    },
+    ocr: {
+      engine: normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider),
+      connection_id: String(settingsOcrConnectionSelect?.value || "").trim(),
+      model: String(settingsOcrModelInput?.value || "").trim(),
+    },
+  });
   ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
   ocrAutoSwitch = Boolean(settingsOcrAutoSwitchCheckbox?.checked);
   ocrImageDetail = normalizeOcrImageDetail(settingsOcrImageDetailSelect?.value || ocrImageDetail);
-  ocrLlmSettings = readOcrLlmSettingsFromControls();
+  renderTaskRoutingControls();
+  syncTaskRoutingVisibility();
   syncUploadAvailability();
   applyTheme(nextTheme);
   docsPageSize = nextPageSize;
@@ -3196,76 +3545,41 @@ settingsForm?.addEventListener("submit", async (event) => {
   logActivity("Saved settings.");
 });
 
-settingsLlmProviderSelect?.addEventListener("change", () => {
-  const nextProvider = normalizeLlmProvider(settingsLlmProviderSelect.value);
-  applyLlmProviderDefaultsToControls(
-    nextProvider,
-    settingsLlmModelInput,
-    settingsLlmBaseUrlInput,
-    { force: true }
-  );
-  setSettingsLlmTestStatus("");
-});
-
 settingsOcrProviderSelect?.addEventListener("change", () => {
   ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect.value);
-  syncOcrSeparateSettingsVisibility();
+  llmRouting.ocr.engine = ocrProvider;
+  syncTaskRoutingVisibility();
   refreshLocalOcrStatus().catch(() => {});
 });
 
-settingsOcrLlmProviderSelect?.addEventListener("change", () => {
-  const nextProvider = normalizeLlmProvider(settingsOcrLlmProviderSelect.value);
-  const defaults = getOcrLlmProviderDefaults(nextProvider);
-  if (defaults) {
-    if (settingsOcrLlmModelInput) {
-      settingsOcrLlmModelInput.value = defaults.model;
-    }
-    if (settingsOcrLlmBaseUrlInput) {
-      settingsOcrLlmBaseUrlInput.value = defaults.base_url;
-    }
-  }
+settingsAddConnectionBtn?.addEventListener("click", () => {
+  llmConnections.push(createEmptyConnection());
+  llmRouting = sanitizeLlmRouting(llmConnections, llmRouting);
+  renderSettingsForm();
 });
 
-settingsTestLlmBtn?.addEventListener("click", async () => {
-  const candidateSettings = readLlmSettingsFromControls();
-  const reason = getLlmUploadBlockReasonForSettings(candidateSettings);
-  if (reason) {
-    setSettingsLlmTestStatus(reason, "error");
-    logActivity(`LLM API test blocked: ${reason}`);
-    return;
-  }
+settingsMetadataConnectionSelect?.addEventListener("change", () => {
+  llmRouting.metadata.connection_id = String(settingsMetadataConnectionSelect.value || "").trim();
+});
 
-  const previousText = settingsTestLlmBtn.textContent;
-  settingsTestLlmBtn.disabled = true;
-  settingsTestLlmBtn.textContent = "Testing...";
-  setSettingsLlmTestStatus("Testing...", "");
-  logActivity("Testing LLM API connection...");
-  try {
-    const response = await apiFetch("/documents/llm/test", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        provider: candidateSettings.provider,
-        model: candidateSettings.model,
-        base_url: candidateSettings.base_url,
-        api_key: candidateSettings.api_key,
-      }),
-    });
-    const payload = await response.json();
-    if (!response.ok) {
-      setSettingsLlmTestStatus(payload.detail || response.statusText, "error");
-      logActivity(`LLM API test failed: ${payload.detail || response.statusText}`);
-      return;
-    }
-    setSettingsLlmTestStatus(`Success (${payload.provider} / ${payload.model})`, "success");
-    logActivity(`LLM API test passed (${payload.provider} / ${payload.model}).`);
-  } catch (error) {
-    setSettingsLlmTestStatus(error.message, "error");
-    logActivity(`LLM API test failed: ${error.message}`);
-  } finally {
-    settingsTestLlmBtn.disabled = false;
-    settingsTestLlmBtn.textContent = previousText || "Test LLM API";
-  }
+settingsMetadataModelInput?.addEventListener("input", () => {
+  llmRouting.metadata.model = String(settingsMetadataModelInput.value || "").trim();
+});
+
+settingsGroundedQaConnectionSelect?.addEventListener("change", () => {
+  llmRouting.grounded_qa.connection_id = String(settingsGroundedQaConnectionSelect.value || "").trim();
+});
+
+settingsGroundedQaModelInput?.addEventListener("input", () => {
+  llmRouting.grounded_qa.model = String(settingsGroundedQaModelInput.value || "").trim();
+});
+
+settingsOcrConnectionSelect?.addEventListener("change", () => {
+  llmRouting.ocr.connection_id = String(settingsOcrConnectionSelect.value || "").trim();
+});
+
+settingsOcrModelInput?.addEventListener("input", () => {
+  llmRouting.ocr.model = String(settingsOcrModelInput.value || "").trim();
 });
 
 settingsChangePasswordBtn?.addEventListener("click", async () => {
