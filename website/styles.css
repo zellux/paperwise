@@ -79,13 +79,9 @@ a {
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  font-weight: 800;
-  font-family: "Archivo", sans-serif;
-  background: linear-gradient(140deg, #ec7b47, #c8502f);
+  display: block;
+  object-fit: cover;
+  box-shadow: 0 6px 16px rgba(200, 80, 47, 0.2);
 }
 
 .brand-name {
