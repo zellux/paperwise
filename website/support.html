@@ -5,31 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Paperwise Support | FAQ</title>
     <meta name="description" content="Common questions and troubleshooting tips for Paperwise." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div class="site-shell topbar-inner">
-        <a class="brand" href="./index.html" aria-label="Paperwise home">
-          <span class="brand-mark" aria-hidden="true"></span>
-          <span>PAPERWISE</span>
-        </a>
-        <nav class="nav" aria-label="Main">
-          <a class="nav-link" href="./index.html">Home</a>
-          <a class="nav-link nav-link-primary" href="/ui/documents">Open App</a>
-        </nav>
-      </div>
-    </header>
+    <div class="hero-wrap hero-wrap-support">
+      <header class="topbar">
+        <div class="site-shell topbar-inner">
+          <a class="brand" href="./index.html" aria-label="Paperwise home">
+            <span class="brand-mark" aria-hidden="true">P</span>
+            <span class="brand-name">Paperwise</span>
+          </a>
+          <nav class="nav" aria-label="Main">
+            <a class="nav-link" href="./index.html">Home</a>
+            <a class="nav-link" href="./support.html">Support</a>
+            <a class="nav-link nav-link-outline" href="/ui/documents">Sign In</a>
+            <a class="nav-link nav-link-primary" href="/ui/documents">Open App</a>
+          </nav>
+        </div>
+      </header>
 
-    <main class="site-shell" style="padding-top: 44px; padding-bottom: 44px;">
-      <section class="section-card">
-        <h1 style="font-size: clamp(1.8rem, 4vw, 2.5rem);">Support FAQ</h1>
-        <p class="lead" style="margin-top: 12px;">
-          Quick answers for the most common setup and usage questions.
-        </p>
-      </section>
+      <main class="site-shell support-main">
+        <section class="hero-card support-hero">
+          <p class="tag">Support</p>
+          <h1>Answers for setup, troubleshooting, and daily use.</h1>
+          <p class="lead">
+            Quick references for the most common Paperwise questions across upload, OCR, parsing, and account access.
+          </p>
+        </section>
+      </main>
+    </div>
 
-      <section class="section" aria-label="Frequently asked questions">
+    <main class="site-shell">
+      <section class="section support-faq" aria-label="Frequently asked questions">
         <div class="faq">
           <article class="faq-item">
             <h3>Why can upload be disabled?</h3>
@@ -81,10 +94,36 @@
           </article>
         </div>
       </section>
+
+      <section class="section section-soft support-help">
+        <div class="section-card">
+          <h2>Need more help?</h2>
+          <p class="section-sub">
+            Open an issue in the repository if you have access:
+            <a href="https://github.com/zellux/paperwise" target="_blank" rel="noopener noreferrer">
+              github.com/zellux/paperwise
+            </a>
+          </p>
+          <div class="cta-row cta-row-left">
+            <a class="btn btn-primary" href="/ui/documents">Open Paperwise</a>
+            <a class="btn btn-secondary" href="./index.html">Back to Home</a>
+          </div>
+        </div>
+      </section>
     </main>
 
     <footer class="footer">
-      <div class="site-shell">Paperwise support and troubleshooting.</div>
+      <div class="site-shell footer-inner">
+        <div>
+          <strong>Paperwise</strong>
+          <p>Support and troubleshooting resources for your document operations workflow.</p>
+        </div>
+        <nav class="footer-links" aria-label="Footer">
+          <a href="./index.html">Home</a>
+          <a href="./support.html">Support</a>
+          <a href="/ui/documents">Open App</a>
+        </nav>
+      </div>
     </footer>
   </body>
 </html>
