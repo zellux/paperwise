@@ -83,6 +83,19 @@ class FakeMassRewriteGroundedLLM(FakeGroundedLLM):
         }
 
 
+class FakeSonicRewriteGroundedLLM(FakeGroundedLLM):
+    def rewrite_retrieval_queries(self, *, question: str) -> dict:
+        del question
+        return {
+            "queries": [
+                "monthly spending on Sonic internet",
+                "Sonic internet monthly bill amount",
+            ],
+            "must_terms": ["Sonic internet", "monthly", "spend"],
+            "optional_terms": ["cost", "bill", "charges", "payment", "per month", "monthly fee"],
+        }
+
+
 def _save_document(
     repository: InMemoryDocumentRepository,
     *,
@@ -570,3 +583,57 @@ def test_build_qa_contexts_limits_unique_documents() -> None:
     selected_doc_ids = {item["document_id"] for item in contexts}
     assert selected_doc_ids == {"doc-a"}
     assert len(contexts) == 2
+
+
+def test_global_ask_prefers_anchor_entity_over_generic_monthly_terms() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-sonic",
+        owner_id=TEST_USER.id,
+        filename="sonic.pdf",
+        text_preview=(
+            "Sonic Internet monthly bill amount due: $54.99. "
+            "Monthly service charge and payment confirmation."
+        ),
+        title="Sonic Internet Bill",
+        document_type="Invoice",
+        tags=["Utilities"],
+    )
+    _save_document(
+        repository,
+        doc_id="doc-fed",
+        owner_id=TEST_USER.id,
+        filename="fed.pdf",
+        text_preview=(
+            "Federal Reserve statement with monthly cap per month and payment operations. "
+            "Monthly roll over and payment mechanics."
+        ),
+        title="Federal Reserve Monetary Policy Statement",
+        document_type="Statement",
+        tags=["Finance"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeSonicRewriteGroundedLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/collections/ask",
+            json={
+                "question": "how much paid monthly for Sonic internet",
+                "top_k_chunks": 8,
+                "debug": True,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        debug_payload = payload["debug"]
+        assert debug_payload["retrieval"]["strong_must_terms"] == ["sonic internet", "sonic", "internet"]
+        assert debug_payload["retrieval"]["anchor_filter_applied"] is True
+        source_doc_ids = {item["document_id"] for item in debug_payload["sources_sent_to_llm"]}
+        assert "doc-sonic" in source_doc_ids
+    finally:
+        app.dependency_overrides.clear()

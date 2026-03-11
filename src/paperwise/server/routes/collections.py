@@ -30,6 +30,23 @@ _RETRIEVAL_GENERIC_TERMS = {
     "changes",
     "value",
     "values",
+    "monthly",
+    "month",
+    "spend",
+    "spending",
+    "cost",
+    "bill",
+    "bills",
+    "charge",
+    "charges",
+    "payment",
+    "payments",
+    "paid",
+    "fee",
+    "fees",
+    "amount",
+    "service",
+    "services",
 }
 
 
@@ -366,19 +383,26 @@ def _term_coverage_count(text: str, terms: list[str]) -> int:
 def _extract_strong_terms(terms: list[str]) -> list[str]:
     strong_terms: list[str] = []
     seen: set[str] = set()
+
+    def add_candidate(candidate: str) -> None:
+        simple = re.sub(r"[^a-z0-9]+", " ", candidate).strip()
+        if not simple or simple in _RETRIEVAL_GENERIC_TERMS:
+            return
+        if len(simple) < 3 and simple not in {"lb", "kg", "cm", "in"}:
+            return
+        if simple in seen:
+            return
+        seen.add(simple)
+        strong_terms.append(simple)
+
     for term in terms:
         normalized = " ".join(str(term or "").lower().split()).strip()
         if not normalized:
             continue
-        simple = re.sub(r"[^a-z0-9]+", " ", normalized).strip()
-        if not simple or simple in _RETRIEVAL_GENERIC_TERMS:
-            continue
-        if len(simple) < 3 and simple not in {"lb", "kg", "cm", "in"}:
-            continue
-        if simple in seen:
-            continue
-        seen.add(simple)
-        strong_terms.append(simple)
+        add_candidate(normalized)
+        if " " in normalized:
+            for token in normalized.split():
+                add_candidate(token)
     return strong_terms
 
 
