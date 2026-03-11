@@ -6,6 +6,14 @@ from paperwise.application.services.history import (
     build_file_moved_history_event,
     build_processing_completed_history_event,
 )
+from paperwise.application.services.llm_preferences import (
+    LLM_TASK_METADATA,
+    LLM_TASK_OCR,
+    default_base_url_for_provider,
+    default_model_for_task,
+    get_normalized_llm_preferences,
+    resolve_task_config,
+)
 from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
@@ -46,6 +54,12 @@ def _build_llm_provider() -> LLMProvider:
 def _resolve_ocr_provider_for_owner(repository: DocumentRepository, owner_id: str) -> str:
     preference = repository.get_user_preference(owner_id)
     preferences = dict(preference.preferences) if preference is not None else {}
+    normalized_llm = get_normalized_llm_preferences(preferences)
+    if normalized_llm["llm_connections"]:
+        ocr_route = normalized_llm["llm_routing"]["ocr"]
+        if ocr_route["engine"] == "tesseract":
+            return "tesseract"
+        return "llm_separate"
     provider_name = str(preferences.get("ocr_provider", "llm")).strip().lower()
     if provider_name in {"tesseract", "llm", "llm_separate"}:
         return provider_name
@@ -66,12 +80,9 @@ def _resolve_llm_provider_from_preferences(
     *,
     preferences: dict[str, str],
     default_llm_provider: LLMProvider,
-    provider_key: str = "llm_provider",
-    model_key: str = "llm_model",
-    base_url_key: str = "llm_base_url",
-    api_key_key: str = "llm_api_key",
+    task: str = LLM_TASK_METADATA,
 ) -> LLMProvider:
-    provider_name = str(preferences.get(provider_key, "")).strip().lower()
+    config = resolve_task_config(preferences, task)
 
     # Preserve worker testability when a fake provider is injected.
     if not isinstance(
@@ -80,48 +91,38 @@ def _resolve_llm_provider_from_preferences(
     ):
         return default_llm_provider
 
-    if not provider_name:
-        raise RuntimeError(f"missing provider setting: {provider_key}")
-
-    configured_key = str(preferences.get(api_key_key, "")).strip()
-    if not configured_key:
-        raise RuntimeError(f"missing API key setting: {api_key_key}")
+    if config is None or not config.provider:
+        raise RuntimeError(f"missing provider setting for task: {task}")
+    if not config.api_key:
+        raise RuntimeError(f"missing API key setting for task: {task}")
 
     ocr_image_detail = str(preferences.get("ocr_image_detail", "auto")).strip().lower()
     if ocr_image_detail not in {"auto", "low", "high"}:
         ocr_image_detail = "auto"
 
-    if provider_name == "openai":
-        openai_default_model = "gpt-4.1-nano" if model_key == "ocr_llm_model" else settings.openai_model
-        model = str(preferences.get(model_key, "")).strip() or openai_default_model
-        base_url = str(preferences.get(base_url_key, "")).strip() or settings.openai_base_url
+    if config.provider == "openai":
         return OpenAILLMProvider(
-            api_key=configured_key,
-            model=model,
-            base_url=base_url,
+            api_key=config.api_key,
+            model=config.model or default_model_for_task("openai", task),
+            base_url=config.base_url or settings.openai_base_url,
             vision_image_detail=ocr_image_detail,
         )
-    if provider_name == "gemini":
-        model = str(preferences.get(model_key, "")).strip() or "gemini-2.0-flash"
-        base_url = str(preferences.get(base_url_key, "")).strip() or "https://generativelanguage.googleapis.com/v1beta"
+    if config.provider == "gemini":
         return GeminiLLMProvider(
-            api_key=configured_key,
-            model=model,
-            base_url=base_url,
+            api_key=config.api_key,
+            model=config.model or default_model_for_task("gemini", task),
+            base_url=config.base_url or default_base_url_for_provider("gemini"),
         )
-    if provider_name == "custom":
-        base_url = str(preferences.get(base_url_key, "")).strip()
-        if not base_url:
-            raise RuntimeError(f"missing base URL setting: {base_url_key}")
-        openai_default_model = "gpt-4.1-nano" if model_key == "ocr_llm_model" else settings.openai_model
-        model = str(preferences.get(model_key, "")).strip() or openai_default_model
+    if config.provider == "custom":
+        if not config.base_url:
+            raise RuntimeError(f"missing base URL setting for task: {task}")
         return OpenAILLMProvider(
-            api_key=configured_key,
-            model=model,
-            base_url=base_url,
+            api_key=config.api_key,
+            model=config.model or default_model_for_task("custom", task),
+            base_url=config.base_url,
             vision_image_detail=ocr_image_detail,
         )
-    raise RuntimeError(f"unsupported provider: {provider_name}")
+    raise RuntimeError(f"unsupported provider: {config.provider}")
 
 
 def _resolve_metadata_llm_provider_for_owner(
@@ -134,6 +135,7 @@ def _resolve_metadata_llm_provider_for_owner(
     return _resolve_llm_provider_from_preferences(
         preferences=preferences,
         default_llm_provider=default_llm_provider,
+        task=LLM_TASK_METADATA,
     )
 
 
@@ -151,14 +153,12 @@ def _resolve_ocr_llm_provider_for_owner(
         return _resolve_llm_provider_from_preferences(
             preferences=preferences,
             default_llm_provider=default_llm_provider,
-            provider_key="ocr_llm_provider",
-            model_key="ocr_llm_model",
-            base_url_key="ocr_llm_base_url",
-            api_key_key="ocr_llm_api_key",
+            task=LLM_TASK_OCR,
         )
     return _resolve_llm_provider_from_preferences(
         preferences=preferences,
         default_llm_provider=default_llm_provider,
+        task=LLM_TASK_OCR,
     )
 
 

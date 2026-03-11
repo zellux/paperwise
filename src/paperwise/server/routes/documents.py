@@ -33,6 +33,16 @@ from paperwise.application.services.history import (
     build_processing_restarted_history_event,
 )
 from paperwise.application.services.llm_parsing import parse_with_llm
+from paperwise.application.services.llm_preferences import (
+    LLM_TASK_GROUNDED_QA,
+    LLM_TASK_METADATA,
+    LLM_TASK_OCR,
+    ResolvedLLMTaskConfig,
+    default_base_url_for_provider,
+    default_model_for_task,
+    get_normalized_llm_preferences,
+    resolve_task_config,
+)
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.application.services.storage_paths import blob_ref_to_path
@@ -47,9 +57,9 @@ from paperwise.domain.models import (
 )
 from paperwise.infrastructure.config import get_settings
 from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
+from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 from paperwise.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
-from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 settings = get_settings()
@@ -160,6 +170,7 @@ class MetadataUpdateRequest(BaseModel):
 
 
 class LLMConnectionTestRequest(BaseModel):
+    connection_name: str | None = None
     provider: str | None = None
     model: str | None = None
     base_url: str | None = None
@@ -341,6 +352,7 @@ def _resolve_llm_provider_for_user(
     return _resolve_llm_provider_from_preferences(
         preferences=preferences,
         default_llm_provider=default_llm_provider,
+        task=LLM_TASK_METADATA,
     )
 
 
@@ -355,30 +367,23 @@ def _resolve_ocr_llm_provider_for_user(
     return _resolve_llm_provider_from_preferences(
         preferences=preferences,
         default_llm_provider=default_llm_provider,
-        provider_key="ocr_llm_provider",
-        model_key="ocr_llm_model",
-        base_url_key="ocr_llm_base_url",
-        api_key_key="ocr_llm_api_key",
-        missing_provider_detail="Configure an OCR LLM provider in Settings before OCR parsing.",
-        missing_api_key_detail="Selected OCR LLM provider requires your OCR LLM API key in Settings.",
-        missing_base_url_detail="Custom OCR LLM provider requires a base URL in Settings.",
+        task=LLM_TASK_OCR,
+        missing_provider_detail="Configure an OCR LLM connection in Settings before OCR parsing.",
+        missing_api_key_detail="Selected OCR LLM connection requires an API key in Settings.",
+        missing_base_url_detail="Custom OCR LLM connection requires a base URL in Settings.",
     )
 
 
-def _resolve_llm_provider_from_preferences(
+def _build_provider_from_task_config(
     *,
-    preferences: dict[str, Any],
+    config: ResolvedLLMTaskConfig | None,
     default_llm_provider: LLMProvider,
-    provider_key: str = "llm_provider",
-    model_key: str = "llm_model",
-    base_url_key: str = "llm_base_url",
-    api_key_key: str = "llm_api_key",
-    missing_provider_detail: str = "Configure an LLM provider in Settings before running LLM parse.",
-    missing_api_key_detail: str = "Selected LLM provider requires your API key in Settings.",
-    missing_base_url_detail: str = "Custom LLM provider requires a base URL in Settings.",
+    task: str,
+    ocr_image_detail: str = "auto",
+    missing_provider_detail: str,
+    missing_api_key_detail: str,
+    missing_base_url_detail: str,
 ) -> LLMProvider:
-    provider_name = str(preferences.get(provider_key, "")).strip().lower()
-
     # Preserve testability when a fake provider is injected via dependency override.
     if not isinstance(
         default_llm_provider,
@@ -386,62 +391,71 @@ def _resolve_llm_provider_from_preferences(
     ):
         return default_llm_provider
 
-    if not provider_name:
+    if config is None or not config.provider:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=missing_provider_detail,
         )
-
-    configured_key = str(preferences.get(api_key_key, "")).strip()
-    if not configured_key:
+    if not config.api_key:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=missing_api_key_detail,
         )
 
-    ocr_image_detail = str(preferences.get("ocr_image_detail", "auto")).strip().lower()
-    if ocr_image_detail not in {"auto", "low", "high"}:
-        ocr_image_detail = "auto"
-
-    if provider_name == "openai":
-        configured_key = str(preferences.get(api_key_key, "")).strip()
-        api_key = configured_key
-        openai_default_model = "gpt-4.1-nano" if model_key == "ocr_llm_model" else settings.openai_model
-        model = str(preferences.get(model_key, "")).strip() or openai_default_model
-        base_url = str(preferences.get(base_url_key, "")).strip() or settings.openai_base_url
+    if config.provider == "openai":
         return OpenAILLMProvider(
-            api_key=api_key,
-            model=model,
-            base_url=base_url,
+            api_key=config.api_key,
+            model=config.model or default_model_for_task("openai", task),
+            base_url=config.base_url or settings.openai_base_url,
             vision_image_detail=ocr_image_detail,
         )
-    if provider_name == "gemini":
-        model = str(preferences.get(model_key, "")).strip() or "gemini-2.0-flash"
-        base_url = str(preferences.get(base_url_key, "")).strip() or "https://generativelanguage.googleapis.com/v1beta"
+    if config.provider == "gemini":
         return GeminiLLMProvider(
-            api_key=configured_key,
-            model=model,
-            base_url=base_url,
+            api_key=config.api_key,
+            model=config.model or default_model_for_task("gemini", task),
+            base_url=config.base_url or default_base_url_for_provider("gemini"),
         )
-    if provider_name == "custom":
-        base_url = str(preferences.get(base_url_key, "")).strip()
-        if not base_url:
+    if config.provider == "custom":
+        if not config.base_url:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=missing_base_url_detail,
             )
-        openai_default_model = "gpt-4.1-nano" if model_key == "ocr_llm_model" else settings.openai_model
-        model = str(preferences.get(model_key, "")).strip() or openai_default_model
         return OpenAILLMProvider(
-            api_key=configured_key,
-            model=model,
-            base_url=base_url,
+            api_key=config.api_key,
+            model=config.model or default_model_for_task("custom", task),
+            base_url=config.base_url,
             vision_image_detail=ocr_image_detail,
         )
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Unsupported LLM provider: {provider_name}",
+        detail=f"Unsupported LLM provider: {config.provider}",
     )
+
+
+def _resolve_llm_provider_from_preferences(
+    *,
+    preferences: dict[str, Any],
+    default_llm_provider: LLMProvider,
+    task: str = LLM_TASK_METADATA,
+    missing_provider_detail: str = "Configure an LLM provider in Settings before running LLM parse.",
+    missing_api_key_detail: str = "Selected LLM provider requires your API key in Settings.",
+    missing_base_url_detail: str = "Custom LLM provider requires a base URL in Settings.",
+) -> LLMProvider:
+    config = resolve_task_config(preferences, task)
+    ocr_image_detail = str(preferences.get("ocr_image_detail", "auto")).strip().lower()
+    if ocr_image_detail not in {"auto", "low", "high"}:
+        ocr_image_detail = "auto"
+    provider = _build_provider_from_task_config(
+        config=config,
+        default_llm_provider=default_llm_provider,
+        task=task,
+        ocr_image_detail=ocr_image_detail,
+        missing_provider_detail=missing_provider_detail,
+        missing_api_key_detail=missing_api_key_detail,
+        missing_base_url_detail=missing_base_url_detail,
+    )
+    return provider
 
 
 def _merge_llm_preferences(
@@ -449,14 +463,29 @@ def _merge_llm_preferences(
     payload: LLMConnectionTestRequest,
 ) -> dict[str, Any]:
     merged = dict(preferences)
-    if payload.provider is not None:
-        merged["llm_provider"] = payload.provider
-    if payload.model is not None:
-        merged["llm_model"] = payload.model
-    if payload.base_url is not None:
-        merged["llm_base_url"] = payload.base_url
-    if payload.api_key is not None:
-        merged["llm_api_key"] = payload.api_key
+    normalized = get_normalized_llm_preferences(merged)
+    connection = {
+        "id": "test-connection",
+        "name": payload.connection_name or "Connection Test",
+        "provider": str(payload.provider or "").strip(),
+        "base_url": str(payload.base_url or "").strip(),
+        "api_key": str(payload.api_key or "").strip(),
+    }
+    normalized["llm_connections"] = [connection]
+    normalized["llm_routing"]["metadata"] = {
+        "connection_id": "test-connection",
+        "model": str(payload.model or "").strip(),
+    }
+    normalized["llm_routing"]["grounded_qa"] = {
+        "connection_id": "test-connection",
+        "model": str(payload.model or "").strip(),
+    }
+    normalized["llm_routing"]["ocr"] = {
+        "engine": "llm",
+        "connection_id": "test-connection",
+        "model": str(payload.model or "").strip(),
+    }
+    merged.update(normalized)
     return merged
 
 
@@ -467,6 +496,12 @@ def _resolve_ocr_provider_for_user(
 ) -> str:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
+    normalized_llm = get_normalized_llm_preferences(preferences)
+    if normalized_llm["llm_connections"]:
+        ocr_route = normalized_llm["llm_routing"]["ocr"]
+        if ocr_route["engine"] == "tesseract":
+            return "tesseract"
+        return "llm_separate"
     provider_name = str(preferences.get("ocr_provider", "llm")).strip().lower()
     if provider_name in {"tesseract", "llm", "llm_separate"}:
         return provider_name
@@ -891,8 +926,14 @@ def test_llm_connection_endpoint(
         preferences=merged_preferences,
         default_llm_provider=default_llm_provider,
     )
-    provider_name = str(merged_preferences.get("llm_provider", "")).strip().lower() or "custom"
-    model_name = str(merged_preferences.get("llm_model", "")).strip() or "default"
+    normalized_llm = get_normalized_llm_preferences(merged_preferences)
+    metadata_route = normalized_llm["llm_routing"]["metadata"]
+    connections_by_id = {
+        str(connection["id"]): connection for connection in normalized_llm["llm_connections"]
+    }
+    selected_connection = connections_by_id.get(str(metadata_route.get("connection_id", "")), {})
+    provider_name = str(selected_connection.get("provider", "")).strip().lower() or "custom"
+    model_name = str(metadata_route.get("model", "")).strip() or "default"
     try:
         llm_provider.suggest_metadata(
             filename="connection-test.txt",

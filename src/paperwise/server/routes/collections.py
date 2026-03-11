@@ -8,13 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
+from paperwise.application.services.llm_preferences import LLM_TASK_GROUNDED_QA
 from paperwise.domain.models import Collection, DocumentChunkSearchHit, User
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
     llm_provider_dependency,
 )
-from paperwise.server.routes.documents import _resolve_llm_provider_for_user
+from paperwise.server.routes.documents import _resolve_llm_provider_from_preferences
 from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -882,10 +883,15 @@ def ask_all_documents_endpoint(
     default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> AskResponse:
-    llm_provider = _resolve_llm_provider_for_user(
-        repository=repository,
-        current_user=current_user,
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    llm_provider = _resolve_llm_provider_from_preferences(
+        preferences=preferences,
         default_llm_provider=default_llm_provider,
+        task=LLM_TASK_GROUNDED_QA,
+        missing_provider_detail="Configure a Grounded Q&A LLM connection in Settings before asking questions.",
+        missing_api_key_detail="Selected Grounded Q&A LLM connection requires an API key in Settings.",
+        missing_base_url_detail="Custom Grounded Q&A connection requires a base URL in Settings.",
     )
     scoped_ids = _resolve_metadata_scoped_document_ids(
         repository=repository,
@@ -925,10 +931,15 @@ def ask_collection_documents_endpoint(
         repository=repository,
         current_user=current_user,
     )
-    llm_provider = _resolve_llm_provider_for_user(
-        repository=repository,
-        current_user=current_user,
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    llm_provider = _resolve_llm_provider_from_preferences(
+        preferences=preferences,
         default_llm_provider=default_llm_provider,
+        task=LLM_TASK_GROUNDED_QA,
+        missing_provider_detail="Configure a Grounded Q&A LLM connection in Settings before asking questions.",
+        missing_api_key_detail="Selected Grounded Q&A LLM connection requires an API key in Settings.",
+        missing_base_url_detail="Custom Grounded Q&A connection requires a base URL in Settings.",
     )
     collection_doc_ids = repository.list_collection_document_ids(collection_id)
     scoped_ids = _resolve_metadata_scoped_document_ids(
