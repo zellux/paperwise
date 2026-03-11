@@ -910,6 +910,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   overflow: auto;
 }
 
+#search-section-ask .docs-table-wrap {
+  margin-top: 10px;
+}
+
 @media (max-width: 960px) {
   .settings-form {
     grid-template-columns: 1fr;
