@@ -8,7 +8,7 @@ WORKER_PID_FILE ?= $(RUN_DIR)/worker.pid
 BACKEND_LOG ?= $(LOG_DIR)/backend.log
 WORKER_LOG ?= $(LOG_DIR)/worker.log
 
-.PHONY: setup deps-up deps-down backend api worker worker-bg backend-bg dev-up dev-stop dev-restart dev-status test smoke-llm
+.PHONY: setup deps-up deps-down docker-up docker-down docker-logs backend api worker worker-bg backend-bg dev-up dev-stop dev-restart dev-status test smoke-llm
 
 setup:
 	$(PYTHON) -m venv $(VENV)
@@ -20,6 +20,15 @@ deps-up:
 
 deps-down:
 	docker compose -f infra/docker-compose.yml down
+
+docker-up:
+	docker compose up -d --build
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f api worker
 
 backend:
 	$(VENV_PYTHON) -m uvicorn paperwise.server.main:app --reload
