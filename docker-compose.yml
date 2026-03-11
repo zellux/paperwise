@@ -20,7 +20,7 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "8000:8000"
+      - "8080:8000"
     volumes:
       - paperwise_data:/data
     healthcheck:
