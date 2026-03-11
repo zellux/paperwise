@@ -483,15 +483,6 @@
                   placeholder="Ask a question and get an answer grounded in selected documents."
                   required
                 ></textarea>
-                <label class="label" for="searchAskTopKInput">Context Chunks</label>
-                <input
-                  id="searchAskTopKInput"
-                  name="searchAskTopKInput"
-                  type="number"
-                  min="3"
-                  max="60"
-                  value="18"
-                />
                 <label class="settings-checkbox-row" for="searchAskDebugToggle">
                   <input id="searchAskDebugToggle" name="searchAskDebugToggle" type="checkbox" />
                   <span>Enable debug output</span>
@@ -660,6 +651,22 @@ Debug output disabled.
                     <option value="50">50</option>
                     <option value="100">100</option>
                   </select>
+                </div>
+              </section>
+
+              <section class="settings-group">
+                <h3 class="settings-group-title">Grounded Q&amp;A</h3>
+                <p class="settings-group-note">Control how many retrieved context chunks are packed into each grounded answer.</p>
+                <div class="settings-group-fields">
+                  <label class="label" for="settingsGroundedQaTopKInput">Context Chunks</label>
+                  <input
+                    id="settingsGroundedQaTopKInput"
+                    name="settingsGroundedQaTopKInput"
+                    type="number"
+                    min="3"
+                    max="60"
+                    value="18"
+                  />
                 </div>
               </section>
 

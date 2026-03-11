@@ -33,7 +33,6 @@ const searchResultsMeta = document.getElementById("searchResultsMeta");
 const searchResultsTableBody = document.getElementById("searchResultsTableBody");
 const searchAskForm = document.getElementById("searchAskForm");
 const searchAskQuestion = document.getElementById("searchAskQuestion");
-const searchAskTopKInput = document.getElementById("searchAskTopKInput");
 const searchAskDebugToggle = document.getElementById("searchAskDebugToggle");
 const searchAskAnswer = document.getElementById("searchAskAnswer");
 const searchAskDebugOutput = document.getElementById("searchAskDebugOutput");
@@ -41,6 +40,7 @@ const searchAskCitationsBody = document.getElementById("searchAskCitationsBody")
 const searchSubsections = [...document.querySelectorAll(".search-subsection")];
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
 const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
+const settingsGroundedQaTopKInput = document.getElementById("settingsGroundedQaTopKInput");
 const settingsLlmProviderSelect = document.getElementById("settingsLlmProviderSelect");
 const settingsLlmModelInput = document.getElementById("settingsLlmModelInput");
 const settingsLlmBaseUrlInput = document.getElementById("settingsLlmBaseUrlInput");
@@ -204,6 +204,7 @@ let docsFilters = {
 };
 let docsPage = 1;
 let docsPageSize = 20;
+let groundedQaTopK = 18;
 let docsTotalCount = 0;
 let docsListRequestSeq = 0;
 let pendingDocsRequestSeq = 0;
@@ -230,6 +231,14 @@ function normalizePageSize(value) {
     return 20;
   }
   return size;
+}
+
+function normalizeGroundedQaTopK(value) {
+  const size = Number(value);
+  if (!Number.isInteger(size)) {
+    return 18;
+  }
+  return Math.max(3, Math.min(60, size));
 }
 
 function cloneDocsFilters(filters) {
@@ -361,6 +370,9 @@ function renderSettingsForm() {
   }
   if (settingsPageSizeSelect && settingsPageSizeSelect.value !== String(docsPageSize)) {
     settingsPageSizeSelect.value = String(docsPageSize);
+  }
+  if (settingsGroundedQaTopKInput && settingsGroundedQaTopKInput.value !== String(groundedQaTopK)) {
+    settingsGroundedQaTopKInput.value = String(groundedQaTopK);
   }
   if (settingsLlmProviderSelect && settingsLlmProviderSelect.value !== llmSettings.provider) {
     settingsLlmProviderSelect.value = llmSettings.provider;
@@ -604,6 +616,7 @@ async function saveUserPreferences() {
       last_view: currentViewId,
       ui_theme: currentTheme,
       docs_page_size: docsPageSize,
+      grounded_qa_top_k_chunks: groundedQaTopK,
       llm_provider: llmSettings.provider,
       llm_model: llmSettings.model,
       llm_base_url: llmSettings.base_url,
@@ -666,6 +679,7 @@ function applyUserPreferences(preferences, options = {}) {
   if (preferences.docs_page_size !== undefined) {
     docsPageSize = normalizePageSize(preferences.docs_page_size);
   }
+  groundedQaTopK = normalizeGroundedQaTopK(preferences.grounded_qa_top_k_chunks);
   llmSettings = {
     provider: normalizeLlmProvider(preferences.llm_provider),
     model: String(preferences.llm_model || "").trim(),
@@ -2500,7 +2514,7 @@ async function runScopedAsk() {
     renderSearchAskDebugOutput(null, debugEnabled);
     return;
   }
-  const topK = Math.max(3, Math.min(60, Number(searchAskTopKInput?.value || 18)));
+  const topK = normalizeGroundedQaTopK(groundedQaTopK);
   const filters = readSearchScopeFilters();
   renderSearchAskAnswer({
     answer: `Querying... ${formatSearchScopeSummary()}`,
@@ -3015,6 +3029,7 @@ settingsForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const nextTheme = normalizeThemeName(settingsThemeSelect?.value || currentTheme);
   const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || docsPageSize);
+  groundedQaTopK = normalizeGroundedQaTopK(settingsGroundedQaTopKInput?.value || groundedQaTopK);
   llmSettings = readLlmSettingsFromControls();
   ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
   ocrAutoSwitch = Boolean(settingsOcrAutoSwitchCheckbox?.checked);
