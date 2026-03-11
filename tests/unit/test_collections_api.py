@@ -69,6 +69,7 @@ class FakeAnchoredGroundedLLM(FakeGroundedLLM):
         return {
             "queries": ["Quincy height measurement history"],
             "must_terms": ["Quincy", "height", "measurements"],
+            "anchor_terms": ["Quincy", "height"],
             "optional_terms": ["cm", "inches"],
         }
 
@@ -79,6 +80,7 @@ class FakeMassRewriteGroundedLLM(FakeGroundedLLM):
         return {
             "queries": ["Quincy weight vital signs", "Quincy body weight lb kg"],
             "must_terms": ["weight"],
+            "anchor_terms": ["Quincy", "weight"],
             "optional_terms": ["lb", "kg", "vital signs"],
         }
 
@@ -92,6 +94,7 @@ class FakeSonicRewriteGroundedLLM(FakeGroundedLLM):
                 "Sonic internet monthly bill amount",
             ],
             "must_terms": ["Sonic internet", "monthly", "spend"],
+            "anchor_terms": ["Sonic internet", "Sonic"],
             "optional_terms": ["cost", "bill", "charges", "payment", "per month", "monthly fee"],
         }
 

@@ -4,9 +4,12 @@ from typing import Any
 
 RETRIEVAL_QUERY_SYSTEM_PROMPT = (
     "You rewrite user questions for document retrieval. "
-    "Return strict JSON with keys: queries, must_terms, optional_terms. "
+    "Return strict JSON with keys: queries, must_terms, anchor_terms, optional_terms. "
     "queries must be 3 to 6 short retrieval queries preserving user intent and entities. "
     "must_terms should include critical anchors (names, exact concepts) if present. "
+    "anchor_terms must contain 1 to 6 high-precision entity anchors used for filtering/ranking. "
+    "Use entities, product names, person names, organizations, account IDs, and exact noun phrases. "
+    "Do not include generic intent words such as monthly, spend, cost, bill, charges, payment. "
     "optional_terms should include synonyms, abbreviations, and unit variants."
 )
 
@@ -25,6 +28,7 @@ def build_retrieval_query_user_prompt(*, question: str) -> dict[str, Any]:
 def extract_retrieval_query_result(parsed: dict[str, Any], *, fallback_question: str) -> dict[str, Any]:
     queries_raw = parsed.get("queries", [])
     must_terms_raw = parsed.get("must_terms", [])
+    anchor_terms_raw = parsed.get("anchor_terms", [])
     optional_terms_raw = parsed.get("optional_terms", [])
 
     def _clean_list(values: Any) -> list[str]:
@@ -45,6 +49,7 @@ def extract_retrieval_query_result(parsed: dict[str, Any], *, fallback_question:
 
     queries = _clean_list(queries_raw)[:6]
     must_terms = _clean_list(must_terms_raw)[:12]
+    anchor_terms = _clean_list(anchor_terms_raw)[:12]
     optional_terms = _clean_list(optional_terms_raw)[:18]
 
     if not queries:
@@ -55,6 +60,6 @@ def extract_retrieval_query_result(parsed: dict[str, Any], *, fallback_question:
     return {
         "queries": queries,
         "must_terms": must_terms,
+        "anchor_terms": anchor_terms,
         "optional_terms": optional_terms,
     }
-

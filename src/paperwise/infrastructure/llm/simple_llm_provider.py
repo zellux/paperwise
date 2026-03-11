@@ -120,5 +120,6 @@ class SimpleLLMProvider(LLMProvider):
         return {
             "queries": queries[:3],
             "must_terms": unique[:5],
+            "anchor_terms": unique[:3],
             "optional_terms": [],
         }

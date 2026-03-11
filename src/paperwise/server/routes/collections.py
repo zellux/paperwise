@@ -18,38 +18,6 @@ from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
-_RETRIEVAL_GENERIC_TERMS = {
-    "history",
-    "measurement",
-    "measurements",
-    "record",
-    "records",
-    "data",
-    "past",
-    "timeline",
-    "changes",
-    "value",
-    "values",
-    "monthly",
-    "month",
-    "spend",
-    "spending",
-    "cost",
-    "bill",
-    "bills",
-    "charge",
-    "charges",
-    "payment",
-    "payments",
-    "paid",
-    "fee",
-    "fees",
-    "amount",
-    "service",
-    "services",
-}
-
-
 class CollectionCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=256)
     description: str = Field(default="", max_length=2000)
@@ -305,23 +273,24 @@ def _build_retrieval_queries_with_llm(
         if debug is not None:
             debug["rewrite_source"] = "heuristic"
             debug["rewrite_reason"] = "no_llm_provider"
-        return {"queries": fallback, "must_terms": [], "optional_terms": []}
+        return {"queries": fallback, "must_terms": [], "anchor_terms": [], "optional_terms": []}
     rewrite_method = getattr(llm_provider, "rewrite_retrieval_queries", None)
     if not callable(rewrite_method):
         if debug is not None:
             debug["rewrite_source"] = "heuristic"
             debug["rewrite_reason"] = "provider_without_rewrite_method"
-        return {"queries": fallback, "must_terms": [], "optional_terms": []}
+        return {"queries": fallback, "must_terms": [], "anchor_terms": [], "optional_terms": []}
     try:
         rewritten = rewrite_method(question=query)
     except Exception as exc:
         if debug is not None:
             debug["rewrite_source"] = "heuristic"
             debug["rewrite_reason"] = f"llm_rewrite_error:{exc}"
-        return {"queries": fallback, "must_terms": [], "optional_terms": []}
+        return {"queries": fallback, "must_terms": [], "anchor_terms": [], "optional_terms": []}
 
     queries_raw = rewritten.get("queries", []) if isinstance(rewritten, dict) else []
     must_terms_raw = rewritten.get("must_terms", []) if isinstance(rewritten, dict) else []
+    anchor_terms_raw = rewritten.get("anchor_terms", []) if isinstance(rewritten, dict) else []
     optional_terms_raw = rewritten.get("optional_terms", []) if isinstance(rewritten, dict) else []
     queries: list[str] = []
     seen: set[str] = set()
@@ -356,6 +325,17 @@ def _build_retrieval_queries_with_llm(
             continue
         seen.add(key)
         optional_terms.append(value)
+    anchor_terms: list[str] = []
+    seen.clear()
+    for item in anchor_terms_raw if isinstance(anchor_terms_raw, list) else []:
+        value = " ".join(str(item or "").split()).strip()
+        if not value:
+            continue
+        key = value.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        anchor_terms.append(value)
     if not queries:
         if debug is not None:
             debug["rewrite_source"] = "heuristic"
@@ -363,6 +343,7 @@ def _build_retrieval_queries_with_llm(
         return {
             "queries": fallback,
             "must_terms": must_terms[:12],
+            "anchor_terms": anchor_terms[:12],
             "optional_terms": optional_terms[:18],
         }
     if debug is not None:
@@ -371,6 +352,7 @@ def _build_retrieval_queries_with_llm(
     return {
         "queries": queries[:6],
         "must_terms": must_terms[:12],
+        "anchor_terms": anchor_terms[:12],
         "optional_terms": optional_terms[:18],
     }
 
@@ -386,7 +368,7 @@ def _extract_strong_terms(terms: list[str]) -> list[str]:
 
     def add_candidate(candidate: str) -> None:
         simple = re.sub(r"[^a-z0-9]+", " ", candidate).strip()
-        if not simple or simple in _RETRIEVAL_GENERIC_TERMS:
+        if not simple:
             return
         if len(simple) < 3 and simple not in {"lb", "kg", "cm", "in"}:
             return
@@ -423,11 +405,13 @@ def _search_document_chunks_multi_query(
     )
     retrieval_queries = list(rewrite_payload.get("queries", []))
     must_terms = [str(item) for item in rewrite_payload.get("must_terms", [])]
+    anchor_terms = [str(item) for item in rewrite_payload.get("anchor_terms", [])]
     optional_terms = [str(item) for item in rewrite_payload.get("optional_terms", [])]
-    strong_must_terms = _extract_strong_terms(must_terms)
+    strong_must_terms = _extract_strong_terms(anchor_terms if anchor_terms else must_terms)
     if debug is not None:
         debug["expanded_queries"] = list(retrieval_queries)
         debug["must_terms"] = must_terms
+        debug["anchor_terms"] = anchor_terms
         debug["optional_terms"] = optional_terms
         debug["strong_must_terms"] = strong_must_terms
         debug["per_query"] = []
