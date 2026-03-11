@@ -99,6 +99,13 @@ class FakeSonicRewriteGroundedLLM(FakeGroundedLLM):
         }
 
 
+class FakeTimeoutGroundedLLM(FakeGroundedLLM):
+    def answer_grounded(self, *, question: str, contexts: list[dict]) -> dict:
+        del question
+        del contexts
+        raise RuntimeError("The read operation timed out")
+
+
 def _save_document(
     repository: InMemoryDocumentRepository,
     *,
@@ -638,5 +645,39 @@ def test_global_ask_prefers_anchor_entity_over_generic_monthly_terms() -> None:
         assert debug_payload["retrieval"]["anchor_filter_applied"] is True
         source_doc_ids = {item["document_id"] for item in debug_payload["sources_sent_to_llm"]}
         assert "doc-sonic" in source_doc_ids
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_global_ask_timeout_returns_clean_gateway_timeout_message() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-timeout",
+        owner_id=TEST_USER.id,
+        filename="timeout.pdf",
+        text_preview="Sonic internet invoice amount due.",
+        title="Timeout Doc",
+        document_type="Invoice",
+        tags=["Utilities"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeTimeoutGroundedLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/collections/ask",
+            json={
+                "question": "How much did I spend on Sonic internet?",
+                "top_k_chunks": 8,
+            },
+        )
+        assert response.status_code == 504
+        detail = str(response.json().get("detail", ""))
+        assert "timed out" in detail.lower()
+        assert "incomplete" in detail.lower()
     finally:
         app.dependency_overrides.clear()

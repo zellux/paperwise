@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
@@ -17,6 +18,12 @@ from paperwise.server.routes.documents import _resolve_llm_provider_for_user
 from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 
 router = APIRouter(prefix="/collections", tags=["collections"])
+
+
+def _is_timeout_error(exc: Exception) -> bool:
+    if isinstance(exc, httpx.TimeoutException):
+        return True
+    return "timed out" in str(exc).lower()
 
 class CollectionCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=256)
@@ -607,10 +614,27 @@ def _ask_grounded(
             ),
         )
 
-    llm_payload = llm_provider.answer_grounded(
-        question=question,
-        contexts=contexts,
-    )
+    try:
+        llm_payload = llm_provider.answer_grounded(
+            question=question,
+            contexts=contexts,
+        )
+    except Exception as exc:
+        if _is_timeout_error(exc):
+            message = (
+                "The LLM request timed out before completion. "
+                "Results may be incomplete. Please retry, reduce scope, or lower context limits in Settings."
+            )
+            log_llm_exchange(
+                provider="grounded_qa",
+                endpoint="/collections/ask",
+                request_payload=request_debug,
+                response_status=504,
+                response_payload={"detail": message},
+                error=str(exc),
+            )
+            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=message) from exc
+        raise
     citations: list[AskCitationResponse] = []
     by_chunk = {ctx["chunk_id"]: ctx for ctx in contexts}
     for citation in llm_payload.get("citations", []) if isinstance(llm_payload, dict) else []:
