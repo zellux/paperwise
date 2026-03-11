@@ -1,3 +1,4 @@
+import re
 from datetime import UTC, datetime
 from uuid import uuid4
 
@@ -5,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
-from paperwise.domain.models import Collection, User
+from paperwise.domain.models import Collection, DocumentChunkSearchHit, User
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
@@ -226,6 +227,78 @@ def _resolve_metadata_scoped_document_ids(
     return sorted(matched_ids)
 
 
+def _build_retrieval_queries(query: str) -> list[str]:
+    compact = " ".join(str(query or "").split()).strip()
+    if not compact:
+        return []
+    lowered = compact.lower()
+    tokens = re.findall(r"[a-z0-9]+", lowered)
+    token_set = set(tokens)
+    variants: list[str] = [compact]
+
+    def add(value: str) -> None:
+        candidate = " ".join(str(value or "").split()).strip()
+        if not candidate:
+            return
+        if candidate.lower() in {item.lower() for item in variants}:
+            return
+        variants.append(candidate)
+
+    if {"measurement", "measurements", "list"}.intersection(token_set):
+        add(f"{compact} values")
+        add(f"{compact} vital signs")
+    if "weight" in token_set:
+        add(compact.replace("weight", "body weight"))
+        add(f"{compact} lb lbs kg")
+    if "mass" in token_set:
+        add(compact.replace("mass", "weight"))
+        add(f"{compact} body weight")
+    if "vitals" in token_set or ("vital" in token_set and "signs" in token_set):
+        add(f"{compact} weight height blood pressure pulse")
+    return variants[:6]
+
+
+def _search_document_chunks_multi_query(
+    *,
+    repository: DocumentRepository,
+    owner_id: str,
+    query: str,
+    limit: int,
+    document_ids: list[str] | None,
+) -> list[DocumentChunkSearchHit]:
+    retrieval_queries = _build_retrieval_queries(query)
+    if not retrieval_queries:
+        return []
+    best_by_chunk: dict[str, DocumentChunkSearchHit] = {}
+    for candidate in retrieval_queries:
+        hits = repository.search_document_chunks(
+            owner_id=owner_id,
+            query=candidate,
+            limit=limit,
+            document_ids=document_ids,
+        )
+        for hit in hits:
+            chunk_id = hit.chunk.id
+            existing = best_by_chunk.get(chunk_id)
+            if existing is None:
+                best_by_chunk[chunk_id] = hit
+                continue
+            merged_terms = sorted(set(existing.matched_terms).union(hit.matched_terms))
+            if float(hit.score) > float(existing.score):
+                best_by_chunk[chunk_id] = DocumentChunkSearchHit(
+                    chunk=hit.chunk,
+                    score=hit.score,
+                    matched_terms=merged_terms,
+                )
+                continue
+            best_by_chunk[chunk_id] = DocumentChunkSearchHit(
+                chunk=existing.chunk,
+                score=existing.score,
+                matched_terms=merged_terms,
+            )
+    return sorted(best_by_chunk.values(), key=lambda item: float(item.score), reverse=True)[:limit]
+
+
 def _build_qa_contexts(
     *,
     repository: DocumentRepository,
@@ -266,7 +339,8 @@ def _ask_grounded(
     top_k_chunks: int,
     document_ids: list[str] | None,
 ) -> AskResponse:
-    chunk_hits = repository.search_document_chunks(
+    chunk_hits = _search_document_chunks_multi_query(
+        repository=repository,
         owner_id=owner_id,
         query=question,
         limit=max(top_k_chunks * 3, top_k_chunks),
@@ -457,7 +531,8 @@ def search_all_documents_endpoint(
         tag_filters=payload.tag,
         document_type_filters=payload.document_type,
     )
-    hits = repository.search_document_chunks(
+    hits = _search_document_chunks_multi_query(
+        repository=repository,
         owner_id=current_user.id,
         query=payload.query,
         limit=max(payload.limit * 4, payload.limit),
@@ -486,7 +561,8 @@ def search_collection_documents_endpoint(
         tag_filters=payload.tag,
         document_type_filters=payload.document_type,
     )
-    hits = repository.search_document_chunks(
+    hits = _search_document_chunks_multi_query(
+        repository=repository,
         owner_id=current_user.id,
         query=payload.query,
         limit=max(payload.limit * 4, payload.limit),

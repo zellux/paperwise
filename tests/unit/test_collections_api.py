@@ -336,3 +336,38 @@ def test_global_ask_supports_tag_and_document_type_filters_without_collection() 
         assert payload["citations"][0]["document_id"] == "doc-contract"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_global_ask_query_expansion_handles_measurement_wording() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-vitals",
+        owner_id=TEST_USER.id,
+        filename="visit-note.pdf",
+        text_preview="Vital signs: Weight 45 lb. Height 120 cm. Follow-up in 6 months.",
+        title="Pediatric Visit Note",
+        document_type="Visit Note",
+        tags=["Medical"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeGroundedLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/collections/ask",
+            json={
+                "question": "List measurement of Quincy mass",
+                "top_k_chunks": 8,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["insufficient_evidence"] is False
+        assert payload["citations"]
+        assert payload["citations"][0]["document_id"] == "doc-vitals"
+    finally:
+        app.dependency_overrides.clear()
