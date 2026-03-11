@@ -1,5 +1,6 @@
 import re
 from datetime import UTC, datetime
+from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -73,6 +74,7 @@ class AskRequest(BaseModel):
     top_k_chunks: int = Field(default=18, ge=3, le=60)
     tag: list[str] = Field(default_factory=list)
     document_type: list[str] = Field(default_factory=list)
+    debug: bool = False
 
 
 class AskCitationResponse(BaseModel):
@@ -87,6 +89,7 @@ class AskResponse(BaseModel):
     answer: str
     insufficient_evidence: bool
     citations: list[AskCitationResponse]
+    debug: dict[str, Any] | None = None
 
 
 def _to_collection_response(
@@ -356,6 +359,7 @@ def _ask_grounded(
     top_k_chunks: int,
     document_ids: list[str] | None,
     debug_scope: dict[str, object] | None = None,
+    debug_enabled: bool = False,
 ) -> AskResponse:
     retrieval_debug: dict[str, object] = {}
     chunk_hits = _search_document_chunks_multi_query(
@@ -377,6 +381,7 @@ def _ask_grounded(
             "document_id": ctx.get("document_id"),
             "title": ctx.get("title"),
             "content_len": len(str(ctx.get("content", ""))),
+            "content_preview": str(ctx.get("content", ""))[:800],
         }
         for ctx in contexts
     ]
@@ -389,6 +394,7 @@ def _ask_grounded(
         "retrieval": retrieval_debug,
         "selected_contexts": context_debug,
     }
+    response_debug: dict[str, Any] = {}
     if not contexts:
         response_debug = {
             "answer": "Not enough evidence in the selected documents.",
@@ -407,6 +413,16 @@ def _ask_grounded(
             answer="Not enough evidence in the selected documents.",
             insufficient_evidence=True,
             citations=[],
+            debug=(
+                {
+                    "scope": request_debug.get("scope"),
+                    "retrieval": request_debug.get("retrieval"),
+                    "sources_sent_to_llm": request_debug.get("selected_contexts"),
+                    "result": response_debug,
+                }
+                if debug_enabled
+                else None
+            ),
         )
 
     llm_payload = llm_provider.answer_grounded(
@@ -463,6 +479,16 @@ def _ask_grounded(
         request_payload=request_debug,
         response_status=200,
         response_payload=response_debug,
+    )
+    response_payload.debug = (
+        {
+            "scope": request_debug.get("scope"),
+            "retrieval": request_debug.get("retrieval"),
+            "sources_sent_to_llm": request_debug.get("selected_contexts"),
+            "result": response_debug,
+        }
+        if debug_enabled
+        else None
     )
     return response_payload
 
@@ -675,6 +701,7 @@ def ask_all_documents_endpoint(
             "document_type": payload.document_type,
             "scoped_document_count": len(scoped_ids) if scoped_ids is not None else None,
         },
+        debug_enabled=payload.debug,
     )
 
 
@@ -717,4 +744,5 @@ def ask_collection_documents_endpoint(
             "document_type": payload.document_type,
             "scoped_document_count": len(scoped_ids) if scoped_ids is not None else None,
         },
+        debug_enabled=payload.debug,
     )

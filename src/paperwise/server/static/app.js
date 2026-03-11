@@ -34,7 +34,9 @@ const searchResultsTableBody = document.getElementById("searchResultsTableBody")
 const searchAskForm = document.getElementById("searchAskForm");
 const searchAskQuestion = document.getElementById("searchAskQuestion");
 const searchAskTopKInput = document.getElementById("searchAskTopKInput");
+const searchAskDebugToggle = document.getElementById("searchAskDebugToggle");
 const searchAskAnswer = document.getElementById("searchAskAnswer");
+const searchAskDebugOutput = document.getElementById("searchAskDebugOutput");
 const searchAskCitationsBody = document.getElementById("searchAskCitationsBody");
 const searchSubsections = [...document.querySelectorAll(".search-subsection")];
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
@@ -1003,6 +1005,7 @@ function clearSession() {
   renderSearchResultsTable({ hits: [] });
   renderSearchResultsMeta("No search run yet.");
   renderSearchAskAnswer(null);
+  renderSearchAskDebugOutput(null, false);
   renderSettingsForm();
   renderActivityTokenTotal(0);
   renderSessionState();
@@ -2222,6 +2225,27 @@ function renderSearchAskAnswer(payload) {
   }
 }
 
+function renderSearchAskDebugOutput(debugPayload, enabled) {
+  if (!searchAskDebugOutput) {
+    return;
+  }
+  if (!enabled) {
+    searchAskDebugOutput.classList.add("view-hidden");
+    searchAskDebugOutput.textContent = "Debug output disabled.";
+    return;
+  }
+  searchAskDebugOutput.classList.remove("view-hidden");
+  if (!debugPayload) {
+    searchAskDebugOutput.textContent = "No debug payload returned.";
+    return;
+  }
+  try {
+    searchAskDebugOutput.textContent = JSON.stringify(debugPayload, null, 2);
+  } catch {
+    searchAskDebugOutput.textContent = String(debugPayload);
+  }
+}
+
 function setButtonBusy(button, busy, busyLabel = "Loading...") {
   if (!button) {
     return;
@@ -2466,12 +2490,14 @@ async function runScopedKeywordSearch() {
 
 async function runScopedAsk() {
   const question = String(searchAskQuestion?.value || "").trim();
+  const debugEnabled = Boolean(searchAskDebugToggle?.checked);
   if (!question) {
     renderSearchAskAnswer({
       answer: "Enter a question.",
       insufficient_evidence: true,
       citations: [],
     });
+    renderSearchAskDebugOutput(null, debugEnabled);
     return;
   }
   const topK = Math.max(3, Math.min(60, Number(searchAskTopKInput?.value || 18)));
@@ -2481,6 +2507,7 @@ async function runScopedAsk() {
     insufficient_evidence: false,
     citations: [],
   });
+  renderSearchAskDebugOutput({ status: "waiting_for_response" }, debugEnabled);
   setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), true, "Asking...");
   try {
     const path = searchSelectedCollectionId
@@ -2489,7 +2516,7 @@ async function runScopedAsk() {
     const response = await apiFetch(path, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ question, top_k_chunks: topK, ...filters }),
+      body: JSON.stringify({ question, top_k_chunks: topK, debug: debugEnabled, ...filters }),
     });
     const payload = await response.json();
     if (!response.ok) {
@@ -2498,10 +2525,12 @@ async function runScopedAsk() {
         insufficient_evidence: true,
         citations: [],
       });
+      renderSearchAskDebugOutput(payload?.debug || null, debugEnabled);
       logActivity(`Ask failed: ${payload.detail || response.statusText}`);
       return;
     }
     renderSearchAskAnswer(payload);
+    renderSearchAskDebugOutput(payload?.debug || null, debugEnabled);
     logActivity(`Grounded ask completed in ${getSearchScopeLabel()}.`);
   } finally {
     setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), false);
@@ -2975,6 +3004,11 @@ searchKeywordForm?.addEventListener("submit", async (event) => {
 searchAskForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   await runScopedAsk();
+});
+
+searchAskDebugToggle?.addEventListener("change", () => {
+  const enabled = Boolean(searchAskDebugToggle.checked);
+  renderSearchAskDebugOutput(null, enabled);
 });
 
 settingsForm?.addEventListener("submit", async (event) => {

@@ -492,11 +492,18 @@
                   max="60"
                   value="18"
                 />
+                <label class="settings-checkbox-row" for="searchAskDebugToggle">
+                  <input id="searchAskDebugToggle" name="searchAskDebugToggle" type="checkbox" />
+                  <span>Enable debug output</span>
+                </label>
                 <div class="actions">
                   <button id="searchAskSubmitBtn" type="submit" class="btn btn-primary">Ask</button>
                 </div>
               </form>
               <pre id="searchAskAnswer" class="output">No answer yet.</pre>
+              <pre id="searchAskDebugOutput" class="output search-debug-output view-hidden">
+Debug output disabled.
+              </pre>
               <div class="docs-table-wrap">
                 <table class="docs-table tags-table">
                   <thead>

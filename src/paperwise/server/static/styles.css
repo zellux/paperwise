@@ -874,6 +874,12 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin-bottom: 8px;
 }
 
+.search-debug-output {
+  margin-top: 10px;
+  max-height: 320px;
+  overflow: auto;
+}
+
 @media (max-width: 960px) {
   .settings-form {
     grid-template-columns: 1fr;

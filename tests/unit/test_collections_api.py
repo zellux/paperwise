@@ -371,3 +371,42 @@ def test_global_ask_query_expansion_handles_measurement_wording() -> None:
         assert payload["citations"][0]["document_id"] == "doc-vitals"
     finally:
         app.dependency_overrides.clear()
+
+
+def test_global_ask_returns_debug_payload_when_enabled() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-debug",
+        owner_id=TEST_USER.id,
+        filename="debug-note.pdf",
+        text_preview="Weight 32 lb and height 98 cm for Quincy.",
+        title="Debug Visit Note",
+        document_type="Visit Note",
+        tags=["Medical"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeGroundedLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/collections/ask",
+            json={
+                "question": "List measurement of Quincy weight",
+                "top_k_chunks": 8,
+                "debug": True,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert isinstance(payload.get("debug"), dict)
+        debug_payload = payload["debug"]
+        assert "retrieval" in debug_payload
+        assert "sources_sent_to_llm" in debug_payload
+        assert isinstance(debug_payload["sources_sent_to_llm"], list)
+        assert debug_payload["sources_sent_to_llm"]
+    finally:
+        app.dependency_overrides.clear()
