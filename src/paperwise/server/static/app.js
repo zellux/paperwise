@@ -220,14 +220,14 @@ let searchDocsCatalog = [];
 let searchSelectedCollectionId = "";
 let searchSelectedCollectionDocumentIds = [];
 let searchActiveSectionId = "search-section-keyword";
-let settingsActiveSectionId = "settings-section-account";
+let settingsActiveSectionId = "settings-section-display";
 const PATH_TO_SEARCH_SECTION_ID = {
   "/ui/collections": "search-section-keyword",
   "/ui/search": "search-section-keyword",
   "/ui/grounded-qa": "search-section-ask",
 };
 const PATH_TO_SETTINGS_SECTION_ID = {
-  "/ui/settings": "settings-section-account",
+  "/ui/settings": "settings-section-display",
   "/ui/settings/account": "settings-section-account",
   "/ui/settings/display": "settings-section-display",
   "/ui/settings/models": "settings-section-models",
@@ -1428,7 +1428,7 @@ function setActiveSearchSection(sectionId) {
 }
 
 function setActiveSettingsSection(sectionId) {
-  const defaultSectionId = "settings-section-account";
+  const defaultSectionId = "settings-section-display";
   const nextSectionId = settingsSubsections.some((section) => section.id === sectionId)
     ? sectionId
     : defaultSectionId;
