@@ -2716,7 +2716,7 @@ async function runScopedAsk() {
     }
     renderSearchAskAnswer(payload);
     renderSearchAskDebugOutput(payload?.debug || null, debugEnabled);
-    logActivity(`Grounded ask completed in ${getSearchScopeLabel()}.`);
+    logActivity(`Ask Your Docs completed in ${getSearchScopeLabel()}.`);
   } finally {
     setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), false);
   }
