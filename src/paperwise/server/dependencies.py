@@ -13,7 +13,6 @@ from paperwise.infrastructure.dispatchers.celery_ingestion_dispatcher import (
     CeleryIngestionDispatcher,
 )
 from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
-from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -30,15 +29,7 @@ if _settings.repository_backend.lower() == "postgres":
 else:
     _document_repository = InMemoryDocumentRepository()
 _storage: StorageProvider = LocalStorageAdapter(_settings.object_store_root)
-_llm_provider: LLMProvider
-if _settings.openai_api_key:
-    _llm_provider = OpenAILLMProvider(
-        api_key=_settings.openai_api_key,
-        model=_settings.openai_model,
-        base_url=_settings.openai_base_url,
-    )
-else:
-    _llm_provider = MissingOpenAIProvider()
+_llm_provider: LLMProvider = MissingOpenAIProvider()
 
 
 def settings_dependency() -> Settings:

@@ -25,17 +25,48 @@ make dev-up
 
 Open [http://localhost:8000](http://localhost:8000) for the initial web UI.
 
-### OpenAI metadata parsing
+## Docker Deployment
 
-Set these in `.env.local` for `llm-parse`:
+This repository includes a full Docker stack (`api`, `worker`, `redis`, `postgres`) for sharing or self-hosting.
+
+1. Create deployment env file:
 
 ```bash
-PAPERWISE_OPENAI_API_KEY=your_key_here
-PAPERWISE_OPENAI_MODEL=gpt-4.1-mini
-PAPERWISE_OPENAI_BASE_URL=https://api.openai.com/v1
+cp .env.docker.example .env
 ```
 
-If `PAPERWISE_OPENAI_API_KEY` is unset, `llm-parse` is disabled.
+2. Set at least:
+
+```bash
+PAPERWISE_AUTH_SECRET=replace-with-a-strong-secret
+```
+
+3. Build and start:
+
+```bash
+docker compose up -d --build
+```
+
+4. Open:
+
+```text
+http://localhost:8000
+```
+
+Useful commands:
+
+- `docker compose ps` - service status.
+- `docker compose logs -f api worker` - follow app logs.
+- `docker compose down` - stop services.
+
+Data persistence:
+
+- Postgres data: `postgres_data` named volume.
+- Object store (uploaded/processed files): `paperwise_data` named volume mounted at `/data/object-store`.
+
+### LLM metadata parsing
+
+`llm-parse` uses provider/API settings configured per user in the web app Settings UI.
 
 ## User System (MVP)
 

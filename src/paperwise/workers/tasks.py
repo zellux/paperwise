@@ -42,12 +42,6 @@ def _build_repository() -> DocumentRepository:
 
 
 def _build_llm_provider() -> LLMProvider:
-    if settings.openai_api_key:
-        return OpenAILLMProvider(
-            api_key=settings.openai_api_key,
-            model=settings.openai_model,
-            base_url=settings.openai_base_url,
-        )
     return MissingOpenAIProvider()
 
 
@@ -104,7 +98,7 @@ def _resolve_llm_provider_from_preferences(
         return OpenAILLMProvider(
             api_key=config.api_key,
             model=config.model or default_model_for_task("openai", task),
-            base_url=config.base_url or settings.openai_base_url,
+            base_url=config.base_url or default_base_url_for_provider("openai"),
             vision_image_detail=ocr_image_detail,
         )
     if config.provider == "gemini":

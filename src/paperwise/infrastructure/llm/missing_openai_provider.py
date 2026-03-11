@@ -37,7 +37,7 @@ class MissingOpenAIProvider(LLMProvider):
         del existing_document_types
         del existing_tags
         raise RuntimeError(
-            "OpenAI provider is required for llm-parse. Set PAPERWISE_OPENAI_API_KEY in .env.local."
+            "LLM parse requires a configured provider. Set provider and API key in Settings."
         )
 
     def answer_grounded(

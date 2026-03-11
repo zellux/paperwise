@@ -406,7 +406,7 @@ def _build_provider_from_task_config(
         return OpenAILLMProvider(
             api_key=config.api_key,
             model=config.model or default_model_for_task("openai", task),
-            base_url=config.base_url or settings.openai_base_url,
+            base_url=config.base_url or default_base_url_for_provider("openai"),
             vision_image_detail=ocr_image_detail,
         )
     if config.provider == "gemini":
