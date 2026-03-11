@@ -163,6 +163,10 @@ body {
   gap: 18px;
 }
 
+:root.has-session .app-shell.view-hidden {
+  display: grid;
+}
+
 .topbar {
   grid-column: 1 / -1;
   display: flex;
@@ -326,6 +330,10 @@ h1 {
   z-index: 2;
   width: min(560px, 94vw);
   margin: 40px auto 8px;
+}
+
+:root.has-session .auth-gate {
+  display: none;
 }
 
 .auth-card {
