@@ -169,7 +169,7 @@ const LLM_PROVIDER_DEFAULTS = {
     base_url: "https://api.openai.com/v1",
   },
   gemini: {
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     base_url: "https://generativelanguage.googleapis.com/v1beta",
   },
 };
@@ -179,7 +179,7 @@ const OCR_LLM_PROVIDER_DEFAULTS = {
     base_url: "https://api.openai.com/v1",
   },
   gemini: {
-    model: "gemini-2.0-flash",
+    model: "gemini-2.5-flash",
     base_url: "https://generativelanguage.googleapis.com/v1beta",
   },
 };
