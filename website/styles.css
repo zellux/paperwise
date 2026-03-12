@@ -556,7 +556,7 @@ h1 span {
 
 .ask-card {
   margin: 0;
-  background: #fff;
+  background: linear-gradient(180deg, #f8f9fc 0%, #ffffff 100%);
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -567,9 +567,11 @@ h1 span {
 .ask-card img {
   display: block;
   width: 100%;
-  height: 560px;
-  object-fit: cover;
-  object-position: top;
+  height: auto;
+  max-height: 980px;
+  object-fit: contain;
+  object-position: top center;
+  background: #f4f6fb;
 }
 
 .ask-card figcaption {
@@ -777,7 +779,7 @@ h1 span {
   }
 
   .ask-card img {
-    height: 420px;
+    max-height: none;
   }
 
   .ask-carousel-controls {
