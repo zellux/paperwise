@@ -55,10 +55,33 @@
       <section class="section support-faq" aria-label="Frequently asked questions">
         <div class="faq">
           <article class="faq-item">
-            <h3>What OCR options are available?</h3>
+            <h3>How does OCR work in Paperwise, and what options can I choose?</h3>
             <p>
-              Local Tesseract, same LLM as metadata, or a separate LLM specifically for OCR. You can also set image
-              detail (auto/low/high) for OpenAI vision OCR.
+              Paperwise first tries to extract text directly from the document when possible. That works well for
+              machine-readable PDFs and avoids unnecessary OCR. When the file is a scan, image-heavy PDF, or low-quality
+              document, Paperwise falls back to OCR based on the mode you choose in Settings.
+            </p>
+            <p>
+              There are three main OCR paths:
+            </p>
+            <p>
+              <strong>Local Tesseract</strong> keeps OCR on your machine using <code>tesseract</code> and
+              <code>pdftoppm</code>. This is a good default for privacy-sensitive setups and clean printed scans, but it
+              can struggle more with messy layouts, handwriting, or degraded images.
+            </p>
+            <p>
+              <strong>LLM OCR using your main model connection</strong> sends rendered page images to the same model
+              family you use for the rest of the pipeline. This is convenient when you want one shared provider setup.
+            </p>
+            <p>
+              <strong>Separate OCR model routing</strong> lets you pick a dedicated OCR model independently from metadata
+              extraction and Q&amp;A. This is usually the best setup when you want a fast multimodal model for OCR and a
+              different model for structured extraction or reasoning.
+            </p>
+            <p>
+              For OpenAI-based vision OCR, you can also tune image detail to <code>auto</code>, <code>low</code>, or
+              <code>high</code>. Higher detail can improve difficult scans, but it may increase latency and cost.
+              Paperwise also supports an auto-switch mode so OCR is only used when local extraction looks weak.
             </p>
           </article>
 
