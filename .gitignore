@@ -23,6 +23,7 @@ coverage.xml
 .coverage
 .run/
 .logs/
+.claude/
 *.log
 
 # Editor temp files
