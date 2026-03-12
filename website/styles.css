@@ -372,7 +372,7 @@ h1 span {
 .feature-grid {
   margin-top: 24px;
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -396,6 +396,49 @@ h1 span {
 .feature-card p {
   color: var(--ink-700);
   margin: 10px 0 0;
+}
+
+.config-showcase {
+  display: grid;
+  grid-template-columns: 0.9fr 1.1fr;
+  gap: 18px;
+  align-items: center;
+}
+
+.config-copy {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+  box-shadow: 0 8px 18px rgba(35, 39, 52, 0.06);
+}
+
+.config-copy .section-sub {
+  margin-bottom: 0;
+}
+
+.config-card {
+  margin: 0;
+  background: linear-gradient(145deg, #fff6ef, #f7f8fc);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  padding: 18px;
+  box-shadow: 0 16px 32px rgba(35, 39, 52, 0.09);
+}
+
+.config-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 18px;
+  border: 1px solid #ebe7e0;
+}
+
+.config-card figcaption {
+  padding-top: 12px;
+  color: var(--ink-700);
+  font-weight: 600;
+  font-size: 0.93rem;
 }
 
 .workflow-grid {
@@ -658,7 +701,7 @@ h1 span {
 
 @media (max-width: 1060px) {
   .feature-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .logo-row {
@@ -674,6 +717,7 @@ h1 span {
   }
 
   .workflow-grid,
+  .config-showcase,
   .ask-grid {
     grid-template-columns: 1fr;
   }
