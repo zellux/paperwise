@@ -29,6 +29,7 @@ const searchAddDocsBtn = document.getElementById("searchAddDocsBtn");
 const searchKeywordForm = document.getElementById("searchKeywordForm");
 const searchKeywordInput = document.getElementById("searchKeywordInput");
 const searchKeywordLimitSelect = document.getElementById("searchKeywordLimitSelect");
+const searchSectionHeading = document.querySelector("#section-search > h2");
 const searchResultsMeta = document.getElementById("searchResultsMeta");
 const searchResultsTableBody = document.getElementById("searchResultsTableBody");
 const searchAskForm = document.getElementById("searchAskForm");
@@ -1494,6 +1495,9 @@ function setActiveSearchSection(sectionId) {
   for (const section of searchSubsections) {
     section.classList.toggle("view-hidden", section.id !== nextSectionId);
   }
+  const showSharedHeader = nextSectionId !== "search-section-ask";
+  searchSectionHeading?.classList.toggle("view-hidden", !showSharedHeader);
+  searchResultsMeta?.classList.toggle("view-hidden", !showSharedHeader);
 }
 
 function setActiveSettingsSection(sectionId) {
