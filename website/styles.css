@@ -1151,6 +1151,60 @@ p {
   margin-top: 8px;
 }
 
+.support-model-table {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid rgba(31, 42, 55, 0.16);
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+
+.support-model-table th,
+.support-model-table td {
+  padding: 12px 14px;
+  text-align: left;
+  vertical-align: top;
+  border-right: 1px solid rgba(31, 42, 55, 0.12);
+  border-bottom: 1px solid rgba(31, 42, 55, 0.12);
+}
+
+.support-model-table th:last-child,
+.support-model-table td:last-child {
+  border-right: 0;
+}
+
+.support-model-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.support-model-table th {
+  background: rgba(244, 247, 250, 0.96);
+  color: var(--ink-faint);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.support-model-table td {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.support-model-table code {
+  font-size: 0.84em;
+  background: rgba(32, 93, 199, 0.08);
+  border: 1px solid rgba(32, 93, 199, 0.12);
+  border-radius: 8px;
+  padding: 2px 6px;
+}
+
 .support-help {
   padding-top: 8px;
 }
