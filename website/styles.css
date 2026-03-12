@@ -224,7 +224,7 @@ h3 {
 }
 
 h1 {
-  font-size: clamp(2.75rem, 6.4vw, 4.9rem);
+  font-size: clamp(2.4rem, 4.8vw, 4rem);
 }
 
 h2 {
@@ -262,7 +262,6 @@ p {
 .hero-preview,
 .feature-row,
 .example-card,
-.stat-card,
 .step-card,
 .support-panel,
 .section-card,
@@ -273,8 +272,17 @@ p {
   box-shadow: var(--shadow-soft);
 }
 
+.stat-card {
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+}
+
 .hero-copy {
-  padding: 42px 38px;
+  padding: 42px 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
 }
 
 .hero-lead,
@@ -318,7 +326,10 @@ p {
   display: grid;
   align-content: center;
   gap: 16px;
-  background: linear-gradient(180deg, #fafbfd 0%, #f3f5f9 100%);
+  background: none;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
 }
 
 .hero-panel {
@@ -1280,4 +1291,66 @@ p {
     width: min(96vw, 96vw);
     padding: 12px;
   }
+}
+
+/* ── Icon styles ───────────────────────────── */
+
+/* Inline icons in buttons */
+.btn i,
+.btn svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* GitHub nav link */
+.nav-link-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nav-link-github svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Feature card heading icons */
+.feature-icon {
+  display: inline-block;
+  vertical-align: middle;
+  width: 22px;
+  height: 22px;
+  margin-right: 8px;
+  margin-bottom: 2px;
+  color: var(--blue);
+  flex-shrink: 0;
+}
+
+.feature-card h3 {
+  display: flex;
+  align-items: center;
+}
+
+/* Stat card icons */
+.stat-icon {
+  display: block;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 14px;
+  color: var(--blue);
+  opacity: 0.75;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }

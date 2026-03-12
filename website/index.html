@@ -15,6 +15,7 @@
   <link rel="icon" type="image/png" href="./paperwise-icon.png" />
   <link rel="apple-touch-icon" href="./paperwise-icon.png" />
   <link rel="stylesheet" href="./styles.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 
 <body class="marketing-body">
@@ -30,7 +31,8 @@
         <a class="nav-link" href="./support.html">Support</a>
       </nav>
       <div class="marketing-actions">
-        <a class="nav-link" href="https://github.com/zellux/paperwise" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a class="nav-link nav-link-github" href="https://github.com/zellux/paperwise" target="_blank"
+          rel="noopener noreferrer"><i data-lucide="github"></i>GitHub</a>
       </div>
     </div>
   </header>
@@ -40,14 +42,15 @@
       <div class="site-shell hero-layout">
         <div class="hero-copy">
           <p class="eyebrow">Open source · Self-hosted</p>
-          <h1>Your documents, structured and queryable.</h1>
+          <h1>Documents, structured and queryable.</h1>
           <p class="hero-lead">
             Paperwise helps you OCR, extract, organize, and query documents on your own
             infrastructure. Run it locally, self-host it for your team, and keep full control of your data.
           </p>
           <div class="hero-actions">
-            <a class="btn btn-primary" href="https://github.com/zellux/paperwise" target="_blank" rel="noopener noreferrer">View on GitHub</a>
-            <a class="btn btn-secondary" href="#examples">See examples</a>
+            <a class="btn btn-primary" href="https://github.com/zellux/paperwise" target="_blank"
+              rel="noopener noreferrer"><i data-lucide="github"></i>View on GitHub</a>
+            <a class="btn btn-secondary" href="#examples"><i data-lucide="play-circle"></i>See examples</a>
           </div>
           <p class="hero-note">Open source &middot; Self-hosted &middot; No paid tier</p>
         </div>
@@ -105,18 +108,22 @@
         <div class="stats-container">
           <div class="stats-grid">
             <article class="stat-card">
+              <i data-lucide="file-stack" class="stat-icon"></i>
               <strong>2.4M+</strong>
               <span>Documents processed</span>
             </article>
             <article class="stat-card">
+              <i data-lucide="check-circle-2" class="stat-icon"></i>
               <strong>99.2%</strong>
               <span>Extraction accuracy</span>
             </article>
             <article class="stat-card">
+              <i data-lucide="zap" class="stat-icon"></i>
               <strong>&lt; 3s</strong>
               <span>Avg. retrieval time</span>
             </article>
             <article class="stat-card">
+              <i data-lucide="layers" class="stat-icon"></i>
               <strong>47</strong>
               <span>Document types supported</span>
             </article>
@@ -136,7 +143,7 @@
           <article class="feature-card">
             <div class="feature-text">
               <p class="eyebrow">OCR &amp; extraction accuracy</p>
-              <h3>OCR &amp; Data Extraction</h3>
+              <h3><i data-lucide="scan-text" class="feature-icon"></i>OCR &amp; Data Extraction</h3>
               <p>
                 Go from a 50-page PDF to a structured database in seconds. Paperwise
                 automatically switches between local OCR and LLM-based OCR depending
@@ -175,7 +182,7 @@
                 <span class="eyebrow-icon" aria-hidden="true"></span>
                 47 document types supported
               </p>
-              <h3>Smart Organization</h3>
+              <h3><i data-lucide="tags" class="feature-icon"></i>Smart Organization</h3>
               <p>
                 Auto-tag documents by type, date, entity, and custom taxonomy. Build
                 filterable views across thousands of files without lifting a finger.
@@ -203,7 +210,7 @@
           <article class="feature-card">
             <div class="feature-text">
               <p class="eyebrow">Source-backed answers</p>
-              <h3>Grounded Q&amp;A</h3>
+              <h3><i data-lucide="message-circle-more" class="feature-icon"></i>Grounded Q&amp;A</h3>
               <p>
                 Ask natural language questions and get answers sourced directly from
                 your documents. Every response links back to the exact page and paragraph.
@@ -221,7 +228,7 @@
           <article class="feature-card feature-card-models">
             <div class="feature-text">
               <p class="eyebrow">3 configurable model slots</p>
-              <h3>Task-Specific Models</h3>
+              <h3><i data-lucide="cpu" class="feature-icon"></i>Task-Specific Models</h3>
               <p>
                 Configure different AI models for OCR, extraction, and Q&amp;A. Use fast models
                 for bulk processing and premium models for high-stakes analysis.
@@ -394,9 +401,11 @@
       <div class="site-shell">
         <div class="cta-card cta-card-centered">
           <h2>Ready to self-host your document stack?</h2>
-          <p>Clone the repo, run it locally or on your own infrastructure, and keep your document workflows under your control.</p>
+          <p>Clone the repo, run it locally or on your own infrastructure, and keep your document workflows under your
+            control.</p>
           <div class="cta-actions">
-            <a class="btn btn-light" href="https://github.com/zellux/paperwise" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+            <a class="btn btn-light" href="https://github.com/zellux/paperwise" target="_blank"
+              rel="noopener noreferrer"><i data-lucide="github"></i>View on GitHub</a>
           </div>
           <p class="cta-note">Open source and self-hosted</p>
         </div>
@@ -487,6 +496,7 @@
       });
     })();
   </script>
+  <script>lucide.createIcons();</script>
 </body>
 
 </html>
