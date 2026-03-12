@@ -71,6 +71,35 @@
           </article>
 
           <article class="faq-item">
+            <h3>Which AI models should I use for OCR, extraction, and Q&amp;A?</h3>
+            <p>
+              If you want one strong default, start with <strong>Gemini 2.5 Flash</strong>. It is the best general
+              starting point for Paperwise because it is fast, multimodal, and well suited to large-volume document
+              work.
+            </p>
+            <p>
+              For task-specific tuning, we recommend:
+            </p>
+            <ul>
+              <li><strong>OCR:</strong> <code>gemini-2.5-flash</code> for scanned PDFs and image-heavy documents.</li>
+              <li><strong>Metadata extraction:</strong> <code>gpt-5-mini</code> for reliable structured extraction with
+                strong quality-to-cost balance.</li>
+              <li><strong>Grounded Q&amp;A:</strong> <code>gpt-5.1</code> or <code>gemini-2.5-pro</code> for harder
+                questions that require synthesis across many chunks.</li>
+              <li><strong>Budget / bulk jobs:</strong> <code>gpt-5-nano</code> or <code>gemini-2.5-flash-lite</code>
+                for lighter classification and high-throughput workloads.</li>
+            </ul>
+            <p>
+              If your documents are mostly clean text PDFs, start cheap. If they are scans, forms, or mixed media,
+              prioritize Gemini for OCR and upgrade Q&amp;A separately only if answer quality needs more depth. See the
+              latest provider docs for current model availability:
+              <a href="https://platform.openai.com/docs/models" target="_blank" rel="noopener noreferrer">OpenAI models</a>
+              and
+              <a href="https://ai.google.dev/gemini-api/docs/models/gemini" target="_blank" rel="noopener noreferrer">Gemini models</a>.
+            </p>
+          </article>
+
+          <article class="faq-item">
             <h3>Why does OCR sometimes time out on dense PDFs?</h3>
             <p>
               Large page images can take longer to process. Paperwise logs per-page OCR progress and retries timed-out
