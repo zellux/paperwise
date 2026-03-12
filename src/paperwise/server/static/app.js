@@ -753,6 +753,14 @@ function renderTaskRoutingControls() {
 }
 
 function getSuggestedTestModel(connectionId) {
+  const connection = getConnectionById(connectionId);
+  if (!connection) {
+    return "";
+  }
+  const connectionDefaultModel = String(connection.default_model || "").trim();
+  if (connectionDefaultModel) {
+    return connectionDefaultModel;
+  }
   const metadataSettings = getResolvedTaskSettings("metadata");
   if (metadataSettings?.connection_id === connectionId && metadataSettings.model) {
     return metadataSettings.model;
@@ -765,11 +773,7 @@ function getSuggestedTestModel(connectionId) {
   if (ocrSettings?.connection_id === connectionId && ocrSettings.model) {
     return ocrSettings.model;
   }
-  const connection = getConnectionById(connectionId);
-  if (!connection) {
-    return "";
-  }
-  return String(connection.default_model || "").trim() || getLlmProviderDefaults(connection.provider)?.model || "";
+  return getLlmProviderDefaults(connection.provider)?.model || "";
 }
 
 async function testConnection(connectionId, buttonEl) {
