@@ -339,6 +339,29 @@ function getOcrLlmProviderDefaults(provider) {
   return OCR_LLM_PROVIDER_DEFAULTS[normalized] || null;
 }
 
+function providerUsesManagedBaseUrl(provider) {
+  const normalized = normalizeLlmProvider(provider);
+  return normalized === "openai" || normalized === "gemini";
+}
+
+function providerShowsBaseUrlField(provider) {
+  return !providerUsesManagedBaseUrl(provider);
+}
+
+function getConnectionBaseUrlHelpText(provider) {
+  const normalized = normalizeLlmProvider(provider);
+  if (normalized === "gemini") {
+    return "Uses Google's default Gemini API endpoint automatically.";
+  }
+  if (normalized === "openai") {
+    return "Uses OpenAI's default API endpoint automatically.";
+  }
+  if (normalized === "custom") {
+    return "Required for OpenAI-compatible providers.";
+  }
+  return "";
+}
+
 function normalizeOcrProvider(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (SUPPORTED_OCR_PROVIDERS.includes(normalized)) {
@@ -495,6 +518,9 @@ function normalizeConnection(connection, index = 0) {
   }
   if (!normalized.name) {
     normalized.name = provider ? provider[0].toUpperCase() + provider.slice(1) : `Connection ${index + 1}`;
+  }
+  if (providerUsesManagedBaseUrl(provider)) {
+    normalized.base_url = "";
   }
   return normalized;
 }
@@ -781,6 +807,11 @@ function renderConnectionsList() {
   settingsConnectionsList.innerHTML = llmConnections
     .map((connection, index) => {
       const status = connectionTestStatuses.get(connection.id) || { message: "", tone: "" };
+      const showBaseUrlField = providerShowsBaseUrlField(connection.provider);
+      const baseUrlHelpText = getConnectionBaseUrlHelpText(connection.provider);
+      const defaultBaseUrl = getLlmProviderDefaults(connection.provider)?.base_url
+        || getOcrLlmProviderDefaults(connection.provider)?.base_url
+        || "";
       return `
         <section class="settings-connection-card" data-connection-id="${escapeHtml(connection.id)}">
           <div class="settings-connection-header">
@@ -797,8 +828,15 @@ function renderConnectionsList() {
               <option value="gemini"${connection.provider === "gemini" ? " selected" : ""}>Gemini</option>
               <option value="custom"${connection.provider === "custom" ? " selected" : ""}>Custom (OpenAI-Compatible)</option>
             </select>
+            ${showBaseUrlField
+              ? `
             <label class="label" for="settingsConnectionBaseUrl-${escapeHtml(connection.id)}">Base URL</label>
             <input id="settingsConnectionBaseUrl-${escapeHtml(connection.id)}" data-connection-field="base_url" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.base_url)}" placeholder="https://api.openai.com/v1" />
+            `
+              : `
+            <span class="label">Base URL</span>
+            <div class="settings-group-note">${escapeHtml(baseUrlHelpText || defaultBaseUrl)}</div>
+            `}
             <label class="label" for="settingsConnectionApiKey-${escapeHtml(connection.id)}">API Key</label>
             <input id="settingsConnectionApiKey-${escapeHtml(connection.id)}" data-connection-field="api_key" data-connection-id="${escapeHtml(connection.id)}" type="password" value="${escapeHtml(connection.api_key)}" placeholder="sk-..." />
             <label class="label" for="settingsConnectionDefaultModel-${escapeHtml(connection.id)}">Default Model</label>
@@ -826,7 +864,9 @@ function renderConnectionsList() {
       if (field === "provider") {
         connection.provider = normalizeLlmProvider(connection.provider);
         const defaults = getLlmProviderDefaults(connection.provider) || getOcrLlmProviderDefaults(connection.provider);
-        if (!connection.base_url && defaults?.base_url) {
+        if (providerUsesManagedBaseUrl(connection.provider)) {
+          connection.base_url = "";
+        } else if (!connection.base_url && defaults?.base_url && !providerUsesManagedBaseUrl(connection.provider)) {
           connection.base_url = defaults.base_url;
         }
         if (!connection.default_model && defaults?.model) {
