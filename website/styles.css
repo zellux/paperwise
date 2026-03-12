@@ -453,11 +453,58 @@ h1 span {
   gap: 10px;
 }
 
-.ask-grid {
+.ask-carousel {
   margin-top: 24px;
+  position: relative;
+}
+
+.ask-carousel-controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.ask-nav {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-900);
+  font: inherit;
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(35, 39, 52, 0.08);
+  transition: transform 0.18s ease, background-color 0.18s ease;
+}
+
+.ask-nav:hover {
+  background: #f6f7fb;
+  transform: translateY(-1px);
+}
+
+.ask-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
   gap: 14px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  cursor: grab;
+  user-select: none;
+  touch-action: pan-y;
+}
+
+.ask-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.ask-grid.is-dragging {
+  cursor: grabbing;
+  scroll-snap-type: none;
 }
 
 .ask-card {
@@ -467,6 +514,7 @@ h1 span {
   border-radius: var(--radius-lg);
   overflow: hidden;
   box-shadow: 0 10px 22px rgba(35, 39, 52, 0.08);
+  scroll-snap-align: start;
 }
 
 .ask-card img {
@@ -613,10 +661,6 @@ h1 span {
     grid-template-columns: 1fr 1fr;
   }
 
-  .ask-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
   .logo-row {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -686,5 +730,9 @@ h1 span {
 
   .ask-card img {
     height: 280px;
+  }
+
+  .ask-carousel-controls {
+    justify-content: center;
   }
 }

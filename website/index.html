@@ -145,31 +145,41 @@
           These are real examples from the Paperwise grounded question workflow. Answers are based on your documents
           and include source-backed context.
         </p>
-        <div class="ask-grid">
-          <figure class="ask-card">
-            <img
-              src="./sample-target-range.jpg"
-              alt="Example grounded answer showing target range summary from documents"
-              loading="lazy"
-            />
-            <figcaption>Example 1: Target range question with grounded response.</figcaption>
-          </figure>
-          <figure class="ask-card">
-            <img
-              src="./sample-sonic-billing.jpg"
-              alt="Example grounded answer showing billing detail retrieval from documents"
-              loading="lazy"
-            />
-            <figcaption>Example 2: Sonic billing question answered from uploaded docs.</figcaption>
-          </figure>
-          <figure class="ask-card">
-            <img
-              src="./sample-domain-list.jpg"
-              alt="Example grounded answer showing a domain list extracted and summarized from documents"
-              loading="lazy"
-            />
-            <figcaption>Example 3: Domain list question answered with grounded document context.</figcaption>
-          </figure>
+        <div class="ask-carousel" data-carousel>
+          <div class="ask-carousel-controls">
+            <button class="ask-nav ask-nav-prev" type="button" aria-label="Show previous grounded example" data-dir="-1">
+              &larr;
+            </button>
+            <button class="ask-nav ask-nav-next" type="button" aria-label="Show next grounded example" data-dir="1">
+              &rarr;
+            </button>
+          </div>
+          <div class="ask-grid" data-carousel-track>
+            <figure class="ask-card">
+              <img
+                src="./sample-target-range.jpg"
+                alt="Example grounded answer showing target range summary from documents"
+                loading="lazy"
+              />
+              <figcaption>Example 1: Target range question with grounded response.</figcaption>
+            </figure>
+            <figure class="ask-card">
+              <img
+                src="./sample-sonic-billing.jpg"
+                alt="Example grounded answer showing billing detail retrieval from documents"
+                loading="lazy"
+              />
+              <figcaption>Example 2: Sonic billing question answered from uploaded docs.</figcaption>
+            </figure>
+            <figure class="ask-card">
+              <img
+                src="./sample-domain-list.jpg"
+                alt="Example grounded answer showing a domain list extracted and summarized from documents"
+                loading="lazy"
+              />
+              <figcaption>Example 3: Domain list question answered with grounded document context.</figcaption>
+            </figure>
+          </div>
         </div>
       </div>
     </section>
@@ -194,5 +204,70 @@
         </nav>
       </div>
     </footer>
+    <script>
+      (() => {
+        const carousels = document.querySelectorAll("[data-carousel]");
+
+        carousels.forEach((carousel) => {
+          const track = carousel.querySelector("[data-carousel-track]");
+          const buttons = carousel.querySelectorAll("[data-dir]");
+
+          if (!track) {
+            return;
+          }
+
+          const cardWidth = () => {
+            const card = track.querySelector(".ask-card");
+            if (!card) {
+              return track.clientWidth;
+            }
+            const gap = Number.parseFloat(window.getComputedStyle(track).columnGap || window.getComputedStyle(track).gap || "0");
+            return card.getBoundingClientRect().width + gap;
+          };
+
+          buttons.forEach((button) => {
+            button.addEventListener("click", () => {
+              const dir = Number.parseInt(button.dataset.dir || "0", 10);
+              track.scrollBy({ left: cardWidth() * dir, behavior: "smooth" });
+            });
+          });
+
+          let pointerActive = false;
+          let startX = 0;
+          let startScrollLeft = 0;
+
+          track.addEventListener("pointerdown", (event) => {
+            pointerActive = true;
+            startX = event.clientX;
+            startScrollLeft = track.scrollLeft;
+            track.classList.add("is-dragging");
+            track.setPointerCapture(event.pointerId);
+          });
+
+          track.addEventListener("pointermove", (event) => {
+            if (!pointerActive) {
+              return;
+            }
+            const deltaX = event.clientX - startX;
+            track.scrollLeft = startScrollLeft - deltaX;
+          });
+
+          const stopDragging = (event) => {
+            if (!pointerActive) {
+              return;
+            }
+            pointerActive = false;
+            track.classList.remove("is-dragging");
+            if (event) {
+              track.releasePointerCapture(event.pointerId);
+            }
+          };
+
+          track.addEventListener("pointerup", stopDragging);
+          track.addEventListener("pointercancel", stopDragging);
+          track.addEventListener("pointerleave", stopDragging);
+        });
+      })();
+    </script>
   </body>
 </html>
