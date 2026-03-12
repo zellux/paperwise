@@ -328,7 +328,7 @@
       </div>
     </footer>
 
-    <div class="lightbox" id="screenshotLightbox" aria-hidden="true">
+    <div class="lightbox" id="screenshotLightbox" aria-hidden="true" inert>
       <div class="lightbox-backdrop" data-lightbox-close></div>
       <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-label="Expanded screenshot preview">
         <button class="lightbox-close" type="button" aria-label="Close screenshot preview" data-lightbox-close>
@@ -342,24 +342,37 @@
       (() => {
         const lightbox = document.getElementById("screenshotLightbox");
         const lightboxImage = document.getElementById("lightboxImage");
+        const lightboxClose = lightbox?.querySelector("[data-lightbox-close]");
         const zoomButtons = document.querySelectorAll("[data-zoom-src]");
         const closeButtons = document.querySelectorAll("[data-lightbox-close]");
+        let lastFocusedElement = null;
 
         if (!lightbox || !lightboxImage) {
           return;
         }
 
         const openLightbox = (src, alt) => {
+          lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
           lightboxImage.src = src;
           lightboxImage.alt = alt;
+          lightbox.removeAttribute("inert");
           lightbox.classList.add("is-open");
           lightbox.setAttribute("aria-hidden", "false");
           document.body.classList.add("lightbox-open");
+          if (lightboxClose instanceof HTMLElement) {
+            lightboxClose.focus();
+          }
         };
 
         const closeLightbox = () => {
+          if (lastFocusedElement instanceof HTMLElement) {
+            lastFocusedElement.focus({ preventScroll: true });
+          } else if (document.activeElement instanceof HTMLElement && lightbox.contains(document.activeElement)) {
+            document.activeElement.blur();
+          }
           lightbox.classList.remove("is-open");
           lightbox.setAttribute("aria-hidden", "true");
+          lightbox.setAttribute("inert", "");
           lightboxImage.src = "";
           lightboxImage.alt = "";
           document.body.classList.remove("lightbox-open");
