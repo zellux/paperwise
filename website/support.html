@@ -8,17 +8,17 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
     <link rel="icon" type="image/png" href="./paperwise-icon.png" />
     <link rel="apple-touch-icon" href="./paperwise-icon.png" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
+  <body class="marketing-body">
     <div class="hero-wrap hero-wrap-support">
-      <header class="topbar">
-        <div class="site-shell topbar-inner">
+      <header class="marketing-header">
+        <div class="site-shell nav-shell">
           <a class="brand" href="./index.html" aria-label="Paperwise home">
             <img
               class="brand-mark"
@@ -30,17 +30,19 @@
             />
             <span class="brand-name">Paperwise</span>
           </a>
-          <nav class="nav" aria-label="Main">
+          <nav class="marketing-nav" aria-label="Main">
             <a class="nav-link" href="./index.html">Home</a>
             <a class="nav-link" href="./support.html">Support</a>
-            <a class="nav-link nav-link-outline" href="/ui/documents">Sign In</a>
-            <a class="nav-link nav-link-primary" href="/ui/documents">Open App</a>
           </nav>
+          <div class="marketing-actions">
+            <a class="nav-link nav-link-outline" href="/ui/documents">Sign in</a>
+            <a class="nav-link nav-link-primary" href="/ui/documents">Open app</a>
+          </div>
         </div>
       </header>
 
       <main class="site-shell support-main">
-        <section class="hero-card support-hero">
+        <section class="support-hero">
           <p class="tag">Support</p>
           <h1>Answers for setup, troubleshooting, and daily use.</h1>
           <p class="lead">
@@ -121,16 +123,23 @@
       </section>
     </main>
 
-    <footer class="footer">
-      <div class="site-shell footer-inner">
-        <div>
-          <strong>Paperwise</strong>
-          <p>Support and troubleshooting resources for your document operations workflow.</p>
-        </div>
-        <nav class="footer-links" aria-label="Footer">
+    <footer class="marketing-footer">
+      <div class="site-shell footer-row">
+        <a class="brand" href="./index.html" aria-label="Paperwise home">
+          <img
+            class="brand-mark"
+            src="./paperwise-icon.png"
+            alt=""
+            aria-hidden="true"
+            width="32"
+            height="32"
+          />
+          <span class="brand-name">Paperwise</span>
+        </a>
+        <nav class="footer-nav" aria-label="Footer">
           <a href="./index.html">Home</a>
           <a href="./support.html">Support</a>
-          <a href="/ui/documents">Open App</a>
+          <a href="/ui/documents">Open app</a>
         </nav>
       </div>
     </footer>

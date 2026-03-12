@@ -3,261 +3,331 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Paperwise | AI Document Ops</title>
+    <title>Paperwise | Structured and Queryable Documents</title>
     <meta
       name="description"
-      content="Paperwise automates document intake, OCR, and metadata extraction so teams can work faster with fewer manual steps."
+      content="Paperwise turns uploaded documents into structured, searchable, grounded knowledge with OCR, extraction, and task-specific AI configuration."
     />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
     <link rel="icon" type="image/png" href="./paperwise-icon.png" />
     <link rel="apple-touch-icon" href="./paperwise-icon.png" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
-  <body>
-    <div class="hero-wrap">
-      <header class="topbar">
-        <div class="site-shell topbar-inner">
-          <a class="brand" href="./index.html" aria-label="Paperwise home">
-            <img
-              class="brand-mark"
-              src="./paperwise-icon.png"
-              alt=""
-              aria-hidden="true"
-              width="32"
-              height="32"
-            />
-            <span class="brand-name">Paperwise</span>
-          </a>
-          <nav class="nav" aria-label="Main">
-            <a class="nav-link" href="#capabilities">Capabilities</a>
-            <a class="nav-link" href="#workflow">Workflow</a>
-            <a class="nav-link" href="#ask-docs">Ask My Docs</a>
-            <a class="nav-link" href="./support.html">Support</a>
-            <a class="nav-link nav-link-outline" href="/ui/documents">Sign In</a>
-            <a class="nav-link nav-link-primary" href="/ui/documents">Book Demo</a>
-          </nav>
-        </div>
-      </header>
-
-      <main class="site-shell">
-        <section class="hero-card">
-          <p class="tag">Document Intelligence Platform</p>
-          <h1>Get sharper <span>understanding</span> from every document.</h1>
-          <p class="lead">
-            Paperwise ingests files, extracts structured fields, and keeps your team aligned with one clean workflow
-            from upload to searchable records.
-          </p>
-          <div class="cta-row">
-            <a class="btn btn-primary" href="/ui/documents">Get Started</a>
-            <a class="btn btn-secondary" href="#capabilities">See Features</a>
-          </div>
-        </section>
-
-        <section class="hero-visual" aria-label="Dashboard preview">
-          <div class="desk-card desk-card-main">
-            <div class="desk-window"></div>
-            <div class="desk-chart"></div>
-            <div class="desk-lines"></div>
-          </div>
-          <div class="desk-card desk-card-float"></div>
-          <div class="paper paper-a"></div>
-          <div class="paper paper-b"></div>
-        </section>
-      </main>
-    </div>
-
-    <section class="partners">
-      <div class="site-shell">
-        <p>Trusted by operations teams at</p>
-        <div class="logo-row" aria-label="Customer logos">
-          <span>Sunline</span>
-          <span>Northfork</span>
-          <span>Omnibase</span>
-          <span>Capwell</span>
-          <span>Greyline</span>
-        </div>
-      </div>
-    </section>
-
-    <section id="capabilities" class="section section-soft">
-      <div class="site-shell">
-        <p class="section-tag">Operations</p>
-        <h2>What sets Paperwise apart?</h2>
-        <p class="section-sub">
-          The platform combines OCR, metadata extraction, and a searchable repository so you can move from files to
-          decisions in minutes.
-        </p>
-        <div class="feature-grid">
-          <article class="feature-card">
-            <h3>Automated ingestion</h3>
-            <p>Upload PDFs, docs, text files, and let Paperwise run parsing pipelines instantly.</p>
-          </article>
-          <article class="feature-card">
-            <h3>Accurate extraction</h3>
-            <p>Use LLM providers and OCR modes that best match your documents and quality needs.</p>
-          </article>
-          <article class="feature-card">
-            <h3>Shared context</h3>
-            <p>Organize everything by tags, correspondents, and types so teams stay aligned.</p>
-          </article>
-          <article class="feature-card">
-            <h3>Fast retrieval</h3>
-            <p>Search, filter, and ask grounded questions over your own document history.</p>
-          </article>
-          <article class="feature-card">
-            <h3>Task-specific models</h3>
-            <p>Customize provider and model settings separately for metadata, OCR, and grounded answers.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="site-shell config-showcase">
-        <article class="config-copy">
-          <p class="section-tag">Model controls</p>
-          <h2>Customizable model config for different tasks.</h2>
-          <p class="section-sub">
-            Paperwise does not force one model across the entire pipeline. You can choose the right provider and model
-            setup for OCR, extraction, and grounded Q&amp;A independently.
-          </p>
-          <ul class="check-list">
-            <li>Use different models for OCR and metadata parsing</li>
-            <li>Adjust grounded answer settings without affecting ingestion</li>
-            <li>Keep provider choices aligned to cost, speed, or accuracy</li>
-          </ul>
-        </article>
-        <figure class="config-card">
+  <body class="marketing-body">
+    <header class="marketing-header">
+      <div class="site-shell nav-shell">
+        <a class="brand" href="./index.html" aria-label="Paperwise home">
           <img
-            src="./model-config.jpg"
-            alt="Paperwise model configuration screen showing separate model settings for different tasks"
-            loading="lazy"
+            class="brand-mark"
+            src="./paperwise-icon.png"
+            alt=""
+            aria-hidden="true"
+            width="32"
+            height="32"
           />
-          <figcaption>Separate model controls for each document task in one settings flow.</figcaption>
-        </figure>
+          <span class="brand-name">Paperwise</span>
+        </a>
+        <nav class="marketing-nav" aria-label="Main">
+          <a class="nav-link" href="#features">Features</a>
+          <a class="nav-link" href="#examples">Examples</a>
+          <a class="nav-link" href="#steps">How it works</a>
+          <a class="nav-link" href="./support.html">Support</a>
+        </nav>
+        <div class="marketing-actions">
+          <a class="nav-link nav-link-outline" href="/ui/documents">Sign in</a>
+          <a class="nav-link nav-link-primary" href="/ui/documents">Get started</a>
+        </div>
       </div>
-    </section>
+    </header>
 
-    <section id="workflow" class="section">
-      <div class="site-shell workflow-grid">
-        <article class="workflow-panel">
-          <p class="section-tag">How it works</p>
-          <h2>One system for intake, processing, and review.</h2>
-          <p>
-            Receive documents, route them through OCR + metadata, and keep outcomes visible in one queue with clean
-            audit history.
-          </p>
-          <ul class="check-list">
-            <li>Bring your own model keys and providers</li>
-            <li>Track parsing status and token usage</li>
-            <li>Review activity events for every document</li>
-          </ul>
-        </article>
-        <article class="workflow-cards" aria-label="Workflow snapshots">
-          <div class="mini-card mini-a"></div>
-          <div class="mini-card mini-b"></div>
-          <div class="mini-card mini-c"></div>
-          <div class="mini-card mini-d"></div>
-        </article>
-      </div>
-    </section>
-
-    <section id="ask-docs" class="section section-soft">
-      <div class="site-shell site-shell-wide">
-        <p class="section-tag">Grounded QA</p>
-        <h2>Ask My Docs with grounded citations</h2>
-        <p class="section-sub">
-          These are real examples from the Paperwise grounded question workflow. Answers are based on your documents
-          and include source-backed context.
-        </p>
-        <div class="ask-carousel" data-carousel>
-          <div class="ask-carousel-controls">
-            <button class="ask-nav ask-nav-prev" type="button" aria-label="Show previous grounded example" data-dir="-1">
-              &larr;
-            </button>
-            <button class="ask-nav ask-nav-next" type="button" aria-label="Show next grounded example" data-dir="1">
-              &rarr;
-            </button>
+    <main>
+      <section class="hero-section">
+        <div class="site-shell hero-layout">
+          <div class="hero-copy">
+            <p class="eyebrow">AI document operations</p>
+            <h1>Your documents, structured and queryable.</h1>
+            <p class="hero-lead">
+              Upload files, extract metadata, configure models per task, and ask grounded questions over your own
+              documents without manual busywork.
+            </p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="/ui/documents">Get started free</a>
+              <a class="btn btn-secondary" href="#examples">See it in action</a>
+            </div>
+            <p class="hero-note">Built for OCR, extraction, grounded Q&amp;A, and searchable document workflows.</p>
           </div>
-          <div class="ask-grid" data-carousel-track>
-            <figure class="ask-card">
+
+          <div class="hero-preview">
+            <div class="hero-panel hero-panel-large">
+              <div class="panel-head">
+                <span class="panel-pill">Grounded answer</span>
+                <span class="panel-meta">Source-backed</span>
+              </div>
+              <div class="panel-body">
+                <p class="panel-question">What domains are currently listed in our uploaded records?</p>
+                <p class="panel-answer">
+                  Paperwise extracts the relevant rows, summarizes them, and keeps the answer tied to the underlying
+                  document context.
+                </p>
+                <div class="panel-table">
+                  <span>domain list</span>
+                  <span>metadata</span>
+                  <span>citations</span>
+                </div>
+              </div>
+            </div>
+            <div class="hero-panel hero-panel-stack">
+              <div class="panel-head">
+                <span class="panel-pill">Task models</span>
+                <span class="panel-meta">Per workflow</span>
+              </div>
+              <ul class="panel-list">
+                <li>OCR model</li>
+                <li>Metadata model</li>
+                <li>Grounded Q&amp;A model</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stats-section">
+        <div class="site-shell">
+          <div class="section-heading">
+            <h2>Built for scale</h2>
+            <p>Designed for teams that need fast retrieval, configurable pipelines, and clean operational visibility.</p>
+          </div>
+          <div class="stats-grid">
+            <article class="stat-card">
+              <strong>2.4M+</strong>
+              <span>Rows and fields processed across documents</span>
+            </article>
+            <article class="stat-card">
+              <strong>99.2%</strong>
+              <span>Structured extraction coverage on supported layouts</span>
+            </article>
+            <article class="stat-card">
+              <strong>&lt; 3s</strong>
+              <span>Fast retrieval for common grounded document questions</span>
+            </article>
+            <article class="stat-card">
+              <strong>47</strong>
+              <span>Operational filters, statuses, and organization paths</span>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="features" class="feature-section">
+        <div class="site-shell">
+          <div class="section-heading">
+            <h2>From upload to insight in minutes</h2>
+            <p>Every step stays in one system: ingestion, OCR, extraction, organization, grounded retrieval, and model control.</p>
+          </div>
+          <div class="feature-list">
+            <article class="feature-row">
+              <div class="feature-text">
+                <p class="eyebrow">OCR and extraction</p>
+                <h3>OCR plus field extraction</h3>
+                <p>
+                  Bring in PDFs and scanned files, run OCR, and turn raw text into usable metadata without switching
+                  between tools.
+                </p>
+              </div>
+              <div class="feature-shot">
+                <button
+                  class="shot-button"
+                  type="button"
+                  data-zoom-src="./sample-target-range.jpg"
+                  data-zoom-alt="Grounded answer example showing target range summary from documents"
+                  aria-label="Open OCR and extraction example"
+                >
+                  <img src="./sample-target-range.jpg" alt="Grounded answer example for target range" loading="lazy" />
+                </button>
+              </div>
+            </article>
+
+            <article class="feature-row">
+              <div class="feature-text">
+                <p class="eyebrow">Model controls</p>
+                <h3>Customizable models per task</h3>
+                <p>
+                  Configure one model for OCR, another for metadata parsing, and a different one for grounded answers.
+                  Match cost, speed, and quality to the exact job.
+                </p>
+              </div>
+              <div class="feature-shot">
+                <button
+                  class="shot-button"
+                  type="button"
+                  data-zoom-src="./model-config.jpg"
+                  data-zoom-alt="Paperwise model configuration screen showing separate model settings for different tasks"
+                  aria-label="Open model configuration example"
+                >
+                  <img src="./model-config.jpg" alt="Model configuration screen" loading="lazy" />
+                </button>
+              </div>
+            </article>
+
+            <article class="feature-row">
+              <div class="feature-text">
+                <p class="eyebrow">Grounded retrieval</p>
+                <h3>Ask your docs, not a generic chatbot</h3>
+                <p>
+                  Get answers built from your uploaded documents with source-backed context, so retrieval stays grounded
+                  in the records you actually manage.
+                </p>
+              </div>
+              <div class="feature-shot">
+                <button
+                  class="shot-button"
+                  type="button"
+                  data-zoom-src="./sample-sonic-billing.jpg"
+                  data-zoom-alt="Grounded answer example showing billing detail retrieval from documents"
+                  aria-label="Open grounded billing example"
+                >
+                  <img src="./sample-sonic-billing.jpg" alt="Grounded billing answer example" loading="lazy" />
+                </button>
+              </div>
+            </article>
+
+            <article class="feature-row">
+              <div class="feature-text">
+                <p class="eyebrow">Queryable records</p>
+                <h3>Searchable outputs and structured lists</h3>
+                <p>
+                  Organize results by tags, correspondents, types, and extracted fields, then search or filter your
+                  workspace without digging through folders manually.
+                </p>
+              </div>
+              <div class="feature-shot">
+                <button
+                  class="shot-button"
+                  type="button"
+                  data-zoom-src="./sample-domain-list.jpg"
+                  data-zoom-alt="Grounded answer example showing a domain list extracted and summarized from documents"
+                  aria-label="Open domain list example"
+                >
+                  <img src="./sample-domain-list.jpg" alt="Queryable domain list example" loading="lazy" />
+                </button>
+              </div>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="examples" class="examples-section">
+        <div class="site-shell">
+          <div class="section-heading">
+            <h2>See it in action</h2>
+            <p>Preview the actual UI: grounded answers, extracted fields, and configuration screens taken from the product.</p>
+          </div>
+          <div class="examples-grid">
+            <article class="example-card example-card-wide">
               <button
-                class="ask-zoom-trigger"
+                class="shot-button"
                 type="button"
-                aria-label="Open Example 1 screenshot in a larger view"
-                data-zoom-src="./sample-target-range.jpg"
-                data-zoom-alt="Example grounded answer showing target range summary from documents"
-              >
-                <img
-                  src="./sample-target-range.jpg"
-                  alt="Example grounded answer showing target range summary from documents"
-                  loading="lazy"
-                />
-              </button>
-              <figcaption>Example 1: Target range question with grounded response.</figcaption>
-            </figure>
-            <figure class="ask-card">
-              <button
-                class="ask-zoom-trigger"
-                type="button"
-                aria-label="Open Example 2 screenshot in a larger view"
                 data-zoom-src="./sample-sonic-billing.jpg"
-                data-zoom-alt="Example grounded answer showing billing detail retrieval from documents"
+                data-zoom-alt="Expanded screenshot of grounded billing answer and table results"
+                aria-label="Open billing answer screenshot"
               >
-                <img
-                  src="./sample-sonic-billing.jpg"
-                  alt="Example grounded answer showing billing detail retrieval from documents"
-                  loading="lazy"
-                />
+                <img src="./sample-sonic-billing.jpg" alt="Billing grounded answer screenshot" loading="lazy" />
               </button>
-              <figcaption>Example 2: Sonic billing question answered from uploaded docs.</figcaption>
-            </figure>
-            <figure class="ask-card">
+            </article>
+            <article class="example-card">
               <button
-                class="ask-zoom-trigger"
+                class="shot-button"
                 type="button"
-                aria-label="Open Example 3 screenshot in a larger view"
-                data-zoom-src="./sample-domain-list.jpg"
-                data-zoom-alt="Example grounded answer showing a domain list extracted and summarized from documents"
+                data-zoom-src="./sample-target-range.jpg"
+                data-zoom-alt="Expanded screenshot of target range grounded answer"
+                aria-label="Open target range screenshot"
               >
-                <img
-                  src="./sample-domain-list.jpg"
-                  alt="Example grounded answer showing a domain list extracted and summarized from documents"
-                  loading="lazy"
-                />
+                <img src="./sample-target-range.jpg" alt="Target range screenshot" loading="lazy" />
               </button>
-              <figcaption>Example 3: Domain list question answered with grounded document context.</figcaption>
-            </figure>
+            </article>
+            <article class="example-card">
+              <button
+                class="shot-button"
+                type="button"
+                data-zoom-src="./model-config.jpg"
+                data-zoom-alt="Expanded screenshot of model configuration screen"
+                aria-label="Open model config screenshot"
+              >
+                <img src="./model-config.jpg" alt="Model config screenshot" loading="lazy" />
+              </button>
+            </article>
           </div>
         </div>
-      </div>
-    </section>
+      </section>
 
-    <section class="cta-band">
-      <div class="site-shell cta-band-inner">
-        <h2>Ready for AI-powered document operations?</h2>
-        <a class="btn btn-dark" href="/ui/documents">Open Paperwise</a>
-      </div>
-    </section>
-
-    <footer class="footer">
-      <div class="site-shell footer-inner">
-        <div>
-          <strong>Paperwise</strong>
-          <p>Bring order to high-volume documents with precise extraction and searchable context.</p>
+      <section id="steps" class="steps-section">
+        <div class="site-shell">
+          <div class="section-heading">
+            <h2>Three steps. Zero manual work.</h2>
+            <p>Set up the workflow once, then let Paperwise handle ingestion, extraction, and retrieval.</p>
+          </div>
+          <div class="steps-grid">
+            <article class="step-card">
+              <span class="step-icon">1</span>
+              <h3>Upload your files</h3>
+              <p>Send PDFs, docs, and text files into one workspace with user-level access controls.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-icon">2</span>
+              <h3>Process and structure</h3>
+              <p>Run OCR, parse metadata, apply model-specific settings, and organize documents automatically.</p>
+            </article>
+            <article class="step-card">
+              <span class="step-icon">3</span>
+              <h3>Query and act</h3>
+              <p>Search, filter, and ask grounded questions over the resulting document set in minutes.</p>
+            </article>
+          </div>
         </div>
-        <nav class="footer-links" aria-label="Footer">
+      </section>
+
+      <section class="cta-section">
+        <div class="site-shell">
+          <div class="cta-card">
+            <div>
+              <h2>Ready to stop searching?</h2>
+              <p>Turn document-heavy workflows into a structured, queryable system your team can trust.</p>
+            </div>
+            <div class="cta-actions">
+              <a class="btn btn-light" href="/ui/documents">Start free</a>
+              <a class="btn btn-ghost-light" href="./support.html">Read support</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="marketing-footer">
+      <div class="site-shell footer-row">
+        <a class="brand" href="./index.html" aria-label="Paperwise home">
+          <img
+            class="brand-mark"
+            src="./paperwise-icon.png"
+            alt=""
+            aria-hidden="true"
+            width="32"
+            height="32"
+          />
+          <span class="brand-name">Paperwise</span>
+        </a>
+        <nav class="footer-nav" aria-label="Footer">
           <a href="./index.html">Home</a>
           <a href="./support.html">Support</a>
-          <a href="/ui/documents">Open App</a>
+          <a href="/ui/documents">Open app</a>
         </nav>
       </div>
     </footer>
+
     <div class="lightbox" id="screenshotLightbox" aria-hidden="true">
       <div class="lightbox-backdrop" data-lightbox-close></div>
       <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-label="Expanded screenshot preview">
@@ -267,121 +337,49 @@
         <img id="lightboxImage" src="" alt="" />
       </div>
     </div>
+
     <script>
       (() => {
-        const carousels = document.querySelectorAll("[data-carousel]");
-
-        carousels.forEach((carousel) => {
-          const track = carousel.querySelector("[data-carousel-track]");
-          const buttons = carousel.querySelectorAll("[data-dir]");
-
-          if (!track) {
-            return;
-          }
-
-          const cardWidth = () => {
-            const card = track.querySelector(".ask-card");
-            if (!card) {
-              return track.clientWidth;
-            }
-            const gap = Number.parseFloat(window.getComputedStyle(track).columnGap || window.getComputedStyle(track).gap || "0");
-            return card.getBoundingClientRect().width + gap;
-          };
-
-          buttons.forEach((button) => {
-            button.addEventListener("click", () => {
-              const dir = Number.parseInt(button.dataset.dir || "0", 10);
-              track.scrollBy({ left: cardWidth() * dir, behavior: "smooth" });
-            });
-          });
-
-          let pointerActive = false;
-          let startX = 0;
-          let startScrollLeft = 0;
-          let dragDistance = 0;
-
-          track.addEventListener("pointerdown", (event) => {
-            pointerActive = true;
-            startX = event.clientX;
-            startScrollLeft = track.scrollLeft;
-            dragDistance = 0;
-            track.classList.add("is-dragging");
-            track.setPointerCapture(event.pointerId);
-          });
-
-          track.addEventListener("pointermove", (event) => {
-            if (!pointerActive) {
-              return;
-            }
-            const deltaX = event.clientX - startX;
-            dragDistance = Math.max(dragDistance, Math.abs(deltaX));
-            track.scrollLeft = startScrollLeft - deltaX;
-          });
-
-          const stopDragging = (event) => {
-            if (!pointerActive) {
-              return;
-            }
-            pointerActive = false;
-            track.classList.remove("is-dragging");
-            if (dragDistance > 8) {
-              track.dataset.dragged = "true";
-              window.setTimeout(() => {
-                delete track.dataset.dragged;
-              }, 0);
-            }
-            if (event) {
-              track.releasePointerCapture(event.pointerId);
-            }
-          };
-
-          track.addEventListener("pointerup", stopDragging);
-          track.addEventListener("pointercancel", stopDragging);
-          track.addEventListener("pointerleave", stopDragging);
-        });
-
         const lightbox = document.getElementById("screenshotLightbox");
         const lightboxImage = document.getElementById("lightboxImage");
-        const zoomButtons = document.querySelectorAll(".ask-zoom-trigger");
+        const zoomButtons = document.querySelectorAll("[data-zoom-src]");
         const closeButtons = document.querySelectorAll("[data-lightbox-close]");
 
-        if (lightbox && lightboxImage) {
-          const openLightbox = (src, alt) => {
-            lightboxImage.src = src;
-            lightboxImage.alt = alt;
-            lightbox.classList.add("is-open");
-            lightbox.setAttribute("aria-hidden", "false");
-            document.body.classList.add("lightbox-open");
-          };
-
-          const closeLightbox = () => {
-            lightbox.classList.remove("is-open");
-            lightbox.setAttribute("aria-hidden", "true");
-            lightboxImage.src = "";
-            lightboxImage.alt = "";
-            document.body.classList.remove("lightbox-open");
-          };
-
-          zoomButtons.forEach((button) => {
-            button.addEventListener("click", () => {
-              const track = button.closest("[data-carousel-track]");
-              if (track?.dataset.dragged === "true") {
-                return;
-              }
-              openLightbox(button.dataset.zoomSrc || "", button.dataset.zoomAlt || "");
-            });
-          });
-
-          closeButtons.forEach((button) => {
-            button.addEventListener("click", closeLightbox);
-          });
-
-          document.addEventListener("keydown", (event) => {
-            if (event.key === "Escape" && lightbox.classList.contains("is-open")) {
-              closeLightbox();
-            }
-          });
+        if (!lightbox || !lightboxImage) {
+          return;
         }
+
+        const openLightbox = (src, alt) => {
+          lightboxImage.src = src;
+          lightboxImage.alt = alt;
+          lightbox.classList.add("is-open");
+          lightbox.setAttribute("aria-hidden", "false");
+          document.body.classList.add("lightbox-open");
+        };
+
+        const closeLightbox = () => {
+          lightbox.classList.remove("is-open");
+          lightbox.setAttribute("aria-hidden", "true");
+          lightboxImage.src = "";
+          lightboxImage.alt = "";
+          document.body.classList.remove("lightbox-open");
+        };
+
+        zoomButtons.forEach((button) => {
+          button.addEventListener("click", () => {
+            openLightbox(button.dataset.zoomSrc || "", button.dataset.zoomAlt || "");
+          });
+        });
+
+        closeButtons.forEach((button) => {
+          button.addEventListener("click", closeLightbox);
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && lightbox.classList.contains("is-open")) {
+            closeLightbox();
+          }
+        });
       })();
     </script>
   </body>
