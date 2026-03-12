@@ -556,15 +556,25 @@ h1 span {
 
 .ask-card {
   margin: 0;
-  background: linear-gradient(180deg, #f8f9fc 0%, #ffffff 100%);
+  background: #fff;
   border: 1px solid var(--line);
   border-radius: var(--radius-lg);
   overflow: hidden;
-  box-shadow: 0 10px 22px rgba(35, 39, 52, 0.08);
+  box-shadow: 0 16px 32px rgba(35, 39, 52, 0.09);
   scroll-snap-align: start;
 }
 
-.ask-card img {
+.ask-zoom-trigger {
+  display: block;
+  width: 100%;
+  padding: 18px;
+  border: 0;
+  background: linear-gradient(145deg, #fff6ef, #f7f8fc);
+  cursor: zoom-in;
+  text-align: left;
+}
+
+.ask-zoom-trigger img {
   display: block;
   width: 100%;
   height: auto;
@@ -572,13 +582,91 @@ h1 span {
   object-fit: contain;
   object-position: top center;
   background: #f4f6fb;
+  border-radius: 18px;
+  border: 1px solid #ebe7e0;
+}
+
+.ask-zoom-trigger::after {
+  content: "Click to zoom";
+  display: inline-flex;
+  margin-top: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid #e6e8ef;
+  color: var(--ink-700);
+  font-size: 0.8rem;
+  font-weight: 700;
 }
 
 .ask-card figcaption {
-  padding: 12px 14px 14px;
+  padding: 0 18px 18px;
   color: var(--ink-700);
   font-weight: 600;
   font-size: 0.93rem;
+}
+
+.lightbox-open {
+  overflow: hidden;
+}
+
+.lightbox {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 30;
+}
+
+.lightbox.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(24, 25, 32, 0.64);
+  backdrop-filter: blur(10px);
+}
+
+.lightbox-dialog {
+  position: relative;
+  width: min(1180px, 92vw);
+  max-height: 88vh;
+  padding: 18px;
+  background: linear-gradient(145deg, #fff8f1, #ffffff);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 28px;
+  box-shadow: 0 30px 80px rgba(12, 13, 20, 0.28);
+}
+
+.lightbox-dialog img {
+  display: block;
+  width: 100%;
+  max-height: calc(88vh - 36px);
+  object-fit: contain;
+  border-radius: 18px;
+  background: #f4f6fb;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink-900);
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(35, 39, 52, 0.14);
 }
 
 .mini-card {
@@ -778,11 +866,20 @@ h1 span {
     height: 56px;
   }
 
-  .ask-card img {
+  .ask-zoom-trigger {
+    padding: 12px;
+  }
+
+  .ask-zoom-trigger img {
     max-height: none;
   }
 
   .ask-carousel-controls {
     justify-content: center;
+  }
+
+  .lightbox-dialog {
+    width: min(94vw, 94vw);
+    padding: 14px;
   }
 }

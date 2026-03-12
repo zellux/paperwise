@@ -186,27 +186,51 @@
           </div>
           <div class="ask-grid" data-carousel-track>
             <figure class="ask-card">
-              <img
-                src="./sample-target-range.jpg"
-                alt="Example grounded answer showing target range summary from documents"
-                loading="lazy"
-              />
+              <button
+                class="ask-zoom-trigger"
+                type="button"
+                aria-label="Open Example 1 screenshot in a larger view"
+                data-zoom-src="./sample-target-range.jpg"
+                data-zoom-alt="Example grounded answer showing target range summary from documents"
+              >
+                <img
+                  src="./sample-target-range.jpg"
+                  alt="Example grounded answer showing target range summary from documents"
+                  loading="lazy"
+                />
+              </button>
               <figcaption>Example 1: Target range question with grounded response.</figcaption>
             </figure>
             <figure class="ask-card">
-              <img
-                src="./sample-sonic-billing.jpg"
-                alt="Example grounded answer showing billing detail retrieval from documents"
-                loading="lazy"
-              />
+              <button
+                class="ask-zoom-trigger"
+                type="button"
+                aria-label="Open Example 2 screenshot in a larger view"
+                data-zoom-src="./sample-sonic-billing.jpg"
+                data-zoom-alt="Example grounded answer showing billing detail retrieval from documents"
+              >
+                <img
+                  src="./sample-sonic-billing.jpg"
+                  alt="Example grounded answer showing billing detail retrieval from documents"
+                  loading="lazy"
+                />
+              </button>
               <figcaption>Example 2: Sonic billing question answered from uploaded docs.</figcaption>
             </figure>
             <figure class="ask-card">
-              <img
-                src="./sample-domain-list.jpg"
-                alt="Example grounded answer showing a domain list extracted and summarized from documents"
-                loading="lazy"
-              />
+              <button
+                class="ask-zoom-trigger"
+                type="button"
+                aria-label="Open Example 3 screenshot in a larger view"
+                data-zoom-src="./sample-domain-list.jpg"
+                data-zoom-alt="Example grounded answer showing a domain list extracted and summarized from documents"
+              >
+                <img
+                  src="./sample-domain-list.jpg"
+                  alt="Example grounded answer showing a domain list extracted and summarized from documents"
+                  loading="lazy"
+                />
+              </button>
               <figcaption>Example 3: Domain list question answered with grounded document context.</figcaption>
             </figure>
           </div>
@@ -234,6 +258,15 @@
         </nav>
       </div>
     </footer>
+    <div class="lightbox" id="screenshotLightbox" aria-hidden="true">
+      <div class="lightbox-backdrop" data-lightbox-close></div>
+      <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-label="Expanded screenshot preview">
+        <button class="lightbox-close" type="button" aria-label="Close screenshot preview" data-lightbox-close>
+          &times;
+        </button>
+        <img id="lightboxImage" src="" alt="" />
+      </div>
+    </div>
     <script>
       (() => {
         const carousels = document.querySelectorAll("[data-carousel]");
@@ -265,11 +298,13 @@
           let pointerActive = false;
           let startX = 0;
           let startScrollLeft = 0;
+          let dragDistance = 0;
 
           track.addEventListener("pointerdown", (event) => {
             pointerActive = true;
             startX = event.clientX;
             startScrollLeft = track.scrollLeft;
+            dragDistance = 0;
             track.classList.add("is-dragging");
             track.setPointerCapture(event.pointerId);
           });
@@ -279,6 +314,7 @@
               return;
             }
             const deltaX = event.clientX - startX;
+            dragDistance = Math.max(dragDistance, Math.abs(deltaX));
             track.scrollLeft = startScrollLeft - deltaX;
           });
 
@@ -288,6 +324,12 @@
             }
             pointerActive = false;
             track.classList.remove("is-dragging");
+            if (dragDistance > 8) {
+              track.dataset.dragged = "true";
+              window.setTimeout(() => {
+                delete track.dataset.dragged;
+              }, 0);
+            }
             if (event) {
               track.releasePointerCapture(event.pointerId);
             }
@@ -297,6 +339,49 @@
           track.addEventListener("pointercancel", stopDragging);
           track.addEventListener("pointerleave", stopDragging);
         });
+
+        const lightbox = document.getElementById("screenshotLightbox");
+        const lightboxImage = document.getElementById("lightboxImage");
+        const zoomButtons = document.querySelectorAll(".ask-zoom-trigger");
+        const closeButtons = document.querySelectorAll("[data-lightbox-close]");
+
+        if (lightbox && lightboxImage) {
+          const openLightbox = (src, alt) => {
+            lightboxImage.src = src;
+            lightboxImage.alt = alt;
+            lightbox.classList.add("is-open");
+            lightbox.setAttribute("aria-hidden", "false");
+            document.body.classList.add("lightbox-open");
+          };
+
+          const closeLightbox = () => {
+            lightbox.classList.remove("is-open");
+            lightbox.setAttribute("aria-hidden", "true");
+            lightboxImage.src = "";
+            lightboxImage.alt = "";
+            document.body.classList.remove("lightbox-open");
+          };
+
+          zoomButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+              const track = button.closest("[data-carousel-track]");
+              if (track?.dataset.dragged === "true") {
+                return;
+              }
+              openLightbox(button.dataset.zoomSrc || "", button.dataset.zoomAlt || "");
+            });
+          });
+
+          closeButtons.forEach((button) => {
+            button.addEventListener("click", closeLightbox);
+          });
+
+          document.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && lightbox.classList.contains("is-open")) {
+              closeLightbox();
+            }
+          });
+        }
       })();
     </script>
   </body>
