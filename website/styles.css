@@ -1017,11 +1017,6 @@ p {
   color: var(--ink-faint);
 }
 
-.footer-copy {
-  color: var(--ink-faint);
-  font-size: 0.85rem;
-}
-
 .lightbox {
   position: fixed;
   inset: 0;
