@@ -1495,7 +1495,7 @@ function setActiveSearchSection(sectionId) {
   for (const section of searchSubsections) {
     section.classList.toggle("view-hidden", section.id !== nextSectionId);
   }
-  const showSharedHeader = nextSectionId !== "search-section-ask";
+  const showSharedHeader = nextSectionId === "search-section-collections";
   searchSectionHeading?.classList.toggle("view-hidden", !showSharedHeader);
   searchResultsMeta?.classList.toggle("view-hidden", !showSharedHeader);
 }
