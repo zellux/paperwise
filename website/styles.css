@@ -538,6 +538,22 @@ p {
   letter-spacing: -0.01em;
 }
 
+.eyebrow-metric {
+  gap: 10px;
+  background: #e4f0ff;
+  color: var(--blue);
+}
+
+.eyebrow-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  font-size: 0.9rem;
+}
+
+.feature-card-org .eyebrow,
 .feature-card-models .eyebrow {
   background: #e4f0ff;
   color: var(--blue);
@@ -570,6 +586,10 @@ p {
 }
 
 .feature-mini-config {
+  align-items: stretch;
+}
+
+.feature-mini-tags {
   align-items: stretch;
 }
 
@@ -621,6 +641,40 @@ p {
   font-size: clamp(0.98rem, 1.15vw, 1.08rem);
   color: #667185;
   line-height: 1.5;
+  letter-spacing: -0.02em;
+}
+
+.mini-tags-panel {
+  width: 100%;
+  display: grid;
+  gap: 18px;
+}
+
+.mini-tags-label {
+  color: var(--blue);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.mini-tags-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.mini-tag-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 18px;
+  border-radius: 14px;
+  background: #eef2f7;
+  color: #2a2f3a;
+  font-size: 0.98rem;
+  font-weight: 700;
   letter-spacing: -0.02em;
 }
 
