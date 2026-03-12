@@ -456,7 +456,7 @@ h1 span {
 .ask-grid {
   margin-top: 24px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
 }
 
@@ -610,6 +610,10 @@ h1 span {
 
 @media (max-width: 1060px) {
   .feature-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .ask-grid {
     grid-template-columns: 1fr 1fr;
   }
 
