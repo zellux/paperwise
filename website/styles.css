@@ -502,11 +502,11 @@ p {
   border: 1px solid #d3d9e4;
   border-radius: 36px;
   box-shadow: none;
-  padding: 28px 34px;
+  padding: 36px 38px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(360px, 0.92fr);
-  gap: 30px;
-  align-items: stretch;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 28px;
+  align-items: start;
 }
 
 .feature-row {
@@ -519,32 +519,35 @@ p {
 .feature-text {
   padding: 0;
   display: grid;
-  align-content: center;
-  gap: 14px;
+  align-content: start;
+  gap: 18px;
+  min-width: 0;
 }
 
 .feature-card .eyebrow {
-  min-height: 46px;
+  min-height: 42px;
   padding: 0 18px;
   width: fit-content;
   border-radius: 999px;
   background: #dde5f2;
   color: #5c6578;
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   font-weight: 800;
   letter-spacing: -0.01em;
 }
 
 .feature-card h3 {
-  font-size: clamp(2rem, 3.2vw, 2.9rem);
+  max-width: 10ch;
+  font-size: clamp(1.9rem, 2.2vw, 2.9rem);
+  line-height: 0.96;
   letter-spacing: -0.05em;
 }
 
 .feature-card p:last-child {
-  max-width: 18ch;
+  max-width: 23ch;
   color: #667185;
-  font-size: clamp(1.12rem, 1.7vw, 1.46rem);
-  line-height: 1.48;
+  font-size: clamp(1rem, 1.25vw, 1.28rem);
+  line-height: 1.45;
   letter-spacing: -0.02em;
 }
 
@@ -552,9 +555,11 @@ p {
   background: #f3f5f9;
   border: 1px solid #d3d9e4;
   border-radius: 28px;
-  padding: 22px 24px;
+  padding: 24px 26px;
   display: flex;
   align-items: center;
+  min-width: 0;
+  min-height: 100%;
 }
 
 .mini-table {
@@ -584,7 +589,7 @@ p {
 
 .mini-table td {
   color: #232935;
-  font-size: clamp(1.02rem, 1.6vw, 1.18rem);
+  font-size: clamp(0.98rem, 1.2vw, 1.1rem);
   letter-spacing: -0.02em;
 }
 
@@ -595,14 +600,14 @@ p {
 
 .mini-q {
   font-weight: 700;
-  font-size: clamp(1.2rem, 1.9vw, 1.5rem);
+  font-size: clamp(1.06rem, 1.35vw, 1.24rem);
   color: var(--ink);
   letter-spacing: -0.03em;
-  line-height: 1.35;
+  line-height: 1.4;
 }
 
 .mini-a {
-  font-size: clamp(1rem, 1.5vw, 1.2rem);
+  font-size: clamp(0.98rem, 1.15vw, 1.08rem);
   color: #667185;
   line-height: 1.5;
   letter-spacing: -0.02em;
@@ -997,6 +1002,7 @@ p {
     padding: 24px;
   }
 
+  .feature-card h3,
   .feature-card p:last-child {
     max-width: 100%;
   }
