@@ -475,13 +475,23 @@ p {
 
 .examples-grid {
   margin-top: 26px;
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
+  display: flex;
   gap: 18px;
+  align-items: start;
 }
 
 .example-card-wide {
-  grid-row: span 2;
+  flex: 1.2 1 0;
+}
+
+.examples-stack {
+  display: flex;
+  flex-direction: column;
+  flex: 0.8 1 0;
+  gap: 18px;
+  align-self: flex-start;
+  width: 100%;
+  height: fit-content;
 }
 
 .steps-grid {
@@ -691,10 +701,13 @@ p {
   .nav-shell,
   .hero-layout,
   .feature-row,
-  .examples-grid,
   .cta-card,
   .config-showcase {
     grid-template-columns: 1fr;
+  }
+
+  .examples-grid {
+    flex-direction: column;
   }
 
   .nav-shell {
