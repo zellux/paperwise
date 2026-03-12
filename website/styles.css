@@ -504,8 +504,8 @@ p {
   box-shadow: none;
   padding: 36px 38px;
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
-  gap: 28px;
+  grid-template-columns: minmax(0, 1.18fr) minmax(320px, 0.82fr);
+  gap: 32px;
   align-items: start;
 }
 
@@ -537,14 +537,14 @@ p {
 }
 
 .feature-card h3 {
-  max-width: 10ch;
-  font-size: clamp(1.9rem, 2.2vw, 2.9rem);
-  line-height: 0.96;
+  max-width: 12ch;
+  font-size: clamp(1.9rem, 2vw, 2.6rem);
+  line-height: 1;
   letter-spacing: -0.05em;
 }
 
 .feature-card p:last-child {
-  max-width: 23ch;
+  max-width: 29ch;
   color: #667185;
   font-size: clamp(1rem, 1.25vw, 1.28rem);
   line-height: 1.45;
