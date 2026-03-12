@@ -539,18 +539,46 @@ p {
 }
 
 .eyebrow-metric {
-  gap: 10px;
-  background: #e4f0ff;
+  gap: 12px;
+  min-height: 50px;
+  padding: 0 20px;
+  background: #e6f0ff;
   color: var(--blue);
+  font-size: 0.92rem;
+  letter-spacing: -0.015em;
 }
 
 .eyebrow-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
-  font-size: 0.9rem;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid currentColor;
+  border-radius: 6px;
+  position: relative;
+}
+
+.eyebrow-icon::before,
+.eyebrow-icon::after {
+  content: "";
+  position: absolute;
+  background: currentColor;
+  border-radius: 999px;
+}
+
+.eyebrow-icon::before {
+  width: 2px;
+  height: 9px;
+  left: 6px;
+  top: 5px;
+}
+
+.eyebrow-icon::after {
+  width: 8px;
+  height: 2px;
+  left: 9px;
+  top: 9px;
 }
 
 .feature-card-org .eyebrow,
@@ -574,6 +602,17 @@ p {
   letter-spacing: -0.02em;
 }
 
+.feature-card-org h3 {
+  font-size: clamp(1.95rem, 2.2vw, 2.65rem);
+  line-height: 0.98;
+}
+
+.feature-card-org p:last-child {
+  max-width: 27ch;
+  font-size: clamp(1rem, 1.2vw, 1.24rem);
+  line-height: 1.42;
+}
+
 .feature-mini {
   background: #f3f5f9;
   border: 1px solid #d3d9e4;
@@ -591,6 +630,8 @@ p {
 
 .feature-mini-tags {
   align-items: stretch;
+  padding: 28px 30px;
+  border-radius: 30px;
 }
 
 .mini-table {
@@ -647,33 +688,33 @@ p {
 .mini-tags-panel {
   width: 100%;
   display: grid;
-  gap: 18px;
+  gap: 20px;
 }
 
 .mini-tags-label {
   color: var(--blue);
-  font-size: 0.9rem;
+  font-size: 0.92rem;
   font-weight: 800;
-  letter-spacing: 0.01em;
+  letter-spacing: 0.015em;
   text-transform: uppercase;
 }
 
 .mini-tags-grid {
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 14px;
 }
 
 .mini-tag-pill {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 46px;
-  padding: 0 18px;
-  border-radius: 14px;
-  background: #eef2f7;
+  min-height: 48px;
+  padding: 0 20px;
+  border-radius: 13px;
+  background: #eef1f6;
   color: #2a2f3a;
-  font-size: 0.98rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.02em;
 }
