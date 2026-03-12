@@ -538,6 +538,11 @@ p {
   letter-spacing: -0.01em;
 }
 
+.feature-card-models .eyebrow {
+  background: #e4f0ff;
+  color: var(--blue);
+}
+
 .feature-card h3 {
   max-width: 11ch;
   font-size: clamp(2rem, 2.3vw, 2.8rem);
@@ -562,6 +567,10 @@ p {
   align-items: center;
   min-width: 0;
   min-height: 100%;
+}
+
+.feature-mini-config {
+  align-items: stretch;
 }
 
 .mini-table {
@@ -613,6 +622,63 @@ p {
   color: #667185;
   line-height: 1.5;
   letter-spacing: -0.02em;
+}
+
+.mini-config {
+  width: 100%;
+  display: grid;
+  gap: 18px;
+}
+
+.mini-config-label {
+  color: var(--blue);
+  font-size: 0.9rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.mini-config-list {
+  display: grid;
+  gap: 12px;
+}
+
+.mini-config-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 56px;
+  padding: 0 16px;
+  border-radius: 16px;
+  background: #eef2f7;
+}
+
+.mini-config-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: #e4f0ff;
+  color: var(--blue);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.mini-config-row strong {
+  color: #232935;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.mini-config-row span:last-child {
+  color: #6b7486;
+  font-size: 0.92rem;
+  font-weight: 600;
 }
 
 .feature-shot,
@@ -1061,6 +1127,13 @@ p {
   .feature-mini {
     padding: 16px;
     border-radius: 22px;
+  }
+
+  .mini-config-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 8px;
+    padding: 14px;
   }
 
   .mini-table th,
