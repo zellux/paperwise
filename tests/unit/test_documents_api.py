@@ -1235,6 +1235,25 @@ def test_llm_connection_test_requires_base_url_for_custom_provider() -> None:
         app.dependency_overrides.clear()
 
 
+def test_llm_connection_test_rejects_openai_style_key_for_gemini() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents/llm/test",
+            json={"provider": "gemini", "api_key": "sk-test"},
+        )
+        assert response.status_code == 400
+        assert response.json()["detail"] == (
+            "Gemini API keys should not start with sk-. Paste your Google AI Studio API key."
+        )
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_llm_connection_test_accepts_payload_overrides_and_calls_provider() -> None:
     repository = InMemoryDocumentRepository()
     fake_provider = FakeLLMProvider()

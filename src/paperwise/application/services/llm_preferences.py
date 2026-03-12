@@ -40,6 +40,16 @@ def normalize_llm_provider(value: Any) -> str:
     return ""
 
 
+def validate_api_key_for_provider(provider: str, api_key: Any) -> str:
+    normalized_provider = normalize_llm_provider(provider)
+    normalized_api_key = str(api_key or "").strip()
+    if not normalized_api_key:
+        return ""
+    if normalized_provider == "gemini" and normalized_api_key.startswith("sk-"):
+        return "Gemini API keys should not start with sk-. Paste your Google AI Studio API key."
+    return ""
+
+
 def default_base_url_for_provider(provider: str) -> str:
     if provider == "openai":
         return DEFAULT_OPENAI_BASE_URL

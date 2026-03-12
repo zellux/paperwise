@@ -296,3 +296,47 @@ def test_user_preferences_put_merges_without_dropping_existing_keys() -> None:
         assert payload["llm_total_tokens_processed"] == 1234
     finally:
         app.dependency_overrides.clear()
+
+
+def test_user_preferences_rejects_openai_style_key_for_gemini() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "prefs-gemini@example.com",
+                "full_name": "Prefs Gemini",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "prefs-gemini@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+        token = login_response.json()["access_token"]
+        headers = {"Authorization": f"Bearer {token}"}
+
+        put_response = client.put(
+            "/users/me/preferences",
+            headers=headers,
+            json={
+                "preferences": {
+                    "ocr_provider": "llm_separate",
+                    "ocr_llm_provider": "gemini",
+                    "ocr_llm_model": "gemini-2.5-flash",
+                    "ocr_llm_api_key": "sk-test",
+                }
+            },
+        )
+        assert put_response.status_code == 400
+        assert put_response.json()["detail"] == (
+            "Gemini API keys should not start with sk-. Paste your Google AI Studio API key."
+        )
+    finally:
+        app.dependency_overrides.clear()

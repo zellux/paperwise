@@ -42,6 +42,7 @@ from paperwise.application.services.llm_preferences import (
     default_model_for_task,
     get_normalized_llm_preferences,
     resolve_task_config,
+    validate_api_key_for_provider,
 )
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
@@ -400,6 +401,12 @@ def _build_provider_from_task_config(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=missing_api_key_detail,
+        )
+    api_key_error = validate_api_key_for_provider(config.provider, config.api_key)
+    if api_key_error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=api_key_error,
         )
 
     if config.provider == "openai":

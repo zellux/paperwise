@@ -362,6 +362,26 @@ function getConnectionBaseUrlHelpText(provider) {
   return "";
 }
 
+function getConnectionApiKeyPlaceholder(provider) {
+  const normalized = normalizeLlmProvider(provider);
+  if (normalized === "gemini") {
+    return "AIza...";
+  }
+  return "sk-...";
+}
+
+function getConnectionApiKeyValidationError(provider, apiKey) {
+  const normalized = normalizeLlmProvider(provider);
+  const normalizedApiKey = String(apiKey || "").trim();
+  if (!normalizedApiKey) {
+    return "";
+  }
+  if (normalized === "gemini" && normalizedApiKey.startsWith("sk-")) {
+    return "Gemini API keys should not start with sk-.";
+  }
+  return "";
+}
+
 function normalizeOcrProvider(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (SUPPORTED_OCR_PROVIDERS.includes(normalized)) {
@@ -658,6 +678,10 @@ function getConnectionValidationError(connection) {
   if (!String(connection?.api_key || "").trim()) {
     return "add an API key.";
   }
+  const apiKeyError = getConnectionApiKeyValidationError(provider, connection?.api_key);
+  if (apiKeyError) {
+    return apiKeyError;
+  }
   if (provider === "custom" && !String(connection?.base_url || "").trim()) {
     return "set a custom base URL.";
   }
@@ -809,6 +833,7 @@ function renderConnectionsList() {
       const status = connectionTestStatuses.get(connection.id) || { message: "", tone: "" };
       const showBaseUrlField = providerShowsBaseUrlField(connection.provider);
       const baseUrlHelpText = getConnectionBaseUrlHelpText(connection.provider);
+      const apiKeyPlaceholder = getConnectionApiKeyPlaceholder(connection.provider);
       const defaultBaseUrl = getLlmProviderDefaults(connection.provider)?.base_url
         || getOcrLlmProviderDefaults(connection.provider)?.base_url
         || "";
@@ -838,7 +863,7 @@ function renderConnectionsList() {
             <div class="settings-group-note">${escapeHtml(baseUrlHelpText || defaultBaseUrl)}</div>
             `}
             <label class="label" for="settingsConnectionApiKey-${escapeHtml(connection.id)}">API Key</label>
-            <input id="settingsConnectionApiKey-${escapeHtml(connection.id)}" data-connection-field="api_key" data-connection-id="${escapeHtml(connection.id)}" type="password" value="${escapeHtml(connection.api_key)}" placeholder="sk-..." />
+            <input id="settingsConnectionApiKey-${escapeHtml(connection.id)}" data-connection-field="api_key" data-connection-id="${escapeHtml(connection.id)}" type="password" value="${escapeHtml(connection.api_key)}" placeholder="${escapeHtml(apiKeyPlaceholder)}" />
             <label class="label" for="settingsConnectionDefaultModel-${escapeHtml(connection.id)}">Default Model</label>
             <input id="settingsConnectionDefaultModel-${escapeHtml(connection.id)}" data-connection-field="default_model" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.default_model || "")}" placeholder="e.g. gpt-4.1-mini" />
           </div>

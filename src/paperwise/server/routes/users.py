@@ -11,6 +11,7 @@ from paperwise.server.dependencies import (
 )
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.application.services.auth_tokens import create_access_token
+from paperwise.application.services.llm_preferences import get_normalized_llm_preferences, validate_api_key_for_provider
 from paperwise.application.services.users import (
     CreateUserCommand,
     authenticate_user,
@@ -74,6 +75,17 @@ def _to_user_response(user: User) -> UserResponse:
         is_active=user.is_active,
         created_at=user.created_at,
     )
+
+
+def _validate_llm_preferences(preferences: dict[str, Any]) -> None:
+    normalized = get_normalized_llm_preferences(preferences)
+    for connection in normalized["llm_connections"]:
+        error = validate_api_key_for_provider(connection.get("provider", ""), connection.get("api_key", ""))
+        if error:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error,
+            )
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
@@ -170,6 +182,7 @@ def put_me_preferences_endpoint(
     existing = repository.get_user_preference(current_user.id)
     merged_preferences = dict(existing.preferences) if existing is not None else {}
     merged_preferences.update(dict(payload.preferences))
+    _validate_llm_preferences(merged_preferences)
     preference = UserPreference(user_id=current_user.id, preferences=merged_preferences)
     repository.save_user_preference(preference)
     return UserPreferenceResponse(preferences=dict(preference.preferences))
