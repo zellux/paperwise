@@ -8,6 +8,7 @@ from paperwise.domain.models import (
     HistoryActorType,
     HistoryEventType,
     LLMParseResult,
+    ParseResult,
 )
 
 
@@ -157,17 +158,29 @@ def build_processing_completed_history_event(
     source: str,
     previous_status: str | None,
     current_status: str,
+    parse_result: ParseResult | None = None,
 ) -> DocumentHistoryEvent:
+    changes: dict[str, object] = {
+        "status": {
+            "before": previous_status,
+            "after": current_status,
+        }
+    }
+    if parse_result is not None:
+        parse_summary: dict[str, object] = {
+            "parser": parse_result.parser,
+            "page_count": parse_result.page_count,
+            "text_preview_chars": len(str(parse_result.text_preview or "")),
+            "text_preview_excerpt": " ".join(str(parse_result.text_preview or "").split())[:240],
+        }
+        if parse_result.ocr_details:
+            parse_summary["ocr"] = parse_result.ocr_details
+        changes["parse"] = parse_summary
     return _new_event(
         document_id=document_id,
         event_type=HistoryEventType.PROCESSING_COMPLETED,
         actor_type=actor_type,
         actor_id=actor_id,
         source=source,
-        changes={
-            "status": {
-                "before": previous_status,
-                "after": current_status,
-            }
-        },
+        changes=changes,
     )

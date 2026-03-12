@@ -259,6 +259,7 @@ def parse_document_task(
                     source="worker.parse_document",
                     previous_status=previous_status,
                     current_status=document.status.value,
+                    parse_result=parsed,
                 )
             ]
         )

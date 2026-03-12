@@ -939,6 +939,14 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         assert "tags_added" in event_types
         assert "processing_completed" in event_types
         assert "file_moved" in event_types
+        processing_events = [event for event in history if event["event_type"] == "processing_completed"]
+        assert processing_events
+        processing_parse = processing_events[0]["changes"]["parse"]
+        assert processing_parse["parser"] == "stub-llm-ocr"
+        assert processing_parse["ocr"]["requested_provider"] == "llm"
+        assert processing_parse["ocr"]["attempts"]["text_extraction"]["attempted"] is True
+        assert processing_parse["ocr"]["attempts"]["llm_text"]["succeeded"] is True
+        assert processing_parse["ocr"]["final_text_source"] == "llm_text_ocr"
 
         llm_events = [event for event in history if event["source"] == "api.llm_parse"]
         assert llm_events

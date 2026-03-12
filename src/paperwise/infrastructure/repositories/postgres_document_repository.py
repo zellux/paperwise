@@ -219,6 +219,7 @@ class PostgresDocumentRepository(DocumentRepository):
                 page_count=row.page_count,
                 text_preview=row.text_preview,
                 created_at=row.created_at,
+                ocr_details=None,
             )
 
     def save_llm_parse_result(self, result: LLMParseResult) -> None:

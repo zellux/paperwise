@@ -34,7 +34,6 @@ from paperwise.application.services.history import (
 )
 from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.llm_preferences import (
-    LLM_TASK_GROUNDED_QA,
     LLM_TASK_METADATA,
     LLM_TASK_OCR,
     ResolvedLLMTaskConfig,
@@ -1271,6 +1270,7 @@ def llm_parse_document_endpoint(
                 source="api.llm_parse",
                 previous_status=DocumentStatus.PROCESSING.value,
                 current_status=document.status.value,
+                parse_result=parse_result,
             )
         ]
     )

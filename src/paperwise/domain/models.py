@@ -46,6 +46,7 @@ class ParseResult:
     page_count: int
     text_preview: str
     created_at: datetime
+    ocr_details: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)

@@ -98,6 +98,10 @@ def test_parse_document_blob_uses_llm_ocr_when_configured(tmp_path, monkeypatch)
     assert llm.calls == 0
     assert result.text_preview == "Structured OCR text"
     assert result.parser == "stub-llm-ocr"
+    assert result.ocr_details is not None
+    assert result.ocr_details["attempts"]["text_extraction"]["attempted"] is True
+    assert result.ocr_details["attempts"]["llm_vision"]["succeeded"] is True
+    assert result.ocr_details["final_text_source"] == "llm_vision_ocr"
 
 
 def test_parse_document_blob_skips_llm_ocr_for_local_provider(tmp_path) -> None:
@@ -195,6 +199,9 @@ def test_parse_document_blob_auto_switch_uses_good_local_ocr_and_skips_llm(
     assert llm.calls == 0
     assert result.parser == "auto-local-tesseract"
     assert result.text_preview == local_text
+    assert result.ocr_details is not None
+    assert result.ocr_details["attempts"]["local_tesseract"]["selected"] is True
+    assert result.ocr_details["final_text_source"] == "local_tesseract_auto_switch"
 
 
 def test_parse_document_blob_auto_switch_off_does_not_run_local_ocr(tmp_path, monkeypatch) -> None:
@@ -277,6 +284,10 @@ def test_parse_document_blob_image_ocr_timeout_falls_back_to_extracted_text(
 
     assert result.parser == "stub-llm-ocr"
     assert "Readable sample OCR text" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["attempts"]["llm_vision"]["attempted"] is True
+    assert result.ocr_details["attempts"]["llm_vision"]["succeeded"] is False
+    assert result.ocr_details["final_text_source"] == "pdf_text_extraction"
 
 
 def test_parse_document_blob_strips_nul_bytes_from_ocr_result(tmp_path, monkeypatch) -> None:
