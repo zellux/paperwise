@@ -243,7 +243,6 @@ p {
   padding: 32px 0 48px;
 }
 
-.stats-section,
 .feature-section,
 .examples-section,
 .steps-section,
@@ -272,11 +271,6 @@ p {
   box-shadow: var(--shadow-soft);
 }
 
-.stat-card {
-  background: var(--surface);
-  border-radius: var(--radius-xl);
-}
-
 .hero-copy {
   padding: 42px 0;
   background: none;
@@ -289,7 +283,6 @@ p {
 .section-heading p,
 .feature-text p,
 .hero-note,
-.stat-card span,
 .step-card p,
 .config-card figcaption,
 .faq-item p,
@@ -467,49 +460,6 @@ p {
 
 .section-heading p {
   max-width: 760px;
-}
-
-.stats-container {
-  margin-top: 36px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
-  overflow: hidden;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 0;
-}
-
-.stat-card {
-  padding: 24px 28px;
-  text-align: center;
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-  border-right: 1px solid var(--line);
-}
-
-.stat-card:last-child {
-  border-right: none;
-}
-
-.stat-card strong {
-  display: block;
-  font-family: "Manrope", sans-serif;
-  font-size: clamp(2rem, 3.5vw, 2.8rem);
-  font-weight: 800;
-  letter-spacing: -0.05em;
-}
-
-.stat-card span {
-  display: block;
-  margin-top: 8px;
-  font-size: 0.93rem;
 }
 
 .feature-list {
@@ -1237,23 +1187,8 @@ p {
     justify-content: flex-start;
   }
 
-  .stats-grid,
   .steps-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .stat-card {
-    border-right: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-  }
-
-  .stat-card:nth-child(2n) {
-    border-right: none;
-  }
-
-  .stat-card:nth-child(3),
-  .stat-card:nth-child(4) {
-    border-bottom: none;
   }
 
   .feature-card {
@@ -1293,20 +1228,10 @@ p {
     padding: 22px;
   }
 
-  .stats-grid,
   .steps-grid,
   .panel-table,
   .feature-grid {
     grid-template-columns: 1fr;
-  }
-
-  .stat-card {
-    border-right: none;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .stat-card:last-child {
-    border-bottom: none;
   }
 
   .feature-shot,
@@ -1385,21 +1310,5 @@ p {
 
 .feature-card h3 {
   display: flex;
-  align-items: center;
-}
-
-/* Stat card icons */
-.stat-icon {
-  display: block;
-  width: 28px;
-  height: 28px;
-  margin-bottom: 14px;
-  color: var(--blue);
-  opacity: 0.75;
-}
-
-.stat-card {
-  display: flex;
-  flex-direction: column;
   align-items: center;
 }
