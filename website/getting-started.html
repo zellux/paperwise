@@ -271,6 +271,121 @@ cd paperwise</code></pre>
         </div>
       </section>
 
+      <section class="section section-soft" id="initial-setup">
+        <div class="section-card setup-section-card">
+          <div class="setup-section-head">
+            <p class="section-tag">First Run</p>
+            <h2>Initial setup inside Paperwise</h2>
+            <p class="section-sub">
+              After the app is running, there is one more required step: configure an
+              AI connection in the web UI. Uploads and AI-backed features depend on
+              the model settings you save per user.
+            </p>
+          </div>
+
+          <div class="setup-notes">
+            <div class="setup-note">
+              <strong>Account required</strong>
+              <span>Paperwise has no guest mode. Create your first account or sign in before using the app.</span>
+            </div>
+            <div class="setup-note">
+              <strong>Where to configure models</strong>
+              <span>Open <code>Settings</code> and then <code>Model Config</code> after signing in.</span>
+            </div>
+          </div>
+
+          <div class="setup-steps">
+            <article class="setup-step">
+              <h3>1. Create your first account</h3>
+              <p class="setup-step-note">
+                On first launch, register a user account in the Paperwise sign-in screen.
+                The model configuration is stored per user, so this is the account that
+                will own your connections and task routing.
+              </p>
+            </article>
+
+            <article class="setup-step">
+              <h3>2. Add a model connection</h3>
+              <p class="setup-step-note">
+                Go to <code>Settings &gt; Model Config</code>, add a connection, and
+                choose your provider. Paperwise currently supports <code>OpenAI</code>,
+                <code>Gemini</code>, and custom OpenAI-compatible providers.
+              </p>
+              <p class="setup-step-note">
+                Enter the provider API key and, if needed, a base URL. You can keep one
+                general-purpose connection or create multiple connections for different
+                tasks.
+              </p>
+            </article>
+
+            <article class="setup-step">
+              <h3>3. Assign task models</h3>
+              <p class="setup-step-note">
+                In the same <code>Model Config</code> section, choose which connection
+                and model each task should use:
+              </p>
+              <ul class="setup-list">
+                <li><strong>Metadata Extraction</strong>: required before uploads and extraction workflows are available.</li>
+                <li><strong>Grounded Q&amp;A</strong>: required if you want Ask My Docs and source-backed answers.</li>
+                <li><strong>OCR</strong>: choose either <code>LLM</code> or <code>Local Tesseract</code>.</li>
+              </ul>
+            </article>
+
+            <article class="setup-step">
+              <h3>4. Pick an OCR mode</h3>
+              <p class="setup-step-note">
+                If you choose <code>LLM</code> for OCR, assign an OCR connection and
+                model just like the other tasks. If you choose
+                <code>Local Tesseract</code>, OCR runs locally instead of using an API
+                model.
+              </p>
+              <p class="setup-step-note">
+                The support page has more guidance on OCR tradeoffs and model choices if
+                you want to tune this further.
+              </p>
+            </article>
+
+            <article class="setup-step">
+              <h3>5. Save settings and test with a document</h3>
+              <p class="setup-step-note">
+                Save the model configuration, upload a sample PDF, and confirm that
+                metadata extraction, OCR, or grounded Q&amp;A behave the way you expect.
+              </p>
+            </article>
+          </div>
+
+          <div class="docs-table-wrap">
+            <table class="support-model-table">
+              <thead>
+                <tr>
+                  <th>Feature</th>
+                  <th>Minimum setup</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Document upload and extraction</td>
+                  <td>A working <code>Metadata Extraction</code> connection in <code>Settings &gt; Model Config</code>.</td>
+                </tr>
+                <tr>
+                  <td>Ask My Docs</td>
+                  <td>A working <code>Grounded Q&amp;A</code> connection in <code>Settings &gt; Model Config</code>.</td>
+                </tr>
+                <tr>
+                  <td>OCR on scans and image PDFs</td>
+                  <td>Either an <code>OCR</code> LLM connection or <code>Local Tesseract</code> enabled.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="cta-row cta-row-left">
+            <a class="btn btn-primary" href="./support.html">Read model setup guidance</a>
+            <a class="btn btn-secondary" href="https://github.com/zellux/paperwise" target="_blank" rel="noopener noreferrer">Open repository</a>
+          </div>
+        </div>
+      </section>
+
       <section class="section section-soft support-help">
         <div class="section-card">
           <h2>Not sure which option to choose?</h2>
