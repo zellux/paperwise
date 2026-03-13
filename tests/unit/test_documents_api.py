@@ -220,6 +220,45 @@ def test_list_documents_supports_offset_pagination() -> None:
         app.dependency_overrides.clear()
 
 
+def test_list_documents_paginates_after_filtering() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        created_ids: list[str] = []
+        for name in ("first.pdf", "second.pdf", "third.pdf", "fourth.pdf"):
+            response = client.post(
+                "/documents",
+                files={"file": (name, f"%PDF-1.7\n{name}".encode("utf-8"), "application/pdf")},
+            )
+            assert response.status_code == 201
+            created_ids.append(response.json()["id"])
+
+        newest_document = repository.get(created_ids[-1])
+        assert newest_document is not None
+        newest_document.owner_id = "different-user-id"
+        repository.save(newest_document)
+
+        count_response = client.get("/documents/count?status=processing")
+        assert count_response.status_code == 200
+        assert count_response.json()["total"] == 3
+
+        paged_response = client.get("/documents?limit=2&offset=0&status=processing")
+        assert paged_response.status_code == 200
+        paged_payload = paged_response.json()
+        assert len(paged_payload) == 2
+        assert [item["id"] for item in paged_payload] == [created_ids[2], created_ids[1]]
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_count_documents_with_filters() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()

@@ -270,6 +270,42 @@ def _resolve_tags(candidate_tags: list[str], existing_tags: list[str]) -> tuple[
     return resolved, created
 
 
+def _iter_filtered_documents(
+    *,
+    repository: DocumentRepository,
+    current_user: User,
+    query: str | None,
+    normalized_tags: set[str],
+    normalized_correspondents: set[str],
+    normalized_document_types: set[str],
+    normalized_statuses: set[str],
+):
+    batch_size = 1000
+    scan_offset = 0
+    while True:
+        documents = repository.list_documents(limit=batch_size, offset=scan_offset)
+        if not documents:
+            break
+        for document in documents:
+            if document.owner_id != current_user.id:
+                continue
+            llm_result = repository.get_llm_parse_result(document.id)
+            if not _matches_document_filters(
+                document=document,
+                llm_result=llm_result,
+                normalized_tags=normalized_tags,
+                normalized_correspondents=normalized_correspondents,
+                normalized_document_types=normalized_document_types,
+                normalized_statuses=normalized_statuses,
+                query=query,
+            ):
+                continue
+            yield document, llm_result
+        if len(documents) < batch_size:
+            break
+        scan_offset += batch_size
+
+
 def _normalized_values(values: list[str] | None) -> set[str]:
     normalized: set[str] = set()
     for value in values or []:
@@ -771,7 +807,6 @@ def list_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentListItemResponse]:
-    documents = repository.list_documents(limit=limit, offset=offset)
     normalized_tags = _normalized_values(tag)
     normalized_correspondents = _normalized_values(correspondent)
     normalized_document_types = _normalized_values(document_type)
@@ -780,19 +815,18 @@ def list_documents_endpoint(
         normalized_statuses = {_normalize_name(DocumentStatus.READY.value)}
 
     results: list[DocumentListItemResponse] = []
-    for document in documents:
-        if document.owner_id != current_user.id:
-            continue
-        llm_result = repository.get_llm_parse_result(document.id)
-        if not _matches_document_filters(
-            document=document,
-            llm_result=llm_result,
-            normalized_tags=normalized_tags,
-            normalized_correspondents=normalized_correspondents,
-            normalized_document_types=normalized_document_types,
-            normalized_statuses=normalized_statuses,
-            query=q,
-        ):
+    matched_offset = 0
+    for document, llm_result in _iter_filtered_documents(
+        repository=repository,
+        current_user=current_user,
+        query=q,
+        normalized_tags=normalized_tags,
+        normalized_correspondents=normalized_correspondents,
+        normalized_document_types=normalized_document_types,
+        normalized_statuses=normalized_statuses,
+    ):
+        if matched_offset < offset:
+            matched_offset += 1
             continue
         results.append(
             _to_list_item_response(
@@ -800,6 +834,8 @@ def list_documents_endpoint(
                 llm_result=llm_result,
             )
         )
+        if len(results) >= limit:
+            break
     return results
 
 
@@ -820,31 +856,18 @@ def count_documents_endpoint(
     if not normalized_statuses:
         normalized_statuses = {_normalize_name(DocumentStatus.READY.value)}
 
-    total = 0
-    batch_size = 1000
-    offset = 0
-    while True:
-        documents = repository.list_documents(limit=batch_size, offset=offset)
-        if not documents:
-            break
-        for document in documents:
-            if document.owner_id != current_user.id:
-                continue
-            llm_result = repository.get_llm_parse_result(document.id)
-            if not _matches_document_filters(
-                document=document,
-                llm_result=llm_result,
-                normalized_tags=normalized_tags,
-                normalized_correspondents=normalized_correspondents,
-                normalized_document_types=normalized_document_types,
-                normalized_statuses=normalized_statuses,
-                query=q,
-            ):
-                continue
-            total += 1
-        if len(documents) < batch_size:
-            break
-        offset += batch_size
+    total = sum(
+        1
+        for _document, _llm_result in _iter_filtered_documents(
+            repository=repository,
+            current_user=current_user,
+            query=q,
+            normalized_tags=normalized_tags,
+            normalized_correspondents=normalized_correspondents,
+            normalized_document_types=normalized_document_types,
+            normalized_statuses=normalized_statuses,
+        )
+    )
     return CountResponse(total=total)
 
 

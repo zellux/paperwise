@@ -3225,7 +3225,7 @@ function renderPaginationControls(currentCount, options = {}) {
     pagePrevBtn.disabled = docsPage <= 1;
   }
   if (pageNextBtn) {
-    pageNextBtn.disabled = docsPage >= totalPages || currentCount < docsPageSize;
+    pageNextBtn.disabled = docsPage >= totalPages;
   }
 }
 
