@@ -1641,7 +1641,7 @@ function renderSortHeaders() {
       direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"
     );
     if (indicator) {
-      indicator.textContent = direction === "asc" ? "^" : direction === "desc" ? "v" : "-";
+      indicator.textContent = direction === "asc" ? "▲" : direction === "desc" ? "▼" : "⇅";
     }
     if (button) {
       const label = button.querySelector("span")?.textContent?.trim() || field;
