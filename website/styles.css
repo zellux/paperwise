@@ -1229,6 +1229,102 @@ details.faq-item > :last-child {
   padding: 2px 6px;
 }
 
+.setup-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.setup-card,
+.setup-section-card {
+  display: grid;
+  gap: 18px;
+}
+
+.setup-card-top,
+.setup-section-head {
+  display: grid;
+  gap: 10px;
+}
+
+.setup-list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--ink-soft);
+  display: grid;
+  gap: 8px;
+}
+
+.setup-list li {
+  padding-left: 2px;
+}
+
+.setup-notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.setup-note {
+  display: grid;
+  gap: 6px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  background: rgba(237, 244, 255, 0.58);
+  border: 1px solid rgba(37, 99, 235, 0.12);
+}
+
+.setup-note strong {
+  font-size: 0.92rem;
+  letter-spacing: -0.02em;
+}
+
+.setup-note span {
+  color: var(--ink-soft);
+  font-size: 0.93rem;
+}
+
+.setup-steps {
+  display: grid;
+  gap: 18px;
+}
+
+.setup-step {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.setup-step h3 {
+  font-size: 1.15rem;
+  letter-spacing: -0.03em;
+}
+
+.setup-step pre {
+  margin: 0;
+  padding: 16px 18px;
+  overflow-x: auto;
+  border-radius: 16px;
+  border: 1px solid rgba(20, 28, 44, 0.08);
+  background: #101826;
+  color: #edf3ff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.setup-step code {
+  font-family: "SFMono-Regular", "Menlo", "Monaco", monospace;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.setup-step-note {
+  color: var(--ink-soft);
+  font-size: 0.94rem;
+}
+
 .support-help {
   padding-top: 8px;
 }
@@ -1268,6 +1364,11 @@ details.faq-item > :last-child {
 
   .steps-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .setup-grid,
+  .setup-notes {
+    grid-template-columns: 1fr;
   }
 
   .feature-card {
