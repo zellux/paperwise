@@ -214,6 +214,28 @@ img {
   text-transform: uppercase;
 }
 
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: #edf4ff;
+  color: var(--blue);
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--blue);
+  display: inline-block;
+}
+
 h1,
 h2,
 h3 {
@@ -1161,7 +1183,6 @@ p {
 @media (max-width: 1080px) {
 
   .nav-shell,
-  .hero-layout,
   .feature-grid,
   .example-row,
   .example-row-reverse,
@@ -1169,6 +1190,7 @@ p {
   .config-showcase {
     grid-template-columns: 1fr;
   }
+
 
   .feature-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1203,6 +1225,11 @@ p {
 
   .marketing-header {
     padding-top: 12px;
+  }
+
+  .hero-layout {
+    grid-template-columns: 1fr;
+    gap: 40px;
   }
 
   .nav-shell {
