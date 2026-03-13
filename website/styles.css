@@ -23,6 +23,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 html,
 body {
   margin: 0;
@@ -269,7 +273,7 @@ p {
 .examples-section,
 .steps-section,
 .cta-section {
-  padding: 40px 0 48px;
+  padding: 64px 0 72px;
 }
 
 .hero-layout {
@@ -1105,8 +1109,61 @@ p {
   gap: 12px;
 }
 
-.faq-item {
+details.faq-item {
+  padding: 0;
+}
+
+details.faq-item summary {
   padding: 18px;
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+details.faq-item summary::-webkit-details-marker {
+  display: none;
+}
+
+details.faq-item summary::after {
+  content: "+";
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--ink-faint);
+  font-size: 1.1rem;
+  font-weight: 600;
+  transition: transform 0.18s ease, background-color 0.18s ease;
+}
+
+details.faq-item[open] summary::after {
+  content: "\2212";
+  background: #edf4ff;
+  color: var(--blue);
+}
+
+details.faq-item summary:hover {
+  background: var(--surface-soft);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+
+details.faq-item:not([open]) summary:hover {
+  border-radius: var(--radius-xl);
+}
+
+details.faq-item > :not(summary) {
+  padding: 0 18px;
+}
+
+details.faq-item > :last-child {
+  padding-bottom: 18px;
 }
 
 .faq-item h3 {

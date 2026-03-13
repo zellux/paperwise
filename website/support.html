@@ -40,7 +40,7 @@
         </div>
       </header>
 
-      <main class="site-shell support-main">
+      <div class="site-shell support-main">
         <section class="support-hero">
           <p class="tag">Support</p>
           <h1>Answers for setup, self-hosting, troubleshooting, and daily use.</h1>
@@ -48,14 +48,14 @@
             Quick references for common Paperwise questions across self-hosting, upload, OCR, parsing, and local account access.
           </p>
         </section>
-      </main>
+      </div>
     </div>
 
     <main class="site-shell">
       <section class="section support-faq" aria-label="Frequently asked questions">
         <div class="faq">
-          <article class="faq-item">
-            <h3>How does text extraction and OCR work in Paperwise, and what options can I choose?</h3>
+          <details class="faq-item" open>
+            <summary><h3>How does text extraction and OCR work in Paperwise, and what options can I choose?</h3></summary>
             <p>
               Paperwise first tries to extract text directly from the document when possible. That works well for
               machine-readable PDFs and avoids unnecessary OCR. When the file is a scan, image-heavy PDF, or low-quality
@@ -83,10 +83,10 @@
               <code>high</code>. Higher detail can improve difficult scans, but it may increase latency and cost.
               Paperwise also supports an auto-switch mode so OCR is only used when local extraction looks weak.
             </p>
-          </article>
+          </details>
 
-          <article class="faq-item">
-            <h3>Which AI models should I use for OCR, extraction, and Q&amp;A?</h3>
+          <details class="faq-item">
+            <summary><h3>Which AI models should I use for OCR, extraction, and Q&amp;A?</h3></summary>
             <p>
               Paperwise works well with both GPT and Gemini setups. Pick the provider you prefer, then use task-specific
               models so OCR, extraction, and grounded Q&amp;A are tuned separately.
@@ -136,25 +136,25 @@
               and
               <a href="https://ai.google.dev/gemini-api/docs/models/gemini" target="_blank" rel="noopener noreferrer">Gemini models</a>.
             </p>
-          </article>
+          </details>
 
-          <article class="faq-item">
-            <h3>Why does OCR sometimes time out on dense PDFs?</h3>
+          <details class="faq-item">
+            <summary><h3>Why does OCR sometimes time out on dense PDFs?</h3></summary>
             <p>
               Large page images can take longer to process. Paperwise logs per-page OCR progress and retries timed-out
               pages. Longer OCR request timeouts are enabled for vision calls.
             </p>
-          </article>
+          </details>
 
-          <article class="faq-item">
-            <h3>How are duplicate files handled?</h3>
+          <details class="faq-item">
+            <summary><h3>How are duplicate files handled?</h3></summary>
             <p>
               Documents are deduplicated by SHA256 checksum to prevent repeated ingestion of the same file content.
             </p>
-          </article>
+          </details>
 
-          <article class="faq-item">
-            <h3>Where can I get additional help?</h3>
+          <details class="faq-item">
+            <summary><h3>Where can I get additional help?</h3></summary>
             <p>
               Open an issue in the repository if you have access:
               <a href="https://github.com/zellux/paperwise" target="_blank" rel="noopener noreferrer">
@@ -162,7 +162,7 @@
               </a>
               .
             </p>
-          </article>
+          </details>
         </div>
       </section>
 
