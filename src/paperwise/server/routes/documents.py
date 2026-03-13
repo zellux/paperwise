@@ -306,6 +306,41 @@ def _iter_filtered_documents(
         scan_offset += batch_size
 
 
+def _normalized_sort_field(value: str | None) -> str | None:
+    normalized = str(value or "").strip()
+    if normalized in {"title", "document_type", "correspondent", "tags", "document_date", "status"}:
+        return normalized
+    return None
+
+
+def _normalized_sort_direction(value: str | None) -> str | None:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"asc", "desc"}:
+        return normalized
+    return None
+
+
+def _document_sort_value(document: Document, llm_result: LLMParseResult | None, sort_field: str) -> str:
+    if sort_field == "title":
+        return llm_result.suggested_title if llm_result and llm_result.suggested_title else document.filename
+    if sort_field == "document_type":
+        return llm_result.document_type if llm_result else ""
+    if sort_field == "correspondent":
+        return llm_result.correspondent if llm_result else ""
+    if sort_field == "tags":
+        return " ".join(llm_result.tags) if llm_result else ""
+    if sort_field == "document_date":
+        return llm_result.document_date or "" if llm_result else ""
+    if sort_field == "status":
+        return document.status.value
+    return ""
+
+
+def _document_sort_key(document: Document, llm_result: LLMParseResult | None, sort_field: str) -> tuple[str, str]:
+    primary = _normalize_name(_document_sort_value(document, llm_result, sort_field))
+    return primary, document.id
+
+
 def _normalized_values(values: list[str] | None) -> set[str]:
     normalized: set[str] = set()
     for value in values or []:
@@ -799,6 +834,8 @@ def create_document_endpoint(
 def list_documents_endpoint(
     limit: int = 100,
     offset: int = Query(0, ge=0),
+    sort_by: str | None = Query(None),
+    sort_dir: str | None = Query(None),
     q: str | None = Query(None),
     tag: list[str] | None = Query(None),
     correspondent: list[str] | None = Query(None),
@@ -811,31 +848,36 @@ def list_documents_endpoint(
     normalized_correspondents = _normalized_values(correspondent)
     normalized_document_types = _normalized_values(document_type)
     normalized_statuses = _normalized_values(status)
+    normalized_sort_field = _normalized_sort_field(sort_by)
+    normalized_sort_direction = _normalized_sort_direction(sort_dir)
     if not normalized_statuses:
         normalized_statuses = {_normalize_name(DocumentStatus.READY.value)}
 
+    matching_documents = list(
+        _iter_filtered_documents(
+            repository=repository,
+            current_user=current_user,
+            query=q,
+            normalized_tags=normalized_tags,
+            normalized_correspondents=normalized_correspondents,
+            normalized_document_types=normalized_document_types,
+            normalized_statuses=normalized_statuses,
+        )
+    )
+    if normalized_sort_field and normalized_sort_direction:
+        matching_documents.sort(
+            key=lambda item: _document_sort_key(item[0], item[1], normalized_sort_field),
+            reverse=normalized_sort_direction == "desc",
+        )
+
     results: list[DocumentListItemResponse] = []
-    matched_offset = 0
-    for document, llm_result in _iter_filtered_documents(
-        repository=repository,
-        current_user=current_user,
-        query=q,
-        normalized_tags=normalized_tags,
-        normalized_correspondents=normalized_correspondents,
-        normalized_document_types=normalized_document_types,
-        normalized_statuses=normalized_statuses,
-    ):
-        if matched_offset < offset:
-            matched_offset += 1
-            continue
+    for document, llm_result in matching_documents[offset : offset + limit]:
         results.append(
             _to_list_item_response(
                 document=document,
                 llm_result=llm_result,
             )
         )
-        if len(results) >= limit:
-            break
     return results
 
 

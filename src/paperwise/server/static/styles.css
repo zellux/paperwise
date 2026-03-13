@@ -1402,6 +1402,46 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-size: 0.72rem;
 }
 
+.table-sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.table-sort-button:hover,
+.table-sort-button:focus-visible {
+  color: var(--ink);
+}
+
+.table-sort-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.table-sort-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 10px;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.docs-table th[aria-sort="ascending"] .table-sort-indicator,
+.docs-table th[aria-sort="descending"] .table-sort-indicator {
+  color: var(--ink);
+}
+
 .docs-table tbody tr:hover {
   background: var(--table-row-hover);
 }

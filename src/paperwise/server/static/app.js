@@ -111,6 +111,7 @@ const processedDocsTableBody = document.getElementById("processedDocsTableBody")
 const activityTokenTotal = document.getElementById("activityTokenTotal");
 const navLinks = [...document.querySelectorAll(".nav-link")];
 const views = [...document.querySelectorAll(".view")];
+const sortableHeaders = [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
 const filterDropdownState = new Map();
 let activeFilterDropdown = null;
 let currentViewId = "section-docs";
@@ -205,6 +206,10 @@ let docsFilters = {
 };
 let docsPage = 1;
 let docsPageSize = 20;
+const DOCS_SORT_FIELDS = new Set(["title", "document_type", "correspondent", "tags", "document_date", "status"]);
+let docsSort = { field: "", direction: "" };
+let tagStatsSort = { field: "", direction: "" };
+let documentTypesSort = { field: "", direction: "" };
 let groundedQaTopK = 18;
 let groundedQaMaxDocuments = 12;
 let docsTotalCount = 0;
@@ -218,6 +223,8 @@ let searchDocsCatalogRequestSeq = 0;
 let searchCollectionDocsRequestSeq = 0;
 let searchCollections = [];
 let searchDocsCatalog = [];
+let currentTagStats = [];
+let currentDocumentTypeStats = [];
 let searchSelectedCollectionId = "";
 let searchSelectedCollectionDocumentIds = [];
 let searchActiveSectionId = "search-section-keyword";
@@ -245,6 +252,41 @@ function normalizePageSize(value) {
     return 20;
   }
   return size;
+}
+
+function normalizeSortDirection(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "asc" || normalized === "desc") {
+    return normalized;
+  }
+  return "";
+}
+
+function normalizeSortField(value, allowedFields) {
+  const normalized = String(value || "").trim();
+  if (allowedFields.has(normalized)) {
+    return normalized;
+  }
+  return "";
+}
+
+function normalizeSortState(value, allowedFields) {
+  const field = normalizeSortField(value?.field, allowedFields);
+  const direction = normalizeSortDirection(value?.direction);
+  if (!field || !direction) {
+    return { field: "", direction: "" };
+  }
+  return { field, direction };
+}
+
+function getNextSortState(currentState, field) {
+  if (currentState.field !== field || !currentState.direction) {
+    return { field, direction: "asc" };
+  }
+  if (currentState.direction === "asc") {
+    return { field, direction: "desc" };
+  }
+  return { field: "", direction: "" };
 }
 
 function normalizeGroundedQaTopK(value) {
@@ -1051,6 +1093,7 @@ async function saveUserPreferences() {
   const payload = {
     preferences: {
       docs_filters: sanitizeDocsFilters(docsFilters),
+      docs_sort: normalizeSortState(docsSort, DOCS_SORT_FIELDS),
       last_view: currentViewId,
       ui_theme: currentTheme,
       docs_page_size: docsPageSize,
@@ -1099,6 +1142,7 @@ function applyUserPreferences(preferences, options = {}) {
   if (preferences.docs_filters && typeof preferences.docs_filters === "object") {
     docsFilters = sanitizeDocsFilters(preferences.docs_filters);
   }
+  docsSort = normalizeSortState(preferences.docs_sort, DOCS_SORT_FIELDS);
   if (
     includeLastView &&
     typeof preferences.last_view === "string" &&
@@ -1141,6 +1185,7 @@ if (authToken && authGate && appShell) {
   setActiveSettingsSection(settingsActiveSectionId);
   setActiveView(currentViewId);
   setActiveNav(currentViewId);
+  renderSortHeaders();
   authGate.classList.add("view-hidden");
   appShell.classList.remove("view-hidden");
 }
@@ -1403,6 +1448,11 @@ function clearSession() {
   connectionTestStatuses.clear();
   docsPage = 1;
   docsPageSize = 20;
+  docsSort = { field: "", direction: "" };
+  tagStatsSort = { field: "", direction: "" };
+  documentTypesSort = { field: "", direction: "" };
+  currentTagStats = [];
+  currentDocumentTypeStats = [];
   docsFilters = sanitizeDocsFilters({
     tag: [],
     correspondent: [],
@@ -1424,6 +1474,7 @@ function clearSession() {
   renderSearchAskAnswer(null);
   renderSearchAskDebugOutput(null, false);
   renderSettingsForm();
+  renderSortHeaders();
   renderActivityTokenTotal(0);
   renderSessionState();
   syncUploadAvailability();
@@ -1532,6 +1583,72 @@ function unique(values) {
 
 function sortValues(values) {
   return [...values].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+}
+
+function compareSortValues(left, right) {
+  const leftNumber = Number(left);
+  const rightNumber = Number(right);
+  const leftIsNumber = Number.isFinite(leftNumber) && String(left).trim() !== "";
+  const rightIsNumber = Number.isFinite(rightNumber) && String(right).trim() !== "";
+  if (leftIsNumber && rightIsNumber) {
+    return leftNumber - rightNumber;
+  }
+  return String(left || "").localeCompare(String(right || ""), undefined, {
+    sensitivity: "base",
+    numeric: true,
+  });
+}
+
+function sortCollection(items, sortState, valueGetters) {
+  const sorted = [...items];
+  if (!sortState.field || !sortState.direction) {
+    return sorted;
+  }
+  const getValue = valueGetters[sortState.field];
+  if (typeof getValue !== "function") {
+    return sorted;
+  }
+  sorted.sort((left, right) => {
+    const comparison = compareSortValues(getValue(left), getValue(right));
+    return sortState.direction === "desc" ? -comparison : comparison;
+  });
+  return sorted;
+}
+
+function getSortStateForTable(tableName) {
+  if (tableName === "docs") {
+    return docsSort;
+  }
+  if (tableName === "tags") {
+    return tagStatsSort;
+  }
+  if (tableName === "document-types") {
+    return documentTypesSort;
+  }
+  return { field: "", direction: "" };
+}
+
+function renderSortHeaders() {
+  for (const header of sortableHeaders) {
+    const tableName = header.dataset.sortTable || "";
+    const field = header.dataset.sortField || "";
+    const sortState = getSortStateForTable(tableName);
+    const direction = sortState.field === field ? sortState.direction : "";
+    const button = header.querySelector(".table-sort-button");
+    const indicator = header.querySelector(".table-sort-indicator");
+    header.setAttribute(
+      "aria-sort",
+      direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"
+    );
+    if (indicator) {
+      indicator.textContent = direction === "asc" ? "^" : direction === "desc" ? "v" : "-";
+    }
+    if (button) {
+      const label = button.querySelector("span")?.textContent?.trim() || field;
+      const nextDirection = getNextSortState(sortState, field).direction || "none";
+      button.title = `Sort ${label} (${nextDirection})`;
+    }
+  }
 }
 
 function getFilterKey(selectEl) {
@@ -1833,6 +1950,8 @@ function syncUrlFromFilters() {
   url.searchParams.delete("view");
   url.searchParams.delete("page");
   url.searchParams.delete("page_size");
+  url.searchParams.delete("sort_by");
+  url.searchParams.delete("sort_dir");
 
   if (docsFilters.q) {
     url.searchParams.set("q", docsFilters.q);
@@ -1854,6 +1973,10 @@ function syncUrlFromFilters() {
   }
   if (docsPageSize !== 20) {
     url.searchParams.set("page_size", String(docsPageSize));
+  }
+  if (docsSort.field && docsSort.direction) {
+    url.searchParams.set("sort_by", docsSort.field);
+    url.searchParams.set("sort_dir", docsSort.direction);
   }
   let viewPath = VIEW_ID_TO_PATH[currentViewId];
   if (currentViewId === "section-settings") {
@@ -1881,6 +2004,13 @@ function readFiltersFromUrl() {
   docsPage = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
   const pageSizeValue = params.get("page_size") || String(docsPageSize || 20);
   docsPageSize = normalizePageSize(pageSizeValue);
+  docsSort = normalizeSortState(
+    {
+      field: params.get("sort_by") || "",
+      direction: params.get("sort_dir") || "",
+    },
+    DOCS_SORT_FIELDS
+  );
   const viewFromUrl = params.get("view");
   const mappedViewId = viewFromUrl ? (VIEW_PARAM_TO_ID[viewFromUrl] || viewFromUrl) : "";
   const pathViewId = getCurrentPathViewId();
@@ -2014,6 +2144,7 @@ function getSuggestedTitle(doc) {
 }
 
 function renderDocsList(documents) {
+  renderSortHeaders();
   if (!documents.length) {
     docsTableBody.innerHTML = '<tr><td colspan="7">No documents found.</td></tr>';
     return;
@@ -2113,12 +2244,17 @@ function renderDocsList(documents) {
 }
 
 function renderTagsList(tagStats) {
-  if (!tagStats.length) {
+  const sortedTagStats = sortCollection(tagStats, tagStatsSort, {
+    tag: (item) => item.tag,
+    document_count: (item) => item.document_count,
+  });
+  renderSortHeaders();
+  if (!sortedTagStats.length) {
     tagsTableBody.innerHTML = '<tr><td colspan="3">No tags found.</td></tr>';
     return;
   }
   tagsTableBody.innerHTML = "";
-  for (const stat of tagStats) {
+  for (const stat of sortedTagStats) {
     const row = document.createElement("tr");
     const tagCell = document.createElement("td");
     tagCell.setAttribute("data-label", "Tag");
@@ -2159,12 +2295,17 @@ function renderTagsList(tagStats) {
 }
 
 function renderDocumentTypesList(typeStats) {
-  if (!typeStats.length) {
+  const sortedTypeStats = sortCollection(typeStats, documentTypesSort, {
+    document_type: (item) => item.document_type,
+    document_count: (item) => item.document_count,
+  });
+  renderSortHeaders();
+  if (!sortedTypeStats.length) {
     documentTypesTableBody.innerHTML = '<tr><td colspan="3">No document types found.</td></tr>';
     return;
   }
   documentTypesTableBody.innerHTML = "";
-  for (const stat of typeStats) {
+  for (const stat of sortedTypeStats) {
     const row = document.createElement("tr");
     const typeCell = document.createElement("td");
     typeCell.setAttribute("data-label", "Document Type");
@@ -3139,11 +3280,16 @@ function getVisiblePendingRowCount() {
 async function loadDocumentsList() {
   const requestSeq = ++docsListRequestSeq;
   renderTableLoading(docsTableBody, 7, "Loading documents...");
+  renderSortHeaders();
   renderPaginationControls(0, { hasExactTotal: false });
   const query = new URLSearchParams({
     limit: String(docsPageSize),
     offset: String((docsPage - 1) * docsPageSize),
   });
+  if (docsSort.field && docsSort.direction) {
+    query.set("sort_by", docsSort.field);
+    query.set("sort_dir", docsSort.direction);
+  }
   if (docsFilters.q) {
     query.set("q", docsFilters.q);
   }
@@ -3305,6 +3451,7 @@ async function loadProcessedDocumentsActivity() {
 async function loadTagStats() {
   const requestSeq = ++tagStatsRequestSeq;
   renderTableLoading(tagsTableBody, 3, "Loading tags...");
+  renderSortHeaders();
   const response = await apiFetch("/documents/metadata/tag-stats");
   if (requestSeq !== tagStatsRequestSeq) {
     return;
@@ -3317,6 +3464,7 @@ async function loadTagStats() {
     logActivity(`Tag stats load failed: ${payload.detail || response.statusText}`);
     return;
   }
+  currentTagStats = [...payload];
   renderTagsList(payload);
   logActivity(`Loaded ${payload.length} tag(s)`);
 }
@@ -3324,6 +3472,7 @@ async function loadTagStats() {
 async function loadDocumentTypeStats() {
   const requestSeq = ++documentTypeStatsRequestSeq;
   renderTableLoading(documentTypesTableBody, 3, "Loading document types...");
+  renderSortHeaders();
   const response = await apiFetch("/documents/metadata/document-type-stats");
   if (requestSeq !== documentTypeStatsRequestSeq) {
     return;
@@ -3336,6 +3485,7 @@ async function loadDocumentTypeStats() {
     logActivity(`Document type stats load failed: ${payload.detail || response.statusText}`);
     return;
   }
+  currentDocumentTypeStats = [...payload];
   renderDocumentTypesList(payload);
   logActivity(`Loaded ${payload.length} document type(s)`);
 }
@@ -3901,6 +4051,31 @@ for (const selectEl of filterSelects) {
   setupFilterDropdown(selectEl);
 }
 
+for (const header of sortableHeaders) {
+  const button = header.querySelector(".table-sort-button");
+  button?.addEventListener("click", async () => {
+    const tableName = header.dataset.sortTable || "";
+    const field = header.dataset.sortField || "";
+    if (tableName === "docs") {
+      docsSort = getNextSortState(docsSort, field);
+      docsPage = 1;
+      syncUrlFromFilters();
+      renderSortHeaders();
+      await loadDocumentsList();
+      return;
+    }
+    if (tableName === "tags") {
+      tagStatsSort = getNextSortState(tagStatsSort, field);
+      renderTagsList(currentTagStats);
+      return;
+    }
+    if (tableName === "document-types") {
+      documentTypesSort = getNextSortState(documentTypesSort, field);
+      renderDocumentTypesList(currentDocumentTypeStats);
+    }
+  });
+}
+
 document.addEventListener("click", (event) => {
   if (!activeFilterDropdown) {
     return;
@@ -3986,6 +4161,7 @@ window.addEventListener("popstate", async () => {
   readFiltersFromUrl();
   applyFiltersToControls();
   renderSettingsForm();
+  renderSortHeaders();
   setActiveView(currentViewId);
   setActiveNav(currentViewId);
   if (currentViewId === "section-document") {
@@ -3997,12 +4173,14 @@ window.addEventListener("popstate", async () => {
 async function initializeApp() {
   await restoreSession();
   if (!authToken || !currentUser) {
+    renderSortHeaders();
     return;
   }
 
   await hydrateUserPreferencesForSession();
   applyFiltersToControls();
   renderSettingsForm();
+  renderSortHeaders();
   syncUploadAvailability();
   setActiveView(currentViewId);
   setActiveNav(currentViewId);

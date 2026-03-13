@@ -259,6 +259,52 @@ def test_list_documents_paginates_after_filtering() -> None:
         app.dependency_overrides.clear()
 
 
+def test_list_documents_supports_sorting() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        for name in ("gamma.pdf", "alpha.pdf", "beta.pdf"):
+            response = client.post(
+                "/documents",
+                files={"file": (name, f"%PDF-1.7\n{name}".encode("utf-8"), "application/pdf")},
+            )
+            assert response.status_code == 201
+
+        default_response = client.get("/documents?limit=3&status=processing")
+        assert default_response.status_code == 200
+        assert [item["filename"] for item in default_response.json()] == [
+            "beta.pdf",
+            "alpha.pdf",
+            "gamma.pdf",
+        ]
+
+        ascending_response = client.get("/documents?limit=3&status=processing&sort_by=title&sort_dir=asc")
+        assert ascending_response.status_code == 200
+        assert [item["filename"] for item in ascending_response.json()] == [
+            "alpha.pdf",
+            "beta.pdf",
+            "gamma.pdf",
+        ]
+
+        descending_response = client.get("/documents?limit=3&status=processing&sort_by=title&sort_dir=desc")
+        assert descending_response.status_code == 200
+        assert [item["filename"] for item in descending_response.json()] == [
+            "gamma.pdf",
+            "beta.pdf",
+            "alpha.pdf",
+        ]
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_count_documents_with_filters() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()
