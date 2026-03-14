@@ -23,17 +23,107 @@ The GitHub Actions publish workflow pushes images to:
 ghcr.io/zellux/paperwise
 ```
 
-Run the latest published image with Docker Compose:
+Create a `.env` file:
 
 ```bash
-cp .env.docker.example .env
-docker compose -f docker-compose.deploy.yml up -d
+PAPERWISE_AUTH_SECRET=replace-with-a-strong-secret
+PAPERWISE_IMAGE=ghcr.io/zellux/paperwise:latest
 ```
 
-To pin a specific release tag:
+Create a `docker-compose.yml` file:
+
+```yaml
+services:
+  api:
+    image: ${PAPERWISE_IMAGE}
+    environment:
+      PAPERWISE_ENV: docker
+      PAPERWISE_LOG_LEVEL: INFO
+      PAPERWISE_API_HOST: 0.0.0.0
+      PAPERWISE_API_PORT: 8000
+      PAPERWISE_REDIS_URL: redis://redis:6379/0
+      PAPERWISE_REPOSITORY_BACKEND: postgres
+      PAPERWISE_POSTGRES_URL: postgresql+psycopg://paperwise:paperwise@postgres:5432/paperwise
+      PAPERWISE_OBJECT_STORE_ROOT: /data/object-store
+      PAPERWISE_AUTH_SECRET: ${PAPERWISE_AUTH_SECRET}
+      PAPERWISE_AUTH_TOKEN_TTL_SECONDS: ${PAPERWISE_AUTH_TOKEN_TTL_SECONDS:-43200}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8000"
+    volumes:
+      - paperwise_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  worker:
+    image: ${PAPERWISE_IMAGE}
+    command: ["celery", "-A", "paperwise.workers.celery_app.celery_app", "worker", "--loglevel=INFO"]
+    environment:
+      PAPERWISE_ENV: docker
+      PAPERWISE_LOG_LEVEL: INFO
+      PAPERWISE_REDIS_URL: redis://redis:6379/0
+      PAPERWISE_REPOSITORY_BACKEND: postgres
+      PAPERWISE_POSTGRES_URL: postgresql+psycopg://paperwise:paperwise@postgres:5432/paperwise
+      PAPERWISE_OBJECT_STORE_ROOT: /data/object-store
+      PAPERWISE_AUTH_SECRET: ${PAPERWISE_AUTH_SECRET}
+      PAPERWISE_AUTH_TOKEN_TTL_SECONDS: ${PAPERWISE_AUTH_TOKEN_TTL_SECONDS:-43200}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    volumes:
+      - paperwise_data:/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: paperwise
+      POSTGRES_PASSWORD: paperwise
+      POSTGRES_DB: paperwise
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U paperwise -d paperwise"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  paperwise_data:
+  postgres_data:
+```
+
+Start the stack:
 
 ```bash
-PAPERWISE_IMAGE=ghcr.io/zellux/paperwise:v0.1.0 docker compose -f docker-compose.deploy.yml up -d
+docker compose up -d
+```
+
+To pin a specific release tag, change `PAPERWISE_IMAGE` in `.env`, for example:
+
+```bash
+PAPERWISE_IMAGE=ghcr.io/zellux/paperwise:v0.1.0
 ```
 
 If the GHCR package is private, make it public in the GitHub package settings before sharing it with other users.
@@ -69,9 +159,9 @@ For more detail, use the docs:
 ## Common commands
 
 ```bash
-docker compose -f docker-compose.deploy.yml ps
-docker compose -f docker-compose.deploy.yml logs -f api worker
-docker compose -f docker-compose.deploy.yml down
+docker compose ps
+docker compose logs -f api worker
+docker compose down
 ```
 
 ## License
