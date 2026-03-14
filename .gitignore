@@ -19,6 +19,8 @@ venv/
 # Tooling
 dist/
 build/
+node_modules/
+.astro/
 coverage.xml
 .coverage
 .run/

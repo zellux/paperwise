@@ -1,11 +1,15 @@
 # Static Website
 
-This directory contains a standalone static website for Paperwise marketing and support content.
+This directory contains a standalone static website for Paperwise marketing content.
+
+Generated product docs now live in `../docs-site` and are built with Starlight. Prefer
+updating setup, support, and operational documentation there when possible.
 
 ## Files
 
 - `index.html` - product showcase page
-- `support.html` - support FAQ page
+- `support.html` - legacy support / FAQ page
+- `getting-started.html` - legacy getting-started page
 - `styles.css` - shared styling
 
 ## Hosting

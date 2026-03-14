@@ -1,0 +1,34 @@
+---
+title: Paperwise Docs
+description: Setup, self-hosting, model configuration, and support for Paperwise.
+template: splash
+hero:
+  tagline: Self-hosted document intelligence for OCR, extraction, search, and grounded Q&A.
+  actions:
+    - text: Getting Started
+      link: /getting-started/
+      icon: right-arrow
+    - text: Open GitHub
+      link: https://github.com/zellux/paperwise
+      icon: external
+      variant: minimal
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+## Start here
+
+<CardGrid stagger>
+  <Card title="Get running" icon="open-book">
+    Follow the Docker or local development setup guide, then complete your first-run model configuration.
+  </Card>
+  <Card title="Configure models" icon="setting">
+    Add provider connections and assign separate models for metadata extraction, grounded Q&A, and OCR.
+  </Card>
+  <Card title="Troubleshoot OCR" icon="document">
+    Learn when to use LLM OCR, when to keep OCR local with Tesseract, and how to tune the OCR path.
+  </Card>
+  <Card title="Understand the repo" icon="add-document">
+    See the development commands, repository layout, and where the backend, workers, and UI live.
+  </Card>
+</CardGrid>
