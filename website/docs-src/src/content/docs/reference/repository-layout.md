@@ -15,7 +15,8 @@ description: High-level map of the Paperwise codebase.
 - `tests` — unit and integration tests
 - `infra` — local infrastructure definitions
 - `docs` — product and design documents
-- `website/docs` — Starlight docs site
+- `website/docs-src` — Starlight docs source
+- `website/docs` — generated static docs output
 - `website` — standalone marketing site
 
 ## Storage layout

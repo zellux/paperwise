@@ -3,6 +3,7 @@ import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
 export default defineConfig({
+	outDir: '../docs',
 	integrations: [
 		starlight({
 			title: 'Paperwise Docs',

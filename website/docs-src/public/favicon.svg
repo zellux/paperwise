@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title>Paperwise</title>
+  <rect width="64" height="64" rx="14" fill="#ef6c2f"/>
+  <path d="M20 20h15c5.523 0 10 4.477 10 10s-4.477 10-10 10H29v10H20V20zm9 9h6a1 1 0 0 0 0-2h-6v2zm0 8h6a1 1 0 0 0 0-2h-6v2z" fill="#fff"/>
+</svg>

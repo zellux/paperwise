@@ -14,7 +14,8 @@ AI-native document management platform (Python-first).
 - `tests` - unit and integration tests.
 - `infra` - local infrastructure definitions (Docker Compose).
 - `docs` - product/design documents.
-- `website/docs` - Starlight docs site for setup, model configuration, and support.
+- `website/docs-src` - Starlight docs source for setup, model configuration, and support.
+- `website/docs` - generated static docs output published with the website.
 
 ## Quickstart (local)
 
@@ -31,7 +32,7 @@ Open [http://localhost:8000](http://localhost:8000) for the initial web UI.
 To run the Starlight docs locally:
 
 ```bash
-cd website/docs
+cd website/docs-src
 npm install
 npm run dev
 ```
