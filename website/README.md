@@ -9,8 +9,8 @@ Generated product docs are published to `./docs`, with the Starlight source livi
 ## Files
 
 - `index.html` - product showcase page
-- `support.html` - legacy support / FAQ page
-- `getting-started.html` - legacy getting-started page
+- `support.html` - redirect shim to `./docs/support/`
+- `getting-started.html` - redirect shim to `./docs/getting-started/`
 - `docs/` - generated static docs output
 - `docs-src/` - Starlight docs source
 - `styles.css` - shared styling
