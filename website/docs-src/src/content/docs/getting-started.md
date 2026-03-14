@@ -104,4 +104,4 @@ After the app is running, there is one more required step: configure model conne
 
 Use Docker if you want the shortest path to a working self-hosted install. Use local dev mode if you plan to modify the code or debug the internals.
 
-Next: [Model Config](/model-config/)
+Next: [Model Config](/docs/model-config/)

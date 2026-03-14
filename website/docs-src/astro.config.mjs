@@ -9,6 +9,9 @@ export default defineConfig({
 		starlight({
 			title: 'Paperwise Docs',
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/zellux/paperwise' }],
+			components: {
+				Header: './src/components/DocsHeader.astro',
+			},
 			sidebar: [
 				{
 					label: 'Start Here',

@@ -74,4 +74,4 @@ If your documents are mostly clean text PDFs, start with the faster models and o
 - OCR failures on scans: switch OCR to a stronger multimodal model or try `Local Tesseract` for cleaner documents.
 - Custom provider not working: verify the base URL and API key in **Model Config**.
 
-Next: [Support](/support/)
+Next: [Support](/docs/support/)
