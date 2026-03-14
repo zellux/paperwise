@@ -11,14 +11,9 @@ const pathname = Astro.url.pathname.replace(/\/+$/, '') || '/docs';
 const navItems = [
 	{ label: 'Home', href: '/', activeWhen: () => false },
 	{
-		label: 'Getting Started',
-		href: '/docs/getting-started/',
-		activeWhen: () => pathname === '/docs/getting-started',
-	},
-	{
-		label: 'Support',
-		href: '/docs/support/',
-		activeWhen: () => pathname === '/docs/support',
+		label: 'Docs',
+		href: '/docs/',
+		activeWhen: () => pathname === '/docs' || pathname.startsWith('/docs/'),
 	},
 ];
 ---
