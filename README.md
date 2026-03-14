@@ -23,19 +23,12 @@ The GitHub Actions publish workflow pushes images to:
 ghcr.io/zellux/paperwise
 ```
 
-Create a `.env` file:
-
-```bash
-PAPERWISE_AUTH_SECRET=replace-with-a-strong-secret
-PAPERWISE_IMAGE=ghcr.io/zellux/paperwise:latest
-```
-
 Create a `docker-compose.yml` file:
 
 ```yaml
 services:
   api:
-    image: ${PAPERWISE_IMAGE}
+    image: ghcr.io/zellux/paperwise:latest
     environment:
       PAPERWISE_ENV: docker
       PAPERWISE_LOG_LEVEL: INFO
@@ -45,8 +38,8 @@ services:
       PAPERWISE_REPOSITORY_BACKEND: postgres
       PAPERWISE_POSTGRES_URL: postgresql+psycopg://paperwise:paperwise@postgres:5432/paperwise
       PAPERWISE_OBJECT_STORE_ROOT: /data/object-store
-      PAPERWISE_AUTH_SECRET: ${PAPERWISE_AUTH_SECRET}
-      PAPERWISE_AUTH_TOKEN_TTL_SECONDS: ${PAPERWISE_AUTH_TOKEN_TTL_SECONDS:-43200}
+      PAPERWISE_AUTH_SECRET: replace-with-a-strong-secret
+      PAPERWISE_AUTH_TOKEN_TTL_SECONDS: "43200"
     depends_on:
       redis:
         condition: service_healthy
@@ -65,7 +58,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: ${PAPERWISE_IMAGE}
+    image: ghcr.io/zellux/paperwise:latest
     command: ["celery", "-A", "paperwise.workers.celery_app.celery_app", "worker", "--loglevel=INFO"]
     environment:
       PAPERWISE_ENV: docker
@@ -74,8 +67,8 @@ services:
       PAPERWISE_REPOSITORY_BACKEND: postgres
       PAPERWISE_POSTGRES_URL: postgresql+psycopg://paperwise:paperwise@postgres:5432/paperwise
       PAPERWISE_OBJECT_STORE_ROOT: /data/object-store
-      PAPERWISE_AUTH_SECRET: ${PAPERWISE_AUTH_SECRET}
-      PAPERWISE_AUTH_TOKEN_TTL_SECONDS: ${PAPERWISE_AUTH_TOKEN_TTL_SECONDS:-43200}
+      PAPERWISE_AUTH_SECRET: replace-with-a-strong-secret
+      PAPERWISE_AUTH_TOKEN_TTL_SECONDS: "43200"
     depends_on:
       redis:
         condition: service_healthy
@@ -120,10 +113,12 @@ Start the stack:
 docker compose up -d
 ```
 
-To pin a specific release tag, change `PAPERWISE_IMAGE` in `.env`, for example:
+Before starting, replace `replace-with-a-strong-secret` with your own secret in both `api` and `worker`.
 
-```bash
-PAPERWISE_IMAGE=ghcr.io/zellux/paperwise:v0.1.0
+To pin a specific release tag, replace the image value, for example:
+
+```yaml
+image: ghcr.io/zellux/paperwise:v0.1.0
 ```
 
 If the GHCR package is private, make it public in the GitHub package settings before sharing it with other users.
