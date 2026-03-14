@@ -17,39 +17,13 @@ Docs:
 - At least one model provider key for metadata extraction and grounded Q&A
 - Optional: `tesseract` if you want OCR to stay local instead of using an LLM for OCR
 
-### Run Paperwise
-
-```bash
-git clone https://github.com/zellux/paperwise.git
-cd paperwise
-cp .env.docker.example .env
-```
-
-Set a strong auth secret in `.env`:
-
-```bash
-PAPERWISE_AUTH_SECRET=replace-with-a-strong-secret
-```
-
-Then start the stack:
-
-```bash
-docker compose up -d --build
-```
-
-Open Paperwise at [http://localhost:8080](http://localhost:8080).
-
-## Run published image
-
-Paperwise can also be deployed from the published container image instead of building from source.
-
 The GitHub Actions publish workflow pushes images to:
 
 ```text
 ghcr.io/zellux/paperwise
 ```
 
-To run the latest published image:
+Run the latest published image with Docker Compose:
 
 ```bash
 cp .env.docker.example .env
@@ -63,6 +37,8 @@ PAPERWISE_IMAGE=ghcr.io/zellux/paperwise:v0.1.0 docker compose -f docker-compose
 ```
 
 If the GHCR package is private, make it public in the GitHub package settings before sharing it with other users.
+
+Open Paperwise at [http://localhost:8080](http://localhost:8080).
 
 ## First-run setup
 
@@ -91,14 +67,6 @@ For more detail, use the docs:
 - [Q&A](https://paperwise.dev/docs/support/)
 
 ## Common commands
-
-```bash
-docker compose ps
-docker compose logs -f api worker
-docker compose down
-```
-
-Published-image commands:
 
 ```bash
 docker compose -f docker-compose.deploy.yml ps
