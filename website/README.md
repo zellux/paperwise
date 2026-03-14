@@ -2,7 +2,7 @@
 
 This directory contains a standalone static website for Paperwise marketing content.
 
-Generated product docs now live in `../docs-site` and are built with Starlight. Prefer
+Generated product docs now live in `./docs` and are built with Starlight. Prefer
 updating setup, support, and operational documentation there when possible.
 
 ## Files
