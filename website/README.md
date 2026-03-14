@@ -3,8 +3,8 @@
 This directory contains a standalone static website for Paperwise marketing content.
 
 Generated product docs are published to `./docs`, with the Starlight source living in
-`./docs-src`. Prefer updating setup, support, and operational documentation in
-`./docs-src`.
+the top-level `docs-src/` directory. Prefer updating setup, support, and operational
+documentation in `../docs-src/`.
 
 ## Files
 
@@ -12,7 +12,6 @@ Generated product docs are published to `./docs`, with the Starlight source livi
 - `support.html` - redirect shim to `./docs/support/`
 - `getting-started.html` - redirect shim to `./docs/getting-started/`
 - `docs/` - generated static docs output
-- `docs-src/` - Starlight docs source
 - `styles.css` - shared styling
 
 ## Hosting

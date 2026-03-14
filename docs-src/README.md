@@ -2,13 +2,13 @@
 
 This directory contains the Starlight source for the Paperwise docs site.
 
-Built static output is written to `../docs` so the generated docs can ship as part of the
-main `website/` directory.
+Built static output is written to `../website/docs` so the generated docs can ship as part of
+the main `website/` directory.
 
 ## Local development
 
 ```bash
-cd website/docs-src
+cd docs-src
 npm install
 npm run dev
 ```

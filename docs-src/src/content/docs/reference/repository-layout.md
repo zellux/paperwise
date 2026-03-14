@@ -14,8 +14,7 @@ description: High-level map of the Paperwise codebase.
 - `src/paperwise/events` — internal event contracts
 - `tests` — unit and integration tests
 - `infra` — local infrastructure definitions
-- `docs` — product and design documents
-- `website/docs-src` — Starlight docs source
+- `docs-src` — Starlight docs source
 - `website/docs` — generated static docs output
 - `website` — standalone marketing site
 

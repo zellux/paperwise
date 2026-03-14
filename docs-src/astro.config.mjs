@@ -5,7 +5,7 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
 	site: 'https://paperwise.dev',
 	base: '/docs',
-	outDir: '../docs',
+	outDir: '../website/docs',
 	integrations: [
 		starlight({
 			title: 'Paperwise Docs',
