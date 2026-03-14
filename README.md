@@ -125,6 +125,30 @@ If the GHCR package is private, make it public in the GitHub package settings be
 
 Open Paperwise at [http://localhost:8080](http://localhost:8080).
 
+## Updating
+
+New images are published automatically when changes land on `main`.
+
+To update a running server that uses `ghcr.io/zellux/paperwise:latest`:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+To pin a release instead of tracking `latest`, set the image tag explicitly, for example:
+
+```yaml
+image: ghcr.io/zellux/paperwise:v0.1.0
+```
+
+Then update by changing the tag in your `docker-compose.yml` and running:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
 ## First-run setup
 
 After the app is running:
@@ -156,6 +180,7 @@ For more detail, use the docs:
 ```bash
 docker compose ps
 docker compose logs -f api worker
+docker compose pull
 docker compose down
 ```
 
