@@ -39,6 +39,31 @@ docker compose up -d --build
 
 Open Paperwise at [http://localhost:8080](http://localhost:8080).
 
+## Run published image
+
+Paperwise can also be deployed from the published container image instead of building from source.
+
+The GitHub Actions publish workflow pushes images to:
+
+```text
+ghcr.io/zellux/paperwise
+```
+
+To run the latest published image:
+
+```bash
+cp .env.docker.example .env
+docker compose -f docker-compose.deploy.yml up -d
+```
+
+To pin a specific release tag:
+
+```bash
+PAPERWISE_IMAGE=ghcr.io/zellux/paperwise:v0.1.0 docker compose -f docker-compose.deploy.yml up -d
+```
+
+If the GHCR package is private, make it public in the GitHub package settings before sharing it with other users.
+
 ## First-run setup
 
 After the app is running:
@@ -71,6 +96,14 @@ For more detail, use the docs:
 docker compose ps
 docker compose logs -f api worker
 docker compose down
+```
+
+Published-image commands:
+
+```bash
+docker compose -f docker-compose.deploy.yml ps
+docker compose -f docker-compose.deploy.yml logs -f api worker
+docker compose -f docker-compose.deploy.yml down
 ```
 
 ## License

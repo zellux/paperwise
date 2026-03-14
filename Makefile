@@ -9,7 +9,7 @@ BACKEND_LOG ?= $(LOG_DIR)/backend.log
 WORKER_LOG ?= $(LOG_DIR)/worker.log
 WEBSITE_PORT ?= 8081
 
-.PHONY: setup deps-up deps-down docker-up docker-down docker-logs backend api worker worker-bg backend-bg website dev-up dev-stop dev-restart dev-status test smoke-llm
+.PHONY: setup deps-up deps-down docker-up docker-down docker-logs docker-deploy-up docker-deploy-down docker-deploy-logs backend api worker worker-bg backend-bg website dev-up dev-stop dev-restart dev-status test smoke-llm
 
 setup:
 	$(PYTHON) -m venv $(VENV)
@@ -30,6 +30,15 @@ docker-down:
 
 docker-logs:
 	docker compose logs -f api worker
+
+docker-deploy-up:
+	docker compose -f docker-compose.deploy.yml up -d
+
+docker-deploy-down:
+	docker compose -f docker-compose.deploy.yml down
+
+docker-deploy-logs:
+	docker compose -f docker-compose.deploy.yml logs -f api worker
 
 backend:
 	$(VENV_PYTHON) -m uvicorn paperwise.server.main:app --reload
