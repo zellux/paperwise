@@ -3775,6 +3775,7 @@ settingsForm?.addEventListener("submit", async (event) => {
     await loadDocumentsList();
   }
   logActivity("Saved settings.");
+  window.location.reload();
 });
 
 settingsOcrProviderSelect?.addEventListener("change", () => {
