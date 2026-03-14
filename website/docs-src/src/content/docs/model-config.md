@@ -67,6 +67,8 @@ These are practical starting points, not hard requirements:
 
 If your documents are mostly clean text PDFs, start with the faster models and only move up when quality is not good enough.
 
+See [Which models should I use?](/docs/support/#which-models-should-i-use) for more detailed starting recommendations and tradeoffs.
+
 ## Common setup issues
 
 - Upload blocked: configure **Metadata Extraction** first.
@@ -74,4 +76,4 @@ If your documents are mostly clean text PDFs, start with the faster models and o
 - OCR failures on scans: switch OCR to a stronger multimodal model or try `Local Tesseract` for cleaner documents.
 - Custom provider not working: verify the base URL and API key in **Model Config**.
 
-Next: [Support](/docs/support/)
+Next: [Q&A](/docs/support/)

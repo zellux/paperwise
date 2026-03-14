@@ -1,6 +1,6 @@
 ---
-title: Support
-description: Setup notes, troubleshooting tips, and operating guidance for Paperwise.
+title: Q&A
+description: Common questions, setup notes, troubleshooting tips, and operating guidance for Paperwise.
 ---
 
 ## How does text extraction and OCR work in Paperwise?

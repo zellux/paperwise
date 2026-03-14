@@ -18,7 +18,7 @@ export default defineConfig({
 					items: [
 						{ label: 'Getting Started', slug: 'getting-started' },
 						{ label: 'Model Config', slug: 'model-config' },
-						{ label: 'Support', slug: 'support' },
+						{ label: 'Q&A', slug: 'support' },
 					],
 				},
 				{
