@@ -17,10 +17,10 @@ setup:
 	$(VENV_PYTHON) -m pip install -e .[dev]
 
 deps-up:
-	docker compose -f infra/docker-compose.yml up -d
+	docker compose up -d redis postgres
 
 deps-down:
-	docker compose -f infra/docker-compose.yml down
+	docker compose stop redis postgres
 
 docker-up:
 	docker compose up -d --build
@@ -119,10 +119,10 @@ dev-status:
 		echo "not running"; \
 	fi
 	@echo "== Dependencies (docker compose) =="
-	@docker compose -f infra/docker-compose.yml ps
+	@docker compose ps redis postgres
 
 test:
 	$(VENV_PYTHON) -m pytest
 
 smoke-llm:
-	$(VENV_PYTHON) scripts/smoke_llm.py
+	$(VENV_PYTHON) tools/smoke_llm.py

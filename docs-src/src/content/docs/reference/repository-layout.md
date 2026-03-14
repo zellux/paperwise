@@ -13,7 +13,7 @@ description: High-level map of the Paperwise codebase.
 - `src/paperwise/infrastructure` — config and external integrations
 - `src/paperwise/events` — internal event contracts
 - `tests` — unit and integration tests
-- `infra` — local infrastructure definitions
+- `tools` — maintenance scripts for migrations, repairs, reindexing, and smoke checks
 - `docs-src` — Starlight docs source
 - `website/docs` — generated static docs output
 - `website` — standalone marketing site
