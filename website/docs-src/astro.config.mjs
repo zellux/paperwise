@@ -18,15 +18,18 @@ export default defineConfig({
 					items: [
 						{ label: 'Getting Started', slug: 'getting-started' },
 						{ label: 'Model Config', slug: 'model-config' },
-						{ label: 'Q&A', slug: 'support' },
 					],
 				},
 				{
-					label: 'Reference',
+					label: 'Development',
 					items: [
-						{ label: 'Local Development', slug: 'reference/local-development' },
+						{ label: 'Dev Environment Setup', slug: 'reference/local-development' },
 						{ label: 'Repository Layout', slug: 'reference/repository-layout' },
 					],
+				},
+				{
+					label: 'Q&A',
+					items: [{ label: 'Common Questions', slug: 'support' }],
 				},
 			],
 		}),

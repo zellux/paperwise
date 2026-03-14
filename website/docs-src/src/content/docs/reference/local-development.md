@@ -1,5 +1,5 @@
 ---
-title: Local Development
+title: Dev Environment Setup
 description: Commands and workflow notes for running Paperwise from source.
 ---
 

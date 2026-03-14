@@ -1,14 +1,13 @@
 ---
 title: Getting Started
-description: Start Paperwise with Docker or a local checkout, then finish the required first-run model setup.
+description: Start Paperwise with Docker Compose, then finish the required first-run model setup.
 ---
 
-Paperwise has two main setup paths:
+For most self-hosted installs, start with Docker Compose.
 
-- **Docker Compose**: recommended for most self-hosted installs.
-- **Local checkout**: best when you want to work on the codebase directly.
+If you want to run Paperwise from source or contribute to the codebase, see [Dev Environment Setup](/docs/reference/local-development/).
 
-## Option 1: Docker Compose
+## Docker Compose
 
 Use the repository root `docker compose` stack when you want the shortest path to a working deployment.
 
@@ -46,42 +45,6 @@ Open Paperwise at `http://localhost:8080`.
 | `docker compose logs -f api worker` | Follow backend and worker logs. |
 | `docker compose down` | Stop the stack. |
 
-## Option 2: Local checkout and dev mode
-
-Use this path when you want to run the backend and worker from source, debug the app, or make code changes.
-
-### Prerequisites
-
-- Python 3.13 recommended
-- Docker available for local dependency services
-
-### Start local development
-
-```bash
-git clone https://github.com/zellux/paperwise.git
-cd paperwise
-cp .env.example .env.local
-make setup
-make dev-up
-```
-
-If you need to choose Python explicitly:
-
-```bash
-make setup PYTHON=python3.13
-```
-
-Open Paperwise at `http://localhost:8000`.
-
-### Useful commands
-
-| Command | What it does |
-| --- | --- |
-| `make dev-status` | Show backend, worker, and dependency status. |
-| `make dev-stop` | Stop the local backend and worker started by `make dev-up`. |
-| `make dev-restart` | Restart the local development stack. |
-| `make test` | Run the test suite. |
-
 ## Required first-run setup
 
 After the app is running, there is one more required step: configure model connections in the web UI.
@@ -100,8 +63,8 @@ After the app is running, there is one more required step: configure model conne
 | Ask My Docs | A working **Grounded Q&A** connection in **Settings > Model Config** |
 | OCR on scans and image PDFs | Either an **OCR** LLM connection or **Local Tesseract** enabled |
 
-## Which path should I choose?
+## Want to run from source?
 
-Use Docker if you want the shortest path to a working self-hosted install. Use local dev mode if you plan to modify the code or debug the internals.
+If you plan to modify the code, debug the internals, or run Paperwise without Docker for the app processes, follow [Dev Environment Setup](/docs/reference/local-development/).
 
 Next: [Model Config](/docs/model-config/)
