@@ -854,8 +854,12 @@ async function testConnection(connectionId, buttonEl) {
       logActivity(`LLM API test failed: ${payload.detail || response.statusText}`);
       return;
     }
-    setConnectionTestStatus(connectionId, `Success (${payload.provider} / ${payload.model})`, "success");
-    logActivity(`LLM API test passed (${payload.provider} / ${payload.model}).`);
+    setConnectionTestStatus(
+      connectionId,
+      `Success (${payload.provider} / ${payload.model}). Save settings to keep this connection.`,
+      "success"
+    );
+    logActivity(`LLM API test passed (${payload.provider} / ${payload.model}). Save settings to keep this connection.`);
   } catch (error) {
     setConnectionTestStatus(connectionId, error.message, "error");
     logActivity(`LLM API test failed: ${error.message}`);
@@ -3771,6 +3775,7 @@ settingsForm?.addEventListener("submit", async (event) => {
     await loadDocumentsList();
   }
   logActivity("Saved settings.");
+  window.location.reload();
 });
 
 settingsOcrProviderSelect?.addEventListener("change", () => {
