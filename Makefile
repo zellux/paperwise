@@ -9,7 +9,7 @@ BACKEND_LOG ?= $(LOG_DIR)/backend.log
 WORKER_LOG ?= $(LOG_DIR)/worker.log
 WEBSITE_PORT ?= 8081
 
-.PHONY: setup deps-up deps-down docker-up docker-down docker-logs backend api worker worker-bg backend-bg website dev-up dev-stop dev-restart dev-status test smoke-llm
+.PHONY: setup deps-up deps-down docker-up docker-down docker-logs docker-deploy-up docker-deploy-down docker-deploy-logs backend api worker worker-bg backend-bg website dev-up dev-stop dev-restart dev-status test smoke-llm
 
 setup:
 	$(PYTHON) -m venv $(VENV)
@@ -17,10 +17,10 @@ setup:
 	$(VENV_PYTHON) -m pip install -e .[dev]
 
 deps-up:
-	docker compose -f infra/docker-compose.yml up -d
+	docker compose up -d redis postgres
 
 deps-down:
-	docker compose -f infra/docker-compose.yml down
+	docker compose stop redis postgres
 
 docker-up:
 	docker compose up -d --build
@@ -30,6 +30,15 @@ docker-down:
 
 docker-logs:
 	docker compose logs -f api worker
+
+docker-deploy-up:
+	docker compose -f docker-compose.deploy.yml up -d
+
+docker-deploy-down:
+	docker compose -f docker-compose.deploy.yml down
+
+docker-deploy-logs:
+	docker compose -f docker-compose.deploy.yml logs -f api worker
 
 backend:
 	$(VENV_PYTHON) -m uvicorn paperwise.server.main:app --reload
@@ -110,10 +119,10 @@ dev-status:
 		echo "not running"; \
 	fi
 	@echo "== Dependencies (docker compose) =="
-	@docker compose -f infra/docker-compose.yml ps
+	@docker compose ps redis postgres
 
 test:
 	$(VENV_PYTHON) -m pytest
 
 smoke-llm:
-	$(VENV_PYTHON) scripts/smoke_llm.py
+	$(VENV_PYTHON) tools/smoke_llm.py

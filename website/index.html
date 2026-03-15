@@ -27,15 +27,17 @@
         <img class="brand-mark" src="./paperwise-icon.png" alt="" aria-hidden="true" width="32" height="32" />
         <span class="brand-name">Paperwise</span>
       </a>
-      <nav class="marketing-nav" aria-label="Main">
+      <button class="nav-toggle" type="button" aria-label="Toggle menu" aria-expanded="false">
+        <i data-lucide="menu" class="nav-toggle-open"></i>
+        <i data-lucide="x" class="nav-toggle-close"></i>
+      </button>
+      <nav class="marketing-nav" id="mobileNav" aria-label="Main">
         <a class="nav-link" href="#features">Features</a>
-        <a class="nav-link" href="./docs/getting-started/">Docs</a>
         <a class="nav-link" href="#steps">How it works</a>
-      </nav>
-      <div class="marketing-actions">
+        <a class="nav-link" href="./docs/getting-started/">Docs</a>
         <a class="nav-link nav-link-github" href="https://github.com/zellux/paperwise" target="_blank"
           rel="noopener noreferrer"><i data-lucide="github"></i>GitHub</a>
-      </div>
+      </nav>
     </div>
   </header>
 
@@ -63,7 +65,7 @@
           <div class="hero-panel hero-panel-large">
             <div class="panel-head">
               <span class="panel-pill">Recent documents</span>
-              <span class="panel-meta">5 new today</span>
+              <span class="panel-meta">4 example docs</span>
             </div>
             <div class="panel-body">
               <table class="panel-doc-table">
@@ -71,29 +73,49 @@
                   <tr>
                     <th>Name</th>
                     <th>Date</th>
-                    <th>Status</th>
+                    <th>Tags</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td>Invoice_Dec_invoice_I.pdf</td>
-                    <td>March 12, 2025</td>
-                    <td><span class="status-pill status-done">parsed</span></td>
+                    <td>Sonic Internet invoice</td>
+                    <td>September 18, 2025</td>
+                    <td>
+                      <div class="table-tag-list">
+                        <span class="table-tag-pill">Billing</span>
+                        <span class="table-tag-pill">Utilities</span>
+                      </div>
+                    </td>
                   </tr>
                   <tr>
-                    <td>All orders from the records</td>
-                    <td></td>
-                    <td></td>
+                    <td>Children's Health - After Visit Summary</td>
+                    <td>May 15, 2024</td>
+                    <td>
+                      <div class="table-tag-list">
+                        <span class="table-tag-pill">Health</span>
+                        <span class="table-tag-pill">Pediatrics</span>
+                      </div>
+                    </td>
                   </tr>
                   <tr>
-                    <td>Monthly Payments</td>
-                    <td>September 1, 2024</td>
-                    <td></td>
+                    <td>Rental agreement</td>
+                    <td>September 29, 2025</td>
+                    <td>
+                      <div class="table-tag-list">
+                        <span class="table-tag-pill">Housing</span>
+                        <span class="table-tag-pill">Agreement</span>
+                      </div>
+                    </td>
                   </tr>
-                  <tr class="row-highlight">
-                    <td>Paperwise Due</td>
-                    <td></td>
-                    <td>See related results</td>
+                  <tr>
+                    <td>Home Plumbing invoice</td>
+                    <td>November 26, 2022</td>
+                    <td>
+                      <div class="table-tag-list">
+                        <span class="table-tag-pill">Plumbing</span>
+                        <span class="table-tag-pill">Contractor</span>
+                      </div>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -459,6 +481,24 @@
         if (event.key === "Escape" && lightbox.classList.contains("is-open")) {
           closeLightbox();
         }
+      });
+    })();
+  </script>
+  <script>
+    (() => {
+      const toggle = document.querySelector('.nav-toggle');
+      const nav = document.getElementById('mobileNav');
+      if (!toggle || !nav) return;
+      toggle.addEventListener('click', () => {
+        const open = toggle.getAttribute('aria-expanded') === 'true';
+        toggle.setAttribute('aria-expanded', String(!open));
+        nav.classList.toggle('is-open', !open);
+      });
+      nav.querySelectorAll('.nav-link').forEach(link => {
+        link.addEventListener('click', () => {
+          toggle.setAttribute('aria-expanded', 'false');
+          nav.classList.remove('is-open');
+        });
       });
     })();
   </script>
