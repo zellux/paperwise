@@ -191,11 +191,13 @@ body {
 .brand-home-btn {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 12px;
   padding: 0;
   border: 0;
   background: transparent;
   cursor: pointer;
+  color: inherit;
+  text-align: left;
 }
 
 .brand-home-btn:focus-visible {
@@ -216,6 +218,10 @@ body {
 .brand-home-btn:hover .brand-icon {
   transform: translateY(-1px);
   box-shadow: 0 6px 14px color-mix(in srgb, var(--accent) 16%, transparent);
+}
+
+.brand-home-btn:hover .brand-title {
+  color: var(--accent);
 }
 
 .brand-copy {
