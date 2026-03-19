@@ -138,7 +138,7 @@ docker compose up -d
 To pin a specific release, replace the image tag, for example:
 
 ```yaml
-image: ghcr.io/zellux/paperwise:v0.1.0
+image: ghcr.io/zellux/paperwise:v0.1.1
 ```
 
 Then update by changing the tag in `docker-compose.yml` and running:

@@ -118,7 +118,7 @@ Before starting, replace `replace-with-a-strong-secret` with your own secret in 
 To pin a specific release tag, replace the image value, for example:
 
 ```yaml
-image: ghcr.io/zellux/paperwise:v0.1.0
+image: ghcr.io/zellux/paperwise:v0.1.1
 ```
 
 If the GHCR package is private, make it public in the GitHub package settings before sharing it with other users.
@@ -149,7 +149,7 @@ docker compose up -d
 To pin a release instead of tracking `latest`, set the image tag explicitly, for example:
 
 ```yaml
-image: ghcr.io/zellux/paperwise:v0.1.0
+image: ghcr.io/zellux/paperwise:v0.1.1
 ```
 
 Then update by changing the tag in your `docker-compose.yml` and running:
