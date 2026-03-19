@@ -43,8 +43,30 @@
         <p class="eyebrow">paperwise / access</p>
         <h1>Sign In Required</h1>
         <p class="subhead">No guest mode. Create an account or sign in to continue.</p>
+        <div class="auth-tabs" role="tablist" aria-label="Authentication options">
+          <button
+            id="authTabSignIn"
+            type="button"
+            class="auth-tab is-active"
+            role="tab"
+            aria-selected="true"
+            aria-controls="authPanelSignIn"
+          >
+            Sign In
+          </button>
+          <button
+            id="authTabSignUp"
+            type="button"
+            class="auth-tab"
+            role="tab"
+            aria-selected="false"
+            aria-controls="authPanelSignUp"
+          >
+            Sign Up
+          </button>
+        </div>
         <div class="auth-layout">
-          <section class="auth-panel">
+          <section id="authPanelSignIn" class="auth-panel" role="tabpanel">
             <h2 class="auth-panel-title">Sign In</h2>
             <p class="auth-panel-note">Use your existing account.</p>
             <form id="signInForm" class="stack">
@@ -55,7 +77,7 @@
               <button type="submit" class="btn btn-primary">Sign In</button>
             </form>
           </section>
-          <section class="auth-panel">
+          <section id="authPanelSignUp" class="auth-panel view-hidden" role="tabpanel">
             <h2 class="auth-panel-title">Sign Up</h2>
             <p class="auth-panel-note">Create a new account.</p>
             <form id="registerForm" class="stack">

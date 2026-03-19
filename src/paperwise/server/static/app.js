@@ -68,6 +68,10 @@ const settingsChangePasswordBtn = document.getElementById("settingsChangePasswor
 const settingsPasswordStatus = document.getElementById("settingsPasswordStatus");
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
+const authTabSignIn = document.getElementById("authTabSignIn");
+const authTabSignUp = document.getElementById("authTabSignUp");
+const authPanelSignIn = document.getElementById("authPanelSignIn");
+const authPanelSignUp = document.getElementById("authPanelSignUp");
 const signInForm = document.getElementById("signInForm");
 const registerForm = document.getElementById("registerForm");
 const authMessage = document.getElementById("authMessage");
@@ -1418,6 +1422,16 @@ function setAuthMessage(message, isError = false) {
   }
   authMessage.textContent = message;
   authMessage.style.color = isError ? "#9f3f1d" : "";
+}
+
+function setActiveAuthTab(tab) {
+  const isSignUp = tab === "signup";
+  authTabSignIn?.classList.toggle("is-active", !isSignUp);
+  authTabSignIn?.setAttribute("aria-selected", String(!isSignUp));
+  authTabSignUp?.classList.toggle("is-active", isSignUp);
+  authTabSignUp?.setAttribute("aria-selected", String(isSignUp));
+  authPanelSignIn?.classList.toggle("view-hidden", isSignUp);
+  authPanelSignUp?.classList.toggle("view-hidden", !isSignUp);
 }
 
 function persistSession(token, user) {
@@ -3683,6 +3697,14 @@ registerForm?.addEventListener("submit", async (event) => {
   } catch (error) {
     setAuthMessage(error.message || "Failed to create account.", true);
   }
+});
+
+authTabSignIn?.addEventListener("click", () => {
+  setActiveAuthTab("signin");
+});
+
+authTabSignUp?.addEventListener("click", () => {
+  setActiveAuthTab("signup");
 });
 
 signOutBtn?.addEventListener("click", () => {

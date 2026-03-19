@@ -344,18 +344,48 @@ h1 {
   padding: 18px;
 }
 
+.auth-tabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  margin: 14px 0 10px;
+  border: 1px solid var(--stroke-soft);
+  border-radius: 999px;
+  background: rgba(246, 241, 230, 0.72);
+}
+
+.auth-tab {
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 16px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-family: var(--sans);
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
+}
+
+.auth-tab:hover {
+  color: var(--ink);
+}
+
+.auth-tab.is-active {
+  background: var(--accent);
+  color: var(--bg-base);
+  box-shadow: 0 8px 18px rgba(95, 88, 61, 0.18);
+}
+
 .auth-layout {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin: 12px 0 8px;
+  margin: 8px 0 8px;
 }
 
 .auth-panel {
   border: 1px solid var(--stroke-soft);
   background: rgba(252, 253, 251, 0.78);
   border-radius: 12px;
-  padding: 12px;
+  padding: 14px;
 }
 
 .auth-panel-title {
@@ -1505,8 +1535,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 @media (max-width: 980px) {
-  .auth-layout {
-    grid-template-columns: 1fr;
+  .auth-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
   }
 
   .topbar {
