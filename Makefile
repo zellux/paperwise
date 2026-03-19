@@ -17,7 +17,22 @@ setup:
 	$(VENV_PYTHON) -m pip install -e .[dev]
 
 deps-up:
-	docker compose up -d redis postgres
+	@redis_owner="$$(docker ps --filter publish=6379 --format '{{.Names}}' | head -n 1)"; \
+	if [ -n "$$redis_owner" ]; then \
+		echo "redis already available on host port 6379 via $$redis_owner; reusing it"; \
+	elif command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:6379 -sTCP:LISTEN >/dev/null 2>&1; then \
+		echo "redis already listening on host port 6379; reusing it"; \
+	else \
+		docker compose up -d redis; \
+	fi
+	@postgres_owner="$$(docker ps --filter publish=5432 --format '{{.Names}}' | head -n 1)"; \
+	if [ -n "$$postgres_owner" ]; then \
+		echo "postgres already available on host port 5432 via $$postgres_owner; reusing it"; \
+	elif command -v lsof >/dev/null 2>&1 && lsof -nP -iTCP:5432 -sTCP:LISTEN >/dev/null 2>&1; then \
+		echo "postgres already listening on host port 5432; reusing it"; \
+	else \
+		docker compose up -d postgres; \
+	fi
 
 deps-down:
 	docker compose stop redis postgres
