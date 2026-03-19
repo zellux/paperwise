@@ -3614,25 +3614,30 @@ signInForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const email = document.getElementById("signInEmail").value.trim();
   const password = document.getElementById("signInPassword").value;
-  const response = await apiFetch("/users/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    allowUnauthorized: true,
-    body: JSON.stringify({ email, password }),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    setAuthMessage(payload.detail || response.statusText, true);
-    return;
+  setAuthMessage("Signing in...");
+  try {
+    const response = await apiFetch("/users/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      allowUnauthorized: true,
+      body: JSON.stringify({ email, password }),
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      setAuthMessage(payload.detail || response.statusText, true);
+      return;
+    }
+    persistSession(payload.access_token, payload.user);
+    renderSessionState();
+    setAuthMessage(`Signed in as ${payload.user.email}.`);
+    await hydrateUserPreferencesForSession();
+    applyFiltersToControls();
+    setActiveView(currentViewId);
+    setActiveNav(currentViewId);
+    await loadDataForCurrentView();
+  } catch (error) {
+    setAuthMessage(error.message || "Failed to sign in.", true);
   }
-  persistSession(payload.access_token, payload.user);
-  renderSessionState();
-  setAuthMessage(`Signed in as ${payload.user.email}.`);
-  await hydrateUserPreferencesForSession();
-  applyFiltersToControls();
-  setActiveView(currentViewId);
-  setActiveNav(currentViewId);
-  await loadDataForCurrentView();
 });
 
 registerForm?.addEventListener("submit", async (event) => {
@@ -3640,39 +3645,44 @@ registerForm?.addEventListener("submit", async (event) => {
   const fullName = document.getElementById("registerName").value.trim();
   const email = document.getElementById("registerEmail").value.trim();
   const password = document.getElementById("registerPassword").value;
-  const registerResponse = await apiFetch("/users", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      full_name: fullName,
-      email,
-      password,
-    }),
-  });
-  const registerPayload = await registerResponse.json();
-  if (!registerResponse.ok) {
-    setAuthMessage(registerPayload.detail || registerResponse.statusText, true);
-    return;
+  setAuthMessage("Creating account...");
+  try {
+    const registerResponse = await apiFetch("/users", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        full_name: fullName,
+        email,
+        password,
+      }),
+    });
+    const registerPayload = await registerResponse.json();
+    if (!registerResponse.ok) {
+      setAuthMessage(registerPayload.detail || registerResponse.statusText, true);
+      return;
+    }
+    const loginResponse = await apiFetch("/users/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      allowUnauthorized: true,
+      body: JSON.stringify({ email, password }),
+    });
+    const loginPayload = await loginResponse.json();
+    if (!loginResponse.ok) {
+      setAuthMessage(loginPayload.detail || loginResponse.statusText, true);
+      return;
+    }
+    persistSession(loginPayload.access_token, loginPayload.user);
+    renderSessionState();
+    setAuthMessage(`Registered ${registerPayload.email}.`);
+    await hydrateUserPreferencesForSession();
+    applyFiltersToControls();
+    setActiveView(currentViewId);
+    setActiveNav(currentViewId);
+    await loadDataForCurrentView();
+  } catch (error) {
+    setAuthMessage(error.message || "Failed to create account.", true);
   }
-  const loginResponse = await apiFetch("/users/login", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    allowUnauthorized: true,
-    body: JSON.stringify({ email, password }),
-  });
-  const loginPayload = await loginResponse.json();
-  if (!loginResponse.ok) {
-    setAuthMessage(loginPayload.detail || loginResponse.statusText, true);
-    return;
-  }
-  persistSession(loginPayload.access_token, loginPayload.user);
-  renderSessionState();
-  setAuthMessage(`Registered ${registerPayload.email}.`);
-  await hydrateUserPreferencesForSession();
-  applyFiltersToControls();
-  setActiveView(currentViewId);
-  setActiveNav(currentViewId);
-  await loadDataForCurrentView();
 });
 
 signOutBtn?.addEventListener("click", () => {
