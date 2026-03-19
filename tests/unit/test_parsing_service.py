@@ -204,6 +204,50 @@ def test_parse_document_blob_auto_switch_uses_good_local_ocr_and_skips_llm(
     assert result.ocr_details["final_text_source"] == "local_tesseract_auto_switch"
 
 
+def test_parse_document_blob_auto_switch_uses_matching_local_ocr_and_skips_llm(
+    tmp_path, monkeypatch
+) -> None:
+    blob = tmp_path / "invoice.pdf"
+    extracted_text = (
+        "Invoice Invoice number IN-2061643 Date of issue May 7, 2024 "
+        "Date due May 7, 2024 Cloudflare Inc 101 Townsend Street "
+        "San Francisco California 94107 United States Bill to Yuanxuan Wang "
+        "Amount due 0.00 USD"
+    )
+    blob.write_bytes(b"%PDF-1.7\nplaceholder\n/Type /Page")
+    llm = RecordingOCRLLM("LLM OCR output should be skipped")
+    local_text = (
+        "Invoice\nInvoice number IN-2061643\nDate of issue May 7, 2024\n"
+        "Date due May 7, 2024\nCloudflare, Inc.\n101 Townsend Street\n"
+        "San Francisco, California 94107\nUnited States\nBill to Yuanxuan Wang\n"
+        "Amount due $0.00 USD"
+    )
+
+    monkeypatch.setattr(
+        parsing_module,
+        "_extract_pdf_text",
+        lambda **kwargs: (extracted_text, 1),
+    )
+    monkeypatch.setattr(parsing_module, "_extract_with_local_tesseract", lambda **kwargs: local_text)
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        ocr_provider="llm",
+        llm_provider=llm,
+        ocr_auto_switch=True,
+    )
+
+    assert llm.image_calls == 0
+    assert llm.calls == 0
+    assert result.parser == "auto-local-tesseract"
+    assert result.text_preview == local_text
+    assert result.ocr_details is not None
+    assert result.ocr_details["attempts"]["local_tesseract"]["quality_passed"] is True
+    assert result.ocr_details["attempts"]["local_tesseract"]["selected"] is True
+    assert result.ocr_details["final_text_source"] == "local_tesseract_auto_switch"
+
+
 def test_parse_document_blob_auto_switch_off_does_not_run_local_ocr(tmp_path, monkeypatch) -> None:
     blob = tmp_path / "manual-llm.pdf"
     blob.write_bytes(b"%PDF-1.7\nshort\n/Type /Page")

@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 import base64
+from difflib import SequenceMatcher
 from html import unescape
 import logging
 from pathlib import Path
@@ -157,6 +158,14 @@ def _is_high_quality_extracted_text(text: str) -> bool:
     return ratio >= 0.45
 
 
+def _normalized_text_similarity(left: str, right: str) -> float:
+    normalized_left = re.sub(r"[^a-z0-9]+", " ", str(left or "").lower()).strip()
+    normalized_right = re.sub(r"[^a-z0-9]+", " ", str(right or "").lower()).strip()
+    if not normalized_left or not normalized_right:
+        return 0.0
+    return SequenceMatcher(a=normalized_left, b=normalized_right).ratio()
+
+
 def _is_good_local_ocr_text(candidate: str, baseline: str) -> bool:
     normalized_candidate = " ".join(str(candidate or "").split())
     if not normalized_candidate:
@@ -169,6 +178,12 @@ def _is_good_local_ocr_text(candidate: str, baseline: str) -> bool:
     normalized_baseline = " ".join(str(baseline or "").split())
     baseline_len = len(normalized_baseline)
     candidate_len = len(normalized_candidate)
+    if normalized_baseline:
+        baseline_ratio = _normalized_text_similarity(normalized_candidate, normalized_baseline)
+        min_len = min(candidate_len, baseline_len)
+        max_len = max(candidate_len, baseline_len)
+        if baseline_ratio >= 0.88 and min_len >= 180 and max_len <= max(1200, min_len + 250):
+            return candidate_ratio >= 0.35
     return candidate_len >= max(300, int(baseline_len * 1.5)) and candidate_ratio >= 0.35
 
 
