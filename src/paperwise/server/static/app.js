@@ -77,6 +77,7 @@ const registerForm = document.getElementById("registerForm");
 const authMessage = document.getElementById("authMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const sessionUserLabel = document.getElementById("sessionUserLabel");
+const brandHomeBtn = document.getElementById("brandHomeBtn");
 const fileInput = document.getElementById("fileInput");
 const uploadDropzone = document.getElementById("uploadDropzone");
 const uploadSelectionLabel = document.getElementById("uploadSelectionLabel");
@@ -3710,6 +3711,15 @@ authTabSignUp?.addEventListener("click", () => {
 signOutBtn?.addEventListener("click", () => {
   clearSession();
   setAuthMessage("Signed out.");
+});
+
+brandHomeBtn?.addEventListener("click", async () => {
+  currentDocumentId = "";
+  currentViewId = "section-docs";
+  setActiveView("section-docs");
+  setActiveNav("section-docs");
+  syncUrlFromFilters();
+  await loadDataForCurrentView();
 });
 
 searchCollectionCreateForm?.addEventListener("submit", async (event) => {
