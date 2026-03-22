@@ -77,6 +77,56 @@ class TextOnlyOCRLLM:
         return "unused"
 
 
+def test_fit_preview_text_preserves_head_and_tail_content() -> None:
+    preview = parsing_module._fit_preview_text(
+        "START " + ("alpha " * 200) + "2026-03-20 END",
+        max_chars=120,
+    )
+
+    assert preview.startswith("START ")
+    assert preview.endswith("2026-03-20 END")
+    assert "..." in preview
+    assert len(preview) == 120
+
+
+def test_select_pdf_page_numbers_prioritizes_front_and_back_pages() -> None:
+    assert parsing_module._select_pdf_page_numbers(page_count=16, max_pages=3) == [1, 2, 16]
+    assert parsing_module._select_pdf_page_numbers(page_count=2, max_pages=3) == [1, 2]
+
+
+def test_extract_pdf_text_preserves_tail_dates_in_preview(monkeypatch, tmp_path) -> None:
+    class FakePage:
+        def __init__(self, text: str) -> None:
+            self._text = text
+
+        def extract_text(self) -> str:
+            return self._text
+
+    class FakeReader:
+        def __init__(self, path: str) -> None:
+            del path
+            self.pages = [
+                FakePage("Opening terms " + ("alpha " * 700)),
+                FakePage("Closing signature date 2026-03-20"),
+            ]
+
+    monkeypatch.setattr(parsing_module, "PdfReader", FakeReader)
+
+    blob = tmp_path / "sample.pdf"
+    blob.write_bytes(b"%PDF-1.7\n/Type /Page\n/Type /Page\n")
+
+    text_preview, page_count = parsing_module._extract_pdf_text(
+        blob_path=blob,
+        raw=blob.read_bytes(),
+        max_chars=240,
+    )
+
+    assert page_count == 2
+    assert "Opening terms" in text_preview
+    assert "2026-03-20" in text_preview
+    assert "..." in text_preview
+
+
 def test_parse_document_blob_uses_llm_ocr_when_configured(tmp_path, monkeypatch) -> None:
     blob = tmp_path / "sample.pdf"
     blob.write_bytes(b"%PDF-1.7\nFake content for OCR\n/Type /Page")

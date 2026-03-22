@@ -24,6 +24,49 @@ except Exception:  # pragma: no cover - optional runtime dependency
 logger = logging.getLogger(__name__)
 
 
+def _fit_preview_text(text: str, *, max_chars: int) -> str:
+    cleaned = _strip_nul(str(text or "")).strip()
+    if max_chars <= 0:
+        return ""
+    if len(cleaned) <= max_chars:
+        return cleaned
+    separator = "\n\n...\n\n"
+    if len(separator) >= max_chars:
+        return cleaned[:max_chars]
+    head_len = (max_chars - len(separator)) // 2
+    tail_len = max_chars - len(separator) - head_len
+    return f"{cleaned[:head_len]}{separator}{cleaned[-tail_len:]}"
+
+
+def _select_pdf_page_numbers(*, page_count: int, max_pages: int) -> list[int]:
+    if page_count <= 0 or max_pages <= 0:
+        return []
+    if page_count <= max_pages:
+        return list(range(1, page_count + 1))
+    if max_pages == 1:
+        return [1]
+    if max_pages == 2:
+        return [1, page_count]
+
+    selected = [1, 2, page_count]
+    if max_pages == 3:
+        return selected
+
+    remaining_slots = max_pages - len(selected)
+    middle_start = 3
+    middle_end = page_count - 1
+    if remaining_slots <= 0 or middle_start >= middle_end:
+        return selected[:max_pages]
+
+    span = middle_end - middle_start
+    inserts: list[int] = []
+    for index in range(remaining_slots):
+        page_number = middle_start + round((index + 1) * span / (remaining_slots + 1))
+        inserts.append(page_number)
+
+    return sorted(set(selected + inserts))
+
+
 def _new_ocr_details(*, requested_provider: str, auto_switch_enabled: bool) -> dict[str, object]:
     return {
         "requested_provider": requested_provider,
@@ -117,20 +160,12 @@ def _extract_pdf_text(
             reader = PdfReader(str(blob_path))
             page_count = max(1, len(reader.pages))
             parts: list[str] = []
-            total = 0
             for page in reader.pages:
                 text = (page.extract_text() or "").strip()
                 if not text:
                     continue
-                remaining = max_chars - total
-                if remaining <= 0:
-                    break
-                chunk = text[:remaining]
-                parts.append(chunk)
-                total += len(chunk)
-                if total >= max_chars:
-                    break
-            extracted = "\n\n".join(parts).strip()
+                parts.append(text)
+            extracted = _fit_preview_text("\n\n".join(parts), max_chars=max_chars)
             if extracted:
                 return extracted, page_count
         except Exception as exc:
@@ -142,7 +177,7 @@ def _extract_pdf_text(
         if printable / len(sample) >= 0.8:
             decoded = sample.decode("utf-8", errors="ignore").replace("\x00", " ").strip()
             if decoded:
-                return re.sub(r"\s+", " ", decoded)[:max_chars], page_count
+                return _fit_preview_text(re.sub(r"\s+", " ", decoded), max_chars=max_chars), page_count
 
     return "", page_count
 
@@ -202,24 +237,36 @@ def _extract_with_local_tesseract(
         pdftoppm = shutil.which("pdftoppm")
         if pdftoppm is None:
             raise RuntimeError("pdftoppm executable not found for PDF rasterization.")
+        page_count = 0
+        if PdfReader is not None:
+            try:
+                page_count = max(1, len(PdfReader(str(blob_path)).pages))
+            except Exception:
+                page_count = 0
+        if page_count <= 0:
+            raw = blob_path.read_bytes()
+            page_count = raw.count(b"/Type /Page") or 1
+        selected_pages = _select_pdf_page_numbers(page_count=page_count, max_pages=3)
         with TemporaryDirectory(prefix="paperwise-ocr-") as temp_dir:
-            out_prefix = f"{temp_dir}/page"
-            subprocess.run(
-                [
-                    pdftoppm,
-                    "-f",
-                    "1",
-                    "-l",
-                    "3",
-                    "-png",
-                    str(blob_path),
-                    out_prefix,
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            image_paths = sorted(Path(temp_dir).glob("page-*.png"))
+            image_paths: list[Path] = []
+            for page_number in selected_pages:
+                out_prefix = f"{temp_dir}/page-{page_number}"
+                subprocess.run(
+                    [
+                        pdftoppm,
+                        "-f",
+                        str(page_number),
+                        "-l",
+                        str(page_number),
+                        "-png",
+                        str(blob_path),
+                        out_prefix,
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                image_paths.extend(sorted(Path(temp_dir).glob(f"page-{page_number}-*.png")))
             if not image_paths:
                 raise RuntimeError("No rasterized PDF pages generated for OCR.")
             for image_path in image_paths:
@@ -244,7 +291,7 @@ def _extract_with_local_tesseract(
             extracted_chunks.append(chunk)
 
     combined = "\n\n".join(extracted_chunks).strip()
-    return combined[:max_chars]
+    return _fit_preview_text(combined, max_chars=max_chars)
 
 
 def _render_pdf_pages_to_data_urls(
@@ -257,23 +304,35 @@ def _render_pdf_pages_to_data_urls(
         raise RuntimeError("pdftoppm executable not found for PDF image rendering.")
 
     with TemporaryDirectory(prefix="paperwise-vision-") as temp_dir:
-        out_prefix = f"{temp_dir}/page"
-        subprocess.run(
-            [
-                pdftoppm,
-                "-f",
-                "1",
-                "-l",
-                str(max(1, max_pages)),
-                "-png",
-                str(blob_path),
-                out_prefix,
-            ],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        image_paths = sorted(Path(temp_dir).glob("page-*.png"))
+        page_count = 0
+        if PdfReader is not None:
+            try:
+                page_count = max(1, len(PdfReader(str(blob_path)).pages))
+            except Exception:
+                page_count = 0
+        if page_count <= 0:
+            raw = blob_path.read_bytes()
+            page_count = raw.count(b"/Type /Page") or 1
+        selected_pages = _select_pdf_page_numbers(page_count=page_count, max_pages=max_pages)
+        image_paths: list[Path] = []
+        for page_number in selected_pages:
+            out_prefix = f"{temp_dir}/page-{page_number}"
+            subprocess.run(
+                [
+                    pdftoppm,
+                    "-f",
+                    str(page_number),
+                    "-l",
+                    str(page_number),
+                    "-png",
+                    str(blob_path),
+                    out_prefix,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            image_paths.extend(sorted(Path(temp_dir).glob(f"page-{page_number}-*.png")))
         if not image_paths:
             raise RuntimeError("No PDF pages were rendered for LLM OCR.")
         data_urls: list[str] = []
