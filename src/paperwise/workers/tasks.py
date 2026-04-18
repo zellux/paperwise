@@ -156,6 +156,31 @@ def _resolve_ocr_llm_provider_for_owner(
     )
 
 
+def _resolve_active_blob_uri(*, document, queued_blob_uri: str) -> str:
+    current_blob_uri = str(document.blob_uri or "").strip()
+    normalized_queued_blob_uri = str(queued_blob_uri or "").strip()
+    if current_blob_uri and current_blob_uri != normalized_queued_blob_uri:
+        logger.info(
+            "parse task using current blob_uri for document_id=%s queued=%s current=%s",
+            document.id,
+            normalized_queued_blob_uri,
+            current_blob_uri,
+        )
+    return current_blob_uri or normalized_queued_blob_uri
+
+
+def _is_already_ready_document(
+    *,
+    document,
+    repository: DocumentRepository,
+) -> bool:
+    if document.status != DocumentStatus.READY:
+        return False
+    if not str(document.blob_uri or "").startswith("processed/"):
+        return False
+    return repository.get_parse_result(document.id) is not None
+
+
 @celery_app.task(name="paperwise.tasks.healthcheck")
 def healthcheck_task() -> str:
     logger.info("worker healthcheck task executed")
@@ -197,6 +222,21 @@ def parse_document_task(
         logger.error("parse task failed; document_id=%s not found", document_id)
         return {"document_id": document_id, "status": "not_found"}
 
+    active_blob_uri = _resolve_active_blob_uri(document=document, queued_blob_uri=blob_uri)
+    existing_parse_result = repository.get_parse_result(document_id)
+    if _is_already_ready_document(document=document, repository=repository):
+        logger.info(
+            "parse task skipped for already-ready document_id=%s blob_uri=%s",
+            document_id,
+            active_blob_uri,
+        )
+        return {
+            "document_id": document_id,
+            "bytes": document.size_bytes,
+            "parser": existing_parse_result.parser if existing_parse_result is not None else "unknown",
+            "status": document.status.value,
+        }
+
     try:
         document.status = DocumentStatus.PROCESSING
         repository.save(document)
@@ -216,7 +256,7 @@ def parse_document_task(
         )
         parsed = parse_document_blob(
             document_id=document_id,
-            blob_uri=blob_uri,
+            blob_uri=active_blob_uri,
             content_type=content_type,
             ocr_provider=ocr_provider,
             llm_provider=ocr_llm_provider,
