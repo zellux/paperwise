@@ -195,11 +195,40 @@ PENDING_STATUSES = {
     DocumentStatus.RECEIVED,
     DocumentStatus.PROCESSING,
 }
+SUPPORTED_UPLOAD_EXTENSIONS = {
+    ".doc",
+    ".docx",
+    ".gif",
+    ".jpeg",
+    ".jpg",
+    ".markdown",
+    ".md",
+    ".pdf",
+    ".png",
+    ".txt",
+    ".webp",
+}
+SUPPORTED_UPLOAD_CONTENT_TYPES = {
+    "application/msword",
+    "application/octet-stream",
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "text/markdown",
+    "text/plain",
+}
 
 
 def _normalize_name(value: str) -> str:
     cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
     return " ".join(cleaned.split())
+
+
+def _normalize_content_type(value: str | None) -> str:
+    return str(value or "").split(";", 1)[0].strip().lower()
 
 
 def _to_title_case(value: str) -> str:
@@ -410,6 +439,14 @@ def _sanitize_filename(value: str) -> str:
     if not cleaned:
         return "uploaded-document.bin"
     return cleaned
+
+
+def _is_supported_upload(*, filename: str, content_type: str | None) -> bool:
+    suffix = Path(filename or "").suffix.lower()
+    normalized_content_type = _normalize_content_type(content_type)
+    if suffix in SUPPORTED_UPLOAD_EXTENSIONS:
+        return True
+    return normalized_content_type in SUPPORTED_UPLOAD_CONTENT_TYPES
 
 
 def _resolve_llm_provider_for_user(
@@ -716,6 +753,7 @@ def _run_parse_document_blob_or_400(
     *,
     document_id: str,
     blob_uri: str,
+    content_type: str | None,
     ocr_provider: str,
     llm_provider: LLMProvider | None,
     ocr_auto_switch: bool = False,
@@ -724,6 +762,7 @@ def _run_parse_document_blob_or_400(
         return parse_document_blob(
             document_id=document_id,
             blob_uri=blob_uri,
+            content_type=content_type,
             ocr_provider=ocr_provider,
             llm_provider=llm_provider,
             ocr_auto_switch=ocr_auto_switch,
@@ -778,6 +817,12 @@ def create_document_endpoint(
 ) -> CreateDocumentResponse:
     del owner_id
     filename = file.filename or "uploaded-document"
+    normalized_content_type = _normalize_content_type(file.content_type) or "application/octet-stream"
+    if not _is_supported_upload(filename=filename, content_type=normalized_content_type):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Unsupported upload type. Use PDF, TXT, MD, DOC, DOCX, PNG, JPG, WEBP, or GIF.",
+        )
     content = file.file.read()
     checksum = sha256(content).hexdigest()
     existing = repository.get_by_owner_checksum(current_user.id, checksum)
@@ -794,12 +839,12 @@ def create_document_endpoint(
     blob_uri = storage.put(
         key=storage_key,
         data=content,
-        content_type=file.content_type or "application/octet-stream",
+        content_type=normalized_content_type,
     )
     metadata_key = f"incoming/{date_path}/{storage_token}.metadata.json"
     metadata_payload = {
         "original_filename": filename,
-        "content_type": file.content_type or "application/octet-stream",
+        "content_type": normalized_content_type,
         "checksum_sha256": checksum,
         "size_bytes": len(content),
         "stored_key": storage_key,
@@ -817,7 +862,7 @@ def create_document_endpoint(
             owner_id=current_user.id,
             blob_uri=blob_uri,
             checksum_sha256=checksum,
-            content_type=file.content_type or "application/octet-stream",
+            content_type=normalized_content_type,
             size_bytes=len(content),
         ),
         repository=repository,
@@ -1201,6 +1246,7 @@ def parse_document_endpoint(
     result = _run_parse_document_blob_or_400(
         document_id=document.id,
         blob_uri=document.blob_uri,
+        content_type=document.content_type,
         ocr_provider=ocr_provider,
         llm_provider=ocr_llm_provider,
         ocr_auto_switch=ocr_auto_switch,
@@ -1282,6 +1328,7 @@ def llm_parse_document_endpoint(
             parse_result = _run_parse_document_blob_or_400(
                 document_id=document.id,
                 blob_uri=document.blob_uri,
+                content_type=document.content_type,
                 ocr_provider=ocr_provider,
                 llm_provider=ocr_llm_provider,
                 ocr_auto_switch=ocr_auto_switch,

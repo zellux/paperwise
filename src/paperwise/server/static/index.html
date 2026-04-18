@@ -625,17 +625,17 @@ Debug output disabled.
         <article id="section-upload" class="panel panel-section view view-hidden">
           <h2>Upload Document</h2>
           <form id="uploadForm" class="stack">
-            <label class="label" for="fileInput">Document files</label>
+            <label class="label" for="fileInput">Document and image files</label>
             <div id="uploadDropzone" class="upload-dropzone" role="button" tabindex="0">
-              <p class="upload-dropzone-title">Drag and drop documents here</p>
+              <p class="upload-dropzone-title">Drag and drop documents or images here</p>
               <p id="uploadSelectionLabel" class="upload-dropzone-subtitle">
-                Supports: PDF, TXT, MD, DOCX, DOC
+                Supports: PDF, TXT, MD, DOCX, DOC, PNG, JPG, WEBP, GIF
               </p>
               <input
                 id="fileInput"
                 name="fileInput"
                 type="file"
-                accept=".pdf,.txt,.md,.markdown,.doc,.docx,text/plain,text/markdown,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/octet-stream"
+                accept=".pdf,.txt,.md,.markdown,.doc,.docx,.png,.jpg,.jpeg,.webp,.gif,text/plain,text/markdown,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp,image/gif,application/octet-stream"
                 multiple
                 required
               />

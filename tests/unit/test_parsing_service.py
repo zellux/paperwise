@@ -355,6 +355,31 @@ def test_parse_document_blob_auto_switch_off_pdf_uses_image_ocr_path(tmp_path, m
     assert result.text_preview == "Vision OCR output used"
 
 
+def test_parse_document_blob_image_uses_llm_image_ocr_path(tmp_path) -> None:
+    blob = tmp_path / "camera-scan"
+    blob.write_bytes(b"\x89PNG\r\n\x1a\nFake image bytes")
+    llm = RecordingOCRLLM("Vision OCR text from image")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="image/png",
+        ocr_provider="llm",
+        llm_provider=llm,
+        ocr_auto_switch=False,
+    )
+
+    assert llm.image_calls == 1
+    assert llm.calls == 0
+    assert result.parser == "stub-llm-ocr"
+    assert result.page_count == 1
+    assert result.text_preview == "Vision OCR text from image"
+    assert result.ocr_details is not None
+    assert result.ocr_details["attempts"]["llm_vision"]["attempted"] is True
+    assert result.ocr_details["attempts"]["llm_vision"]["succeeded"] is True
+    assert result.ocr_details["final_text_source"] == "llm_vision_ocr"
+
+
 def test_parse_document_blob_image_ocr_timeout_falls_back_to_extracted_text(
     tmp_path, monkeypatch
 ) -> None:

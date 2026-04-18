@@ -1368,14 +1368,42 @@ function delay(ms) {
   });
 }
 
-const SUPPORTED_UPLOAD_EXTENSIONS = new Set([".pdf", ".txt", ".md", ".markdown", ".doc", ".docx"]);
+const SUPPORTED_UPLOAD_LABEL = "Supports: PDF, TXT, MD, DOCX, DOC, PNG, JPG, WEBP, GIF";
+const SUPPORTED_UPLOAD_EXTENSIONS = new Set([
+  ".pdf",
+  ".txt",
+  ".md",
+  ".markdown",
+  ".doc",
+  ".docx",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".gif",
+]);
+const SUPPORTED_UPLOAD_MIME_TYPES = new Set([
+  "application/msword",
+  "application/octet-stream",
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "text/markdown",
+  "text/plain",
+]);
+
+function isSupportedUploadFile(file) {
+  const name = (file?.name || "").toLowerCase();
+  const ext = name.includes(".") ? `.${name.split(".").pop()}` : "";
+  const type = String(file?.type || "").split(";")[0].trim().toLowerCase();
+  return SUPPORTED_UPLOAD_EXTENSIONS.has(ext) || SUPPORTED_UPLOAD_MIME_TYPES.has(type);
+}
 
 function collectSupportedFiles(fileList) {
-  return [...(fileList || [])].filter((file) => {
-    const name = (file.name || "").toLowerCase();
-    const ext = name.includes(".") ? `.${name.split(".").pop()}` : "";
-    return SUPPORTED_UPLOAD_EXTENSIONS.has(ext);
-  });
+  return [...(fileList || [])].filter((file) => isSupportedUploadFile(file));
 }
 
 function updateSelectedFilesLabel() {
@@ -1384,7 +1412,7 @@ function updateSelectedFilesLabel() {
   }
   const files = fileInput.files ? [...fileInput.files] : [];
   if (!files.length) {
-    uploadSelectionLabel.textContent = "Supports: PDF, TXT, MD, DOCX, DOC";
+    uploadSelectionLabel.textContent = SUPPORTED_UPLOAD_LABEL;
     return;
   }
   if (files.length === 1) {
@@ -3914,7 +3942,7 @@ uploadForm.addEventListener("submit", async (event) => {
 
   const files = collectSupportedFiles(fileInput?.files || []);
   if (!files.length) {
-    logActivity("Upload blocked: select at least one supported document file.");
+    logActivity("Upload blocked: select at least one supported document or image file.");
     return;
   }
 
@@ -3994,7 +4022,7 @@ uploadDropzone?.addEventListener("drop", (event) => {
   }
   const dropped = collectSupportedFiles(event.dataTransfer?.files || []);
   if (!dropped.length) {
-    logActivity("Drop ignored: only supported document types are accepted.");
+    logActivity("Drop ignored: only supported document and image types are accepted.");
     return;
   }
   setSelectedFiles(dropped);

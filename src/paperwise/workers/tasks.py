@@ -217,6 +217,7 @@ def parse_document_task(
         parsed = parse_document_blob(
             document_id=document_id,
             blob_uri=blob_uri,
+            content_type=content_type,
             ocr_provider=ocr_provider,
             llm_provider=ocr_llm_provider,
             ocr_auto_switch=ocr_auto_switch,

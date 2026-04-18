@@ -173,6 +173,64 @@ def test_create_and_get_document() -> None:
         app.dependency_overrides.clear()
 
 
+def test_create_and_get_image_document() -> None:
+    store_dir = Path("local/test-object-store")
+    if store_dir.exists():
+        for item in store_dir.rglob("*"):
+            if item.is_file():
+                item.unlink()
+
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={"file": ("receipt.png", b"\x89PNG\r\n\x1a\nfake-image", "image/png")},
+        )
+        assert create_response.status_code == 201
+
+        payload = create_response.json()
+        get_response = client.get(f"/documents/{payload['id']}")
+        assert get_response.status_code == 200
+        assert get_response.json()["filename"] == "receipt.png"
+        assert get_response.json()["content_type"] == "image/png"
+
+        file_response = client.get(f"/documents/{payload['id']}/file")
+        assert file_response.status_code == 200
+        assert file_response.headers["content-type"].startswith("image/png")
+        assert file_response.content == b"\x89PNG\r\n\x1a\nfake-image"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_document_rejects_unsupported_upload_type() -> None:
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter("local/test-object-store")
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents",
+            files={"file": ("malware.exe", b"MZfake", "application/x-msdownload")},
+        )
+        assert response.status_code == 415
+        assert "Unsupported upload type" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_get_document_not_found() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository

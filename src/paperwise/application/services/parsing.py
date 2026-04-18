@@ -23,6 +23,15 @@ except Exception:  # pragma: no cover - optional runtime dependency
 
 logger = logging.getLogger(__name__)
 
+SUPPORTED_IMAGE_MIME_TYPES_BY_SUFFIX = {
+    ".gif": "image/gif",
+    ".jpeg": "image/jpeg",
+    ".jpg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+SUPPORTED_IMAGE_MIME_TYPES = frozenset(SUPPORTED_IMAGE_MIME_TYPES_BY_SUFFIX.values())
+
 
 def _fit_preview_text(text: str, *, max_chars: int) -> str:
     cleaned = _strip_nul(str(text or "")).strip()
@@ -123,6 +132,22 @@ def _set_final_ocr_source(
 
 def _strip_nul(value: str) -> str:
     return str(value).replace("\x00", "")
+
+
+def _normalize_content_type(value: str | None) -> str:
+    return str(value or "").split(";", 1)[0].strip().lower()
+
+
+def _resolve_supported_image_mime_type(*, suffix: str, content_type: str | None) -> str | None:
+    normalized_content_type = _normalize_content_type(content_type)
+    if normalized_content_type in SUPPORTED_IMAGE_MIME_TYPES:
+        return normalized_content_type
+    return SUPPORTED_IMAGE_MIME_TYPES_BY_SUFFIX.get(suffix)
+
+
+def _build_image_data_url(*, raw: bytes, mime_type: str) -> str:
+    encoded = base64.b64encode(raw).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
 
 
 def _extract_text_like_segments(raw: bytes, *, max_chars: int) -> str:
@@ -346,6 +371,7 @@ def parse_document_blob(
     document_id: str,
     blob_uri: str,
     *,
+    content_type: str | None = None,
     ocr_provider: str = "llm",
     llm_provider: LLMProvider | None = None,
     ocr_auto_switch: bool = False,
@@ -358,6 +384,11 @@ def parse_document_blob(
     raw = blob_path.read_bytes()
     normalized_ocr = str(ocr_provider).strip().lower()
     suffix = blob_path.suffix.lower()
+    normalized_content_type = _normalize_content_type(content_type)
+    supported_image_mime_type = _resolve_supported_image_mime_type(
+        suffix=suffix,
+        content_type=normalized_content_type,
+    )
     ocr_details = _new_ocr_details(
         requested_provider=normalized_ocr,
         auto_switch_enabled=bool(ocr_auto_switch),
@@ -365,6 +396,7 @@ def parse_document_blob(
     final_text_source = ""
 
     is_pdf = raw.startswith(b"%PDF") or suffix == ".pdf"
+    is_supported_image = supported_image_mime_type is not None
     if is_pdf:
         if normalized_ocr == "tesseract":
             page_count = raw.count(b"/Type /Page")
@@ -436,6 +468,34 @@ def parse_document_blob(
             quality="direct_text",
         )
         final_text_source = "docx_text_read"
+    elif is_supported_image:
+        text_preview = _extract_text_like_segments(raw, max_chars=400)
+        if normalized_ocr == "tesseract":
+            _mark_ocr_attempt(ocr_details, "local_tesseract", attempted=True)
+            text_preview = _extract_with_local_tesseract(
+                blob_path=blob_path,
+                is_pdf=False,
+                max_chars=4000,
+            )
+            _mark_ocr_attempt(
+                ocr_details,
+                "local_tesseract",
+                succeeded=bool(text_preview.strip()),
+                selected=True,
+                chars=len(text_preview),
+            )
+            final_text_source = "local_tesseract"
+        else:
+            _mark_ocr_attempt(
+                ocr_details,
+                "text_extraction",
+                attempted=True,
+                succeeded=bool(text_preview.strip()),
+                chars=len(text_preview),
+                quality="heuristic_image",
+            )
+            final_text_source = "image_binary_preview"
+        page_count = 1
     else:
         text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
         if normalized_ocr == "tesseract":
@@ -512,9 +572,18 @@ def parse_document_blob(
                     ocr_details=ocr_details,
                 )
         used_image_ocr = False
-        if is_pdf and callable(extract_images_method):
-            logger.info("Rendering PDF pages for vision OCR: %s", blob_path)
-            image_data_urls = _render_pdf_pages_to_data_urls(blob_path=blob_path, max_pages=3)
+        if (is_pdf or is_supported_image) and callable(extract_images_method):
+            if is_pdf:
+                logger.info("Rendering PDF pages for vision OCR: %s", blob_path)
+                image_data_urls = _render_pdf_pages_to_data_urls(blob_path=blob_path, max_pages=3)
+            else:
+                logger.info("Using uploaded image directly for vision OCR: %s", blob_path)
+                image_data_urls = [
+                    _build_image_data_url(
+                        raw=raw,
+                        mime_type=supported_image_mime_type or "image/png",
+                    )
+                ]
             _mark_ocr_attempt(
                 ocr_details,
                 "llm_vision",
@@ -566,7 +635,11 @@ def parse_document_blob(
             try:
                 ocr_text = extract_method(
                     filename=blob_path.name,
-                    content_type="application/pdf" if is_pdf else "text/plain",
+                    content_type=(
+                        "application/pdf"
+                        if is_pdf
+                        else supported_image_mime_type or normalized_content_type or "text/plain"
+                    ),
                     text_preview=text_preview,
                 )
                 if isinstance(ocr_text, str) and ocr_text.strip():
