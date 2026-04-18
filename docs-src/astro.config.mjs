@@ -10,6 +10,16 @@ export default defineConfig({
 		starlight({
 			title: 'Paperwise Docs',
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/zellux/paperwise' }],
+			head: [
+				{
+					tag: 'script',
+					attrs: {
+						defer: true,
+						src: 'https://cloud.umami.is/script.js',
+						'data-website-id': '425d11c9-640e-4d9e-8319-3e4cd0914958',
+					},
+				},
+			],
 			components: {
 				Header: './src/components/DocsHeader.astro',
 			},
