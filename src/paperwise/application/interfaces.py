@@ -73,6 +73,9 @@ class StorageProvider(Protocol):
     def put(self, key: str, data: bytes, content_type: str) -> str:
         """Store a binary artifact and return its canonical URI."""
 
+    def delete(self, uri: str) -> None:
+        """Delete a previously stored artifact if it exists."""
+
 
 class DocumentRepository(Protocol):
     def save(self, document: Document) -> None:
@@ -86,6 +89,9 @@ class DocumentRepository(Protocol):
 
     def list_documents(self, limit: int = 100, *, offset: int = 0) -> list[Document]:
         """List recent documents."""
+
+    def delete_document(self, document_id: str) -> None:
+        """Delete a document and all related records."""
 
     def save_parse_result(self, result: ParseResult) -> None:
         """Persist parse output for a document."""

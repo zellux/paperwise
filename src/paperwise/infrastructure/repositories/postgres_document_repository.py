@@ -192,6 +192,47 @@ class PostgresDocumentRepository(DocumentRepository):
                 for row in rows
             ]
 
+    def delete_document(self, document_id: str) -> None:
+        with self._session_factory() as session:
+            collection_rows = session.scalars(
+                select(CollectionDocumentRow).where(CollectionDocumentRow.document_id == document_id)
+            ).all()
+            touched_collection_ids = {row.collection_id for row in collection_rows}
+            for row in collection_rows:
+                session.delete(row)
+            if touched_collection_ids:
+                touched_collections = session.scalars(
+                    select(CollectionRow).where(CollectionRow.id.in_(sorted(touched_collection_ids)))
+                ).all()
+                now = datetime.now(UTC)
+                for row in touched_collections:
+                    row.updated_at = now
+
+            parse_row = session.get(ParseResultRow, document_id)
+            if parse_row is not None:
+                session.delete(parse_row)
+
+            llm_row = session.get(LLMParseResultRow, document_id)
+            if llm_row is not None:
+                session.delete(llm_row)
+
+            history_rows = session.scalars(
+                select(DocumentHistoryEventRow).where(DocumentHistoryEventRow.document_id == document_id)
+            ).all()
+            for row in history_rows:
+                session.delete(row)
+
+            chunk_rows = session.scalars(
+                select(DocumentChunkRow).where(DocumentChunkRow.document_id == document_id)
+            ).all()
+            for row in chunk_rows:
+                session.delete(row)
+
+            document_row = session.get(DocumentRow, document_id)
+            if document_row is not None:
+                session.delete(document_row)
+            session.commit()
+
     def save_parse_result(self, result: ParseResult) -> None:
         with self._session_factory() as session:
             row = session.get(ParseResultRow, result.document_id)

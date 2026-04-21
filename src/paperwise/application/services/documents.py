@@ -49,3 +49,8 @@ def create_document(
 def get_document(document_id: str, repository: DocumentRepository) -> Document | None:
     """Fetch a document aggregate by ID."""
     return repository.get(document_id)
+
+
+def delete_document(document_id: str, repository: DocumentRepository) -> None:
+    """Delete a document aggregate and its related records."""
+    repository.delete_document(document_id)

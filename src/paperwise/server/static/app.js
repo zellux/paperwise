@@ -2,6 +2,7 @@ const uploadForm = document.getElementById("uploadForm");
 const documentMetaForm = document.getElementById("documentMetaForm");
 const backToDocsBtn = document.getElementById("backToDocsBtn");
 const reprocessDocumentBtn = document.getElementById("reprocessDocumentBtn");
+const deleteDocumentBtn = document.getElementById("deleteDocumentBtn");
 const viewDocumentFileBtn = document.getElementById("viewDocumentFileBtn");
 const docsFilterForm = document.getElementById("docsFilterForm");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
@@ -2190,6 +2191,53 @@ function getSuggestedTitle(doc) {
   return "(Pending title)";
 }
 
+async function deleteDocumentById(documentId, options = {}) {
+  const documentLabel = String(options.documentLabel || documentId || "").trim() || "this document";
+  const confirmMessage = `Delete "${documentLabel}"? This permanently removes the file and its metadata.`;
+  if (!window.confirm(confirmMessage)) {
+    return false;
+  }
+
+  const visibleDocRows = docsTableBody?.querySelectorAll("tr[data-doc-id]").length || 0;
+  const shouldStepBackPage =
+    currentViewId === "section-docs" && docsPage > 1 && visibleDocRows <= 1;
+
+  const response = await apiFetch(`/documents/${documentId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    logActivity(`Document delete failed: ${payload.detail || response.statusText}`);
+    return false;
+  }
+
+  if (shouldStepBackPage) {
+    docsPage -= 1;
+  }
+  if (currentDocumentId === documentId) {
+    currentDocumentId = "";
+    setActiveView("section-docs");
+    setActiveNav("section-docs");
+    syncUrlFromFilters();
+  }
+
+  await loadDocumentsList();
+  await loadPendingDocuments();
+
+  if (currentViewId === "section-activity") {
+    await loadProcessedDocumentsActivity();
+  }
+  if (currentViewId === "section-tags") {
+    await loadTagStats();
+  }
+  if (currentViewId === "section-document-types") {
+    await loadDocumentTypeStats();
+  }
+
+  logActivity(`Deleted document ${documentId}.`);
+  return true;
+}
+
 function renderDocsList(documents) {
   renderSortHeaders();
   if (!documents.length) {
@@ -2199,6 +2247,7 @@ function renderDocsList(documents) {
   docsTableBody.innerHTML = "";
   for (const doc of documents) {
     const row = document.createElement("tr");
+    row.setAttribute("data-doc-id", doc.id);
 
     let suggestedTitle = "-";
     let documentType = "-";
@@ -2274,6 +2323,17 @@ function renderDocsList(documents) {
           } catch (error) {
             logActivity(`Failed to open file: ${error.message}`);
           }
+        },
+      })
+    );
+    actionsWrap.appendChild(
+      createIconActionButton({
+        icon: "trash",
+        label: "Delete document",
+        onClick: async () => {
+          await deleteDocumentById(doc.id, {
+            documentLabel: getSuggestedTitle(doc),
+          });
         },
       })
     );
@@ -4093,6 +4153,16 @@ reprocessDocumentBtn?.addEventListener("click", async () => {
   } else {
     logActivity(`Reprocessing still running for ${currentDocumentId}. Refresh to check later.`);
   }
+});
+
+deleteDocumentBtn?.addEventListener("click", async () => {
+  if (!currentDocumentId) {
+    logActivity("No document selected.");
+    return;
+  }
+  await deleteDocumentById(currentDocumentId, {
+    documentLabel: metaTitleInput?.value?.trim() || detailFilename?.textContent || currentDocumentId,
+  });
 });
 
 viewDocumentFileBtn?.addEventListener("click", async () => {

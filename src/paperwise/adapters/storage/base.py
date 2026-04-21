@@ -5,3 +5,5 @@ class BaseStorageAdapter(StorageProvider):
     def put(self, key: str, data: bytes, content_type: str) -> str:
         raise NotImplementedError
 
+    def delete(self, uri: str) -> None:
+        raise NotImplementedError

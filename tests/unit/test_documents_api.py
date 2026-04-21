@@ -14,7 +14,16 @@ from paperwise.server.dependencies import (
     storage_dependency,
 )
 from paperwise.server.main import app
-from paperwise.domain.models import LLMParseResult, User
+from paperwise.domain.models import (
+    Collection,
+    DocumentChunk,
+    DocumentHistoryEvent,
+    HistoryActorType,
+    HistoryEventType,
+    LLMParseResult,
+    ParseResult,
+    User,
+)
 from paperwise.domain.models import UserPreference
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
@@ -239,6 +248,141 @@ def test_get_document_not_found() -> None:
     try:
         client = TestClient(app)
         response = client.get("/documents/missing-doc")
+        assert response.status_code == 404
+        assert response.json()["detail"] == "Document not found"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_delete_document_removes_file_metadata_and_related_records() -> None:
+    store_dir = Path("local/test-object-store")
+    if store_dir.exists():
+        for item in store_dir.rglob("*"):
+            if item.is_file():
+                item.unlink()
+
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={"file": ("statement.pdf", b"%PDF-delete-me", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        document_id = create_response.json()["id"]
+
+        document = repository.get(document_id)
+        assert document is not None
+        blob_path = store_dir / document.blob_uri
+        metadata_path = blob_path.with_name(f"{blob_path.name.split('_', 1)[0]}.metadata.json")
+        assert blob_path.exists()
+        assert metadata_path.exists()
+
+        repository.save_parse_result(
+            ParseResult(
+                document_id=document_id,
+                parser="test",
+                status="ok",
+                size_bytes=12,
+                page_count=1,
+                text_preview="Delete me",
+                created_at=datetime.now(UTC),
+            )
+        )
+        repository.save_llm_parse_result(
+            LLMParseResult(
+                document_id=document_id,
+                suggested_title="Delete Me",
+                document_date="2026-04-20",
+                correspondent="Paperwise",
+                document_type="Statement",
+                tags=["Delete"],
+                created_correspondent=False,
+                created_document_type=False,
+                created_tags=[],
+                created_at=datetime.now(UTC),
+            )
+        )
+        repository.append_history_events(
+            [
+                DocumentHistoryEvent(
+                    id="evt-delete-1",
+                    document_id=document_id,
+                    event_type=HistoryEventType.METADATA_CHANGED,
+                    actor_type=HistoryActorType.USER,
+                    actor_id=TEST_USER.id,
+                    source="test",
+                    changes={"field": "value"},
+                    created_at=datetime.now(UTC),
+                )
+            ]
+        )
+        repository.replace_document_chunks(
+            document_id=document_id,
+            owner_id=TEST_USER.id,
+            chunks=[
+                DocumentChunk(
+                    id="chunk-delete-1",
+                    document_id=document_id,
+                    owner_id=TEST_USER.id,
+                    chunk_index=0,
+                    content="Delete me",
+                    token_count=2,
+                    created_at=datetime.now(UTC),
+                )
+            ],
+        )
+        collection = Collection(
+            id="collection-delete-1",
+            owner_id=TEST_USER.id,
+            name="Cleanup Test",
+            description="",
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
+        )
+        repository.create_collection(collection)
+        repository.add_collection_documents(
+            collection.id,
+            [document_id],
+            added_at=datetime.now(UTC),
+        )
+
+        delete_response = client.delete(f"/documents/{document_id}")
+        assert delete_response.status_code == 204
+        assert delete_response.content == b""
+
+        get_response = client.get(f"/documents/{document_id}")
+        assert get_response.status_code == 404
+        assert get_response.json()["detail"] == "Document not found"
+        assert not blob_path.exists()
+        assert not metadata_path.exists()
+        assert repository.get(document_id) is None
+        assert repository.get_parse_result(document_id) is None
+        assert repository.get_llm_parse_result(document_id) is None
+        assert repository.list_history(document_id) == []
+        assert repository.list_document_chunks(document_id) == []
+        assert repository.list_collection_document_ids(collection.id) == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_delete_document_not_found() -> None:
+    repository = InMemoryDocumentRepository()
+    storage = LocalStorageAdapter("local/test-object-store")
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        response = client.delete("/documents/missing-doc")
         assert response.status_code == 404
         assert response.json()["detail"] == "Document not found"
     finally:

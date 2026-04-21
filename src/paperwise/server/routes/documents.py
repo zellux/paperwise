@@ -24,7 +24,12 @@ from paperwise.application.interfaces import (
     LLMProvider,
     StorageProvider,
 )
-from paperwise.application.services.documents import CreateDocumentCommand, create_document, get_document
+from paperwise.application.services.documents import (
+    CreateDocumentCommand,
+    create_document,
+    delete_document,
+    get_document,
+)
 from paperwise.application.services.file_relocation import move_blob_to_processed
 from paperwise.application.services.history import (
     build_file_moved_history_event,
@@ -637,12 +642,49 @@ def _resolve_ocr_auto_switch_for_user(
 
 
 def _resolve_file_path_from_uri(blob_uri: str) -> Path | None:
-    resolved = blob_ref_to_path(blob_uri, settings.object_store_root)
+    resolved = _resolve_blob_path_from_uri(blob_uri)
     if resolved is None:
         return None
     if not resolved.exists() or not resolved.is_file():
         return None
     return resolved
+
+
+def _resolve_blob_path_from_uri(blob_uri: str) -> Path | None:
+    return blob_ref_to_path(blob_uri, settings.object_store_root)
+
+
+def _metadata_paths_for_blob_path(blob_path: Path) -> list[Path]:
+    token_prefix = blob_path.name.split("_", 1)[0].strip()
+    candidates = [
+        blob_path.with_name(f"{token_prefix}.metadata.json") if token_prefix else blob_path,
+        blob_path.with_name(f"{blob_path.stem}.metadata.json"),
+        blob_path.with_name(f"{blob_path.name}.metadata.json"),
+    ]
+    unique_paths: list[Path] = []
+    seen: set[Path] = set()
+    for candidate in candidates:
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        unique_paths.append(candidate)
+    return unique_paths
+
+
+def _delete_local_path_if_present(path: Path) -> None:
+    if path.exists() and path.is_file():
+        path.unlink()
+
+
+def _cleanup_empty_storage_dirs(start: Path) -> None:
+    root_dir = Path(settings.object_store_root).expanduser().resolve()
+    current = start.resolve()
+    while current != root_dir and root_dir in current.parents:
+        try:
+            current.rmdir()
+        except OSError:
+            break
+        current = current.parent
 
 
 def _to_response(document: Document) -> DocumentResponse:
@@ -1153,6 +1195,31 @@ def get_document_file_endpoint(
         filename=document.filename,
         content_disposition_type="inline",
     )
+
+
+@router.delete("/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_document_endpoint(
+    document_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    storage: StorageProvider = Depends(storage_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> None:
+    document = _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
+    blob_path = _resolve_blob_path_from_uri(document.blob_uri)
+    metadata_paths = _metadata_paths_for_blob_path(blob_path) if blob_path is not None else []
+
+    storage.delete(document.blob_uri)
+    for metadata_path in metadata_paths:
+        _delete_local_path_if_present(metadata_path)
+
+    if blob_path is not None:
+        _cleanup_empty_storage_dirs(blob_path.parent)
+
+    delete_document(document_id=document.id, repository=repository)
 
 
 @router.post("/{document_id}/reprocess", response_model=CreateDocumentResponse)

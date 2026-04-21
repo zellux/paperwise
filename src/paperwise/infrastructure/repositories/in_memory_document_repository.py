@@ -118,6 +118,21 @@ class InMemoryDocumentRepository(DocumentRepository):
             end = start + max(0, limit)
             return docs[start:end]
 
+    def delete_document(self, document_id: str) -> None:
+        with self._lock:
+            self._documents.pop(document_id, None)
+            self._parse_results.pop(document_id, None)
+            self._llm_parse_results.pop(document_id, None)
+            self._history.pop(document_id, None)
+            self._document_chunks.pop(document_id, None)
+            now = datetime.now(UTC)
+            for collection_id, docs in self._collection_documents.items():
+                if docs.pop(document_id, None) is None:
+                    continue
+                collection = self._collections.get(collection_id)
+                if collection is not None:
+                    collection.updated_at = now
+
     def save_parse_result(self, result: ParseResult) -> None:
         with self._lock:
             self._parse_results[result.document_id] = result
