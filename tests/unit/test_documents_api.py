@@ -1230,6 +1230,12 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         assert processing_events
         processing_parse = processing_events[0]["changes"]["parse"]
         assert processing_parse["parser"] == "stub-llm-ocr"
+        assert processing_parse["text_preview_bytes"] > 0
+        assert processing_parse["ocr_process"]["location"] == "remote"
+        assert processing_parse["ocr_process"]["engine"] == "llm"
+        assert processing_parse["ocr_process"]["method"] == "llm_text"
+        assert processing_parse["ocr_process"]["provider"] == "fake"
+        assert processing_parse["ocr_process"]["result_size_bytes"] == processing_parse["text_preview_bytes"]
         assert processing_parse["ocr"]["requested_provider"] == "llm"
         assert processing_parse["ocr"]["attempts"]["text_extraction"]["attempted"] is True
         assert processing_parse["ocr"]["attempts"]["llm_text"]["succeeded"] is True

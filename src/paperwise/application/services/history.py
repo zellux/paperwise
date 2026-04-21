@@ -171,9 +171,13 @@ def build_processing_completed_history_event(
             "parser": parse_result.parser,
             "page_count": parse_result.page_count,
             "text_preview_chars": len(str(parse_result.text_preview or "")),
+            "text_preview_bytes": len(str(parse_result.text_preview or "").encode("utf-8")),
             "text_preview_excerpt": " ".join(str(parse_result.text_preview or "").split())[:240],
         }
         if parse_result.ocr_details:
+            process_summary = parse_result.ocr_details.get("process")
+            if isinstance(process_summary, dict):
+                parse_summary["ocr_process"] = process_summary
             parse_summary["ocr"] = parse_result.ocr_details
         changes["parse"] = parse_summary
     return _new_event(

@@ -11,6 +11,7 @@ class RecordingOCRLLM:
         self.ocr_text = ocr_text
         self.calls = 0
         self.image_calls = 0
+        self._model = "test-ocr-model"
 
     def extract_ocr_text(
         self,
@@ -152,6 +153,11 @@ def test_parse_document_blob_uses_llm_ocr_when_configured(tmp_path, monkeypatch)
     assert result.ocr_details["attempts"]["text_extraction"]["attempted"] is True
     assert result.ocr_details["attempts"]["llm_vision"]["succeeded"] is True
     assert result.ocr_details["final_text_source"] == "llm_vision_ocr"
+    assert result.ocr_details["process"]["location"] == "remote"
+    assert result.ocr_details["process"]["engine"] == "llm"
+    assert result.ocr_details["process"]["method"] == "llm_vision"
+    assert result.ocr_details["process"]["model"] == "test-ocr-model"
+    assert result.ocr_details["process"]["result_size_bytes"] == len("Structured OCR text".encode("utf-8"))
 
 
 def test_parse_document_blob_skips_llm_ocr_for_local_provider(tmp_path) -> None:
@@ -252,6 +258,10 @@ def test_parse_document_blob_auto_switch_uses_good_local_ocr_and_skips_llm(
     assert result.ocr_details is not None
     assert result.ocr_details["attempts"]["local_tesseract"]["selected"] is True
     assert result.ocr_details["final_text_source"] == "local_tesseract_auto_switch"
+    assert result.ocr_details["process"]["location"] == "local"
+    assert result.ocr_details["process"]["engine"] == "tesseract"
+    assert result.ocr_details["process"]["model"] is None
+    assert result.ocr_details["process"]["result_size_bytes"] == len(local_text.encode("utf-8"))
 
 
 def test_parse_document_blob_auto_switch_uses_matching_local_ocr_and_skips_llm(

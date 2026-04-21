@@ -88,6 +88,7 @@ def _new_ocr_details(*, requested_provider: str, auto_switch_enabled: bool) -> d
         },
         "final_text_source": "",
         "final_text_chars": 0,
+        "final_text_bytes": 0,
     }
 
 
@@ -126,8 +127,109 @@ def _set_final_ocr_source(
     source: str,
     text_preview: str,
 ) -> None:
+    final_text = str(text_preview or "")
     ocr_details["final_text_source"] = source
-    ocr_details["final_text_chars"] = len(str(text_preview or ""))
+    ocr_details["final_text_chars"] = len(final_text)
+    ocr_details["final_text_bytes"] = len(final_text.encode("utf-8"))
+
+
+def _get_llm_provider_model(llm_provider: LLMProvider | None) -> str | None:
+    if llm_provider is None:
+        return None
+    for attr_name in ("_model", "model"):
+        value = getattr(llm_provider, attr_name, None)
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if cleaned:
+                return cleaned
+    return None
+
+
+def _get_llm_provider_base_url(llm_provider: LLMProvider | None) -> str | None:
+    if llm_provider is None:
+        return None
+    client = getattr(llm_provider, "_client", None)
+    base_url = getattr(client, "base_url", None)
+    if base_url is None:
+        return None
+    cleaned = str(base_url).strip().rstrip("/")
+    return cleaned or None
+
+
+def _get_llm_provider_name(llm_provider: LLMProvider | None) -> str | None:
+    if llm_provider is None:
+        return None
+    class_name = llm_provider.__class__.__name__
+    if class_name == "GeminiLLMProvider":
+        return "gemini"
+    if class_name == "OpenAILLMProvider":
+        base_url = (_get_llm_provider_base_url(llm_provider) or "").casefold()
+        if base_url.endswith("/v1") and "api.openai.com" in base_url:
+            return "openai"
+        if base_url:
+            return "custom"
+        return "openai"
+    if class_name == "SimpleLLMProvider":
+        return "simple"
+    if class_name == "MissingOpenAIProvider":
+        return "missing_openai"
+    if class_name.endswith("LLMProvider"):
+        normalized = class_name[: -len("LLMProvider")].strip()
+        if normalized:
+            return normalized.casefold()
+    return class_name.casefold() or None
+
+
+def _set_ocr_process_details(
+    ocr_details: dict[str, object],
+    *,
+    llm_provider: LLMProvider | None,
+    text_preview: str,
+) -> None:
+    attempts = ocr_details.get("attempts")
+    if not isinstance(attempts, dict):
+        attempts = {}
+
+    def _selected(attempt_key: str) -> bool:
+        attempt = attempts.get(attempt_key)
+        return isinstance(attempt, dict) and bool(attempt.get("selected"))
+
+    location = "none"
+    engine = "direct_text"
+    method = str(ocr_details.get("final_text_source") or "").strip() or "direct_text"
+    provider_name = None
+    model = None
+    base_url = None
+
+    if _selected("local_tesseract"):
+        location = "local"
+        engine = "tesseract"
+        method = "local_tesseract"
+        provider_name = "tesseract"
+    elif _selected("llm_vision"):
+        location = "remote"
+        engine = "llm"
+        method = "llm_vision"
+        provider_name = _get_llm_provider_name(llm_provider)
+        model = _get_llm_provider_model(llm_provider)
+        base_url = _get_llm_provider_base_url(llm_provider)
+    elif _selected("llm_text"):
+        location = "remote"
+        engine = "llm"
+        method = "llm_text"
+        provider_name = _get_llm_provider_name(llm_provider)
+        model = _get_llm_provider_model(llm_provider)
+        base_url = _get_llm_provider_base_url(llm_provider)
+
+    ocr_details["process"] = {
+        "location": location,
+        "engine": engine,
+        "method": method,
+        "provider": provider_name,
+        "model": model,
+        "base_url": base_url,
+        "result_size_bytes": len(str(text_preview or "").encode("utf-8")),
+    }
 
 
 def _strip_nul(value: str) -> str:
@@ -561,6 +663,11 @@ def parse_document_blob(
                     source="local_tesseract_auto_switch",
                     text_preview=cleaned_preview,
                 )
+                _set_ocr_process_details(
+                    ocr_details,
+                    llm_provider=llm_provider,
+                    text_preview=cleaned_preview,
+                )
                 return ParseResult(
                     document_id=document_id,
                     parser=parser_name,
@@ -679,6 +786,11 @@ def parse_document_blob(
     _set_final_ocr_source(
         ocr_details,
         source=final_text_source or parser_name,
+        text_preview=text_preview,
+    )
+    _set_ocr_process_details(
+        ocr_details,
+        llm_provider=llm_provider,
         text_preview=text_preview,
     )
     return ParseResult(

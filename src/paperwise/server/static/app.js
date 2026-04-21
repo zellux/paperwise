@@ -1304,7 +1304,28 @@ function buildHistoryChangeLines(event) {
   if (event.event_type === "processing_completed") {
     const before = stringifyHistoryValue(changes.status?.before);
     const after = stringifyHistoryValue(changes.status?.after);
-    return [`Status: ${before} -> ${after}`];
+    const lines = [`Status: ${before} -> ${after}`];
+    const parse = changes.parse || {};
+    if (parse.parser) {
+      lines.push(`Parser: ${parse.parser}`);
+    }
+    const ocrProcess = parse.ocr_process || parse.ocr?.process || null;
+    if (ocrProcess && typeof ocrProcess === "object") {
+      const location = stringifyHistoryValue(ocrProcess.location);
+      const engine = stringifyHistoryValue(ocrProcess.engine);
+      const method = stringifyHistoryValue(ocrProcess.method);
+      lines.push(`OCR path: ${location} | ${engine} | ${method}`);
+      if (ocrProcess.provider) {
+        lines.push(`OCR provider: ${ocrProcess.provider}`);
+      }
+      if (ocrProcess.model) {
+        lines.push(`OCR model: ${ocrProcess.model}`);
+      }
+      if (Number.isFinite(ocrProcess.result_size_bytes)) {
+        lines.push(`OCR result size: ${Number(ocrProcess.result_size_bytes).toLocaleString()} bytes`);
+      }
+    }
+    return lines;
   }
   try {
     return [JSON.stringify(changes)];
