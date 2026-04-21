@@ -83,6 +83,9 @@ const fileInput = document.getElementById("fileInput");
 const uploadDropzone = document.getElementById("uploadDropzone");
 const uploadSelectionLabel = document.getElementById("uploadSelectionLabel");
 const uploadSubmitBtn = document.getElementById("uploadSubmitBtn");
+const uploadProgressWrap = document.getElementById("uploadProgressWrap");
+const uploadProgressBar = document.getElementById("uploadProgressBar");
+const uploadProgressStatus = document.getElementById("uploadProgressStatus");
 
 const metaTitleInput = document.getElementById("metaTitle");
 const metaDateInput = document.getElementById("metaDate");
@@ -235,6 +238,7 @@ let searchSelectedCollectionId = "";
 let searchSelectedCollectionDocumentIds = [];
 let searchActiveSectionId = "search-section-keyword";
 let settingsActiveSectionId = "settings-section-display";
+let uploadInProgress = false;
 const PATH_TO_SEARCH_SECTION_ID = {
   "/ui/collections": "search-section-keyword",
   "/ui/search": "search-section-keyword",
@@ -1423,6 +1427,41 @@ function updateSelectedFilesLabel() {
   uploadSelectionLabel.textContent = `Selected ${files.length} files`;
 }
 
+function hideUploadProgress() {
+  if (uploadProgressWrap) {
+    uploadProgressWrap.hidden = true;
+  }
+  if (uploadProgressBar) {
+    uploadProgressBar.max = 1;
+    uploadProgressBar.value = 0;
+  }
+  if (uploadProgressStatus) {
+    uploadProgressStatus.textContent = "Ready.";
+  }
+}
+
+function showUploadProgress(processed, total, message) {
+  if (!uploadProgressWrap || !uploadProgressBar || !uploadProgressStatus) {
+    return;
+  }
+  uploadProgressWrap.hidden = false;
+  uploadProgressBar.max = Math.max(total, 1);
+  uploadProgressBar.value = Math.max(0, Math.min(processed, total));
+  uploadProgressStatus.textContent = message;
+}
+
+function syncUploadProgressFromSelection() {
+  if (!fileInput || uploadInProgress) {
+    return;
+  }
+  const files = fileInput.files ? [...fileInput.files] : [];
+  if (files.length <= 1) {
+    hideUploadProgress();
+    return;
+  }
+  showUploadProgress(0, files.length, `Ready to upload ${files.length} files.`);
+}
+
 function setSelectedFiles(files) {
   if (!fileInput) {
     return;
@@ -1433,6 +1472,7 @@ function setSelectedFiles(files) {
   }
   fileInput.files = data.files;
   updateSelectedFilesLabel();
+  syncUploadProgressFromSelection();
 }
 
 async function uploadDocumentFile(file) {
@@ -4050,18 +4090,56 @@ uploadForm.addEventListener("submit", async (event) => {
   }
 
   const uploadedIds = [];
-  for (const file of files) {
-    logActivity(`Uploading ${file.name}...`);
-    try {
-      const payload = await uploadDocumentFile(file);
-      uploadedIds.push(payload.id);
-      logActivity(`Uploaded ${file.name} => document ${payload.id}`);
-    } catch (error) {
-      logActivity(`Upload failed for ${file.name}: ${error.message}`);
+  let failedUploads = 0;
+  uploadInProgress = true;
+  if (uploadSubmitBtn) {
+    uploadSubmitBtn.disabled = true;
+  }
+  if (fileInput) {
+    fileInput.disabled = true;
+  }
+  if (uploadDropzone) {
+    uploadDropzone.classList.add("is-disabled");
+    uploadDropzone.setAttribute("aria-disabled", "true");
+    uploadDropzone.tabIndex = -1;
+  }
+  if (files.length > 1) {
+    showUploadProgress(0, files.length, `Uploading 0 of ${files.length} files...`);
+  }
+  try {
+    for (const [index, file] of files.entries()) {
+      logActivity(`Uploading ${file.name}...`);
+      try {
+        const payload = await uploadDocumentFile(file);
+        uploadedIds.push(payload.id);
+        logActivity(`Uploaded ${file.name} => document ${payload.id}`);
+      } catch (error) {
+        failedUploads += 1;
+        logActivity(`Upload failed for ${file.name}: ${error.message}`);
+      }
+      if (files.length > 1) {
+        const processed = index + 1;
+        const message =
+          failedUploads > 0
+            ? `Uploading ${processed} of ${files.length} files... ${failedUploads} failed so far.`
+            : `Uploading ${processed} of ${files.length} files...`;
+        showUploadProgress(processed, files.length, message);
+      }
     }
+  } finally {
+    uploadInProgress = false;
+    syncUploadAvailability();
   }
 
   updateSelectedFilesLabel();
+  if (files.length > 1) {
+    const successCount = uploadedIds.length;
+    const summary =
+      failedUploads > 0
+        ? `Finished ${successCount} of ${files.length} files. ${failedUploads} failed.`
+        : `Finished uploading ${files.length} files.`;
+    showUploadProgress(files.length, files.length, summary);
+  }
   if (!uploadedIds.length) {
     return;
   }
@@ -4079,6 +4157,7 @@ uploadForm.addEventListener("submit", async (event) => {
 
 fileInput?.addEventListener("change", () => {
   updateSelectedFilesLabel();
+  syncUploadProgressFromSelection();
 });
 
 uploadDropzone?.addEventListener("click", (event) => {

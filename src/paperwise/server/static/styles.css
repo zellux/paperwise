@@ -576,6 +576,60 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-size: 0.9rem;
 }
 
+.upload-progress {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid var(--stroke-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.upload-progress-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.upload-progress-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.upload-progress-status {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.upload-progress-bar {
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(205, 215, 210, 0.9);
+  appearance: none;
+}
+
+.upload-progress-bar::-webkit-progress-bar {
+  background: rgba(205, 215, 210, 0.9);
+  border-radius: 999px;
+}
+
+.upload-progress-bar::-webkit-progress-value {
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 72%, white));
+  border-radius: 999px;
+}
+
+.upload-progress-bar::-moz-progress-bar {
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 72%, white));
+  border-radius: 999px;
+}
+
 #fileInput {
   position: absolute;
   width: 1px;

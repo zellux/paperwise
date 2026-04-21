@@ -38,3 +38,25 @@ def test_static_assets_serve_clickable_tag_ui() -> None:
     styles = client.get("/static/styles.css")
     assert styles.status_code == 200
     assert ".tag-pill-button" in styles.text
+
+
+def test_upload_ui_includes_batch_progress_shell() -> None:
+    client = TestClient(app)
+    response = client.get("/ui/upload")
+
+    assert response.status_code == 200
+    assert 'id="uploadProgressWrap"' in response.text
+    assert 'id="uploadProgressBar"' in response.text
+    assert 'id="uploadProgressStatus"' in response.text
+
+
+def test_static_assets_serve_upload_progress_ui() -> None:
+    client = TestClient(app)
+
+    app_js = client.get("/static/app.js")
+    assert app_js.status_code == 200
+    assert "showUploadProgress" in app_js.text
+
+    styles = client.get("/static/styles.css")
+    assert styles.status_code == 200
+    assert ".upload-progress" in styles.text

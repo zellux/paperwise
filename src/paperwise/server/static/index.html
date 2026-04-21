@@ -645,6 +645,13 @@ Debug output disabled.
             </div>
 
             <button id="uploadSubmitBtn" type="submit" class="btn btn-primary">Upload Selected Files</button>
+            <div id="uploadProgressWrap" class="upload-progress" hidden>
+              <div class="upload-progress-header">
+                <span class="upload-progress-label">Batch upload progress</span>
+                <span id="uploadProgressStatus" class="upload-progress-status">Ready.</span>
+              </div>
+              <progress id="uploadProgressBar" class="upload-progress-bar" value="0" max="1"></progress>
+            </div>
           </form>
         </article>
 
