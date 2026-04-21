@@ -890,12 +890,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .document-history-changes {
   margin: 0;
   display: grid;
-  gap: 3px;
+  gap: 2px;
 }
 
 .document-history-change {
+  margin: 0;
   font-size: 0.8rem;
-  line-height: 1.35;
+  line-height: 1.25;
   color: var(--ink);
   word-break: break-word;
 }
