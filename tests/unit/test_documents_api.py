@@ -50,6 +50,7 @@ class FakeDispatcher:
 class FakeLLMProvider:
     def __init__(self) -> None:
         self.calls = 0
+        self._model = "metadata-test-model"
 
     def suggest_metadata(
         self,
@@ -1240,6 +1241,9 @@ def test_llm_parse_dedupes_and_creates_taxonomy() -> None:
         assert processing_parse["ocr"]["attempts"]["text_extraction"]["attempted"] is True
         assert processing_parse["ocr"]["attempts"]["llm_text"]["succeeded"] is True
         assert processing_parse["ocr"]["final_text_source"] == "llm_text_ocr"
+        metadata_parse = processing_events[0]["changes"]["metadata_parse"]
+        assert metadata_parse["provider"] == "fake"
+        assert metadata_parse["model"] == "metadata-test-model"
 
         llm_events = [event for event in history if event["source"] == "api.llm_parse"]
         assert llm_events

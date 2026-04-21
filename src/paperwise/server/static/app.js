@@ -1307,7 +1307,7 @@ function buildHistoryChangeLines(event) {
     const lines = [`Status: ${before} -> ${after}`];
     const parse = changes.parse || {};
     if (parse.parser) {
-      lines.push(`Parser: ${parse.parser}`);
+      lines.push(`OCR parser: ${parse.parser}`);
     }
     const ocrProcess = parse.ocr_process || parse.ocr?.process || null;
     if (ocrProcess && typeof ocrProcess === "object") {
@@ -1323,6 +1323,18 @@ function buildHistoryChangeLines(event) {
       }
       if (Number.isFinite(ocrProcess.result_size_bytes)) {
         lines.push(`OCR result size: ${Number(ocrProcess.result_size_bytes).toLocaleString()} bytes`);
+      }
+    }
+    const metadataParse = changes.metadata_parse || null;
+    if (metadataParse && typeof metadataParse === "object") {
+      if (metadataParse.provider) {
+        lines.push(`Metadata provider: ${metadataParse.provider}`);
+      }
+      if (metadataParse.model) {
+        lines.push(`Metadata model: ${metadataParse.model}`);
+      }
+      if (Number.isFinite(metadataParse.total_tokens) && Number(metadataParse.total_tokens) > 0) {
+        lines.push(`Metadata tokens: ${Number(metadataParse.total_tokens).toLocaleString()}`);
       }
     }
     return lines;

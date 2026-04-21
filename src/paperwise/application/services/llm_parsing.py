@@ -3,6 +3,7 @@ from difflib import SequenceMatcher
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.history import build_metadata_history_events
+from paperwise.application.services.llm_runtime import summarize_llm_provider
 from paperwise.domain.models import (
     Document,
     HistoryActorType,
@@ -94,6 +95,22 @@ def _validate_date(value: str | None) -> str | None:
         return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
     except ValueError:
         return None
+
+
+def _build_metadata_llm_details(
+    *,
+    llm_provider: LLMProvider,
+    llm_total_tokens: int,
+) -> dict[str, object]:
+    summary = summarize_llm_provider(llm_provider)
+    return {
+        "task": "metadata",
+        "engine": "llm",
+        "provider": summary["provider"],
+        "model": summary["model"],
+        "base_url": summary["base_url"],
+        "total_tokens": llm_total_tokens,
+    }
 
 
 def parse_with_llm(
@@ -199,6 +216,10 @@ def parse_with_llm(
         created_tags=created_tags,
         created_at=datetime.now(UTC),
         llm_total_tokens=llm_total_tokens,
+        llm_details=_build_metadata_llm_details(
+            llm_provider=llm_provider,
+            llm_total_tokens=llm_total_tokens,
+        ),
     )
     repository.save_llm_parse_result(result)
     if llm_total_tokens > 0:

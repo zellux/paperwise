@@ -1450,6 +1450,7 @@ def llm_parse_document_endpoint(
                 previous_status=DocumentStatus.PROCESSING.value,
                 current_status=document.status.value,
                 parse_result=parse_result,
+                llm_result=result,
             )
         ]
     )

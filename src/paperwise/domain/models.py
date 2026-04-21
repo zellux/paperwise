@@ -62,6 +62,7 @@ class LLMParseResult:
     created_tags: list[str]
     created_at: datetime
     llm_total_tokens: int = 0
+    llm_details: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)

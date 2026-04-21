@@ -269,7 +269,7 @@ def parse_document_task(
             parse_result=parsed,
         )
         logger.info("Indexed %d chunk(s) for document_id=%s", chunk_count, document.id)
-        parse_with_llm(
+        llm_result = parse_with_llm(
             document=document,
             parse_result=parsed,
             repository=repository,
@@ -301,6 +301,7 @@ def parse_document_task(
                     previous_status=previous_status,
                     current_status=document.status.value,
                     parse_result=parsed,
+                    llm_result=llm_result,
                 )
             ]
         )

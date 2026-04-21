@@ -11,6 +11,7 @@ from tempfile import TemporaryDirectory
 from zipfile import BadZipFile, ZipFile
 
 from paperwise.application.interfaces import LLMProvider
+from paperwise.application.services.llm_runtime import summarize_llm_provider
 from paperwise.domain.models import ParseResult
 from paperwise.infrastructure.config import get_settings
 from paperwise.application.services.storage_paths import blob_ref_to_path
@@ -133,53 +134,6 @@ def _set_final_ocr_source(
     ocr_details["final_text_bytes"] = len(final_text.encode("utf-8"))
 
 
-def _get_llm_provider_model(llm_provider: LLMProvider | None) -> str | None:
-    if llm_provider is None:
-        return None
-    for attr_name in ("_model", "model"):
-        value = getattr(llm_provider, attr_name, None)
-        if isinstance(value, str):
-            cleaned = value.strip()
-            if cleaned:
-                return cleaned
-    return None
-
-
-def _get_llm_provider_base_url(llm_provider: LLMProvider | None) -> str | None:
-    if llm_provider is None:
-        return None
-    client = getattr(llm_provider, "_client", None)
-    base_url = getattr(client, "base_url", None)
-    if base_url is None:
-        return None
-    cleaned = str(base_url).strip().rstrip("/")
-    return cleaned or None
-
-
-def _get_llm_provider_name(llm_provider: LLMProvider | None) -> str | None:
-    if llm_provider is None:
-        return None
-    class_name = llm_provider.__class__.__name__
-    if class_name == "GeminiLLMProvider":
-        return "gemini"
-    if class_name == "OpenAILLMProvider":
-        base_url = (_get_llm_provider_base_url(llm_provider) or "").casefold()
-        if base_url.endswith("/v1") and "api.openai.com" in base_url:
-            return "openai"
-        if base_url:
-            return "custom"
-        return "openai"
-    if class_name == "SimpleLLMProvider":
-        return "simple"
-    if class_name == "MissingOpenAIProvider":
-        return "missing_openai"
-    if class_name.endswith("LLMProvider"):
-        normalized = class_name[: -len("LLMProvider")].strip()
-        if normalized:
-            return normalized.casefold()
-    return class_name.casefold() or None
-
-
 def _set_ocr_process_details(
     ocr_details: dict[str, object],
     *,
@@ -197,29 +151,26 @@ def _set_ocr_process_details(
     location = "none"
     engine = "direct_text"
     method = str(ocr_details.get("final_text_source") or "").strip() or "direct_text"
-    provider_name = None
-    model = None
-    base_url = None
+    provider_summary = summarize_llm_provider(llm_provider)
+    provider_name = provider_summary["provider"]
+    model = provider_summary["model"]
+    base_url = provider_summary["base_url"]
 
     if _selected("local_tesseract"):
         location = "local"
         engine = "tesseract"
         method = "local_tesseract"
         provider_name = "tesseract"
+        model = None
+        base_url = None
     elif _selected("llm_vision"):
         location = "remote"
         engine = "llm"
         method = "llm_vision"
-        provider_name = _get_llm_provider_name(llm_provider)
-        model = _get_llm_provider_model(llm_provider)
-        base_url = _get_llm_provider_base_url(llm_provider)
     elif _selected("llm_text"):
         location = "remote"
         engine = "llm"
         method = "llm_text"
-        provider_name = _get_llm_provider_name(llm_provider)
-        model = _get_llm_provider_model(llm_provider)
-        base_url = _get_llm_provider_base_url(llm_provider)
 
     ocr_details["process"] = {
         "location": location,

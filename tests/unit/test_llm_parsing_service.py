@@ -116,6 +116,7 @@ class AcronymCaseLLMProvider:
 class TokenUsageLLMProvider:
     def __init__(self, total_tokens: int) -> None:
         self._total_tokens = total_tokens
+        self._model = "metadata-token-model"
 
     def suggest_metadata(
         self,
@@ -256,6 +257,10 @@ def test_parse_with_llm_tracks_total_tokens_in_user_preferences() -> None:
 
     assert first.llm_total_tokens == 120
     assert second.llm_total_tokens == 80
+    assert first.llm_details is not None
+    assert first.llm_details["provider"] == "tokenusage"
+    assert first.llm_details["model"] == "metadata-token-model"
+    assert first.llm_details["total_tokens"] == 120
     preference = repository.get_user_preference(document.owner_id)
     assert preference is not None
     assert preference.preferences["llm_total_tokens_processed"] == 200

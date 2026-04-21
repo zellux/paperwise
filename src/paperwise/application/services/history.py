@@ -159,6 +159,7 @@ def build_processing_completed_history_event(
     previous_status: str | None,
     current_status: str,
     parse_result: ParseResult | None = None,
+    llm_result: LLMParseResult | None = None,
 ) -> DocumentHistoryEvent:
     changes: dict[str, object] = {
         "status": {
@@ -180,6 +181,8 @@ def build_processing_completed_history_event(
                 parse_summary["ocr_process"] = process_summary
             parse_summary["ocr"] = parse_result.ocr_details
         changes["parse"] = parse_summary
+    if llm_result is not None and isinstance(llm_result.llm_details, dict):
+        changes["metadata_parse"] = dict(llm_result.llm_details)
     return _new_event(
         document_id=document_id,
         event_type=HistoryEventType.PROCESSING_COMPLETED,

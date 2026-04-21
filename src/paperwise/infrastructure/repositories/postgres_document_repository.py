@@ -331,6 +331,7 @@ class PostgresDocumentRepository(DocumentRepository):
                 created_document_type=row.created_document_type,
                 created_tags=normalized_created_tags,
                 created_at=row.created_at,
+                llm_details=None,
             )
 
     def list_correspondents(self) -> list[str]:
