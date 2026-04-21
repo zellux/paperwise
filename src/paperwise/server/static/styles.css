@@ -877,7 +877,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .settings-group-title {
   margin: 0;
   font-size: 0.94rem;
-  font-family: var(--serif);
+  font-family: var(--sans);
+  font-weight: 700;
 }
 
 .settings-group-note {
@@ -923,7 +924,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .settings-task-title {
   margin: 0;
   font-size: 0.84rem;
-  font-family: var(--serif);
+  font-family: var(--sans);
+  font-weight: 700;
 }
 
 .settings-route-grid {
