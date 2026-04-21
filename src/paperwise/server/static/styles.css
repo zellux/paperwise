@@ -479,8 +479,8 @@ h1 {
 
 .auth-panel-title {
   margin: 0;
-  font-family: var(--serif);
   font-size: 1.05rem;
+  font-weight: 700;
 }
 
 .auth-panel-note {
@@ -847,7 +847,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .document-history-title {
   margin: 0 0 10px;
   font-size: 0.98rem;
-  font-family: var(--serif);
+  font-weight: 700;
 }
 
 .document-history-list {
@@ -1149,7 +1149,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .search-card h3 {
   margin: 0 0 10px;
   font-size: 0.96rem;
-  font-family: var(--serif);
+  font-weight: 700;
 }
 
 .search-card select {
@@ -1476,11 +1476,16 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .markdown-output h1,
-.markdown-output h2,
-.markdown-output h3 {
+.markdown-output h2 {
   margin: 0 0 8px 0;
   font-family: var(--serif);
   line-height: 1.25;
+}
+
+.markdown-output h3 {
+  margin: 0 0 8px 0;
+  line-height: 1.25;
+  font-weight: 700;
 }
 
 .markdown-output h1 {
