@@ -656,7 +656,7 @@ Debug output disabled.
         </article>
 
         <article id="section-upload" class="panel panel-section view view-hidden">
-          <h2>Upload Document</h2>
+          <h2>Upload Documents</h2>
           <form id="uploadForm" class="stack">
             <label class="label" for="fileInput">Document and image files</label>
             <div id="uploadDropzone" class="upload-dropzone" role="button" tabindex="0">
@@ -672,9 +672,22 @@ Debug output disabled.
                 multiple
                 required
               />
+              <input
+                id="folderInput"
+                name="folderInput"
+                type="file"
+                webkitdirectory
+                directory
+                multiple
+                hidden
+                tabindex="-1"
+              />
             </div>
 
-            <button id="uploadSubmitBtn" type="submit" class="btn btn-primary">Upload Selected Files</button>
+            <div class="actions">
+              <button id="uploadFolderBtn" type="button" class="btn btn-muted">Choose Folder</button>
+              <button id="uploadSubmitBtn" type="submit" class="btn btn-primary">Upload Selected Files</button>
+            </div>
             <div id="uploadProgressWrap" class="upload-progress" hidden>
               <div class="upload-progress-header">
                 <span class="upload-progress-label">Batch upload progress</span>

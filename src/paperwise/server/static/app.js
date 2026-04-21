@@ -80,6 +80,8 @@ const signOutBtn = document.getElementById("signOutBtn");
 const sessionUserLabel = document.getElementById("sessionUserLabel");
 const brandHomeBtn = document.getElementById("brandHomeBtn");
 const fileInput = document.getElementById("fileInput");
+const folderInput = document.getElementById("folderInput");
+const uploadFolderBtn = document.getElementById("uploadFolderBtn");
 const uploadDropzone = document.getElementById("uploadDropzone");
 const uploadSelectionLabel = document.getElementById("uploadSelectionLabel");
 const uploadSubmitBtn = document.getElementById("uploadSubmitBtn");
@@ -239,6 +241,7 @@ let searchSelectedCollectionDocumentIds = [];
 let searchActiveSectionId = "search-section-keyword";
 let settingsActiveSectionId = "settings-section-display";
 let uploadInProgress = false;
+let uploadSelectionContext = { source: "files", folderName: "" };
 const PATH_TO_SEARCH_SECTION_ID = {
   "/ui/collections": "search-section-keyword",
   "/ui/search": "search-section-keyword",
@@ -1056,6 +1059,12 @@ function syncUploadAvailability(options = {}) {
   if (fileInput) {
     fileInput.disabled = blocked;
   }
+  if (folderInput) {
+    folderInput.disabled = blocked;
+  }
+  if (uploadFolderBtn) {
+    uploadFolderBtn.disabled = blocked;
+  }
   if (uploadDropzone) {
     uploadDropzone.classList.toggle("is-disabled", blocked);
     uploadDropzone.setAttribute("aria-disabled", blocked ? "true" : "false");
@@ -1417,6 +1426,58 @@ function collectSupportedFiles(fileList) {
   return [...(fileList || [])].filter((file) => isSupportedUploadFile(file));
 }
 
+function getFolderNameFromFiles(files) {
+  for (const file of files || []) {
+    const relativePath = String(file?.webkitRelativePath || "").trim();
+    if (!relativePath) {
+      continue;
+    }
+    const folderName = relativePath.split("/")[0]?.trim();
+    if (folderName) {
+      return folderName;
+    }
+  }
+  return "";
+}
+
+async function collectFilesFromDirectoryHandle(directoryHandle) {
+  const files = [];
+
+  async function visit(handle) {
+    for await (const entry of handle.values()) {
+      if (entry.kind === "file") {
+        files.push(await entry.getFile());
+        continue;
+      }
+      if (entry.kind === "directory") {
+        await visit(entry);
+      }
+    }
+  }
+
+  await visit(directoryHandle);
+  return files;
+}
+
+function applyFolderSelection(selectedFiles, folderName = "") {
+  const supportedFiles = collectSupportedFiles(selectedFiles);
+  const ignoredCount = selectedFiles.length - supportedFiles.length;
+
+  if (!supportedFiles.length) {
+    setSelectedFiles([], { source: "folder", folderName });
+    if (selectedFiles.length) {
+      logActivity("Folder selection ignored: no supported files were found.");
+    }
+    return;
+  }
+
+  setSelectedFiles(supportedFiles, { source: "folder", folderName });
+  if (ignoredCount > 0) {
+    logActivity(`Folder selection skipped ${ignoredCount} unsupported file(s).`);
+  }
+  logActivity(`Ready to upload ${supportedFiles.length} file(s) from folder selection.`);
+}
+
 function updateSelectedFilesLabel() {
   if (!uploadSelectionLabel || !fileInput) {
     return;
@@ -1428,6 +1489,10 @@ function updateSelectedFilesLabel() {
   }
   if (files.length === 1) {
     uploadSelectionLabel.textContent = `Selected: ${files[0].name}`;
+    return;
+  }
+  if (uploadSelectionContext.source === "folder" && uploadSelectionContext.folderName) {
+    uploadSelectionLabel.textContent = `Selected ${files.length} files from ${uploadSelectionContext.folderName}`;
     return;
   }
   uploadSelectionLabel.textContent = `Selected ${files.length} files`;
@@ -1468,7 +1533,7 @@ function syncUploadProgressFromSelection() {
   showUploadProgress(0, files.length, `Ready to upload ${files.length} files.`);
 }
 
-function setSelectedFiles(files) {
+function setSelectedFiles(files, options = {}) {
   if (!fileInput) {
     return;
   }
@@ -1477,6 +1542,10 @@ function setSelectedFiles(files) {
     data.items.add(file);
   }
   fileInput.files = data.files;
+  uploadSelectionContext = {
+    source: options.source === "folder" ? "folder" : "files",
+    folderName: String(options.folderName || "").trim(),
+  };
   updateSelectedFilesLabel();
   syncUploadProgressFromSelection();
 }
@@ -4104,6 +4173,12 @@ uploadForm.addEventListener("submit", async (event) => {
   if (fileInput) {
     fileInput.disabled = true;
   }
+  if (folderInput) {
+    folderInput.disabled = true;
+  }
+  if (uploadFolderBtn) {
+    uploadFolderBtn.disabled = true;
+  }
   if (uploadDropzone) {
     uploadDropzone.classList.add("is-disabled");
     uploadDropzone.setAttribute("aria-disabled", "true");
@@ -4162,8 +4237,36 @@ uploadForm.addEventListener("submit", async (event) => {
 });
 
 fileInput?.addEventListener("change", () => {
+  uploadSelectionContext = { source: "files", folderName: "" };
   updateSelectedFilesLabel();
   syncUploadProgressFromSelection();
+});
+
+folderInput?.addEventListener("change", () => {
+  const selectedFiles = [...(folderInput.files || [])];
+  const folderName = getFolderNameFromFiles(selectedFiles);
+  applyFolderSelection(selectedFiles, folderName);
+  folderInput.value = "";
+});
+
+uploadFolderBtn?.addEventListener("click", async () => {
+  if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
+    return;
+  }
+  if (typeof window.showDirectoryPicker === "function") {
+    try {
+      const directoryHandle = await window.showDirectoryPicker();
+      const selectedFiles = await collectFilesFromDirectoryHandle(directoryHandle);
+      applyFolderSelection(selectedFiles, directoryHandle.name || "");
+      return;
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        return;
+      }
+      logActivity("Directory picker unavailable in this browser context. Falling back to file input.");
+    }
+  }
+  folderInput?.click();
 });
 
 uploadDropzone?.addEventListener("click", (event) => {
