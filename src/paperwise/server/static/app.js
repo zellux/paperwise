@@ -11,6 +11,7 @@ const pagePrevBtn = document.getElementById("pagePrevBtn");
 const pageNextBtn = document.getElementById("pageNextBtn");
 const pageIndicator = document.getElementById("pageIndicator");
 const docsTotalLabel = document.getElementById("docsTotalLabel");
+const docsProcessingLabel = document.getElementById("docsProcessingLabel");
 const settingsForm = document.getElementById("settingsForm");
 const searchCollectionCreateForm = document.getElementById("searchCollectionCreateForm");
 const searchCollectionNameInput = document.getElementById("searchCollectionName");
@@ -3640,8 +3641,24 @@ function renderPaginationControls(currentCount, options = {}) {
   }
 }
 
+function renderDocsProcessingCount(count, options = {}) {
+  if (!docsProcessingLabel) {
+    return;
+  }
+  if (options.loading) {
+    docsProcessingLabel.textContent = "Processing: loading...";
+    return;
+  }
+  if (options.unavailable) {
+    docsProcessingLabel.textContent = "Processing: unavailable";
+    return;
+  }
+  docsProcessingLabel.textContent = `Processing: ${Math.max(0, Number(count) || 0).toLocaleString()}`;
+}
+
 async function loadPendingDocuments() {
   const requestSeq = ++pendingDocsRequestSeq;
+  renderDocsProcessingCount(0, { loading: true });
   renderTableLoading(pendingTableBody, 4, "Loading pending documents...");
   const response = await apiFetch("/documents/pending?limit=200");
   if (requestSeq !== pendingDocsRequestSeq) {
@@ -3654,10 +3671,12 @@ async function loadPendingDocuments() {
   if (!response.ok) {
     // Keep restart enabled if the UI still has visible pending rows.
     setRestartPendingButtonEnabled(getVisiblePendingRowCount() > 0);
+    renderDocsProcessingCount(0, { unavailable: true });
     logActivity(`Pending list failed: ${payload.detail || response.statusText}`);
     return;
   }
   renderPendingList(payload);
+  renderDocsProcessingCount(payload.length);
   const hasRestartable = Array.isArray(payload) && payload.some((doc) => isRestartablePendingDocument(doc));
   setRestartPendingButtonEnabled(hasRestartable);
   logActivity(`Loaded ${payload.length} pending document(s)`);
@@ -3784,7 +3803,7 @@ async function loadDataForCurrentView() {
     renderSettingsForm();
     return;
   }
-  await loadDocumentsList();
+  await Promise.all([loadDocumentsList(), loadPendingDocuments()]);
 }
 
 async function openDocumentView(documentId) {
