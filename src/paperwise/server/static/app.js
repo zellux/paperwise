@@ -2087,10 +2087,58 @@ async function applyFiltersFromControls() {
   await loadDocumentsList();
 }
 
+async function openDocumentsWithFilters(nextFilters, activityMessage = "") {
+  if (Object.prototype.hasOwnProperty.call(nextFilters, "q")) {
+    docsFilters.q = String(nextFilters.q || "").trim();
+  }
+  if (Object.prototype.hasOwnProperty.call(nextFilters, "tag")) {
+    docsFilters.tag = unique(nextFilters.tag || []);
+  }
+  if (Object.prototype.hasOwnProperty.call(nextFilters, "correspondent")) {
+    docsFilters.correspondent = unique(nextFilters.correspondent || []);
+  }
+  if (Object.prototype.hasOwnProperty.call(nextFilters, "document_type")) {
+    docsFilters.document_type = unique(nextFilters.document_type || []);
+  }
+  if (Object.prototype.hasOwnProperty.call(nextFilters, "status")) {
+    docsFilters.status = unique(nextFilters.status || []);
+  }
+  docsPage = 1;
+  applyFiltersToControls();
+  setActiveView("section-docs");
+  setActiveNav("section-docs");
+  syncUrlFromFilters();
+  await loadDocumentsList();
+  if (activityMessage) {
+    logActivity(activityMessage);
+  }
+}
+
 function navigateToDocument(documentId) {
   const url = new URL("/ui/document", window.location.origin);
   url.searchParams.set("id", documentId);
   window.location.href = `${url.pathname}?${url.searchParams.toString()}`;
+}
+
+function createTagFilterButton(tag) {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "tag-pill tag-pill-button";
+  button.textContent = tag;
+  button.title = `Show documents tagged ${tag}`;
+  button.addEventListener("click", async () => {
+    await openDocumentsWithFilters(
+      {
+        q: "",
+        tag: [tag],
+        correspondent: [],
+        document_type: [],
+        status: [],
+      },
+      `Filtered documents by tag: ${tag}`
+    );
+  });
+  return button;
 }
 
 async function openDocumentFile(documentId) {
@@ -2286,10 +2334,7 @@ function renderDocsList(documents) {
       const pills = document.createElement("div");
       pills.className = "tag-pills";
       for (const tag of doc.llm_metadata.tags) {
-        const pill = document.createElement("span");
-        pill.className = "tag-pill";
-        pill.textContent = tag;
-        pills.appendChild(pill);
+        pills.appendChild(createTagFilterButton(tag));
       }
       tagsCell.appendChild(pills);
     } else {
@@ -2379,17 +2424,16 @@ function renderTagsList(tagStats) {
         icon: "eye",
         label: `View documents for tag ${stat.tag}`,
         onClick: async () => {
-          docsFilters.tag = [stat.tag];
-          docsFilters.correspondent = [];
-          docsFilters.document_type = [];
-          docsFilters.status = [];
-          docsPage = 1;
-          applyFiltersToControls();
-          setActiveView("section-docs");
-          setActiveNav("section-docs");
-          syncUrlFromFilters();
-          await loadDocumentsList();
-          logActivity(`Filtered documents by tag: ${stat.tag}`);
+          await openDocumentsWithFilters(
+            {
+              q: "",
+              tag: [stat.tag],
+              correspondent: [],
+              document_type: [],
+              status: [],
+            },
+            `Filtered documents by tag: ${stat.tag}`
+          );
         },
       })
     );
@@ -2430,17 +2474,16 @@ function renderDocumentTypesList(typeStats) {
         icon: "eye",
         label: `View documents for type ${stat.document_type}`,
         onClick: async () => {
-          docsFilters.tag = [];
-          docsFilters.correspondent = [];
-          docsFilters.document_type = [stat.document_type];
-          docsFilters.status = [];
-          docsPage = 1;
-          applyFiltersToControls();
-          setActiveView("section-docs");
-          setActiveNav("section-docs");
-          syncUrlFromFilters();
-          await loadDocumentsList();
-          logActivity(`Filtered documents by type: ${stat.document_type}`);
+          await openDocumentsWithFilters(
+            {
+              q: "",
+              tag: [],
+              correspondent: [],
+              document_type: [stat.document_type],
+              status: [],
+            },
+            `Filtered documents by type: ${stat.document_type}`
+          );
         },
       })
     );

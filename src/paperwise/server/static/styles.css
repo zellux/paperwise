@@ -1525,6 +1525,20 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   white-space: nowrap;
 }
 
+.tag-pill-button {
+  cursor: pointer;
+  font: inherit;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.tag-pill-button:hover,
+.tag-pill-button:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--table-pill-border));
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--accent) 16%, transparent);
+  transform: translateY(-1px);
+  outline: none;
+}
+
 .table-actions {
   display: inline-flex;
   align-items: center;

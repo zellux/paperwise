@@ -26,3 +26,15 @@ def test_ui_routes_serve_index_html() -> None:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
         assert "<!doctype html>" in response.text.lower()
+
+
+def test_static_assets_serve_clickable_tag_ui() -> None:
+    client = TestClient(app)
+
+    app_js = client.get("/static/app.js")
+    assert app_js.status_code == 200
+    assert "createTagFilterButton" in app_js.text
+
+    styles = client.get("/static/styles.css")
+    assert styles.status_code == 200
+    assert ".tag-pill-button" in styles.text
