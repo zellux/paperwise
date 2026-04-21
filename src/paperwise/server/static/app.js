@@ -172,7 +172,7 @@ let currentUser = null;
 let userPreferenceSaveTimer = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember", "folio", "forge"];
 const THEME_STORAGE_KEY = "paperwise.ui.theme";
-let currentTheme = "atlas";
+let currentTheme = "forge";
 const SUPPORTED_LLM_PROVIDERS = ["openai", "gemini", "custom"];
 const LLM_PROVIDER_DEFAULTS = {
   openai: {
@@ -351,18 +351,18 @@ function normalizeThemeName(value) {
   if (SUPPORTED_THEMES.includes(normalized)) {
     return normalized;
   }
-  return "atlas";
+  return "forge";
 }
 
 function readBootTheme() {
   const bootTheme = normalizeThemeName(document.documentElement?.dataset?.uiTheme || "");
-  if (bootTheme !== "atlas") {
+  if (bootTheme !== "forge") {
     return bootTheme;
   }
   try {
     return normalizeThemeName(window.localStorage.getItem(THEME_STORAGE_KEY));
   } catch {
-    return "atlas";
+    return "forge";
   }
 }
 
@@ -1533,7 +1533,7 @@ function renderSessionState() {
 
 function clearSession() {
   persistSession("", null);
-  applyTheme("atlas");
+  applyTheme("forge");
   llmConnections = [];
   llmRouting = createDefaultLlmRouting();
   ocrProvider = "llm";

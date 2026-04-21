@@ -22,12 +22,12 @@
           const key = "paperwise.ui.theme";
           const supported = new Set(["atlas", "ledger", "moss", "ember", "folio", "forge"]);
           const stored = String(window.localStorage.getItem(key) || "").trim().toLowerCase();
-          const theme = supported.has(stored) ? stored : "atlas";
+          const theme = supported.has(stored) ? stored : "forge";
           document.documentElement.classList.add(`theme-${theme}`);
           document.documentElement.dataset.uiTheme = theme;
         } catch (_error) {
-          document.documentElement.classList.add("theme-atlas");
-          document.documentElement.dataset.uiTheme = "atlas";
+          document.documentElement.classList.add("theme-forge");
+          document.documentElement.dataset.uiTheme = "forge";
         }
       })();
     </script>
