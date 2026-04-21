@@ -1214,6 +1214,12 @@ function formatStatus(value) {
     .toUpperCase();
 }
 
+function renderStatusBadge(value) {
+  if (!value) return '<span class="status-badge">—</span>';
+  const cls = `status-badge status-${String(value).toLowerCase()}`;
+  return `<span class="${cls}">${escapeHtml(formatStatus(value))}</span>`;
+}
+
 function formatBytes(value) {
   const bytes = Number(value || 0);
   if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -2385,7 +2391,7 @@ function renderDocsList(documents) {
     dateCell.textContent = documentDate;
     const statusCell = document.createElement("td");
     statusCell.setAttribute("data-label", "Status");
-    statusCell.textContent = formatStatus(doc.status);
+    statusCell.innerHTML = renderStatusBadge(doc.status);
 
     const actionCell = document.createElement("td");
     actionCell.setAttribute("data-label", "Action");
@@ -2558,7 +2564,7 @@ function renderPendingList(documents) {
 
     const statusCell = document.createElement("td");
     statusCell.setAttribute("data-label", "Status");
-    statusCell.textContent = formatStatus(doc.status);
+    statusCell.innerHTML = renderStatusBadge(doc.status);
     const createdCell = document.createElement("td");
     createdCell.setAttribute("data-label", "Created");
     createdCell.textContent = new Date(doc.created_at).toLocaleString();
@@ -2607,7 +2613,7 @@ function renderProcessedDocsActivity(documents) {
 
     const statusCell = document.createElement("td");
     statusCell.setAttribute("data-label", "Status");
-    statusCell.textContent = formatStatus(doc.status);
+    statusCell.innerHTML = renderStatusBadge(doc.status);
 
     const uploadedCell = document.createElement("td");
     uploadedCell.setAttribute("data-label", "Uploaded");
@@ -3731,7 +3737,7 @@ async function openDocumentView(documentId) {
   detailDocId.textContent = doc.id || "-";
   detailOwnerId.textContent = doc.owner_id || "-";
   detailFilename.textContent = doc.filename || "-";
-  detailStatus.textContent = formatStatus(doc.status);
+  detailStatus.innerHTML = renderStatusBadge(doc.status);
   detailOcrContent.textContent = String(payload.ocr_text_preview || "").trim() || "-";
   detailCreatedAt.textContent = doc.created_at
     ? new Date(doc.created_at).toLocaleString()
