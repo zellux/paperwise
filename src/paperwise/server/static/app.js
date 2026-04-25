@@ -439,6 +439,20 @@ function getConnectionApiKeyValidationError(provider, apiKey) {
   return "";
 }
 
+function formatApiErrorDetail(detail) {
+  if (typeof detail === "string") {
+    return detail;
+  }
+  if (detail == null) {
+    return "";
+  }
+  try {
+    return JSON.stringify(detail);
+  } catch (_error) {
+    return String(detail);
+  }
+}
+
 function normalizeOcrProvider(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (SUPPORTED_OCR_PROVIDERS.includes(normalized)) {
@@ -862,10 +876,17 @@ async function testConnection(connectionId, buttonEl) {
         api_key: connection.api_key,
       }),
     });
-    const payload = await response.json();
+    const responseText = await response.text();
+    let payload = {};
+    try {
+      payload = responseText ? JSON.parse(responseText) : {};
+    } catch (_error) {
+      payload = {};
+    }
     if (!response.ok) {
-      setConnectionTestStatus(connectionId, payload.detail || response.statusText, "error");
-      logActivity(`LLM API test failed: ${payload.detail || response.statusText}`);
+      const errorMessage = formatApiErrorDetail(payload.detail) || responseText || response.statusText;
+      setConnectionTestStatus(connectionId, errorMessage, "error");
+      logActivity(`LLM API test failed: ${errorMessage}`);
       return;
     }
     setConnectionTestStatus(

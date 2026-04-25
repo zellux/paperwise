@@ -608,6 +608,23 @@ def _merge_llm_preferences(
     return merged
 
 
+def _format_llm_connection_test_error(exc: Exception) -> str:
+    message = str(exc)
+    response = getattr(exc, "response", None)
+    if response is None:
+        return message
+
+    response_text = str(getattr(response, "text", "") or "").strip()
+    if not response_text:
+        return message
+
+    status_code = getattr(response, "status_code", None)
+    prefix = f"HTTP {status_code} response" if status_code else "Provider response"
+    if response_text in message:
+        return message
+    return f"{message}; {prefix}: {response_text}"
+
+
 def _resolve_ocr_provider_for_user(
     *,
     repository: DocumentRepository,
@@ -1107,7 +1124,7 @@ def test_llm_connection_endpoint(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"LLM API test failed: {exc}",
+            detail=f"LLM API test failed: {_format_llm_connection_test_error(exc)}",
         ) from exc
 
     return LLMConnectionTestResponse(

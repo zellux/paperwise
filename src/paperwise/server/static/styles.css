@@ -1224,9 +1224,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .settings-inline-status {
+  flex: 1 1 260px;
   font-size: 0.84rem;
+  line-height: 1.35;
   color: var(--ink-soft);
   min-height: 1.1em;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
 }
 
 .settings-inline-status.is-success {

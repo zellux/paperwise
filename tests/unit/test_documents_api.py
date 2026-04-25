@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 import io
 from zipfile import ZipFile
 
+import httpx
 from fastapi.testclient import TestClient
 
 from paperwise.server.routes import documents as documents_routes
@@ -89,6 +90,34 @@ class FakeLLMProvider:
         del filename
         del content_type
         return text_preview
+
+
+class FakeFailingLLMProvider:
+    def suggest_metadata(
+        self,
+        *,
+        filename: str,
+        text_preview: str,
+        current_correspondent: str | None,
+        current_document_type: str | None,
+        existing_correspondents: list[str],
+        existing_document_types: list[str],
+        existing_tags: list[str],
+    ) -> dict:
+        del filename
+        del text_preview
+        del current_correspondent
+        del current_document_type
+        del existing_correspondents
+        del existing_document_types
+        del existing_tags
+        request = httpx.Request("POST", "https://api.example.test/v1/chat/completions")
+        response = httpx.Response(
+            401,
+            request=request,
+            json={"error": {"message": "Invalid API key: sk-bad", "type": "invalid_request_error"}},
+        )
+        response.raise_for_status()
 
 
 TEST_USER = User(
@@ -1583,6 +1612,34 @@ def test_llm_connection_test_accepts_payload_overrides_and_calls_provider() -> N
         assert payload["provider"] == "openai"
         assert payload["model"] == "gpt-4.1-mini"
         assert fake_provider.calls == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_connection_test_includes_provider_response_body_on_failure() -> None:
+    repository = InMemoryDocumentRepository()
+    fake_provider = FakeFailingLLMProvider()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: fake_provider
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents/llm/test",
+            json={
+                "provider": "openai",
+                "model": "gpt-4.1-mini",
+                "api_key": "sk-bad",
+                "base_url": "https://api.openai.com/v1",
+            },
+        )
+        assert response.status_code == 502
+        detail = response.json()["detail"]
+        assert "LLM API test failed:" in detail
+        assert "401 Unauthorized" in detail
+        assert "Invalid API key: sk-bad" in detail
+        assert "invalid_request_error" in detail
     finally:
         app.dependency_overrides.clear()
 
