@@ -38,10 +38,8 @@ const searchAskForm = document.getElementById("searchAskForm");
 const searchAskQuestion = document.getElementById("searchAskQuestion");
 const searchAskNewChatBtn = document.getElementById("searchAskNewChatBtn");
 const searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
-const searchAskDebugToggle = document.getElementById("searchAskDebugToggle");
 const searchAskMessages = document.getElementById("searchAskMessages");
 const searchAskAnswer = document.getElementById("searchAskAnswer");
-const searchAskDebugOutput = document.getElementById("searchAskDebugOutput");
 const searchAskCitationsBody = document.getElementById("searchAskCitationsBody");
 const searchSubsections = [...document.querySelectorAll(".search-subsection")];
 const settingsSubsections = [...document.querySelectorAll(".settings-subsection")];
@@ -1714,7 +1712,6 @@ function clearSession() {
   renderSearchResultsMeta("No search run yet.");
   renderSearchAskMessages();
   renderSearchAskAnswer(null);
-  renderSearchAskDebugOutput(null, false);
   renderSettingsForm();
   renderSortHeaders();
   renderActivityTokenTotal(0);
@@ -3105,18 +3102,27 @@ function renderSearchResultsTable(payload) {
 }
 
 function renderSearchAskAnswer(payload) {
-  if (!searchAskAnswer || !searchAskCitationsBody) {
+  if (!searchAskAnswer && !searchAskCitationsBody) {
     return;
   }
   if (!payload) {
-    searchAskAnswer.innerHTML = "<p>No answer yet.</p>";
-    searchAskCitationsBody.innerHTML = '<tr><td colspan="2">No citations.</td></tr>';
+    if (searchAskAnswer) {
+      searchAskAnswer.innerHTML = "<p>No answer yet.</p>";
+    }
+    if (searchAskCitationsBody) {
+      searchAskCitationsBody.innerHTML = '<tr><td colspan="2">No citations.</td></tr>';
+    }
     return;
   }
   const answer = String(payload.answer || "").trim();
   const note = payload.insufficient_evidence ? "\n\n_Insufficient evidence in selected scope._" : "";
   const markdown = answer ? `${answer}${note}` : "No answer returned.";
-  searchAskAnswer.innerHTML = renderMarkdown(markdown);
+  if (searchAskAnswer) {
+    searchAskAnswer.innerHTML = renderMarkdown(markdown);
+  }
+  if (!searchAskCitationsBody) {
+    return;
+  }
   const citations = Array.isArray(payload.citations) ? payload.citations : [];
   if (!citations.length) {
     searchAskCitationsBody.innerHTML = '<tr><td colspan="2">No citations.</td></tr>';
@@ -3151,6 +3157,7 @@ function appendSearchAskMessage(role, content, options = {}) {
     content: String(content || "").trim(),
     pending: Boolean(options.pending),
     toolCalls: Array.isArray(options.toolCalls) ? options.toolCalls : [],
+    citations: Array.isArray(options.citations) ? options.citations : [],
     statusKind: String(options.statusKind || "").trim(),
     statusSummary: String(options.statusSummary || "").trim(),
     statusDetail: String(options.statusDetail || "").trim(),
@@ -3173,6 +3180,7 @@ function updatePendingSearchAskMessage(message, content, options = {}) {
   message.content = String(content || "").trim();
   message.pending = false;
   message.toolCalls = Array.isArray(options.toolCalls) ? options.toolCalls : [];
+  message.citations = Array.isArray(options.citations) ? options.citations : [];
   renderSearchAskMessages();
 }
 
@@ -3304,6 +3312,30 @@ function renderSearchAskActivityMessage(message, item) {
   }
 }
 
+function renderChatCitations(message, item) {
+  if (!Array.isArray(message.citations) || !message.citations.length) {
+    return;
+  }
+  const details = document.createElement("details");
+  details.className = "chat-citations";
+  const summary = document.createElement("summary");
+  summary.textContent = `Sources (${message.citations.length})`;
+  details.appendChild(summary);
+
+  const list = document.createElement("div");
+  list.className = "chat-citation-list";
+  for (const citation of message.citations) {
+    const source = document.createElement("button");
+    source.type = "button";
+    source.className = "chat-citation-source";
+    source.textContent = citation.title || citation.document_id || "Source";
+    source.addEventListener("click", () => navigateToDocument(citation.document_id));
+    list.appendChild(source);
+  }
+  details.appendChild(list);
+  item.appendChild(details);
+}
+
 function renderSearchAskMessages() {
   if (!searchAskMessages) {
     return;
@@ -3341,6 +3373,7 @@ function renderSearchAskMessages() {
     body.innerHTML = renderMarkdown(message.pending ? "Working..." : message.content || "No response.");
     item.appendChild(role);
     item.appendChild(body);
+    renderChatCitations(message, item);
     searchAskMessages.appendChild(item);
   }
   searchAskMessages.scrollTop = searchAskMessages.scrollHeight;
@@ -3356,7 +3389,6 @@ function resetSearchAskChat() {
   renderSearchAskTokenUsage();
   renderSearchAskMessages();
   renderSearchAskAnswer(null);
-  renderSearchAskDebugOutput(null, Boolean(searchAskDebugToggle?.checked));
   if (searchAskQuestion) {
     searchAskQuestion.value = "";
     searchAskQuestion.focus();
@@ -3506,27 +3538,6 @@ function renderMarkdown(markdown) {
     return "<p>No answer returned.</p>";
   }
   return html.join("");
-}
-
-function renderSearchAskDebugOutput(debugPayload, enabled) {
-  if (!searchAskDebugOutput) {
-    return;
-  }
-  if (!enabled) {
-    searchAskDebugOutput.classList.add("view-hidden");
-    searchAskDebugOutput.textContent = "Debug output disabled.";
-    return;
-  }
-  searchAskDebugOutput.classList.remove("view-hidden");
-  if (!debugPayload) {
-    searchAskDebugOutput.textContent = "No debug payload returned.";
-    return;
-  }
-  try {
-    searchAskDebugOutput.textContent = JSON.stringify(debugPayload, null, 2);
-  } catch {
-    searchAskDebugOutput.textContent = String(debugPayload);
-  }
 }
 
 function setButtonBusy(button, busy, busyLabel = "Loading...") {
@@ -3847,7 +3858,7 @@ function appendSearchAskRoundDetail(round, label, detail) {
   }
 }
 
-function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled, activityMessage = null) {
+function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMessage = null) {
   if (eventType === "status") {
     appendSearchAskActivityRound(activityMessage, data);
     return null;
@@ -3893,7 +3904,6 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnable
     const detail = data.detail || "Chat failed.";
     updatePendingSearchAskMessage(pendingMessage, detail);
     renderSearchAskAnswer({ answer: detail, insufficient_evidence: true, citations: [] });
-    renderSearchAskDebugOutput(data?.debug || null, debugEnabled);
     return { error: detail };
   }
   if (eventType === "final") {
@@ -3901,20 +3911,19 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnable
     updatePendingSearchAskMessage(
       pendingMessage,
       data?.message?.content || "No answer returned.",
-      { toolCalls: data?.tool_calls || [] },
+      { citations: data?.citations || [], toolCalls: data?.tool_calls || [] },
     );
     renderSearchAskAnswer({
       answer: data?.message?.content || "",
       insufficient_evidence: !Array.isArray(data?.citations) || !data.citations.length,
       citations: data?.citations || [],
     });
-    renderSearchAskDebugOutput(data?.debug || null, debugEnabled);
     return { final: data };
   }
   return null;
 }
 
-async function runSearchAskStream(requestBody, pendingMessage, debugEnabled, activityMessage) {
+async function runSearchAskStream(requestBody, pendingMessage, activityMessage) {
   const response = await apiFetch("/query/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
@@ -3937,7 +3946,7 @@ async function runSearchAskStream(requestBody, pendingMessage, debugEnabled, act
         continue;
       }
       const { eventType, data } = parseSearchAskStreamEvent(rawEvent);
-      const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled, activityMessage);
+      const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMessage);
       if (handled?.error) {
         throw new Error(handled.error);
       }
@@ -3951,7 +3960,7 @@ async function runSearchAskStream(requestBody, pendingMessage, debugEnabled, act
   }
   if (buffer.trim()) {
     const { eventType, data } = parseSearchAskStreamEvent(buffer);
-    const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled, activityMessage);
+    const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMessage);
     if (handled?.error) {
       throw new Error(handled.error);
     }
@@ -3964,14 +3973,12 @@ async function runSearchAskStream(requestBody, pendingMessage, debugEnabled, act
 
 async function runScopedAsk() {
   const question = String(searchAskQuestion?.value || "").trim();
-  const debugEnabled = Boolean(searchAskDebugToggle?.checked);
   if (searchAskInFlight) {
     appendSearchAskStatus("Still working", "Wait for the current request to finish.");
     return;
   }
   if (!question) {
     appendSearchAskMessage("assistant", "Enter a question.");
-    renderSearchAskDebugOutput(null, debugEnabled);
     return;
   }
   const topK = normalizeGroundedQaTopK(groundedQaTopK);
@@ -3982,7 +3989,6 @@ async function runScopedAsk() {
   if (searchAskQuestion) {
     searchAskQuestion.value = "";
   }
-  renderSearchAskDebugOutput({ status: "waiting_for_response" }, debugEnabled);
   setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), true, "Asking...");
   searchAskInFlight = true;
   const requestBody = {
@@ -3996,10 +4002,10 @@ async function runScopedAsk() {
     },
     top_k_chunks: topK,
     max_documents: maxDocuments,
-    debug: debugEnabled,
+    debug: false,
   };
   try {
-    const streamedPayload = await runSearchAskStream(requestBody, pendingMessage, debugEnabled, activityMessage);
+    const streamedPayload = await runSearchAskStream(requestBody, pendingMessage, activityMessage);
     if (streamedPayload) {
       logActivity("Ask Your Docs chat completed.");
       return;
@@ -4013,7 +4019,6 @@ async function runScopedAsk() {
     if (!response.ok) {
       updatePendingSearchAskMessage(pendingMessage, payload.detail || response.statusText);
       renderSearchAskAnswer({ answer: payload.detail || response.statusText, insufficient_evidence: true, citations: [] });
-      renderSearchAskDebugOutput(payload?.debug || null, debugEnabled);
       logActivity(`Ask failed: ${payload.detail || response.statusText}`);
       return;
     }
@@ -4021,14 +4026,13 @@ async function runScopedAsk() {
     updatePendingSearchAskMessage(
       pendingMessage,
       payload?.message?.content || "No answer returned.",
-      { toolCalls: payload?.tool_calls || [] },
+      { citations: payload?.citations || [], toolCalls: payload?.tool_calls || [] },
     );
     renderSearchAskAnswer({
       answer: payload?.message?.content || "",
       insufficient_evidence: !Array.isArray(payload?.citations) || !payload.citations.length,
       citations: payload?.citations || [],
     });
-    renderSearchAskDebugOutput(payload?.debug || null, debugEnabled);
     logActivity("Ask Your Docs chat completed.");
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error || "Chat failed.");
@@ -4600,11 +4604,6 @@ searchAskMessages?.addEventListener("click", (event) => {
   }
   message.expanded = !message.expanded;
   renderSearchAskMessages();
-});
-
-searchAskDebugToggle?.addEventListener("change", () => {
-  const enabled = Boolean(searchAskDebugToggle.checked);
-  renderSearchAskDebugOutput(null, enabled);
 });
 
 settingsForm?.addEventListener("submit", async (event) => {

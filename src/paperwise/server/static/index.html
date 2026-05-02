@@ -537,49 +537,24 @@
                   <button id="searchAskNewChatBtn" type="button" class="btn btn-muted">New Chat</button>
                 </div>
               </div>
-              <p class="search-hint">Chat across your documents with metadata-aware tools.</p>
               <div id="searchAskMessages" class="chat-messages" aria-live="polite">
                 <div class="chat-message chat-message-assistant">
                   <div class="chat-message-role">Paperwise</div>
                   <div class="chat-message-body markdown-output">Ask a question to begin.</div>
                 </div>
               </div>
-              <form id="searchAskForm" class="stack">
-                <label class="label" for="searchAskQuestion">Message</label>
+              <form id="searchAskForm" class="chat-composer">
                 <textarea
                   id="searchAskQuestion"
                   name="searchAskQuestion"
-                  rows="3"
+                  rows="2"
                   placeholder="Ask a follow-up, filter by tag, or ask about document metadata."
                   required
                 ></textarea>
-                <label class="settings-checkbox-row" for="searchAskDebugToggle">
-                  <input id="searchAskDebugToggle" name="searchAskDebugToggle" type="checkbox" />
-                  <span>Enable debug output</span>
-                </label>
-                <div class="actions">
+                <div class="chat-composer-footer">
                   <button id="searchAskSubmitBtn" type="submit" class="btn btn-primary">Ask</button>
                 </div>
               </form>
-              <div id="searchAskAnswer" class="output markdown-output view-hidden">No answer yet.</div>
-              <pre id="searchAskDebugOutput" class="output search-debug-output view-hidden">
-Debug output disabled.
-              </pre>
-              <div class="docs-table-wrap">
-                <table class="docs-table tags-table">
-                  <thead>
-                    <tr>
-                      <th>Source</th>
-                      <th>Quote</th>
-                    </tr>
-                  </thead>
-                  <tbody id="searchAskCitationsBody">
-                    <tr>
-                      <td colspan="2">No citations.</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
             </section>
           </section>
         </article>

@@ -1219,20 +1219,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .chat-messages {
   display: grid;
-  gap: 10px;
-  max-height: 460px;
+  gap: 12px;
+  max-height: min(58vh, 620px);
   overflow: auto;
-  margin: 10px 0 14px;
-  padding: 10px;
-  border: 1px solid var(--stroke);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.72);
+  margin: 12px 0;
+  padding: 4px 2px;
 }
 
 .chat-message {
   display: grid;
   gap: 4px;
-  max-width: 86%;
+  max-width: 88%;
 }
 
 .chat-message-user {
@@ -1258,7 +1255,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .chat-message-body {
   border: 1px solid var(--stroke);
   border-radius: 8px;
-  padding: 9px 11px;
+  padding: 10px 12px;
   background: var(--paper);
 }
 
@@ -1281,10 +1278,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   gap: 6px;
   width: 100%;
   min-height: 28px;
-  border: 1px dashed var(--stroke);
-  border-radius: 8px;
-  padding: 5px 8px;
-  background: rgba(255, 255, 255, 0.54);
+  border: 0;
+  border-radius: 6px;
+  padding: 4px 6px;
+  background: transparent;
   color: var(--ink-soft);
   cursor: pointer;
   font: inherit;
@@ -1293,8 +1290,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .chat-status-summary:hover {
-  border-color: rgba(43, 91, 74, 0.28);
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(43, 91, 74, 0.06);
 }
 
 .chat-status-marker {
@@ -1327,8 +1323,65 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   white-space: pre-wrap;
 }
 
-#search-section-ask .docs-table-wrap {
-  margin-top: 10px;
+.chat-citations {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.chat-citations summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.chat-citation-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.chat-citation-source {
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.76rem;
+}
+
+.chat-citation-source:hover {
+  border-color: rgba(43, 91, 74, 0.34);
+  background: rgba(43, 91, 74, 0.08);
+}
+
+.chat-composer {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--paper);
+}
+
+.chat-composer textarea {
+  min-height: 56px;
+  padding: 6px 4px;
+  border: 0;
+  background: transparent;
+  resize: vertical;
+}
+
+.chat-composer textarea:focus {
+  outline: none;
+}
+
+.chat-composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 @media (max-width: 960px) {
