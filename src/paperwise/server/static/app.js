@@ -3529,6 +3529,26 @@ function renderMarkdownTable(headerLine, bodyLines) {
   return `<table>${thead}${tbody}</table>`;
 }
 
+function getMarkdownListKind(line) {
+  if (/^\s*[-*]\s+/.test(line)) {
+    return "ul";
+  }
+  if (/^\s*\d+\.\s+/.test(line)) {
+    return "ol";
+  }
+  return "";
+}
+
+function findNextNonEmptyMarkdownLine(lines, startIndex) {
+  for (let index = startIndex; index < lines.length; index += 1) {
+    const line = String(lines[index] || "").trim();
+    if (line) {
+      return line;
+    }
+  }
+  return "";
+}
+
 function renderMarkdown(markdown) {
   const lines = String(markdown || "").replace(/\r\n/g, "\n").split("\n");
   const html = [];
@@ -3548,13 +3568,17 @@ function renderMarkdown(markdown) {
     const nextLine = index + 1 < lines.length ? lines[index + 1].trim() : "";
     const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
     const ulMatch = line.match(/^[-*]\s+(.+)$/);
-    const olMatch = line.match(/^\d+\.\s+(.+)$/);
+    const olMatch = line.match(/^(\d+)\.\s+(.+)$/);
     const quoteMatch = line.match(/^>\s+(.+)$/);
     const looksLikeTable = line.includes("|") && nextLine.includes("|") && isMarkdownTableSeparator(nextLine);
 
     if (!line.trim()) {
-      closeList();
       flushMarkdownParagraph(paragraph, html);
+      const nextListKind = getMarkdownListKind(findNextNonEmptyMarkdownLine(lines, index + 1));
+      if (listKind && nextListKind === listKind) {
+        continue;
+      }
+      closeList();
       continue;
     }
 
@@ -3606,10 +3630,11 @@ function renderMarkdown(markdown) {
       flushMarkdownParagraph(paragraph, html);
       if (listKind !== "ol") {
         closeList();
-        html.push("<ol>");
+        const start = Number(olMatch[1] || 1);
+        html.push(start > 1 ? `<ol start="${start}">` : "<ol>");
         listKind = "ol";
       }
-      html.push(`<li>${renderInlineMarkdown(olMatch[1])}</li>`);
+      html.push(`<li>${renderInlineMarkdown(olMatch[2])}</li>`);
       continue;
     }
 
