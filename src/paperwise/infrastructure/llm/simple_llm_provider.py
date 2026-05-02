@@ -123,3 +123,13 @@ class SimpleLLMProvider(LLMProvider):
             "anchor_terms": unique[:3],
             "optional_terms": [],
         }
+
+    def answer_with_tools(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        del messages
+        del tools
+        raise RuntimeError("Conversational tool use requires a remote LLM provider.")

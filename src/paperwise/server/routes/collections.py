@@ -1,3 +1,4 @@
+import json
 import re
 from datetime import UTC, datetime
 from typing import Any
@@ -19,6 +20,7 @@ from paperwise.server.routes.documents import _resolve_llm_provider_from_prefere
 from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 
 router = APIRouter(prefix="/collections", tags=["collections"])
+query_router = APIRouter(prefix="/query", tags=["query"])
 
 
 def _is_timeout_error(exc: Exception) -> bool:
@@ -85,6 +87,27 @@ class AskRequest(BaseModel):
     debug: bool = False
 
 
+class ChatMessageRequest(BaseModel):
+    role: str = Field(min_length=1, max_length=20)
+    content: str = Field(default="", max_length=12000)
+
+
+class ChatScopeRequest(BaseModel):
+    tag: list[str] = Field(default_factory=list)
+    document_type: list[str] = Field(default_factory=list)
+    correspondent: list[str] = Field(default_factory=list)
+    date_from: str | None = None
+    date_to: str | None = None
+
+
+class ChatRequest(BaseModel):
+    messages: list[ChatMessageRequest] = Field(min_length=1, max_length=30)
+    scope: ChatScopeRequest = Field(default_factory=ChatScopeRequest)
+    top_k_chunks: int = Field(default=18, ge=3, le=60)
+    max_documents: int = Field(default=12, ge=1, le=50)
+    debug: bool = False
+
+
 class AskCitationResponse(BaseModel):
     chunk_id: str
     document_id: str
@@ -92,11 +115,24 @@ class AskCitationResponse(BaseModel):
     quote: str
 
 
+class ChatToolCallResponse(BaseModel):
+    name: str
+    arguments: dict[str, Any]
+    result_count: int
+
+
 class AskResponse(BaseModel):
     question: str
     answer: str
     insufficient_evidence: bool
     citations: list[AskCitationResponse]
+    debug: dict[str, Any] | None = None
+
+
+class ChatResponse(BaseModel):
+    message: ChatMessageRequest
+    citations: list[AskCitationResponse]
+    tool_calls: list[ChatToolCallResponse]
     debug: dict[str, Any] | None = None
 
 
@@ -197,10 +233,25 @@ def _resolve_metadata_scoped_document_ids(
     base_document_ids: list[str] | None,
     tag_filters: list[str] | None,
     document_type_filters: list[str] | None,
+    correspondent_filters: list[str] | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    title_query: str | None = None,
 ) -> list[str] | None:
     normalized_tags = _normalized_values(tag_filters)
     normalized_document_types = _normalized_values(document_type_filters)
-    if not normalized_tags and not normalized_document_types:
+    normalized_correspondents = _normalized_values(correspondent_filters)
+    title_terms = _normalized_values([title_query] if title_query else [])
+    parsed_date_from = _parse_iso_date_filter(date_from)
+    parsed_date_to = _parse_iso_date_filter(date_to)
+    if (
+        not normalized_tags
+        and not normalized_document_types
+        and not normalized_correspondents
+        and not parsed_date_from
+        and not parsed_date_to
+        and not title_terms
+    ):
         if base_document_ids is None:
             return None
         return sorted(set(base_document_ids))
@@ -229,6 +280,19 @@ def _resolve_metadata_scoped_document_ids(
             if normalized_document_types:
                 if _normalize_name(llm_result.document_type) not in normalized_document_types:
                     continue
+            if normalized_correspondents:
+                if _normalize_name(llm_result.correspondent) not in normalized_correspondents:
+                    continue
+            document_date = _parse_iso_date_filter(llm_result.document_date)
+            if parsed_date_from and (document_date is None or document_date < parsed_date_from):
+                continue
+            if parsed_date_to and (document_date is None or document_date > parsed_date_to):
+                continue
+            if title_terms:
+                title = llm_result.suggested_title or document.filename
+                normalized_title = _normalize_name(title)
+                if not all(term in normalized_title for term in title_terms):
+                    continue
             if document.id in seen_ids:
                 continue
             seen_ids.add(document.id)
@@ -237,6 +301,16 @@ def _resolve_metadata_scoped_document_ids(
             break
         offset += batch_size
     return sorted(matched_ids)
+
+
+def _parse_iso_date_filter(value: str | None):
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return datetime.strptime(text, "%Y-%m-%d").date()
+    except ValueError:
+        return None
 
 
 def _build_retrieval_queries_heuristic(query: str) -> list[str]:
@@ -536,6 +610,242 @@ def _build_qa_contexts(
     return contexts
 
 
+CHAT_SYSTEM_PROMPT = (
+    "You are Paperwise's conversational document assistant. Use the available tools to inspect the user's "
+    "documents, tags, metadata, and grounded text chunks. Do not answer from outside knowledge. For document "
+    "content claims, cite returned source titles or chunk IDs in your Markdown answer. Always query across all "
+    "owner-visible documents unless a metadata filter is needed. If the tools return no useful evidence, say "
+    "that the documents do not contain enough evidence. Prefer metadata tools for "
+    "questions about counts, available tags, document types, dates, correspondents, or document lists."
+)
+
+
+CHAT_TOOLS: list[dict[str, Any]] = [
+    {
+        "type": "function",
+        "function": {
+            "name": "search_document_chunks",
+            "description": "Search OCR text chunks in owner-visible documents using optional metadata filters.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                    "document_types": {"type": "array", "items": {"type": "string"}},
+                    "correspondents": {"type": "array", "items": {"type": "string"}},
+                    "date_from": {"type": "string", "description": "Inclusive YYYY-MM-DD lower bound."},
+                    "date_to": {"type": "string", "description": "Inclusive YYYY-MM-DD upper bound."},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 60},
+                },
+                "required": ["query"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "query_document_metadata",
+            "description": "List documents by title, tag, type, correspondent, or document date without reading full text.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "title_query": {"type": "string"},
+                    "tags": {"type": "array", "items": {"type": "string"}},
+                    "document_types": {"type": "array", "items": {"type": "string"}},
+                    "correspondents": {"type": "array", "items": {"type": "string"}},
+                    "date_from": {"type": "string"},
+                    "date_to": {"type": "string"},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+                },
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "summarize_taxonomy",
+            "description": "Return available tags, document types, and correspondents for the current user scope.",
+            "parameters": {"type": "object", "properties": {}},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "get_document_context",
+            "description": "Fetch OCR chunks and metadata for one owner-visible document by document_id.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "document_id": {"type": "string"},
+                    "max_chunks": {"type": "integer", "minimum": 1, "maximum": 20},
+                },
+                "required": ["document_id"],
+            },
+        },
+    },
+]
+
+
+def _merge_tool_filters(scope: ChatScopeRequest, arguments: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "tag": list(scope.tag or []) + [str(item) for item in arguments.get("tags", []) if str(item).strip()],
+        "document_type": list(scope.document_type or [])
+        + [str(item) for item in arguments.get("document_types", []) if str(item).strip()],
+        "correspondent": list(scope.correspondent or [])
+        + [str(item) for item in arguments.get("correspondents", []) if str(item).strip()],
+        "date_from": arguments.get("date_from") or scope.date_from,
+        "date_to": arguments.get("date_to") or scope.date_to,
+    }
+
+
+def _to_tool_document_item(repository: DocumentRepository, document_id: str) -> dict[str, Any] | None:
+    document = repository.get(document_id)
+    if document is None:
+        return None
+    llm = repository.get_llm_parse_result(document_id)
+    return {
+        "document_id": document.id,
+        "filename": document.filename,
+        "title": llm.suggested_title if llm is not None and llm.suggested_title else document.filename,
+        "document_date": llm.document_date if llm is not None else None,
+        "document_type": llm.document_type if llm is not None else None,
+        "correspondent": llm.correspondent if llm is not None else None,
+        "tags": list(llm.tags or []) if llm is not None else [],
+        "created_at": document.created_at.isoformat(),
+    }
+
+
+def _execute_chat_tool(
+    *,
+    repository: DocumentRepository,
+    llm_provider: LLMProvider,
+    current_user: User,
+    scope: ChatScopeRequest,
+    top_k_chunks: int,
+    max_documents: int,
+    name: str,
+    arguments: dict[str, Any],
+) -> dict[str, Any]:
+    merged_filters = _merge_tool_filters(scope, arguments)
+    scoped_ids = _resolve_metadata_scoped_document_ids(
+        repository=repository,
+        current_user=current_user,
+        base_document_ids=None,
+        tag_filters=merged_filters["tag"],
+        document_type_filters=merged_filters["document_type"],
+        correspondent_filters=merged_filters["correspondent"],
+        date_from=merged_filters["date_from"],
+        date_to=merged_filters["date_to"],
+        title_query=str(arguments.get("title_query") or ""),
+    )
+    if name == "search_document_chunks":
+        query = " ".join(str(arguments.get("query") or "").split()).strip()
+        limit = max(1, min(60, int(arguments.get("limit") or top_k_chunks)))
+        hits = _search_document_chunks_multi_query(
+            repository=repository,
+            owner_id=current_user.id,
+            query=query,
+            limit=max(limit * 3, limit),
+            document_ids=scoped_ids,
+            llm_provider=llm_provider,
+        )
+        contexts = _build_qa_contexts(
+            repository=repository,
+            chunk_hits=hits,
+            top_k_chunks=limit,
+            max_documents=max_documents,
+        )
+        return {"results": contexts, "total_results": len(contexts), "scope_document_count": len(scoped_ids) if scoped_ids is not None else None}
+    if name == "query_document_metadata":
+        limit = max(1, min(100, int(arguments.get("limit") or 25)))
+        document_ids = scoped_ids
+        if document_ids is None:
+            document_ids = [
+                document.id
+                for document in repository.list_documents(limit=10_000)
+                if document.owner_id == current_user.id
+            ]
+        items = []
+        for document_id in document_ids[:limit]:
+            item = _to_tool_document_item(repository, document_id)
+            if item is not None:
+                items.append(item)
+        return {"documents": items, "total_results": len(document_ids), "returned_results": len(items)}
+    if name == "summarize_taxonomy":
+        document_ids = scoped_ids
+        if document_ids is None:
+            document_ids = [
+                document.id
+                for document in repository.list_documents(limit=10_000)
+                if document.owner_id == current_user.id
+            ]
+        tag_counts: dict[str, int] = {}
+        type_counts: dict[str, int] = {}
+        correspondent_counts: dict[str, int] = {}
+        for document_id in document_ids:
+            llm = repository.get_llm_parse_result(document_id)
+            if llm is None:
+                continue
+            for tag in llm.tags:
+                tag_counts[tag] = tag_counts.get(tag, 0) + 1
+            type_counts[llm.document_type] = type_counts.get(llm.document_type, 0) + 1
+            correspondent_counts[llm.correspondent] = correspondent_counts.get(llm.correspondent, 0) + 1
+
+        def top_items(counts: dict[str, int]) -> list[dict[str, Any]]:
+            return [
+                {"name": name, "document_count": count}
+                for name, count in sorted(counts.items(), key=lambda item: (-item[1], item[0].casefold()))[:30]
+            ]
+
+        return {
+            "document_count": len(document_ids),
+            "tags": top_items(tag_counts),
+            "document_types": top_items(type_counts),
+            "correspondents": top_items(correspondent_counts),
+        }
+    if name == "get_document_context":
+        document_id = str(arguments.get("document_id") or "").strip()
+        document = repository.get(document_id)
+        if document is None or document.owner_id != current_user.id:
+            return {"error": "Document not found."}
+        max_chunks = max(1, min(20, int(arguments.get("max_chunks") or 8)))
+        metadata = _to_tool_document_item(repository, document_id)
+        chunks = [
+            {
+                "chunk_id": chunk.id,
+                "document_id": chunk.document_id,
+                "title": metadata["title"] if metadata else document.filename,
+                "content": chunk.content[:2500],
+            }
+            for chunk in repository.list_document_chunks(document_id)[:max_chunks]
+        ]
+        return {"document": metadata, "chunks": chunks, "total_results": len(chunks)}
+    return {"error": f"Unknown tool: {name}"}
+
+
+def _extract_tool_citations(tool_payloads: list[dict[str, Any]]) -> list[AskCitationResponse]:
+    citations: list[AskCitationResponse] = []
+    seen: set[str] = set()
+    for payload in tool_payloads:
+        candidates = list(payload.get("results", []))
+        candidates.extend(payload.get("chunks", []))
+        for item in candidates:
+            chunk_id = str(item.get("chunk_id") or "").strip()
+            document_id = str(item.get("document_id") or "").strip()
+            if not chunk_id or not document_id or chunk_id in seen:
+                continue
+            seen.add(chunk_id)
+            citations.append(
+                AskCitationResponse(
+                    chunk_id=chunk_id,
+                    document_id=document_id,
+                    title=str(item.get("title") or ""),
+                    quote=str(item.get("content") or "")[:240],
+                )
+            )
+    return citations[:20]
+
+
 def _ask_grounded(
     *,
     repository: DocumentRepository,
@@ -698,6 +1008,145 @@ def _ask_grounded(
         else None
     )
     return response_payload
+
+
+def _build_chat_messages(payload: ChatRequest) -> list[dict[str, Any]]:
+    messages: list[dict[str, Any]] = [{"role": "system", "content": CHAT_SYSTEM_PROMPT}]
+    for item in payload.messages:
+        role = item.role.strip().lower()
+        if role not in {"user", "assistant"}:
+            continue
+        content = item.content.strip()
+        if not content:
+            continue
+        messages.append({"role": role, "content": content})
+    if len(messages) == 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="At least one user message is required.")
+    return messages
+
+
+def _chat_with_tools(
+    *,
+    repository: DocumentRepository,
+    llm_provider: LLMProvider,
+    current_user: User,
+    payload: ChatRequest,
+) -> ChatResponse:
+    answer_with_tools = getattr(llm_provider, "answer_with_tools", None)
+    if not callable(answer_with_tools):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Selected Grounded Q&A provider does not support conversational tool use.",
+        )
+    messages = _build_chat_messages(payload)
+    tool_calls_for_response: list[ChatToolCallResponse] = []
+    tool_payloads: list[dict[str, Any]] = []
+    debug_steps: list[dict[str, Any]] = []
+    last_response: dict[str, Any] = {}
+    for _ in range(6):
+        try:
+            last_response = answer_with_tools(messages=messages, tools=CHAT_TOOLS)
+        except Exception as exc:
+            if _is_timeout_error(exc):
+                raise HTTPException(
+                    status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                    detail=(
+                        "The LLM request timed out before completion. "
+                        "Please retry, reduce scope, or lower context limits in Settings."
+                    ),
+                ) from exc
+            if isinstance(exc, RuntimeError):
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+            raise
+        tool_calls = last_response.get("tool_calls", []) if isinstance(last_response, dict) else []
+        if not tool_calls:
+            break
+        assistant_tool_calls: list[dict[str, Any]] = []
+        tool_results: list[tuple[str, str, dict[str, Any]]] = []
+        for call in tool_calls:
+            call_id = str(call.get("id") or uuid4())
+            name = str(call.get("name") or "").strip()
+            raw_arguments = call.get("arguments", "{}")
+            try:
+                arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else dict(raw_arguments or {})
+            except (TypeError, ValueError):
+                arguments = {}
+            assistant_tool_calls.append(
+                {
+                    "id": call_id,
+                    "type": "function",
+                    "function": {"name": name, "arguments": json.dumps(arguments)},
+                }
+            )
+            result = _execute_chat_tool(
+                repository=repository,
+                llm_provider=llm_provider,
+                current_user=current_user,
+                scope=payload.scope,
+                top_k_chunks=payload.top_k_chunks,
+                max_documents=payload.max_documents,
+                name=name,
+                arguments=arguments,
+            )
+            tool_payloads.append(result)
+            tool_results.append((call_id, name, result))
+            result_count = int(result.get("total_results") or result.get("returned_results") or 0)
+            tool_calls_for_response.append(
+                ChatToolCallResponse(name=name, arguments=arguments, result_count=result_count)
+            )
+            debug_steps.append({"tool": name, "arguments": arguments, "result": result})
+        messages.append(
+            {
+                "role": "assistant",
+                "content": str(last_response.get("content") or ""),
+                "tool_calls": assistant_tool_calls,
+            }
+        )
+        for call_id, name, result in tool_results:
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": call_id,
+                    "name": name,
+                    "content": json.dumps(result),
+                }
+            )
+        if len(tool_calls_for_response) >= 10:
+            break
+    content = str(last_response.get("content") or "").strip()
+    if not content:
+        content = "I could not find enough evidence in the selected documents."
+    return ChatResponse(
+        message=ChatMessageRequest(role="assistant", content=content),
+        citations=_extract_tool_citations(tool_payloads),
+        tool_calls=tool_calls_for_response,
+        debug={"steps": debug_steps} if payload.debug else None,
+    )
+
+
+@query_router.post("/chat", response_model=ChatResponse)
+def chat_all_documents_endpoint(
+    payload: ChatRequest,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> ChatResponse:
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    llm_provider = _resolve_llm_provider_from_preferences(
+        preferences=preferences,
+        default_llm_provider=default_llm_provider,
+        task=LLM_TASK_GROUNDED_QA,
+        missing_provider_detail="Configure a Grounded Q&A LLM connection in Settings before chatting with your documents.",
+        missing_api_key_detail="Selected Grounded Q&A LLM connection requires an API key in Settings.",
+        missing_base_url_detail="Custom Grounded Q&A connection requires a base URL in Settings.",
+    )
+    return _chat_with_tools(
+        repository=repository,
+        llm_provider=llm_provider,
+        current_user=current_user,
+        payload=payload,
+    )
 
 
 @router.post("", response_model=CollectionResponse, status_code=status.HTTP_201_CREATED)

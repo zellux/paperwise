@@ -447,3 +447,70 @@ class OpenAILLMProvider(LLMProvider):
         content = str(payload["choices"][0]["message"]["content"]).strip()
         parsed = json.loads(content)
         return extract_retrieval_query_result(parsed, fallback_question=question)
+
+    def answer_with_tools(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        request_payload = {
+            "model": self._model,
+            "temperature": 0,
+            "messages": messages,
+            "tools": tools,
+            "tool_choice": "auto",
+        }
+        response: httpx.Response | None = None
+        response_payload: Any = None
+        try:
+            try:
+                response = self._client.post(
+                    "/chat/completions",
+                    json=request_payload,
+                    timeout=120.0,
+                )
+            except TypeError:
+                response = self._client.post("/chat/completions", json=request_payload)
+            try:
+                response_payload = response.json()
+            except ValueError:
+                response_payload = {"raw_text": getattr(response, "text", "")}
+        except Exception as exc:
+            log_llm_exchange(
+                provider="openai",
+                endpoint="/chat/completions",
+                request_payload=request_payload,
+                error=str(exc),
+            )
+            raise
+        log_llm_exchange(
+            provider="openai",
+            endpoint="/chat/completions",
+            request_payload=request_payload,
+            response_status=getattr(response, "status_code", None),
+            response_payload=response_payload,
+        )
+        response.raise_for_status()
+        payload = response_payload if isinstance(response_payload, dict) else response.json()
+        message = payload["choices"][0]["message"]
+        tool_calls: list[dict[str, Any]] = []
+        for call in message.get("tool_calls", []) or []:
+            function = call.get("function", {}) if isinstance(call, dict) else {}
+            tool_calls.append(
+                {
+                    "id": str(call.get("id", "")),
+                    "name": str(function.get("name", "")),
+                    "arguments": str(function.get("arguments", "{}")),
+                }
+            )
+        result = {
+            "role": "assistant",
+            "content": str(message.get("content") or ""),
+            "tool_calls": tool_calls,
+        }
+        usage = payload.get("usage", {})
+        total_tokens = usage.get("total_tokens")
+        if isinstance(total_tokens, int) and total_tokens > 0:
+            result["llm_total_tokens"] = total_tokens
+        return result

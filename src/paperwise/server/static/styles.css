@@ -1193,6 +1193,54 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   overflow: auto;
 }
 
+.chat-messages {
+  display: grid;
+  gap: 10px;
+  max-height: 460px;
+  overflow: auto;
+  margin: 10px 0 14px;
+  padding: 10px;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.chat-message {
+  display: grid;
+  gap: 4px;
+  max-width: 86%;
+}
+
+.chat-message-user {
+  justify-self: end;
+}
+
+.chat-message-assistant {
+  justify-self: start;
+}
+
+.chat-message-role {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.chat-message-body {
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: var(--paper);
+}
+
+.chat-message-user .chat-message-body {
+  background: var(--accent-soft);
+}
+
+.chat-tool-strip {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+}
+
 #search-section-ask .docs-table-wrap {
   margin-top: 10px;
 }

@@ -37,6 +37,7 @@ const searchResultsTableBody = document.getElementById("searchResultsTableBody")
 const searchAskForm = document.getElementById("searchAskForm");
 const searchAskQuestion = document.getElementById("searchAskQuestion");
 const searchAskDebugToggle = document.getElementById("searchAskDebugToggle");
+const searchAskMessages = document.getElementById("searchAskMessages");
 const searchAskAnswer = document.getElementById("searchAskAnswer");
 const searchAskDebugOutput = document.getElementById("searchAskDebugOutput");
 const searchAskCitationsBody = document.getElementById("searchAskCitationsBody");
@@ -235,6 +236,7 @@ let searchDocsCatalogRequestSeq = 0;
 let searchCollectionDocsRequestSeq = 0;
 let searchCollections = [];
 let searchDocsCatalog = [];
+let searchAskMessagesState = [];
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
 let searchSelectedCollectionId = "";
@@ -1679,6 +1681,7 @@ function clearSession() {
   });
   searchCollections = [];
   searchDocsCatalog = [];
+  searchAskMessagesState = [];
   searchSelectedCollectionId = "";
   searchSelectedCollectionDocumentIds = [];
   searchActiveSectionId = "search-section-keyword";
@@ -1689,6 +1692,7 @@ function clearSession() {
   renderSearchCollectionDocumentsTable();
   renderSearchResultsTable({ hits: [] });
   renderSearchResultsMeta("No search run yet.");
+  renderSearchAskMessages();
   renderSearchAskAnswer(null);
   renderSearchAskDebugOutput(null, false);
   renderSettingsForm();
@@ -3113,6 +3117,70 @@ function renderSearchAskAnswer(payload) {
   }
 }
 
+function appendSearchAskMessage(role, content, options = {}) {
+  const normalizedRole = role === "user" ? "user" : "assistant";
+  const message = {
+    role: normalizedRole,
+    content: String(content || "").trim(),
+    pending: Boolean(options.pending),
+    toolCalls: Array.isArray(options.toolCalls) ? options.toolCalls : [],
+  };
+  if (!message.content && !message.pending) {
+    return null;
+  }
+  searchAskMessagesState.push(message);
+  renderSearchAskMessages();
+  return message;
+}
+
+function updatePendingSearchAskMessage(message, content, options = {}) {
+  if (!message) {
+    return;
+  }
+  message.content = String(content || "").trim();
+  message.pending = false;
+  message.toolCalls = Array.isArray(options.toolCalls) ? options.toolCalls : [];
+  renderSearchAskMessages();
+}
+
+function renderSearchAskMessages() {
+  if (!searchAskMessages) {
+    return;
+  }
+  if (!searchAskMessagesState.length) {
+    searchAskMessages.innerHTML = `
+      <div class="chat-message chat-message-assistant">
+        <div class="chat-message-role">Paperwise</div>
+        <div class="chat-message-body markdown-output">Ask a question to begin.</div>
+      </div>
+    `;
+    return;
+  }
+  searchAskMessages.innerHTML = "";
+  for (const message of searchAskMessagesState) {
+    const item = document.createElement("div");
+    item.className = `chat-message chat-message-${message.role}`;
+    const role = document.createElement("div");
+    role.className = "chat-message-role";
+    role.textContent = message.role === "user" ? "You" : "Paperwise";
+    const body = document.createElement("div");
+    body.className = "chat-message-body markdown-output";
+    body.innerHTML = renderMarkdown(message.pending ? "Working..." : message.content || "No response.");
+    item.appendChild(role);
+    item.appendChild(body);
+    if (message.toolCalls.length) {
+      const tools = document.createElement("div");
+      tools.className = "chat-tool-strip";
+      tools.textContent = message.toolCalls
+        .map((call) => `${call.name || "tool"} (${Number(call.result_count || 0)})`)
+        .join(" · ");
+      item.appendChild(tools);
+    }
+    searchAskMessages.appendChild(item);
+  }
+  searchAskMessages.scrollTop = searchAskMessages.scrollHeight;
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -3521,29 +3589,32 @@ async function runScopedAsk() {
   const question = String(searchAskQuestion?.value || "").trim();
   const debugEnabled = Boolean(searchAskDebugToggle?.checked);
   if (!question) {
-    renderSearchAskAnswer({
-      answer: "Enter a question.",
-      insufficient_evidence: true,
-      citations: [],
-    });
+    appendSearchAskMessage("assistant", "Enter a question.");
     renderSearchAskDebugOutput(null, debugEnabled);
     return;
   }
   const topK = normalizeGroundedQaTopK(groundedQaTopK);
   const maxDocuments = normalizeGroundedQaMaxDocuments(groundedQaMaxDocuments);
-  renderSearchAskAnswer({
-    answer: "Querying...",
-    insufficient_evidence: false,
-    citations: [],
-  });
+  appendSearchAskMessage("user", question);
+  const pendingMessage = appendSearchAskMessage("assistant", "", { pending: true });
+  if (searchAskQuestion) {
+    searchAskQuestion.value = "";
+  }
   renderSearchAskDebugOutput({ status: "waiting_for_response" }, debugEnabled);
   setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), true, "Asking...");
   try {
-    const response = await apiFetch("/collections/ask", {
+    const response = await apiFetch("/query/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        question,
+        messages: searchAskMessagesState
+          .filter((message) => !message.pending && ["user", "assistant"].includes(message.role))
+          .map((message) => ({ role: message.role, content: message.content })),
+        scope: {
+          tag: [],
+          document_type: [],
+          correspondent: [],
+        },
         top_k_chunks: topK,
         max_documents: maxDocuments,
         debug: debugEnabled,
@@ -3551,18 +3622,24 @@ async function runScopedAsk() {
     });
     const payload = await response.json();
     if (!response.ok) {
-      renderSearchAskAnswer({
-        answer: payload.detail || response.statusText,
-        insufficient_evidence: true,
-        citations: [],
-      });
+      updatePendingSearchAskMessage(pendingMessage, payload.detail || response.statusText);
+      renderSearchAskAnswer({ answer: payload.detail || response.statusText, insufficient_evidence: true, citations: [] });
       renderSearchAskDebugOutput(payload?.debug || null, debugEnabled);
       logActivity(`Ask failed: ${payload.detail || response.statusText}`);
       return;
     }
-    renderSearchAskAnswer(payload);
+    updatePendingSearchAskMessage(
+      pendingMessage,
+      payload?.message?.content || "No answer returned.",
+      { toolCalls: payload?.tool_calls || [] },
+    );
+    renderSearchAskAnswer({
+      answer: payload?.message?.content || "",
+      insufficient_evidence: !Array.isArray(payload?.citations) || !payload.citations.length,
+      citations: payload?.citations || [],
+    });
     renderSearchAskDebugOutput(payload?.debug || null, debugEnabled);
-    logActivity("Ask Your Docs completed.");
+    logActivity("Ask Your Docs chat completed.");
   } finally {
     setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), false);
   }

@@ -106,6 +106,62 @@ class FakeTimeoutGroundedLLM(FakeGroundedLLM):
         raise RuntimeError("The read operation timed out")
 
 
+class FakeToolChatLLM(FakeGroundedLLM):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def answer_with_tools(self, *, messages: list[dict], tools: list[dict]) -> dict:
+        del tools
+        self.calls += 1
+        if self.calls == 1:
+            return {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "name": "search_document_chunks",
+                        "arguments": '{"query":"Sonic internet amount","tags":["Utilities"],"limit":5}',
+                    }
+                ],
+            }
+        tool_payload = {}
+        for message in messages:
+            if message.get("role") == "tool":
+                import json
+
+                tool_payload = json.loads(message.get("content", "{}"))
+        results = tool_payload.get("results", [])
+        title = results[0].get("title", "the document") if results else "the document"
+        return {
+            "role": "assistant",
+            "content": f"Sonic internet is covered by {title}.",
+            "tool_calls": [],
+        }
+
+
+class FakeMetadataToolChatLLM(FakeGroundedLLM):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def answer_with_tools(self, *, messages: list[dict], tools: list[dict]) -> dict:
+        del tools
+        self.calls += 1
+        if self.calls == 1:
+            return {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "name": "query_document_metadata",
+                        "arguments": '{"document_types":["Invoice"],"limit":10}',
+                    }
+                ],
+            }
+        return {"role": "assistant", "content": "I found the matching invoice metadata.", "tool_calls": []}
+
+
 def _save_document(
     repository: InMemoryDocumentRepository,
     *,
@@ -116,6 +172,7 @@ def _save_document(
     title: str,
     document_type: str = "Memo",
     tags: list[str] | None = None,
+    document_date: str | None = "2026-03-10",
 ) -> None:
     now = datetime.now(UTC)
     repository.save(
@@ -151,7 +208,7 @@ def _save_document(
         LLMParseResult(
             document_id=doc_id,
             suggested_title=title,
-            document_date="2026-03-10",
+            document_date=document_date,
             correspondent="Example Corp",
             document_type=document_type,
             tags=list(tags or ["Research"]),
@@ -393,6 +450,126 @@ def test_global_ask_supports_tag_and_document_type_filters_without_collection() 
         assert payload["insufficient_evidence"] is False
         assert payload["citations"]
         assert payload["citations"][0]["document_id"] == "doc-contract"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_chat_queries_all_documents_with_tool_calls() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-sonic",
+        owner_id=TEST_USER.id,
+        filename="sonic.pdf",
+        text_preview="Sonic Internet monthly bill amount due: $54.99.",
+        title="Sonic Internet Bill",
+        document_type="Invoice",
+        tags=["Utilities"],
+    )
+    _save_document(
+        repository,
+        doc_id="doc-medical",
+        owner_id=TEST_USER.id,
+        filename="medical.pdf",
+        text_preview="Pediatric visit note with height and weight.",
+        title="Visit Note",
+        document_type="Visit Note",
+        tags=["Medical"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeToolChatLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/query/chat",
+            json={
+                "messages": [{"role": "user", "content": "How much was Sonic internet?"}],
+                "top_k_chunks": 8,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert "Sonic Internet Bill" in payload["message"]["content"]
+        assert payload["tool_calls"][0]["name"] == "search_document_chunks"
+        assert payload["citations"]
+        assert payload["citations"][0]["document_id"] == "doc-sonic"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_chat_metadata_tool_scans_all_owned_documents() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-invoice",
+        owner_id=TEST_USER.id,
+        filename="invoice.pdf",
+        text_preview="Invoice amount details.",
+        title="Invoice Doc",
+        document_type="Invoice",
+        tags=["Finance"],
+    )
+    _save_document(
+        repository,
+        doc_id="doc-contract",
+        owner_id=TEST_USER.id,
+        filename="contract.pdf",
+        text_preview="Service agreement details.",
+        title="Contract Doc",
+        document_type="Contract",
+        tags=["Legal"],
+    )
+    _save_document(
+        repository,
+        doc_id="doc-other-owner",
+        owner_id="other-user",
+        filename="other.pdf",
+        text_preview="Invoice amount details.",
+        title="Other Invoice",
+        document_type="Invoice",
+        tags=["Finance"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeMetadataToolChatLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/query/chat",
+            json={
+                "messages": [{"role": "user", "content": "Which invoices do I have?"}],
+                "debug": True,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["tool_calls"][0]["name"] == "query_document_metadata"
+        documents = payload["debug"]["steps"][0]["result"]["documents"]
+        assert [item["document_id"] for item in documents] == ["doc-invoice"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_chat_returns_clean_error_for_provider_without_tool_chat() -> None:
+    repository = InMemoryDocumentRepository()
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeGroundedLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/query/chat",
+            json={"messages": [{"role": "user", "content": "What documents do I have?"}]},
+        )
+        assert response.status_code == 400
+        assert "does not support conversational tool use" in response.json()["detail"]
     finally:
         app.dependency_overrides.clear()
 

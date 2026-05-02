@@ -293,3 +293,61 @@ def test_openai_provider_grounded_qa_uses_extended_timeout(monkeypatch) -> None:
 
     assert result["answer"] == "The policy rate changed over time."
     assert captured_call["timeout"] == 120.0
+
+
+def test_openai_provider_returns_tool_calls(monkeypatch) -> None:
+    captured_call: dict[str, object] = {}
+
+    class FakeClient:
+        def post(self, _path: str, json: dict, timeout: float | None = None):
+            captured_call["payload"] = json
+            captured_call["timeout"] = timeout
+
+            class Response:
+                status_code = 200
+                text = ""
+
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict:
+                    return {
+                        "usage": {"total_tokens": 42},
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": "",
+                                    "tool_calls": [
+                                        {
+                                            "id": "call-1",
+                                            "function": {
+                                                "name": "search_document_chunks",
+                                                "arguments": '{"query":"invoice"}',
+                                            },
+                                        }
+                                    ],
+                                }
+                            }
+                        ],
+                    }
+
+            return Response()
+
+    provider = OpenAILLMProvider(api_key="k", model="m")
+    monkeypatch.setattr(provider, "_client", FakeClient())
+
+    result = provider.answer_with_tools(
+        messages=[{"role": "user", "content": "Find invoices"}],
+        tools=[{"type": "function", "function": {"name": "search_document_chunks"}}],
+    )
+
+    assert captured_call["payload"]["tool_choice"] == "auto"
+    assert captured_call["timeout"] == 120.0
+    assert result["tool_calls"] == [
+        {
+            "id": "call-1",
+            "name": "search_document_chunks",
+            "arguments": '{"query":"invoice"}',
+        }
+    ]
+    assert result["llm_total_tokens"] == 42

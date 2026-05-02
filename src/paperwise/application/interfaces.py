@@ -63,6 +63,14 @@ class LLMProvider(Protocol):
     ) -> dict[str, Any]:
         """Generate retrieval query variants and anchors for grounded retrieval."""
 
+    def answer_with_tools(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Run a chat turn that may request one or more application-owned tool calls."""
+
 
 class SearchProvider(Protocol):
     def search(self, query: str, limit: int = 10) -> list[dict]:

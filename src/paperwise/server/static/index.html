@@ -531,14 +531,20 @@
           <section id="search-section-ask" class="search-subsection view-hidden">
             <section class="search-card">
               <h3>Ask Your Docs</h3>
-              <p class="search-hint">Ask questions across all your documents.</p>
+              <p class="search-hint">Chat across your documents with metadata-aware tools.</p>
+              <div id="searchAskMessages" class="chat-messages" aria-live="polite">
+                <div class="chat-message chat-message-assistant">
+                  <div class="chat-message-role">Paperwise</div>
+                  <div class="chat-message-body markdown-output">Ask a question to begin.</div>
+                </div>
+              </div>
               <form id="searchAskForm" class="stack">
-                <label class="label" for="searchAskQuestion">Question</label>
+                <label class="label" for="searchAskQuestion">Message</label>
                 <textarea
                   id="searchAskQuestion"
                   name="searchAskQuestion"
-                  rows="4"
-                  placeholder="Ask a question and get an answer grounded in selected documents."
+                  rows="3"
+                  placeholder="Ask a follow-up, filter by tag, or ask about document metadata."
                   required
                 ></textarea>
                 <label class="settings-checkbox-row" for="searchAskDebugToggle">
@@ -549,7 +555,7 @@
                   <button id="searchAskSubmitBtn" type="submit" class="btn btn-primary">Ask</button>
                 </div>
               </form>
-              <div id="searchAskAnswer" class="output markdown-output">No answer yet.</div>
+              <div id="searchAskAnswer" class="output markdown-output view-hidden">No answer yet.</div>
               <pre id="searchAskDebugOutput" class="output search-debug-output view-hidden">
 Debug output disabled.
               </pre>
