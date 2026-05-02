@@ -191,3 +191,36 @@ def build_processing_completed_history_event(
         source=source,
         changes=changes,
     )
+
+
+def build_processing_failed_history_event(
+    *,
+    document_id: str,
+    actor_type: HistoryActorType,
+    actor_id: str | None,
+    source: str,
+    previous_status: str | None,
+    current_status: str,
+    error_message: str,
+    error_type: str | None = None,
+) -> DocumentHistoryEvent:
+    error: dict[str, str] = {
+        "message": error_message,
+    }
+    if error_type:
+        error["type"] = error_type
+    changes: dict[str, object] = {
+        "status": {
+            "before": previous_status,
+            "after": current_status,
+        },
+        "error": error,
+    }
+    return _new_event(
+        document_id=document_id,
+        event_type=HistoryEventType.PROCESSING_FAILED,
+        actor_type=actor_type,
+        actor_id=actor_id,
+        source=source,
+        changes=changes,
+    )

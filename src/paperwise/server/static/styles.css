@@ -1193,6 +1193,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   overflow: auto;
 }
 
+.chat-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.chat-header-row h3 {
+  margin: 0;
+}
+
 .chat-messages {
   display: grid;
   gap: 10px;
@@ -1219,6 +1230,11 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   justify-self: start;
 }
 
+.chat-message-status {
+  justify-self: stretch;
+  max-width: 100%;
+}
+
 .chat-message-role {
   color: var(--ink-soft);
   font-size: 0.76rem;
@@ -1234,6 +1250,14 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .chat-message-user .chat-message-body {
   background: var(--accent-soft);
+}
+
+.chat-message-status .chat-message-body {
+  padding: 6px 9px;
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--ink-soft);
+  font-size: 0.78rem;
 }
 
 .chat-tool-strip {
@@ -2024,6 +2048,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: rgba(26, 108, 80, 0.09);
   color: #1a6c50;
   border: 1px solid rgba(26, 108, 80, 0.24);
+}
+
+.status-failed {
+  background: rgba(171, 51, 51, 0.1);
+  color: #8f2f2f;
+  border: 1px solid rgba(171, 51, 51, 0.28);
+}
+
+.pending-error-note {
+  margin-top: 5px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 /* ─── Empty table state ──────────────────────────────────── */

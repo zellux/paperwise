@@ -1,6 +1,6 @@
 import json
 
-from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
+from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider, TOOL_CHAT_SYSTEM_PROMPT
 from paperwise.infrastructure.llm.grounded_qa_prompt import GROUNDED_QA_SYSTEM_PROMPT
 from paperwise.infrastructure.llm.metadata_prompt import SYSTEM_PROMPT
 from paperwise.infrastructure.llm.ocr_prompt import OCR_SYSTEM_PROMPT
@@ -180,3 +180,61 @@ def test_gemini_provider_grounded_qa_uses_long_running_client(monkeypatch) -> No
     assert result["answer"] == "The policy rate changed over time."
     assert result["llm_total_tokens"] == 654
     assert getattr(captured_call["config"], "system_instruction", None) == GROUNDED_QA_SYSTEM_PROMPT
+
+
+def test_gemini_provider_returns_tool_calls(monkeypatch) -> None:
+    captured_call: dict[str, object] = {}
+
+    class FakeResponse:
+        text = json.dumps(
+            {
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "name": "search_document_chunks",
+                        "arguments": {"query": "invoice"},
+                    }
+                ],
+            }
+        )
+
+        class usage_metadata:
+            total_token_count = 44
+
+        def model_dump(self, *args, **kwargs) -> dict:
+            del args, kwargs
+            return {
+                "usage_metadata": {"total_token_count": 44},
+                "candidates": [{"content": {"parts": [{"text": self.text}]}}],
+            }
+
+    class FakeModels:
+        def generate_content(self, *, model: str, contents: str, config: object) -> FakeResponse:
+            captured_call["model"] = model
+            captured_call["contents"] = contents
+            captured_call["config"] = config
+            return FakeResponse()
+
+    provider = GeminiLLMProvider(api_key="k", model="gemini-test")
+    monkeypatch.setattr(
+        provider,
+        "_long_running_client",
+        type("FakeClient", (), {"models": FakeModels()})(),
+    )
+
+    result = provider.answer_with_tools(
+        messages=[{"role": "user", "content": "Find invoices"}],
+        tools=[{"type": "function", "function": {"name": "search_document_chunks"}}],
+    )
+
+    assert result["tool_calls"] == [
+        {
+            "id": "call-1",
+            "name": "search_document_chunks",
+            "arguments": '{"query": "invoice"}',
+        }
+    ]
+    assert result["llm_total_tokens"] == 44
+    assert getattr(captured_call["config"], "system_instruction", None) == TOOL_CHAT_SYSTEM_PROMPT
+    assert getattr(captured_call["config"], "response_mime_type", None) == "application/json"

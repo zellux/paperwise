@@ -458,9 +458,10 @@ class OpenAILLMProvider(LLMProvider):
             "model": self._model,
             "temperature": 0,
             "messages": messages,
-            "tools": tools,
-            "tool_choice": "auto",
         }
+        if tools:
+            request_payload["tools"] = tools
+            request_payload["tool_choice"] = "auto"
         response: httpx.Response | None = None
         response_payload: Any = None
         try:

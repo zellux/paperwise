@@ -4,8 +4,9 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from paperwise.server.routes.documents import router as documents_router
-from paperwise.server.routes.collections import query_router, router as collections_router
+from paperwise.server.routes.collections import router as collections_router
 from paperwise.server.routes.health import router as health_router
+from paperwise.server.routes.query import router as query_router
 from paperwise.server.routes.ui import router as ui_router
 from paperwise.server.routes.users import router as users_router
 from paperwise.infrastructure.config import get_settings

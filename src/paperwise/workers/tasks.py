@@ -5,6 +5,7 @@ from paperwise.application.services.file_relocation import move_blob_to_processe
 from paperwise.application.services.history import (
     build_file_moved_history_event,
     build_processing_completed_history_event,
+    build_processing_failed_history_event,
 )
 from paperwise.application.services.llm_preferences import (
     LLM_TASK_METADATA,
@@ -181,6 +182,31 @@ def _is_already_ready_document(
     return repository.get_parse_result(document.id) is not None
 
 
+def _format_processing_failure_message(exc: Exception) -> str:
+    message = str(exc).strip() or type(exc).__name__
+    normalized = message.lower()
+    if "llm ocr failed" in normalized and "404" in normalized and "openrouter" in normalized:
+        return (
+            "LLM OCR failed because OpenRouter returned HTTP 404. "
+            "Check that the OCR route uses a valid OpenRouter model slug and a vision-capable model, "
+            "or switch OCR to Gemini, OpenAI, or local Tesseract. "
+            f"Raw error: {message}"
+        )
+    if "llm ocr failed" in normalized and "404" in normalized:
+        return (
+            "LLM OCR failed because the provider returned HTTP 404. "
+            "Check that the OCR route uses a valid model name and base URL, and that the model supports images. "
+            f"Raw error: {message}"
+        )
+    if "llm ocr failed" in normalized and ("image" in normalized or "vision" in normalized):
+        return (
+            "LLM OCR failed while sending an image to the configured provider. "
+            "Check that the OCR model supports vision input, or switch OCR to local Tesseract. "
+            f"Raw error: {message}"
+        )
+    return message
+
+
 @celery_app.task(name="paperwise.tasks.healthcheck")
 def healthcheck_task() -> str:
     logger.info("worker healthcheck task executed")
@@ -315,8 +341,25 @@ def parse_document_task(
         )
         if file_move_event is not None:
             repository.append_history_events([file_move_event])
-    except Exception:
+    except Exception as exc:
         logger.exception("analysis pipeline failed for document_id=%s", document_id)
+        previous_status = document.status.value
+        document.status = DocumentStatus.FAILED
+        repository.save(document)
+        repository.append_history_events(
+            [
+                build_processing_failed_history_event(
+                    document_id=document.id,
+                    actor_type=HistoryActorType.SYSTEM,
+                    actor_id=None,
+                    source="worker.parse_document",
+                    previous_status=previous_status,
+                    current_status=document.status.value,
+                    error_message=_format_processing_failure_message(exc),
+                    error_type=type(exc).__name__,
+                )
+            ]
+        )
         raise
 
     logger.info(

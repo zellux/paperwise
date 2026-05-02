@@ -35,6 +35,12 @@ from paperwise.infrastructure.llm.retrieval_query_prompt import (
 
 _DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 _LONG_RUNNING_TIMEOUT_SECONDS = 120.0
+TOOL_CHAT_SYSTEM_PROMPT = (
+    "You are a tool-calling chat adapter for Paperwise. Return strict JSON with keys content and tool_calls. "
+    "If a tool is needed, set content to an empty string and tool_calls to an array of objects with keys "
+    "id, name, and arguments. arguments must be a JSON object. If tool results are already present in the "
+    "messages, return the final assistant content and an empty tool_calls array."
+)
 
 
 class _GeminiModelsClient(Protocol):
@@ -411,3 +417,58 @@ class GeminiLLMProvider(LLMProvider):
         text = _extract_response_text(response, response_payload)
         parsed = json.loads(text.strip())
         return extract_retrieval_query_result(parsed, fallback_question=question)
+
+    def answer_with_tools(
+        self,
+        *,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        user_prompt = {
+            "messages": messages,
+            "tools": tools,
+            "instructions": (
+                "Choose zero or more tools from the tool list when document lookup is needed. "
+                "Tool call arguments must match the tool schemas. If tool role messages are present, "
+                "write the final assistant response in content and return no tool calls."
+            ),
+        }
+        contents = json.dumps(user_prompt)
+        response, response_payload = self._generate_content(
+            contents=contents,
+            log_contents=contents,
+            system_instruction=TOOL_CHAT_SYSTEM_PROMPT,
+            response_mime_type="application/json",
+            long_running=True,
+        )
+        text = _extract_response_text(response, response_payload).strip()
+        parsed = json.loads(text)
+        tool_calls: list[dict[str, Any]] = []
+        raw_tool_calls = parsed.get("tool_calls", []) if isinstance(parsed, dict) else []
+        if isinstance(raw_tool_calls, list):
+            for index, item in enumerate(raw_tool_calls, start=1):
+                if not isinstance(item, dict):
+                    continue
+                name = str(item.get("name") or "").strip()
+                if not name:
+                    continue
+                arguments = item.get("arguments", {})
+                if not isinstance(arguments, dict):
+                    arguments = {}
+                call_id = str(item.get("id") or f"gemini-tool-call-{index}")
+                tool_calls.append(
+                    {
+                        "id": call_id,
+                        "name": name,
+                        "arguments": json.dumps(arguments),
+                    }
+                )
+        result = {
+            "role": "assistant",
+            "content": str(parsed.get("content") or "") if isinstance(parsed, dict) else "",
+            "tool_calls": tool_calls,
+        }
+        total_tokens = _extract_total_tokens(response, response_payload)
+        if isinstance(total_tokens, int) and total_tokens > 0:
+            result["llm_total_tokens"] = total_tokens
+        return result

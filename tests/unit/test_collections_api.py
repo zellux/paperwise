@@ -500,6 +500,43 @@ def test_chat_queries_all_documents_with_tool_calls() -> None:
         app.dependency_overrides.clear()
 
 
+def test_chat_stream_reports_tool_progress() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-sonic",
+        owner_id=TEST_USER.id,
+        filename="sonic.pdf",
+        text_preview="Sonic Internet monthly bill amount due: $54.99.",
+        title="Sonic Internet Bill",
+        document_type="Invoice",
+        tags=["Utilities"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeToolChatLLM()
+
+    try:
+        client = TestClient(app)
+        with client.stream(
+            "POST",
+            "/query/chat/stream",
+            json={
+                "messages": [{"role": "user", "content": "How much was Sonic internet?"}],
+                "top_k_chunks": 8,
+            },
+        ) as response:
+            assert response.status_code == 200
+            body = "".join(response.iter_text())
+        assert "event: status" in body
+        assert "event: tool_call" in body
+        assert "event: tool_result" in body
+        assert "event: final" in body
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_chat_metadata_tool_scans_all_owned_documents() -> None:
     repository = InMemoryDocumentRepository()
     _save_document(

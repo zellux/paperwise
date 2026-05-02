@@ -7,6 +7,7 @@ from typing import Any
 class DocumentStatus(StrEnum):
     RECEIVED = "received"
     PROCESSING = "processing"
+    FAILED = "failed"
     READY = "ready"
 
 
@@ -17,6 +18,7 @@ class HistoryEventType(StrEnum):
     FILE_MOVED = "file_moved"
     PROCESSING_RESTARTED = "processing_restarted"
     PROCESSING_COMPLETED = "processing_completed"
+    PROCESSING_FAILED = "processing_failed"
 
 
 class HistoryActorType(StrEnum):

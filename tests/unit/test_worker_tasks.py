@@ -108,6 +108,57 @@ def test_parse_document_task_uses_current_document_blob_uri(monkeypatch) -> None
     assert result["status"] == "ready"
 
 
+def test_parse_document_task_marks_document_failed_and_records_history(monkeypatch) -> None:
+    repository = InMemoryDocumentRepository()
+    document = Document(
+        id="doc-fail",
+        filename="scan.pdf",
+        owner_id="user-1",
+        blob_uri="incoming/scan.pdf",
+        checksum_sha256="abc123",
+        content_type="application/pdf",
+        size_bytes=123,
+        status=DocumentStatus.PROCESSING,
+        created_at=datetime.now(UTC),
+    )
+    repository.save(document)
+
+    def fail_parse_document_blob(**kwargs):
+        del kwargs
+        raise RuntimeError("LLM OCR failed: HTTP 404 from OpenRouter")
+
+    monkeypatch.setattr(worker_tasks, "_build_repository", lambda: repository)
+    monkeypatch.setattr(worker_tasks, "_build_llm_provider", lambda: object())
+    monkeypatch.setattr(worker_tasks, "_resolve_ocr_provider_for_owner", lambda *args, **kwargs: "llm")
+    monkeypatch.setattr(worker_tasks, "_resolve_ocr_auto_switch_for_owner", lambda *args, **kwargs: False)
+    monkeypatch.setattr(worker_tasks, "_resolve_metadata_llm_provider_for_owner", lambda *args, **kwargs: object())
+    monkeypatch.setattr(worker_tasks, "_resolve_ocr_llm_provider_for_owner", lambda *args, **kwargs: object())
+    monkeypatch.setattr(worker_tasks, "parse_document_blob", fail_parse_document_blob)
+
+    try:
+        worker_tasks.parse_document_task(
+            document_id="doc-fail",
+            blob_uri="incoming/scan.pdf",
+            filename="scan.pdf",
+            content_type="application/pdf",
+        )
+    except RuntimeError:
+        pass
+    else:  # pragma: no cover - defensive
+        raise AssertionError("parse_document_task should re-raise parse failures")
+
+    updated = repository.get("doc-fail")
+    assert updated is not None
+    assert updated.status == DocumentStatus.FAILED
+    history = repository.list_history("doc-fail")
+    assert history
+    assert history[0].event_type.value == "processing_failed"
+    assert history[0].changes["status"]["after"] == "failed"
+    assert "OpenRouter" in history[0].changes["error"]["message"]
+    assert "vision-capable model" in history[0].changes["error"]["message"]
+    assert "Raw error: LLM OCR failed: HTTP 404 from OpenRouter" in history[0].changes["error"]["message"]
+
+
 def test_parse_document_task_skips_duplicate_ready_document(monkeypatch) -> None:
     repository = InMemoryDocumentRepository()
     document = Document(

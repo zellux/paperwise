@@ -199,6 +199,7 @@ class LocalOCRStatusResponse(BaseModel):
 PENDING_STATUSES = {
     DocumentStatus.RECEIVED,
     DocumentStatus.PROCESSING,
+    DocumentStatus.FAILED,
 }
 SUPPORTED_UPLOAD_EXTENSIONS = {
     ".doc",

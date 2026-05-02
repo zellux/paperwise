@@ -36,6 +36,7 @@ const searchResultsMeta = document.getElementById("searchResultsMeta");
 const searchResultsTableBody = document.getElementById("searchResultsTableBody");
 const searchAskForm = document.getElementById("searchAskForm");
 const searchAskQuestion = document.getElementById("searchAskQuestion");
+const searchAskNewChatBtn = document.getElementById("searchAskNewChatBtn");
 const searchAskDebugToggle = document.getElementById("searchAskDebugToggle");
 const searchAskMessages = document.getElementById("searchAskMessages");
 const searchAskAnswer = document.getElementById("searchAskAnswer");
@@ -237,6 +238,7 @@ let searchCollectionDocsRequestSeq = 0;
 let searchCollections = [];
 let searchDocsCatalog = [];
 let searchAskMessagesState = [];
+let searchAskInFlight = false;
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
 let searchSelectedCollectionId = "";
@@ -1324,6 +1326,19 @@ function buildHistoryChangeLines(event) {
     const after = stringifyHistoryValue(changes.status?.after);
     return [`Status: ${before} -> ${after}`];
   }
+  if (event.event_type === "processing_failed") {
+    const before = stringifyHistoryValue(changes.status?.before);
+    const after = stringifyHistoryValue(changes.status?.after);
+    const lines = [`Status: ${before} -> ${after}`];
+    const error = changes.error || {};
+    if (error.type) {
+      lines.push(`Error type: ${stringifyHistoryValue(error.type)}`);
+    }
+    if (error.message) {
+      lines.push(`Error: ${stringifyHistoryValue(error.message)}`);
+    }
+    return lines;
+  }
   if (event.event_type === "processing_completed") {
     const before = stringifyHistoryValue(changes.status?.before);
     const after = stringifyHistoryValue(changes.status?.after);
@@ -2159,7 +2174,7 @@ function refreshFilterOptionsFromDocuments(documents) {
   setSelectOptions(filterTag, [...tags]);
   setSelectOptions(filterCorrespondent, [...correspondents]);
   setSelectOptions(filterType, [...documentTypes]);
-  setSelectOptions(filterStatus, ["received", "processing", "ready", ...statuses]);
+  setSelectOptions(filterStatus, ["received", "processing", "failed", "ready", ...statuses]);
 }
 
 function syncUrlFromFilters() {
@@ -2520,6 +2535,12 @@ function renderDocsList(documents) {
     const statusCell = document.createElement("td");
     statusCell.setAttribute("data-label", "Status");
     statusCell.innerHTML = renderStatusBadge(doc.status);
+    if (doc.status === "failed") {
+      const note = document.createElement("div");
+      note.className = "pending-error-note";
+      note.textContent = "Open document history for failure details.";
+      statusCell.appendChild(note);
+    }
 
     const actionCell = document.createElement("td");
     actionCell.setAttribute("data-label", "Action");
@@ -3118,12 +3139,13 @@ function renderSearchAskAnswer(payload) {
 }
 
 function appendSearchAskMessage(role, content, options = {}) {
-  const normalizedRole = role === "user" ? "user" : "assistant";
+  const normalizedRole = role === "user" || role === "status" ? role : "assistant";
   const message = {
     role: normalizedRole,
     content: String(content || "").trim(),
     pending: Boolean(options.pending),
     toolCalls: Array.isArray(options.toolCalls) ? options.toolCalls : [],
+    statusKind: String(options.statusKind || "").trim(),
   };
   if (!message.content && !message.pending) {
     return null;
@@ -3141,6 +3163,13 @@ function updatePendingSearchAskMessage(message, content, options = {}) {
   message.pending = false;
   message.toolCalls = Array.isArray(options.toolCalls) ? options.toolCalls : [];
   renderSearchAskMessages();
+}
+
+function appendSearchAskStatus(label, detail = "", options = {}) {
+  const parts = [String(label || "").trim(), String(detail || "").trim()].filter(Boolean);
+  return appendSearchAskMessage("status", parts.join(": "), {
+    statusKind: options.statusKind || "",
+  });
 }
 
 function renderSearchAskMessages() {
@@ -3162,7 +3191,7 @@ function renderSearchAskMessages() {
     item.className = `chat-message chat-message-${message.role}`;
     const role = document.createElement("div");
     role.className = "chat-message-role";
-    role.textContent = message.role === "user" ? "You" : "Paperwise";
+    role.textContent = message.role === "user" ? "You" : message.role === "status" ? "Status" : "Paperwise";
     const body = document.createElement("div");
     body.className = "chat-message-body markdown-output";
     body.innerHTML = renderMarkdown(message.pending ? "Working..." : message.content || "No response.");
@@ -3179,6 +3208,20 @@ function renderSearchAskMessages() {
     searchAskMessages.appendChild(item);
   }
   searchAskMessages.scrollTop = searchAskMessages.scrollHeight;
+}
+
+function resetSearchAskChat() {
+  if (searchAskInFlight) {
+    return;
+  }
+  searchAskMessagesState = [];
+  renderSearchAskMessages();
+  renderSearchAskAnswer(null);
+  renderSearchAskDebugOutput(null, Boolean(searchAskDebugToggle?.checked));
+  if (searchAskQuestion) {
+    searchAskQuestion.value = "";
+    searchAskQuestion.focus();
+  }
 }
 
 function escapeHtml(value) {
@@ -3585,9 +3628,135 @@ async function runScopedKeywordSearch() {
   }
 }
 
+function parseSearchAskStreamEvent(rawEvent) {
+  const lines = String(rawEvent || "").split(/\r?\n/);
+  let eventType = "message";
+  const dataLines = [];
+  for (const line of lines) {
+    if (line.startsWith("event:")) {
+      eventType = line.slice("event:".length).trim() || "message";
+      continue;
+    }
+    if (line.startsWith("data:")) {
+      dataLines.push(line.slice("data:".length).trimStart());
+    }
+  }
+  const dataText = dataLines.join("\n");
+  let data = {};
+  if (dataText) {
+    try {
+      data = JSON.parse(dataText);
+    } catch {
+      data = { detail: dataText };
+    }
+  }
+  return { eventType, data };
+}
+
+function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled) {
+  if (eventType === "status") {
+    appendSearchAskStatus(data.label || "Working", data.detail || "", { statusKind: "request" });
+    return null;
+  }
+  if (eventType === "llm_response") {
+    appendSearchAskStatus(
+      "LLM response",
+      `${Number(data.tool_call_count || 0)} tool call(s) requested`,
+      { statusKind: "llm" },
+    );
+    return null;
+  }
+  if (eventType === "tool_call") {
+    appendSearchAskStatus(data.name || "Tool call", JSON.stringify(data.arguments || {}), { statusKind: "tool" });
+    return null;
+  }
+  if (eventType === "tool_result") {
+    appendSearchAskStatus(
+      data.name || "Tool result",
+      `${Number(data.result_count || 0)} result(s)`,
+      { statusKind: "tool" },
+    );
+    return null;
+  }
+  if (eventType === "error") {
+    const detail = data.detail || "Chat failed.";
+    updatePendingSearchAskMessage(pendingMessage, detail);
+    renderSearchAskAnswer({ answer: detail, insufficient_evidence: true, citations: [] });
+    renderSearchAskDebugOutput(data?.debug || null, debugEnabled);
+    return { error: detail };
+  }
+  if (eventType === "final") {
+    updatePendingSearchAskMessage(
+      pendingMessage,
+      data?.message?.content || "No answer returned.",
+      { toolCalls: data?.tool_calls || [] },
+    );
+    renderSearchAskAnswer({
+      answer: data?.message?.content || "",
+      insufficient_evidence: !Array.isArray(data?.citations) || !data.citations.length,
+      citations: data?.citations || [],
+    });
+    renderSearchAskDebugOutput(data?.debug || null, debugEnabled);
+    return { final: data };
+  }
+  return null;
+}
+
+async function runSearchAskStream(requestBody, pendingMessage, debugEnabled) {
+  const response = await apiFetch("/query/chat/stream", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    body: JSON.stringify(requestBody),
+  });
+  if (!response.ok || !response.body) {
+    return null;
+  }
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalPayload = null;
+  while (true) {
+    const { value, done } = await reader.read();
+    buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+    const events = buffer.split(/\n\n/);
+    buffer = events.pop() || "";
+    for (const rawEvent of events) {
+      if (!rawEvent.trim()) {
+        continue;
+      }
+      const { eventType, data } = parseSearchAskStreamEvent(rawEvent);
+      const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled);
+      if (handled?.error) {
+        throw new Error(handled.error);
+      }
+      if (handled?.final) {
+        finalPayload = handled.final;
+      }
+    }
+    if (done) {
+      break;
+    }
+  }
+  if (buffer.trim()) {
+    const { eventType, data } = parseSearchAskStreamEvent(buffer);
+    const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled);
+    if (handled?.error) {
+      throw new Error(handled.error);
+    }
+    if (handled?.final) {
+      finalPayload = handled.final;
+    }
+  }
+  return finalPayload;
+}
+
 async function runScopedAsk() {
   const question = String(searchAskQuestion?.value || "").trim();
   const debugEnabled = Boolean(searchAskDebugToggle?.checked);
+  if (searchAskInFlight) {
+    appendSearchAskStatus("Still working", "Wait for the current request to finish.");
+    return;
+  }
   if (!question) {
     appendSearchAskMessage("assistant", "Enter a question.");
     renderSearchAskDebugOutput(null, debugEnabled);
@@ -3602,23 +3771,30 @@ async function runScopedAsk() {
   }
   renderSearchAskDebugOutput({ status: "waiting_for_response" }, debugEnabled);
   setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), true, "Asking...");
+  searchAskInFlight = true;
+  const requestBody = {
+    messages: searchAskMessagesState
+      .filter((message) => !message.pending && ["user", "assistant"].includes(message.role))
+      .map((message) => ({ role: message.role, content: message.content })),
+    scope: {
+      tag: [],
+      document_type: [],
+      correspondent: [],
+    },
+    top_k_chunks: topK,
+    max_documents: maxDocuments,
+    debug: debugEnabled,
+  };
   try {
+    const streamedPayload = await runSearchAskStream(requestBody, pendingMessage, debugEnabled);
+    if (streamedPayload) {
+      logActivity("Ask Your Docs chat completed.");
+      return;
+    }
     const response = await apiFetch("/query/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: searchAskMessagesState
-          .filter((message) => !message.pending && ["user", "assistant"].includes(message.role))
-          .map((message) => ({ role: message.role, content: message.content })),
-        scope: {
-          tag: [],
-          document_type: [],
-          correspondent: [],
-        },
-        top_k_chunks: topK,
-        max_documents: maxDocuments,
-        debug: debugEnabled,
-      }),
+      body: JSON.stringify(requestBody),
     });
     const payload = await response.json();
     if (!response.ok) {
@@ -3640,7 +3816,13 @@ async function runScopedAsk() {
     });
     renderSearchAskDebugOutput(payload?.debug || null, debugEnabled);
     logActivity("Ask Your Docs chat completed.");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error || "Chat failed.");
+    updatePendingSearchAskMessage(pendingMessage, message);
+    renderSearchAskAnswer({ answer: message, insufficient_evidence: true, citations: [] });
+    logActivity(`Ask failed: ${message}`);
   } finally {
+    searchAskInFlight = false;
     setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), false);
   }
 }
@@ -4163,6 +4345,19 @@ searchKeywordForm?.addEventListener("submit", async (event) => {
 });
 
 searchAskForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await runScopedAsk();
+});
+
+searchAskNewChatBtn?.addEventListener("click", () => {
+  resetSearchAskChat();
+  logActivity("Ask Your Docs chat reset.");
+});
+
+searchAskQuestion?.addEventListener("keydown", async (event) => {
+  if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) {
+    return;
+  }
   event.preventDefault();
   await runScopedAsk();
 });
