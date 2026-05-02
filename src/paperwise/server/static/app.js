@@ -37,6 +37,7 @@ const searchResultsTableBody = document.getElementById("searchResultsTableBody")
 const searchAskForm = document.getElementById("searchAskForm");
 const searchAskQuestion = document.getElementById("searchAskQuestion");
 const searchAskNewChatBtn = document.getElementById("searchAskNewChatBtn");
+const searchAskThreadSelect = document.getElementById("searchAskThreadSelect");
 const searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
 const searchAskMessages = document.getElementById("searchAskMessages");
 const searchAskAnswer = document.getElementById("searchAskAnswer");
@@ -241,6 +242,8 @@ let searchAskInFlight = false;
 let searchAskMessageSeq = 0;
 let searchAskCurrentTokens = 0;
 let searchAskTimerId = 0;
+let searchAskThreadId = "";
+let searchAskThreads = [];
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
 let searchSelectedCollectionId = "";
@@ -1700,6 +1703,8 @@ function clearSession() {
   searchDocsCatalog = [];
   searchAskMessagesState = [];
   searchAskCurrentTokens = 0;
+  searchAskThreadId = "";
+  searchAskThreads = [];
   searchSelectedCollectionId = "";
   searchSelectedCollectionDocumentIds = [];
   searchActiveSectionId = "search-section-keyword";
@@ -1707,6 +1712,7 @@ function clearSession() {
   setActiveSearchSection(searchActiveSectionId);
   renderSearchScopeOptions();
   renderSearchAskTokenUsage();
+  renderSearchAskThreadSelect();
   renderCollectionsTable();
   renderSearchCollectionDocumentsTable();
   renderSearchResultsTable({ hits: [] });
@@ -3301,6 +3307,85 @@ function updateSearchAskTokenUsage(tokenUsage) {
   renderSearchAskTokenUsage();
 }
 
+function renderSearchAskThreadSelect() {
+  if (!searchAskThreadSelect) {
+    return;
+  }
+  const currentValue = searchAskThreadId;
+  searchAskThreadSelect.innerHTML = "";
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Recent chats";
+  searchAskThreadSelect.appendChild(placeholder);
+  for (const thread of searchAskThreads) {
+    const option = document.createElement("option");
+    option.value = thread.id;
+    option.textContent = thread.title || "Untitled chat";
+    searchAskThreadSelect.appendChild(option);
+  }
+  searchAskThreadSelect.value = currentValue || "";
+}
+
+async function loadSearchAskThreads() {
+  if (!searchAskThreadSelect) {
+    return;
+  }
+  const response = await apiFetch("/query/chat/threads");
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Chat history failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+  searchAskThreads = Array.isArray(payload) ? payload : [];
+  renderSearchAskThreadSelect();
+}
+
+function hydrateSearchAskMessages(messages) {
+  searchAskMessagesState = [];
+  searchAskMessageSeq = 0;
+  for (const item of Array.isArray(messages) ? messages : []) {
+    const role = String(item?.role || "").trim().toLowerCase();
+    const content = String(item?.content || "").trim();
+    if (!content || !["user", "assistant"].includes(role)) {
+      continue;
+    }
+    searchAskMessagesState.push({
+      id: `chat-message-${++searchAskMessageSeq}`,
+      role,
+      content,
+      pending: false,
+      toolCalls: [],
+      citations: Array.isArray(item?.citations) ? item.citations : [],
+      statusKind: "",
+      statusSummary: "",
+      statusDetail: "",
+      expanded: false,
+      activity: false,
+      activityRounds: [],
+    });
+  }
+  renderSearchAskMessages();
+}
+
+async function loadSearchAskThread(threadId) {
+  const id = String(threadId || "").trim();
+  if (!id || searchAskInFlight) {
+    return;
+  }
+  const response = await apiFetch(`/query/chat/threads/${encodeURIComponent(id)}`);
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Load chat failed: ${payload.detail || response.statusText}`);
+    renderSearchAskThreadSelect();
+    return;
+  }
+  searchAskThreadId = payload.id || "";
+  updateSearchAskTokenUsage(payload.token_usage);
+  hydrateSearchAskMessages(payload.messages || []);
+  renderSearchAskThreadSelect();
+  logActivity(`Loaded chat: ${payload.title || "Untitled chat"}`);
+}
+
 function formatSearchAskJsonDetail(value) {
   try {
     return JSON.stringify(value || {}, null, 2);
@@ -3470,8 +3555,10 @@ function resetSearchAskChat() {
   searchAskMessagesState = [];
   searchAskMessageSeq = 0;
   searchAskCurrentTokens = 0;
+  searchAskThreadId = "";
   syncSearchAskTimer();
   renderSearchAskTokenUsage();
+  renderSearchAskThreadSelect();
   renderSearchAskMessages();
   renderSearchAskAnswer(null);
   if (searchAskQuestion) {
@@ -4112,6 +4199,7 @@ async function runScopedAsk() {
   setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), true, "Asking...");
   searchAskInFlight = true;
   const requestBody = {
+    thread_id: searchAskThreadId || null,
     messages: searchAskMessagesState
       .filter((message) => !message.pending && ["user", "assistant"].includes(message.role))
       .map((message) => ({ role: message.role, content: message.content })),
@@ -4127,6 +4215,8 @@ async function runScopedAsk() {
   try {
     const streamedPayload = await runSearchAskStream(requestBody, pendingMessage, activityMessage);
     if (streamedPayload) {
+      searchAskThreadId = streamedPayload.thread_id || searchAskThreadId;
+      await loadSearchAskThreads();
       logActivity("Ask Your Docs chat completed.");
       return;
     }
@@ -4143,6 +4233,7 @@ async function runScopedAsk() {
       return;
     }
     updateSearchAskTokenUsage(payload?.token_usage);
+    searchAskThreadId = payload?.thread_id || searchAskThreadId;
     updatePendingSearchAskMessage(
       pendingMessage,
       payload?.message?.content || "No answer returned.",
@@ -4153,6 +4244,7 @@ async function runScopedAsk() {
       insufficient_evidence: !Array.isArray(payload?.citations) || !payload.citations.length,
       citations: payload?.citations || [],
     });
+    await loadSearchAskThreads();
     logActivity("Ask Your Docs chat completed.");
   } catch (error) {
     finishAllSearchAskRounds(activityMessage);
@@ -4171,7 +4263,7 @@ async function initializeSearchView() {
   searchCollections = [];
   searchSelectedCollectionId = "";
   searchSelectedCollectionDocumentIds = [];
-  await loadSearchDocumentsCatalog();
+  await Promise.all([loadSearchDocumentsCatalog(), loadSearchAskThreads()]);
   setActiveSearchSection(searchActiveSectionId);
   renderSearchCollectionDocumentsTable();
   renderSearchResultsMeta("Ready.");
@@ -4692,6 +4784,10 @@ searchAskForm?.addEventListener("submit", async (event) => {
 searchAskNewChatBtn?.addEventListener("click", () => {
   resetSearchAskChat();
   logActivity("Ask Your Docs chat reset.");
+});
+
+searchAskThreadSelect?.addEventListener("change", async () => {
+  await loadSearchAskThread(searchAskThreadSelect.value);
 });
 
 searchAskQuestion?.addEventListener("keydown", async (event) => {

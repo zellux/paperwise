@@ -519,6 +519,24 @@ def test_chat_queries_all_documents_with_tool_calls() -> None:
         assert payload["token_usage"]["llm_requests"] == 2
         assert payload["citations"]
         assert payload["citations"][0]["document_id"] == "doc-sonic"
+        thread_id = payload["thread_id"]
+        assert thread_id
+
+        threads_response = client.get("/query/chat/threads")
+        assert threads_response.status_code == 200
+        threads = threads_response.json()
+        assert threads[0]["id"] == thread_id
+        assert threads[0]["message_count"] == 2
+
+        thread_response = client.get(f"/query/chat/threads/{thread_id}")
+        assert thread_response.status_code == 200
+        thread = thread_response.json()
+        assert thread["messages"][0] == {
+            "role": "user",
+            "content": "How much was Sonic internet?",
+        }
+        assert thread["messages"][1]["role"] == "assistant"
+        assert thread["messages"][1]["citations"][0]["document_id"] == "doc-sonic"
     finally:
         app.dependency_overrides.clear()
 
@@ -557,6 +575,7 @@ def test_chat_stream_reports_tool_progress() -> None:
         assert "event: tool_result" in body
         assert "event: token_usage" in body
         assert '"total_tokens": 24' in body
+        assert '"thread_id":' in body
         assert "event: final" in body
     finally:
         app.dependency_overrides.clear()

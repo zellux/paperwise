@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -9,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.llm_preferences import LLM_TASK_GROUNDED_QA
-from paperwise.domain.models import User
+from paperwise.domain.models import User, UserPreference
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
@@ -40,6 +41,7 @@ class ChatScopeRequest(BaseModel):
 
 
 class ChatRequest(BaseModel):
+    thread_id: str | None = Field(default=None, max_length=64)
     messages: list[ChatMessageRequest] = Field(min_length=1, max_length=30)
     scope: ChatScopeRequest = Field(default_factory=ChatScopeRequest)
     top_k_chunks: int = Field(default=18, ge=3, le=60)
@@ -66,11 +68,25 @@ class ChatTokenUsageResponse(BaseModel):
 
 
 class ChatResponse(BaseModel):
+    thread_id: str | None = None
     message: ChatMessageRequest
     citations: list[ChatCitationResponse]
     tool_calls: list[ChatToolCallResponse]
     token_usage: ChatTokenUsageResponse = Field(default_factory=ChatTokenUsageResponse)
     debug: dict[str, Any] | None = None
+
+
+class ChatThreadSummaryResponse(BaseModel):
+    id: str
+    title: str
+    message_count: int
+    created_at: str
+    updated_at: str
+
+
+class ChatThreadResponse(ChatThreadSummaryResponse):
+    messages: list[dict[str, Any]]
+    token_usage: ChatTokenUsageResponse = Field(default_factory=ChatTokenUsageResponse)
 
 
 CHAT_SYSTEM_PROMPT = (
@@ -84,6 +100,10 @@ CHAT_SYSTEM_PROMPT = (
 MAX_CHAT_TOOL_ROUNDS = 3
 CHAT_SEARCH_CONTEXT_MAX_CHARS = 1800
 CHAT_CONTEXT_PREFIX_CHARS = 420
+CHAT_THREADS_PREFERENCE_KEY = "chat_threads"
+MAX_CHAT_THREADS = 20
+MAX_STORED_CHAT_MESSAGES = 40
+MAX_STORED_CHAT_MESSAGE_CHARS = 8000
 
 
 CHAT_TOOLS: list[dict[str, Any]] = [
@@ -150,6 +170,140 @@ CHAT_TOOLS: list[dict[str, Any]] = [
         },
     },
 ]
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(UTC).isoformat()
+
+
+def _chat_threads_from_preferences(preferences: dict[str, Any]) -> list[dict[str, Any]]:
+    raw_threads = preferences.get(CHAT_THREADS_PREFERENCE_KEY, [])
+    if not isinstance(raw_threads, list):
+        return []
+    threads = [thread for thread in raw_threads if isinstance(thread, dict) and str(thread.get("id") or "").strip()]
+    return sorted(
+        threads,
+        key=lambda item: str(item.get("updated_at") or item.get("created_at") or ""),
+        reverse=True,
+    )
+
+
+def _thread_title_from_messages(messages: list[dict[str, Any]]) -> str:
+    for message in messages:
+        if message.get("role") != "user":
+            continue
+        content = " ".join(str(message.get("content") or "").split())
+        if content:
+            return content[:80]
+    return "New chat"
+
+
+def _truncate_stored_chat_content(value: str) -> str:
+    content = str(value or "").strip()
+    if len(content) <= MAX_STORED_CHAT_MESSAGE_CHARS:
+        return content
+    return content[:MAX_STORED_CHAT_MESSAGE_CHARS].rstrip() + "\n\n[truncated]"
+
+
+def _stored_chat_messages(payload: ChatRequest, response: ChatResponse) -> list[dict[str, Any]]:
+    messages: list[dict[str, Any]] = []
+    for message in payload.messages:
+        role = message.role.strip().lower()
+        content = message.content.strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        messages.append({"role": role, "content": _truncate_stored_chat_content(content)})
+    assistant_message: dict[str, Any] = {
+        "role": "assistant",
+        "content": _truncate_stored_chat_content(response.message.content),
+    }
+    if response.citations:
+        assistant_message["citations"] = [citation.model_dump(mode="json") for citation in response.citations]
+    messages.append(assistant_message)
+    return messages[-MAX_STORED_CHAT_MESSAGES:]
+
+
+def _save_chat_thread(
+    *,
+    repository: DocumentRepository,
+    current_user: User,
+    payload: ChatRequest,
+    response: ChatResponse,
+) -> ChatResponse:
+    existing = repository.get_user_preference(current_user.id)
+    preferences = dict(existing.preferences) if existing is not None else {}
+    threads = _chat_threads_from_preferences(preferences)
+    thread_id = (payload.thread_id or "").strip() or str(uuid4())
+    now = _utc_now_iso()
+    previous = next((thread for thread in threads if thread.get("id") == thread_id), None)
+    messages = _stored_chat_messages(payload, response)
+    thread = {
+        "id": thread_id,
+        "title": str(previous.get("title") or "").strip() if previous else _thread_title_from_messages(messages),
+        "messages": messages,
+        "token_usage": response.token_usage.model_dump(mode="json"),
+        "created_at": str(previous.get("created_at") or now) if previous else now,
+        "updated_at": now,
+    }
+    if not thread["title"]:
+        thread["title"] = _thread_title_from_messages(messages)
+    remaining = [item for item in threads if item.get("id") != thread_id]
+    preferences[CHAT_THREADS_PREFERENCE_KEY] = [thread, *remaining][:MAX_CHAT_THREADS]
+    repository.save_user_preference(UserPreference(user_id=current_user.id, preferences=preferences))
+    response.thread_id = thread_id
+    return response
+
+
+def _to_chat_thread_summary(thread: dict[str, Any]) -> ChatThreadSummaryResponse:
+    messages = thread.get("messages", [])
+    message_count = len(messages) if isinstance(messages, list) else 0
+    return ChatThreadSummaryResponse(
+        id=str(thread.get("id") or ""),
+        title=str(thread.get("title") or "Untitled chat"),
+        message_count=message_count,
+        created_at=str(thread.get("created_at") or ""),
+        updated_at=str(thread.get("updated_at") or ""),
+    )
+
+
+def _to_chat_thread_response(thread: dict[str, Any]) -> ChatThreadResponse:
+    summary = _to_chat_thread_summary(thread)
+    raw_usage = thread.get("token_usage", {})
+    usage = raw_usage if isinstance(raw_usage, dict) else {}
+    raw_messages = thread.get("messages", [])
+    messages = [message for message in raw_messages if isinstance(message, dict)] if isinstance(raw_messages, list) else []
+    return ChatThreadResponse(
+        **summary.model_dump(mode="json"),
+        messages=messages,
+        token_usage=ChatTokenUsageResponse(
+            total_tokens=int(usage.get("total_tokens") or 0),
+            llm_requests=int(usage.get("llm_requests") or 0),
+        ),
+    )
+
+
+@router.get("/chat/threads", response_model=list[ChatThreadSummaryResponse])
+def list_chat_threads_endpoint(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> list[ChatThreadSummaryResponse]:
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    return [_to_chat_thread_summary(thread) for thread in _chat_threads_from_preferences(preferences)]
+
+
+@router.get("/chat/threads/{thread_id}", response_model=ChatThreadResponse)
+def get_chat_thread_endpoint(
+    thread_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> ChatThreadResponse:
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    for thread in _chat_threads_from_preferences(preferences):
+        if thread.get("id") == thread_id:
+            return _to_chat_thread_response(thread)
+    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat thread not found.")
 
 
 def _merge_tool_filters(scope: ChatScopeRequest, arguments: dict[str, Any]) -> dict[str, Any]:
@@ -504,12 +658,18 @@ def _chat_with_tools(
     content = str(last_response.get("content") or "").strip()
     if not content:
         content = "I could not find enough evidence in the documents."
-    return ChatResponse(
+    response = ChatResponse(
         message=ChatMessageRequest(role="assistant", content=content),
         citations=_extract_tool_citations(tool_payloads),
         tool_calls=tool_calls_for_response,
         token_usage=ChatTokenUsageResponse(**token_usage),
         debug={"steps": debug_steps} if payload.debug else None,
+    )
+    return _save_chat_thread(
+        repository=repository,
+        current_user=current_user,
+        payload=payload,
+        response=response,
     )
 
 
@@ -658,6 +818,12 @@ def _iter_chat_events(
             tool_calls=tool_calls_for_response,
             token_usage=ChatTokenUsageResponse(**token_usage),
             debug={"steps": debug_steps} if payload.debug else None,
+        )
+        response = _save_chat_thread(
+            repository=repository,
+            current_user=current_user,
+            payload=payload,
+            response=response,
         )
         yield _sse_event("final", response.model_dump(mode="json"))
     except Exception as exc:
