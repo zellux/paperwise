@@ -1204,6 +1204,19 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin: 0;
 }
 
+.chat-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chat-token-usage {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .chat-messages {
   display: grid;
   gap: 10px;

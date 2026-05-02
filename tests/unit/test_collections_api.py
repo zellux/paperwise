@@ -20,6 +20,7 @@ from paperwise.server.dependencies import (
 )
 from paperwise.server.main import app
 from paperwise.server.routes.collections import _build_qa_contexts
+from paperwise.server.routes.query import _compact_chat_context_content
 
 
 TEST_USER = User(
@@ -61,6 +62,18 @@ class FakeGroundedLLM:
             "must_terms": [],
             "optional_terms": [],
         }
+
+
+def test_compact_chat_context_keeps_query_centered_excerpt() -> None:
+    content = "intro " * 500 + "Height 2 ft 10 in recorded at the visit. " + "footer " * 500
+
+    excerpt, truncated = _compact_chat_context_content(content, "Quincy height")
+
+    assert truncated is True
+    assert len(excerpt) < len(content)
+    assert "Height 2 ft 10 in" in excerpt
+    assert excerpt.startswith("...")
+    assert excerpt.endswith("...")
 
 
 class FakeAnchoredGroundedLLM(FakeGroundedLLM):
@@ -117,6 +130,7 @@ class FakeToolChatLLM(FakeGroundedLLM):
             return {
                 "role": "assistant",
                 "content": "",
+                "llm_total_tokens": 11,
                 "tool_calls": [
                     {
                         "id": "call-1",
@@ -136,6 +150,7 @@ class FakeToolChatLLM(FakeGroundedLLM):
         return {
             "role": "assistant",
             "content": f"Sonic internet is covered by {title}.",
+            "llm_total_tokens": 13,
             "tool_calls": [],
         }
 
@@ -151,6 +166,7 @@ class FakeMetadataToolChatLLM(FakeGroundedLLM):
             return {
                 "role": "assistant",
                 "content": "",
+                "llm_total_tokens": 17,
                 "tool_calls": [
                     {
                         "id": "call-1",
@@ -159,7 +175,12 @@ class FakeMetadataToolChatLLM(FakeGroundedLLM):
                     }
                 ],
             }
-        return {"role": "assistant", "content": "I found the matching invoice metadata.", "tool_calls": []}
+        return {
+            "role": "assistant",
+            "content": "I found the matching invoice metadata.",
+            "llm_total_tokens": 19,
+            "tool_calls": [],
+        }
 
 
 def _save_document(
@@ -494,6 +515,8 @@ def test_chat_queries_all_documents_with_tool_calls() -> None:
         payload = response.json()
         assert "Sonic Internet Bill" in payload["message"]["content"]
         assert payload["tool_calls"][0]["name"] == "search_document_chunks"
+        assert payload["token_usage"]["total_tokens"] == 24
+        assert payload["token_usage"]["llm_requests"] == 2
         assert payload["citations"]
         assert payload["citations"][0]["document_id"] == "doc-sonic"
     finally:
@@ -532,6 +555,8 @@ def test_chat_stream_reports_tool_progress() -> None:
         assert "event: status" in body
         assert "event: tool_call" in body
         assert "event: tool_result" in body
+        assert "event: token_usage" in body
+        assert '"total_tokens": 24' in body
         assert "event: final" in body
     finally:
         app.dependency_overrides.clear()
@@ -586,6 +611,7 @@ def test_chat_metadata_tool_scans_all_owned_documents() -> None:
         assert response.status_code == 200
         payload = response.json()
         assert payload["tool_calls"][0]["name"] == "query_document_metadata"
+        assert payload["token_usage"]["total_tokens"] == 36
         documents = payload["debug"]["steps"][0]["result"]["documents"]
         assert [item["document_id"] for item in documents] == ["doc-invoice"]
     finally:

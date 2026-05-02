@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 from uuid import uuid4
 
@@ -59,10 +60,16 @@ class ChatToolCallResponse(BaseModel):
     result_count: int
 
 
+class ChatTokenUsageResponse(BaseModel):
+    total_tokens: int = 0
+    llm_requests: int = 0
+
+
 class ChatResponse(BaseModel):
     message: ChatMessageRequest
     citations: list[ChatCitationResponse]
     tool_calls: list[ChatToolCallResponse]
+    token_usage: ChatTokenUsageResponse = Field(default_factory=ChatTokenUsageResponse)
     debug: dict[str, Any] | None = None
 
 
@@ -75,6 +82,8 @@ CHAT_SYSTEM_PROMPT = (
     "questions about counts, available tags, document types, dates, correspondents, or document lists."
 )
 MAX_CHAT_TOOL_ROUNDS = 3
+CHAT_SEARCH_CONTEXT_MAX_CHARS = 1800
+CHAT_CONTEXT_PREFIX_CHARS = 420
 
 
 CHAT_TOOLS: list[dict[str, Any]] = [
@@ -180,6 +189,52 @@ def _all_owned_document_ids(repository: DocumentRepository, current_user: User) 
     ]
 
 
+def _extract_chat_query_terms(query: str) -> list[str]:
+    terms = []
+    for term in re.findall(r"[\w\u4e00-\u9fff']+", query.casefold()):
+        if len(term) >= 3 or re.search(r"[\u4e00-\u9fff]", term):
+            terms.append(term)
+    return terms
+
+
+def _compact_chat_context_content(content: str, query: str) -> tuple[str, bool]:
+    text = str(content or "")
+    if len(text) <= CHAT_SEARCH_CONTEXT_MAX_CHARS:
+        return text, False
+    lowered = text.casefold()
+    match_index = -1
+    for term in _extract_chat_query_terms(query):
+        index = lowered.find(term)
+        if index != -1 and (match_index == -1 or index < match_index):
+            match_index = index
+    if match_index == -1:
+        start = 0
+    else:
+        start = max(0, match_index - CHAT_CONTEXT_PREFIX_CHARS)
+    end = min(len(text), start + CHAT_SEARCH_CONTEXT_MAX_CHARS)
+    if end == len(text):
+        start = max(0, end - CHAT_SEARCH_CONTEXT_MAX_CHARS)
+    excerpt = text[start:end].strip()
+    if start > 0:
+        excerpt = f"... {excerpt}"
+    if end < len(text):
+        excerpt = f"{excerpt} ..."
+    return excerpt, True
+
+
+def _compact_chat_search_contexts(contexts: list[dict[str, Any]], query: str) -> list[dict[str, Any]]:
+    compacted = []
+    for context in contexts:
+        content, truncated = _compact_chat_context_content(str(context.get("content") or ""), query)
+        item = dict(context)
+        item["content"] = content
+        if truncated:
+            item["content_truncated"] = True
+            item["source_content_chars"] = len(str(context.get("content") or ""))
+        compacted.append(item)
+    return compacted
+
+
 def _execute_chat_tool(
     *,
     repository: DocumentRepository,
@@ -220,6 +275,7 @@ def _execute_chat_tool(
             top_k_chunks=limit,
             max_documents=max_documents,
         )
+        contexts = _compact_chat_search_contexts(contexts, query)
         return {
             "results": contexts,
             "total_results": len(contexts),
@@ -318,6 +374,14 @@ def _build_chat_messages(payload: ChatRequest) -> list[dict[str, Any]]:
     return messages
 
 
+def _record_chat_token_usage(token_usage: dict[str, int], response: dict[str, Any]) -> None:
+    total_tokens = response.get("llm_total_tokens") if isinstance(response, dict) else None
+    if not isinstance(total_tokens, int) or total_tokens <= 0:
+        return
+    token_usage["total_tokens"] = token_usage.get("total_tokens", 0) + total_tokens
+    token_usage["llm_requests"] = token_usage.get("llm_requests", 0) + 1
+
+
 def _chat_with_tools(
     *,
     repository: DocumentRepository,
@@ -335,11 +399,13 @@ def _chat_with_tools(
     tool_calls_for_response: list[ChatToolCallResponse] = []
     tool_payloads: list[dict[str, Any]] = []
     debug_steps: list[dict[str, Any]] = []
+    token_usage: dict[str, int] = {"total_tokens": 0, "llm_requests": 0}
     last_response: dict[str, Any] = {}
     exhausted_tool_rounds = False
     for _ in range(MAX_CHAT_TOOL_ROUNDS):
         try:
             last_response = answer_with_tools(messages=messages, tools=CHAT_TOOLS)
+            _record_chat_token_usage(token_usage, last_response)
         except Exception as exc:
             if _is_timeout_error(exc):
                 raise HTTPException(
@@ -422,6 +488,7 @@ def _chat_with_tools(
         )
         try:
             last_response = answer_with_tools(messages=messages, tools=[])
+            _record_chat_token_usage(token_usage, last_response)
         except Exception as exc:
             if _is_timeout_error(exc):
                 raise HTTPException(
@@ -441,6 +508,7 @@ def _chat_with_tools(
         message=ChatMessageRequest(role="assistant", content=content),
         citations=_extract_tool_citations(tool_payloads),
         tool_calls=tool_calls_for_response,
+        token_usage=ChatTokenUsageResponse(**token_usage),
         debug={"steps": debug_steps} if payload.debug else None,
     )
 
@@ -473,20 +541,34 @@ def _iter_chat_events(
     tool_calls_for_response: list[ChatToolCallResponse] = []
     tool_payloads: list[dict[str, Any]] = []
     debug_steps: list[dict[str, Any]] = []
+    token_usage: dict[str, int] = {"total_tokens": 0, "llm_requests": 0}
     last_response: dict[str, Any] = {}
     exhausted_tool_rounds = False
     try:
         for round_index in range(MAX_CHAT_TOOL_ROUNDS):
+            if tool_calls_for_response:
+                status_detail = (
+                    f"Reading {len(tool_calls_for_response)} tool result(s) and writing an answer, "
+                    f"round {round_index + 1}."
+                )
+            else:
+                status_detail = f"Choosing document tools, round {round_index + 1}."
             yield _sse_event(
                 "status",
-                {"label": "LLM request", "detail": f"Planning response, round {round_index + 1}."},
+                {"label": "LLM request", "detail": status_detail},
             )
             last_response = answer_with_tools(messages=messages, tools=CHAT_TOOLS)
+            _record_chat_token_usage(token_usage, last_response)
             tool_calls = last_response.get("tool_calls", []) if isinstance(last_response, dict) else []
             yield _sse_event(
                 "llm_response",
-                {"label": "LLM response", "tool_call_count": len(tool_calls)},
+                {
+                    "label": "LLM response",
+                    "tool_call_count": len(tool_calls),
+                    "token_usage": token_usage,
+                },
             )
+            yield _sse_event("token_usage", token_usage)
             if not tool_calls:
                 break
 
@@ -564,6 +646,8 @@ def _iter_chat_events(
                 {"label": "LLM request", "detail": "Writing final answer from collected tool results."},
             )
             last_response = answer_with_tools(messages=messages, tools=[])
+            _record_chat_token_usage(token_usage, last_response)
+            yield _sse_event("token_usage", token_usage)
 
         content = str(last_response.get("content") or "").strip()
         if not content:
@@ -572,6 +656,7 @@ def _iter_chat_events(
             message=ChatMessageRequest(role="assistant", content=content),
             citations=_extract_tool_citations(tool_payloads),
             tool_calls=tool_calls_for_response,
+            token_usage=ChatTokenUsageResponse(**token_usage),
             debug={"steps": debug_steps} if payload.debug else None,
         )
         yield _sse_event("final", response.model_dump(mode="json"))

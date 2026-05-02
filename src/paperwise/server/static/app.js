@@ -37,6 +37,7 @@ const searchResultsTableBody = document.getElementById("searchResultsTableBody")
 const searchAskForm = document.getElementById("searchAskForm");
 const searchAskQuestion = document.getElementById("searchAskQuestion");
 const searchAskNewChatBtn = document.getElementById("searchAskNewChatBtn");
+const searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
 const searchAskDebugToggle = document.getElementById("searchAskDebugToggle");
 const searchAskMessages = document.getElementById("searchAskMessages");
 const searchAskAnswer = document.getElementById("searchAskAnswer");
@@ -240,6 +241,7 @@ let searchDocsCatalog = [];
 let searchAskMessagesState = [];
 let searchAskInFlight = false;
 let searchAskMessageSeq = 0;
+let searchAskCurrentTokens = 0;
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
 let searchSelectedCollectionId = "";
@@ -1698,12 +1700,14 @@ function clearSession() {
   searchCollections = [];
   searchDocsCatalog = [];
   searchAskMessagesState = [];
+  searchAskCurrentTokens = 0;
   searchSelectedCollectionId = "";
   searchSelectedCollectionDocumentIds = [];
   searchActiveSectionId = "search-section-keyword";
   currentViewId = "section-docs";
   setActiveSearchSection(searchActiveSectionId);
   renderSearchScopeOptions();
+  renderSearchAskTokenUsage();
   renderCollectionsTable();
   renderSearchCollectionDocumentsTable();
   renderSearchResultsTable({ hits: [] });
@@ -3182,6 +3186,30 @@ function appendSearchAskStatus(label, detail = "", options = {}) {
   });
 }
 
+function formatTokenCount(value) {
+  const count = Number(value || 0);
+  if (!Number.isFinite(count) || count <= 0) {
+    return "0";
+  }
+  return Math.round(count).toLocaleString();
+}
+
+function renderSearchAskTokenUsage() {
+  if (!searchAskTokenUsage) {
+    return;
+  }
+  searchAskTokenUsage.textContent = `Tokens: ${formatTokenCount(searchAskCurrentTokens)}`;
+}
+
+function updateSearchAskTokenUsage(tokenUsage) {
+  const nextTotal = Number(tokenUsage?.total_tokens || 0);
+  if (!Number.isFinite(nextTotal) || nextTotal < 0) {
+    return;
+  }
+  searchAskCurrentTokens = nextTotal;
+  renderSearchAskTokenUsage();
+}
+
 function formatSearchAskJsonDetail(value) {
   try {
     return JSON.stringify(value || {}, null, 2);
@@ -3270,6 +3298,8 @@ function resetSearchAskChat() {
   }
   searchAskMessagesState = [];
   searchAskMessageSeq = 0;
+  searchAskCurrentTokens = 0;
+  renderSearchAskTokenUsage();
   renderSearchAskMessages();
   renderSearchAskAnswer(null);
   renderSearchAskDebugOutput(null, Boolean(searchAskDebugToggle?.checked));
@@ -3718,6 +3748,7 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnable
   }
   if (eventType === "llm_response") {
     const toolCallCount = Number(data.tool_call_count || 0);
+    updateSearchAskTokenUsage(data.token_usage);
     appendSearchAskStatus(
       "LLM response",
       toolCallCount ? `${toolCallCount} tool call(s) requested` : "ready to answer",
@@ -3726,6 +3757,10 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnable
         detail: formatSearchAskJsonDetail(data),
       },
     );
+    return null;
+  }
+  if (eventType === "token_usage") {
+    updateSearchAskTokenUsage(data);
     return null;
   }
   if (eventType === "tool_call") {
@@ -3755,6 +3790,7 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnable
     return { error: detail };
   }
   if (eventType === "final") {
+    updateSearchAskTokenUsage(data?.token_usage);
     updatePendingSearchAskMessage(
       pendingMessage,
       data?.message?.content || "No answer returned.",
@@ -3873,6 +3909,7 @@ async function runScopedAsk() {
       logActivity(`Ask failed: ${payload.detail || response.statusText}`);
       return;
     }
+    updateSearchAskTokenUsage(payload?.token_usage);
     updatePendingSearchAskMessage(
       pendingMessage,
       payload?.message?.content || "No answer returned.",

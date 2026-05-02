@@ -532,7 +532,10 @@
             <section class="search-card">
               <div class="chat-header-row">
                 <h3>Ask Your Docs</h3>
-                <button id="searchAskNewChatBtn" type="button" class="btn btn-muted">New Chat</button>
+                <div class="chat-header-actions">
+                  <span id="searchAskTokenUsage" class="chat-token-usage">Tokens: 0</span>
+                  <button id="searchAskNewChatBtn" type="button" class="btn btn-muted">New Chat</button>
+                </div>
               </div>
               <p class="search-hint">Chat across your documents with metadata-aware tools.</p>
               <div id="searchAskMessages" class="chat-messages" aria-live="polite">
