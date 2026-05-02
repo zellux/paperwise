@@ -351,3 +351,44 @@ def test_openai_provider_returns_tool_calls(monkeypatch) -> None:
         }
     ]
     assert result["llm_total_tokens"] == 42
+
+
+def test_openai_provider_retries_rate_limited_tool_chat(monkeypatch) -> None:
+    calls = {"count": 0}
+    sleeps: list[float] = []
+
+    class FakeClient:
+        def post(self, _path: str, json: dict, timeout: float | None = None):
+            del json
+            del timeout
+            calls["count"] += 1
+
+            class Response:
+                status_code = 429 if calls["count"] == 1 else 200
+                text = ""
+                headers = {"retry-after": "0.25"} if calls["count"] == 1 else {}
+
+                def raise_for_status(self) -> None:
+                    if self.status_code >= 400:
+                        raise RuntimeError(f"HTTP {self.status_code}")
+
+                def json(self) -> dict:
+                    if self.status_code == 429:
+                        return {"error": {"message": "rate limited"}}
+                    return {
+                        "usage": {"total_tokens": 7},
+                        "choices": [{"message": {"content": "Done.", "tool_calls": []}}],
+                    }
+
+            return Response()
+
+    provider = OpenAILLMProvider(api_key="k", model="m")
+    monkeypatch.setattr(provider, "_client", FakeClient())
+    monkeypatch.setattr("paperwise.infrastructure.llm.openai_llm_provider.time.sleep", sleeps.append)
+
+    result = provider.answer_with_tools(messages=[{"role": "user", "content": "Hi"}], tools=[])
+
+    assert calls["count"] == 2
+    assert sleeps == [1.0]
+    assert result["content"] == "Done."
+    assert result["llm_total_tokens"] == 7

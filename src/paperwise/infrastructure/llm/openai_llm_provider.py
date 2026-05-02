@@ -1,6 +1,7 @@
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
+import time
 from typing import Any
 
 import httpx
@@ -30,6 +31,9 @@ from paperwise.infrastructure.llm.retrieval_query_prompt import (
 
 logger = logging.getLogger(__name__)
 
+_RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+_DEFAULT_CHAT_COMPLETIONS_ATTEMPTS = 3
+
 
 class OpenAILLMProvider(LLMProvider):
     def __init__(
@@ -52,6 +56,69 @@ class OpenAILLMProvider(LLMProvider):
                 "Content-Type": "application/json",
             },
         )
+
+    def _chat_completions(
+        self,
+        request_payload: dict[str, Any],
+        *,
+        timeout: float | None = None,
+        max_attempts: int = _DEFAULT_CHAT_COMPLETIONS_ATTEMPTS,
+    ) -> tuple[httpx.Response, Any]:
+        attempts = max(1, max_attempts)
+        last_error: Exception | None = None
+        for attempt in range(attempts):
+            response: httpx.Response | None = None
+            response_payload: Any = None
+            try:
+                try:
+                    if timeout is None:
+                        response = self._client.post("/chat/completions", json=request_payload)
+                    else:
+                        response = self._client.post(
+                            "/chat/completions",
+                            json=request_payload,
+                            timeout=timeout,
+                        )
+                except TypeError:
+                    response = self._client.post("/chat/completions", json=request_payload)
+                try:
+                    response_payload = response.json()
+                except ValueError:
+                    response_payload = {"raw_text": getattr(response, "text", "")}
+            except (httpx.TimeoutException, httpx.TransportError) as exc:
+                last_error = exc
+                log_llm_exchange(
+                    provider="openai",
+                    endpoint="/chat/completions",
+                    request_payload=request_payload,
+                    error=str(exc),
+                )
+                if attempt + 1 >= attempts:
+                    raise
+                time.sleep(2**attempt)
+                continue
+
+            status_code = int(getattr(response, "status_code", 0) or 0)
+            if status_code in _RETRYABLE_STATUS_CODES and attempt + 1 < attempts:
+                log_llm_exchange(
+                    provider="openai",
+                    endpoint="/chat/completions",
+                    request_payload=request_payload,
+                    response_status=status_code,
+                    response_payload=response_payload,
+                )
+                retry_after = 0.0
+                headers = getattr(response, "headers", {}) or {}
+                try:
+                    retry_after = float(headers.get("retry-after", 0))
+                except (TypeError, ValueError, AttributeError):
+                    retry_after = 0.0
+                time.sleep(max(retry_after, float(2**attempt)))
+                continue
+            return response, response_payload
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Chat completions request failed without a response.")
 
     def suggest_metadata(
         self,
@@ -82,23 +149,7 @@ class OpenAILLMProvider(LLMProvider):
                 {"role": "user", "content": json.dumps(user_prompt)},
             ],
         }
-        response: httpx.Response | None = None
-        response_payload: Any = None
-
-        try:
-            response = self._client.post("/chat/completions", json=request_payload)
-            try:
-                response_payload = response.json()
-            except ValueError:
-                response_payload = {"raw_text": getattr(response, "text", "")}
-        except Exception as exc:
-            log_llm_exchange(
-                provider="openai",
-                endpoint="/chat/completions",
-                request_payload=request_payload,
-                error=str(exc),
-            )
-            raise
+        response, response_payload = self._chat_completions(request_payload)
 
         log_llm_exchange(
             provider="openai",
@@ -361,31 +412,8 @@ class OpenAILLMProvider(LLMProvider):
                 {"role": "user", "content": json.dumps(user_prompt)},
             ],
         }
-        response: httpx.Response | None = None
-        response_payload: Any = None
-        try:
-            # Grounded Q&A can send much larger prompts than metadata or rewrite calls.
-            try:
-                response = self._client.post(
-                    "/chat/completions",
-                    json=request_payload,
-                    timeout=120.0,
-                )
-            except TypeError:
-                # Test doubles may not accept per-request timeout kwargs.
-                response = self._client.post("/chat/completions", json=request_payload)
-            try:
-                response_payload = response.json()
-            except ValueError:
-                response_payload = {"raw_text": getattr(response, "text", "")}
-        except Exception as exc:
-            log_llm_exchange(
-                provider="openai",
-                endpoint="/chat/completions",
-                request_payload=request_payload,
-                error=str(exc),
-            )
-            raise
+        # Grounded Q&A can send much larger prompts than metadata or rewrite calls.
+        response, response_payload = self._chat_completions(request_payload, timeout=120.0)
         log_llm_exchange(
             provider="openai",
             endpoint="/chat/completions",
@@ -419,22 +447,7 @@ class OpenAILLMProvider(LLMProvider):
                 {"role": "user", "content": json.dumps(user_prompt)},
             ],
         }
-        response: httpx.Response | None = None
-        response_payload: Any = None
-        try:
-            response = self._client.post("/chat/completions", json=request_payload)
-            try:
-                response_payload = response.json()
-            except ValueError:
-                response_payload = {"raw_text": getattr(response, "text", "")}
-        except Exception as exc:
-            log_llm_exchange(
-                provider="openai",
-                endpoint="/chat/completions",
-                request_payload=request_payload,
-                error=str(exc),
-            )
-            raise
+        response, response_payload = self._chat_completions(request_payload)
         log_llm_exchange(
             provider="openai",
             endpoint="/chat/completions",
@@ -462,29 +475,7 @@ class OpenAILLMProvider(LLMProvider):
         if tools:
             request_payload["tools"] = tools
             request_payload["tool_choice"] = "auto"
-        response: httpx.Response | None = None
-        response_payload: Any = None
-        try:
-            try:
-                response = self._client.post(
-                    "/chat/completions",
-                    json=request_payload,
-                    timeout=120.0,
-                )
-            except TypeError:
-                response = self._client.post("/chat/completions", json=request_payload)
-            try:
-                response_payload = response.json()
-            except ValueError:
-                response_payload = {"raw_text": getattr(response, "text", "")}
-        except Exception as exc:
-            log_llm_exchange(
-                provider="openai",
-                endpoint="/chat/completions",
-                request_payload=request_payload,
-                error=str(exc),
-            )
-            raise
+        response, response_payload = self._chat_completions(request_payload, timeout=120.0)
         log_llm_exchange(
             provider="openai",
             endpoint="/chat/completions",
