@@ -240,6 +240,7 @@ let searchAskMessagesState = [];
 let searchAskInFlight = false;
 let searchAskMessageSeq = 0;
 let searchAskCurrentTokens = 0;
+let searchAskTimerId = 0;
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
 let searchSelectedCollectionId = "";
@@ -3205,6 +3206,77 @@ function appendSearchAskActivity() {
   });
 }
 
+function hasActiveSearchAskRound() {
+  return searchAskMessagesState.some(
+    (message) =>
+      message.activity &&
+      Array.isArray(message.activityRounds) &&
+      message.activityRounds.some((round) => round.startedAt && !round.endedAt),
+  );
+}
+
+function syncSearchAskTimer() {
+  if (hasActiveSearchAskRound()) {
+    if (!searchAskTimerId) {
+      searchAskTimerId = window.setInterval(() => {
+        if (!hasActiveSearchAskRound()) {
+          syncSearchAskTimer();
+          return;
+        }
+        renderSearchAskMessages();
+      }, 1000);
+    }
+    return;
+  }
+  if (searchAskTimerId) {
+    window.clearInterval(searchAskTimerId);
+    searchAskTimerId = 0;
+  }
+}
+
+function finishActiveSearchAskRound(activityMessage) {
+  if (!activityMessage || !Array.isArray(activityMessage.activityRounds)) {
+    return;
+  }
+  const round = activityMessage.activityRounds.at(-1);
+  if (round?.startedAt && !round.endedAt) {
+    round.endedAt = Date.now();
+  }
+  syncSearchAskTimer();
+}
+
+function finishAllSearchAskRounds(activityMessage) {
+  if (!activityMessage || !Array.isArray(activityMessage.activityRounds)) {
+    syncSearchAskTimer();
+    return;
+  }
+  const now = Date.now();
+  for (const round of activityMessage.activityRounds) {
+    if (round.startedAt && !round.endedAt) {
+      round.endedAt = now;
+    }
+  }
+  syncSearchAskTimer();
+}
+
+function formatElapsedTime(ms) {
+  const totalSeconds = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  if (minutes > 0) {
+    return `${minutes}m ${seconds}s`;
+  }
+  return `${seconds}s`;
+}
+
+function getRoundElapsedLabel(round) {
+  if (!round?.startedAt) {
+    return "";
+  }
+  const end = round.endedAt || Date.now();
+  return formatElapsedTime(end - round.startedAt);
+}
+
 function formatTokenCount(value) {
   const count = Number(value || 0);
   if (!Number.isFinite(count) || count <= 0) {
@@ -3268,14 +3340,16 @@ function renderSearchAskStatusMessage(message, item) {
 function formatSearchAskRoundSummary(round) {
   const toolCount = Number(round.toolCallCount || 0);
   const resultCount = Number(round.resultCount || 0);
+  const elapsed = getRoundElapsedLabel(round);
+  const elapsedText = elapsed ? ` · ${elapsed}` : "";
   if (round.finalReady) {
-    return `Round ${round.index}: answer ready`;
+    return `Round ${round.index}: answer ready${elapsedText}`;
   }
   if (toolCount > 0) {
     const resultText = resultCount > 0 ? `, ${resultCount} result(s)` : "";
-    return `Round ${round.index}: ${toolCount} tool call(s)${resultText}`;
+    return `Round ${round.index}: ${toolCount} tool call(s)${resultText}${elapsedText}`;
   }
-  return `Round ${round.index}: ${round.summary || "LLM request"}`;
+  return `Round ${round.index}: ${round.summary || "LLM request"}${elapsedText}`;
 }
 
 function renderSearchAskActivityMessage(message, item) {
@@ -3301,6 +3375,12 @@ function renderSearchAskActivityMessage(message, item) {
 
     summaryButton.appendChild(marker);
     summaryButton.appendChild(text);
+    if (round.startedAt && !round.endedAt) {
+      const live = document.createElement("span");
+      live.className = "chat-status-live";
+      live.setAttribute("aria-hidden", "true");
+      summaryButton.appendChild(live);
+    }
     item.appendChild(summaryButton);
 
     if (round.expanded && round.details?.length) {
@@ -3340,6 +3420,8 @@ function renderSearchAskMessages() {
   if (!searchAskMessages) {
     return;
   }
+  const shouldStickToBottom =
+    searchAskMessages.scrollHeight - searchAskMessages.scrollTop - searchAskMessages.clientHeight < 24;
   if (!searchAskMessagesState.length) {
     searchAskMessages.innerHTML = `
       <div class="chat-message chat-message-assistant">
@@ -3376,7 +3458,9 @@ function renderSearchAskMessages() {
     renderChatCitations(message, item);
     searchAskMessages.appendChild(item);
   }
-  searchAskMessages.scrollTop = searchAskMessages.scrollHeight;
+  if (shouldStickToBottom) {
+    searchAskMessages.scrollTop = searchAskMessages.scrollHeight;
+  }
 }
 
 function resetSearchAskChat() {
@@ -3386,6 +3470,7 @@ function resetSearchAskChat() {
   searchAskMessagesState = [];
   searchAskMessageSeq = 0;
   searchAskCurrentTokens = 0;
+  syncSearchAskTimer();
   renderSearchAskTokenUsage();
   renderSearchAskMessages();
   renderSearchAskAnswer(null);
@@ -3818,6 +3903,7 @@ function getSearchAskActivityRound(activityMessage) {
       details: [],
       toolCallCount: 0,
       resultCount: 0,
+      startedAt: Date.now(),
       expanded: false,
     };
     activityMessage.activityRounds.push(round);
@@ -3836,15 +3922,18 @@ function appendSearchAskActivityRound(activityMessage, data) {
     });
     return;
   }
+  finishActiveSearchAskRound(activityMessage);
   const round = {
     index: activityMessage.activityRounds.length + 1,
     summary: data.detail || data.label || "LLM request",
     details: [data.detail || data.label || "LLM request"],
     toolCallCount: 0,
     resultCount: 0,
+    startedAt: Date.now(),
     expanded: false,
   };
   activityMessage.activityRounds.push(round);
+  syncSearchAskTimer();
   renderSearchAskMessages();
 }
 
@@ -3871,6 +3960,10 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMes
       round.toolCallCount = toolCallCount;
       round.finalReady = toolCallCount === 0;
       round.summary = toolCallCount ? `${toolCallCount} tool call(s) requested` : "answer ready";
+      if (toolCallCount === 0 && !round.endedAt) {
+        round.endedAt = Date.now();
+        syncSearchAskTimer();
+      }
       appendSearchAskRoundDetail(round, "LLM response", formatSearchAskJsonDetail(data));
       renderSearchAskMessages();
     }
@@ -3901,12 +3994,14 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMes
     return null;
   }
   if (eventType === "error") {
+    finishAllSearchAskRounds(activityMessage);
     const detail = data.detail || "Chat failed.";
     updatePendingSearchAskMessage(pendingMessage, detail);
     renderSearchAskAnswer({ answer: detail, insufficient_evidence: true, citations: [] });
     return { error: detail };
   }
   if (eventType === "final") {
+    finishAllSearchAskRounds(activityMessage);
     updateSearchAskTokenUsage(data?.token_usage);
     updatePendingSearchAskMessage(
       pendingMessage,
@@ -4035,12 +4130,14 @@ async function runScopedAsk() {
     });
     logActivity("Ask Your Docs chat completed.");
   } catch (error) {
+    finishAllSearchAskRounds(activityMessage);
     const message = error instanceof Error ? error.message : String(error || "Chat failed.");
     updatePendingSearchAskMessage(pendingMessage, message);
     renderSearchAskAnswer({ answer: message, insufficient_evidence: true, citations: [] });
     logActivity(`Ask failed: ${message}`);
   } finally {
     searchAskInFlight = false;
+    syncSearchAskTimer();
     setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), false);
   }
 }
