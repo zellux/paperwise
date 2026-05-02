@@ -1233,6 +1233,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 .chat-message-status {
   justify-self: stretch;
   max-width: 100%;
+  gap: 3px;
 }
 
 .chat-message-role {
@@ -1258,6 +1259,59 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   background: rgba(255, 255, 255, 0.54);
   color: var(--ink-soft);
   font-size: 0.78rem;
+}
+
+.chat-status-summary {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 28px;
+  border: 1px dashed var(--stroke);
+  border-radius: 8px;
+  padding: 5px 8px;
+  background: rgba(255, 255, 255, 0.54);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  text-align: left;
+}
+
+.chat-status-summary:hover {
+  border-color: rgba(43, 91, 74, 0.28);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+.chat-status-marker {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.chat-status-summary-text {
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-height: 1.35;
+}
+
+.chat-status-detail {
+  max-height: 220px;
+  overflow: auto;
+  margin: 0 0 0 22px;
+  border: 1px solid var(--stroke);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.68);
+  color: var(--ink);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
 }
 
 .chat-tool-strip {

@@ -239,6 +239,7 @@ let searchCollections = [];
 let searchDocsCatalog = [];
 let searchAskMessagesState = [];
 let searchAskInFlight = false;
+let searchAskMessageSeq = 0;
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
 let searchSelectedCollectionId = "";
@@ -3141,11 +3142,15 @@ function renderSearchAskAnswer(payload) {
 function appendSearchAskMessage(role, content, options = {}) {
   const normalizedRole = role === "user" || role === "status" ? role : "assistant";
   const message = {
+    id: `chat-message-${++searchAskMessageSeq}`,
     role: normalizedRole,
     content: String(content || "").trim(),
     pending: Boolean(options.pending),
     toolCalls: Array.isArray(options.toolCalls) ? options.toolCalls : [],
     statusKind: String(options.statusKind || "").trim(),
+    statusSummary: String(options.statusSummary || "").trim(),
+    statusDetail: String(options.statusDetail || "").trim(),
+    expanded: Boolean(options.expanded),
   };
   if (!message.content && !message.pending) {
     return null;
@@ -3166,10 +3171,51 @@ function updatePendingSearchAskMessage(message, content, options = {}) {
 }
 
 function appendSearchAskStatus(label, detail = "", options = {}) {
-  const parts = [String(label || "").trim(), String(detail || "").trim()].filter(Boolean);
+  const summary = String(options.summary || label || "Working").trim();
+  const fullDetail = String(options.detail || detail || "").trim();
+  const compactDetail = String(detail || "").trim();
+  const parts = [summary, compactDetail].filter(Boolean);
   return appendSearchAskMessage("status", parts.join(": "), {
     statusKind: options.statusKind || "",
+    statusSummary: parts.join(": "),
+    statusDetail: fullDetail,
   });
+}
+
+function formatSearchAskJsonDetail(value) {
+  try {
+    return JSON.stringify(value || {}, null, 2);
+  } catch {
+    return String(value || "");
+  }
+}
+
+function renderSearchAskStatusMessage(message, item) {
+  const summaryButton = document.createElement("button");
+  summaryButton.type = "button";
+  summaryButton.className = "chat-status-summary";
+  summaryButton.setAttribute("aria-expanded", message.expanded ? "true" : "false");
+  summaryButton.dataset.messageId = message.id;
+
+  const marker = document.createElement("span");
+  marker.className = "chat-status-marker";
+  marker.setAttribute("aria-hidden", "true");
+  marker.textContent = message.expanded ? "v" : ">";
+
+  const text = document.createElement("span");
+  text.className = "chat-status-summary-text";
+  text.textContent = message.statusSummary || message.content || "Working...";
+
+  summaryButton.appendChild(marker);
+  summaryButton.appendChild(text);
+  item.appendChild(summaryButton);
+
+  if (message.expanded && message.statusDetail) {
+    const detail = document.createElement("pre");
+    detail.className = "chat-status-detail";
+    detail.textContent = message.statusDetail;
+    item.appendChild(detail);
+  }
 }
 
 function renderSearchAskMessages() {
@@ -3189,6 +3235,14 @@ function renderSearchAskMessages() {
   for (const message of searchAskMessagesState) {
     const item = document.createElement("div");
     item.className = `chat-message chat-message-${message.role}`;
+    if (message.statusKind) {
+      item.classList.add(`chat-message-status-${message.statusKind}`);
+    }
+    if (message.role === "status") {
+      renderSearchAskStatusMessage(message, item);
+      searchAskMessages.appendChild(item);
+      continue;
+    }
     const role = document.createElement("div");
     role.className = "chat-message-role";
     role.textContent = message.role === "user" ? "You" : message.role === "status" ? "Status" : "Paperwise";
@@ -3215,6 +3269,7 @@ function resetSearchAskChat() {
     return;
   }
   searchAskMessagesState = [];
+  searchAskMessageSeq = 0;
   renderSearchAskMessages();
   renderSearchAskAnswer(null);
   renderSearchAskDebugOutput(null, Boolean(searchAskDebugToggle?.checked));
@@ -3655,26 +3710,40 @@ function parseSearchAskStreamEvent(rawEvent) {
 
 function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled) {
   if (eventType === "status") {
-    appendSearchAskStatus(data.label || "Working", data.detail || "", { statusKind: "request" });
+    appendSearchAskStatus(data.label || "Working", data.detail || "", {
+      statusKind: "request",
+      detail: data.detail || "",
+    });
     return null;
   }
   if (eventType === "llm_response") {
+    const toolCallCount = Number(data.tool_call_count || 0);
     appendSearchAskStatus(
       "LLM response",
-      `${Number(data.tool_call_count || 0)} tool call(s) requested`,
-      { statusKind: "llm" },
+      toolCallCount ? `${toolCallCount} tool call(s) requested` : "ready to answer",
+      {
+        statusKind: "llm",
+        detail: formatSearchAskJsonDetail(data),
+      },
     );
     return null;
   }
   if (eventType === "tool_call") {
-    appendSearchAskStatus(data.name || "Tool call", JSON.stringify(data.arguments || {}), { statusKind: "tool" });
+    appendSearchAskStatus(`Tool call: ${data.name || "tool"}`, "arguments ready", {
+      statusKind: "tool",
+      detail: formatSearchAskJsonDetail(data.arguments || {}),
+    });
     return null;
   }
   if (eventType === "tool_result") {
+    const resultCount = Number(data.result_count || 0);
     appendSearchAskStatus(
-      data.name || "Tool result",
-      `${Number(data.result_count || 0)} result(s)`,
-      { statusKind: "tool" },
+      `Tool result: ${data.name || "tool"}`,
+      `${resultCount} result(s)`,
+      {
+        statusKind: "tool",
+        detail: formatSearchAskJsonDetail(data),
+      },
     );
     return null;
   }
@@ -4360,6 +4429,19 @@ searchAskQuestion?.addEventListener("keydown", async (event) => {
   }
   event.preventDefault();
   await runScopedAsk();
+});
+
+searchAskMessages?.addEventListener("click", (event) => {
+  const button = event.target instanceof Element ? event.target.closest(".chat-status-summary") : null;
+  if (!(button instanceof HTMLElement)) {
+    return;
+  }
+  const message = searchAskMessagesState.find((item) => item.id === button.dataset.messageId);
+  if (!message || !message.statusDetail) {
+    return;
+  }
+  message.expanded = !message.expanded;
+  renderSearchAskMessages();
 });
 
 searchAskDebugToggle?.addEventListener("change", () => {
