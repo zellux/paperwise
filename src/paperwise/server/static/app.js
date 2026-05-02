@@ -3155,6 +3155,8 @@ function appendSearchAskMessage(role, content, options = {}) {
     statusSummary: String(options.statusSummary || "").trim(),
     statusDetail: String(options.statusDetail || "").trim(),
     expanded: Boolean(options.expanded),
+    activity: Boolean(options.activity),
+    activityRounds: Array.isArray(options.activityRounds) ? options.activityRounds : [],
   };
   if (!message.content && !message.pending) {
     return null;
@@ -3183,6 +3185,15 @@ function appendSearchAskStatus(label, detail = "", options = {}) {
     statusKind: options.statusKind || "",
     statusSummary: parts.join(": "),
     statusDetail: fullDetail,
+  });
+}
+
+function appendSearchAskActivity() {
+  return appendSearchAskMessage("status", "Working through document tools.", {
+    statusKind: "activity",
+    statusSummary: "Working through document tools.",
+    activity: true,
+    activityRounds: [],
   });
 }
 
@@ -3246,6 +3257,53 @@ function renderSearchAskStatusMessage(message, item) {
   }
 }
 
+function formatSearchAskRoundSummary(round) {
+  const toolCount = Number(round.toolCallCount || 0);
+  const resultCount = Number(round.resultCount || 0);
+  if (round.finalReady) {
+    return `Round ${round.index}: answer ready`;
+  }
+  if (toolCount > 0) {
+    const resultText = resultCount > 0 ? `, ${resultCount} result(s)` : "";
+    return `Round ${round.index}: ${toolCount} tool call(s)${resultText}`;
+  }
+  return `Round ${round.index}: ${round.summary || "LLM request"}`;
+}
+
+function renderSearchAskActivityMessage(message, item) {
+  const rounds = message.activityRounds.length
+    ? message.activityRounds
+    : [{ index: 1, summary: message.statusSummary || message.content || "Working", details: [] }];
+  for (const round of rounds) {
+    const summaryButton = document.createElement("button");
+    summaryButton.type = "button";
+    summaryButton.className = "chat-status-summary";
+    summaryButton.setAttribute("aria-expanded", round.expanded ? "true" : "false");
+    summaryButton.dataset.messageId = message.id;
+    summaryButton.dataset.roundIndex = String(round.index);
+
+    const marker = document.createElement("span");
+    marker.className = "chat-status-marker";
+    marker.setAttribute("aria-hidden", "true");
+    marker.textContent = round.expanded ? "v" : ">";
+
+    const text = document.createElement("span");
+    text.className = "chat-status-summary-text";
+    text.textContent = formatSearchAskRoundSummary(round);
+
+    summaryButton.appendChild(marker);
+    summaryButton.appendChild(text);
+    item.appendChild(summaryButton);
+
+    if (round.expanded && round.details?.length) {
+      const detail = document.createElement("pre");
+      detail.className = "chat-status-detail";
+      detail.textContent = round.details.join("\n\n");
+      item.appendChild(detail);
+    }
+  }
+}
+
 function renderSearchAskMessages() {
   if (!searchAskMessages) {
     return;
@@ -3267,7 +3325,11 @@ function renderSearchAskMessages() {
       item.classList.add(`chat-message-status-${message.statusKind}`);
     }
     if (message.role === "status") {
-      renderSearchAskStatusMessage(message, item);
+      if (message.activity) {
+        renderSearchAskActivityMessage(message, item);
+      } else {
+        renderSearchAskStatusMessage(message, item);
+      }
       searchAskMessages.appendChild(item);
       continue;
     }
@@ -3279,14 +3341,6 @@ function renderSearchAskMessages() {
     body.innerHTML = renderMarkdown(message.pending ? "Working..." : message.content || "No response.");
     item.appendChild(role);
     item.appendChild(body);
-    if (message.toolCalls.length) {
-      const tools = document.createElement("div");
-      tools.className = "chat-tool-strip";
-      tools.textContent = message.toolCalls
-        .map((call) => `${call.name || "tool"} (${Number(call.result_count || 0)})`)
-        .join(" · ");
-      item.appendChild(tools);
-    }
     searchAskMessages.appendChild(item);
   }
   searchAskMessages.scrollTop = searchAskMessages.scrollHeight;
@@ -3738,25 +3792,77 @@ function parseSearchAskStreamEvent(rawEvent) {
   return { eventType, data };
 }
 
-function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled) {
-  if (eventType === "status") {
+function getSearchAskActivityRound(activityMessage) {
+  if (!activityMessage) {
+    return null;
+  }
+  if (!Array.isArray(activityMessage.activityRounds)) {
+    activityMessage.activityRounds = [];
+  }
+  let round = activityMessage.activityRounds.at(-1);
+  if (!round) {
+    round = {
+      index: 1,
+      summary: "LLM request",
+      details: [],
+      toolCallCount: 0,
+      resultCount: 0,
+      expanded: false,
+    };
+    activityMessage.activityRounds.push(round);
+  }
+  if (!Array.isArray(round.details)) {
+    round.details = [];
+  }
+  return round;
+}
+
+function appendSearchAskActivityRound(activityMessage, data) {
+  if (!activityMessage) {
     appendSearchAskStatus(data.label || "Working", data.detail || "", {
       statusKind: "request",
       detail: data.detail || "",
     });
+    return;
+  }
+  const round = {
+    index: activityMessage.activityRounds.length + 1,
+    summary: data.detail || data.label || "LLM request",
+    details: [data.detail || data.label || "LLM request"],
+    toolCallCount: 0,
+    resultCount: 0,
+    expanded: false,
+  };
+  activityMessage.activityRounds.push(round);
+  renderSearchAskMessages();
+}
+
+function appendSearchAskRoundDetail(round, label, detail) {
+  if (!round) {
+    return;
+  }
+  const parts = [String(label || "").trim(), String(detail || "").trim()].filter(Boolean);
+  if (parts.length) {
+    round.details.push(parts.join("\n"));
+  }
+}
+
+function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled, activityMessage = null) {
+  if (eventType === "status") {
+    appendSearchAskActivityRound(activityMessage, data);
     return null;
   }
   if (eventType === "llm_response") {
     const toolCallCount = Number(data.tool_call_count || 0);
     updateSearchAskTokenUsage(data.token_usage);
-    appendSearchAskStatus(
-      "LLM response",
-      toolCallCount ? `${toolCallCount} tool call(s) requested` : "ready to answer",
-      {
-        statusKind: "llm",
-        detail: formatSearchAskJsonDetail(data),
-      },
-    );
+    const round = getSearchAskActivityRound(activityMessage);
+    if (round) {
+      round.toolCallCount = toolCallCount;
+      round.finalReady = toolCallCount === 0;
+      round.summary = toolCallCount ? `${toolCallCount} tool call(s) requested` : "answer ready";
+      appendSearchAskRoundDetail(round, "LLM response", formatSearchAskJsonDetail(data));
+      renderSearchAskMessages();
+    }
     return null;
   }
   if (eventType === "token_usage") {
@@ -3764,22 +3870,23 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnable
     return null;
   }
   if (eventType === "tool_call") {
-    appendSearchAskStatus(`Tool call: ${data.name || "tool"}`, "arguments ready", {
-      statusKind: "tool",
-      detail: formatSearchAskJsonDetail(data.arguments || {}),
-    });
+    const round = getSearchAskActivityRound(activityMessage);
+    if (round) {
+      round.toolCallCount = Math.max(Number(round.toolCallCount || 0), Number(round.toolCalls?.length || 0) + 1);
+      round.toolCalls = [...(round.toolCalls || []), data.name || "tool"];
+      appendSearchAskRoundDetail(round, `Tool call: ${data.name || "tool"}`, formatSearchAskJsonDetail(data.arguments || {}));
+      renderSearchAskMessages();
+    }
     return null;
   }
   if (eventType === "tool_result") {
     const resultCount = Number(data.result_count || 0);
-    appendSearchAskStatus(
-      `Tool result: ${data.name || "tool"}`,
-      `${resultCount} result(s)`,
-      {
-        statusKind: "tool",
-        detail: formatSearchAskJsonDetail(data),
-      },
-    );
+    const round = getSearchAskActivityRound(activityMessage);
+    if (round) {
+      round.resultCount = Number(round.resultCount || 0) + resultCount;
+      appendSearchAskRoundDetail(round, `Tool result: ${data.name || "tool"}`, formatSearchAskJsonDetail(data));
+      renderSearchAskMessages();
+    }
     return null;
   }
   if (eventType === "error") {
@@ -3807,7 +3914,7 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnable
   return null;
 }
 
-async function runSearchAskStream(requestBody, pendingMessage, debugEnabled) {
+async function runSearchAskStream(requestBody, pendingMessage, debugEnabled, activityMessage) {
   const response = await apiFetch("/query/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
@@ -3830,7 +3937,7 @@ async function runSearchAskStream(requestBody, pendingMessage, debugEnabled) {
         continue;
       }
       const { eventType, data } = parseSearchAskStreamEvent(rawEvent);
-      const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled);
+      const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled, activityMessage);
       if (handled?.error) {
         throw new Error(handled.error);
       }
@@ -3844,7 +3951,7 @@ async function runSearchAskStream(requestBody, pendingMessage, debugEnabled) {
   }
   if (buffer.trim()) {
     const { eventType, data } = parseSearchAskStreamEvent(buffer);
-    const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled);
+    const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, debugEnabled, activityMessage);
     if (handled?.error) {
       throw new Error(handled.error);
     }
@@ -3870,6 +3977,7 @@ async function runScopedAsk() {
   const topK = normalizeGroundedQaTopK(groundedQaTopK);
   const maxDocuments = normalizeGroundedQaMaxDocuments(groundedQaMaxDocuments);
   appendSearchAskMessage("user", question);
+  const activityMessage = appendSearchAskActivity();
   const pendingMessage = appendSearchAskMessage("assistant", "", { pending: true });
   if (searchAskQuestion) {
     searchAskQuestion.value = "";
@@ -3891,7 +3999,7 @@ async function runScopedAsk() {
     debug: debugEnabled,
   };
   try {
-    const streamedPayload = await runSearchAskStream(requestBody, pendingMessage, debugEnabled);
+    const streamedPayload = await runSearchAskStream(requestBody, pendingMessage, debugEnabled, activityMessage);
     if (streamedPayload) {
       logActivity("Ask Your Docs chat completed.");
       return;
@@ -4474,7 +4582,20 @@ searchAskMessages?.addEventListener("click", (event) => {
     return;
   }
   const message = searchAskMessagesState.find((item) => item.id === button.dataset.messageId);
-  if (!message || !message.statusDetail) {
+  if (!message) {
+    return;
+  }
+  if (message.activity) {
+    const roundIndex = Number(button.dataset.roundIndex || 0);
+    const round = message.activityRounds.find((item) => Number(item.index) === roundIndex);
+    if (!round || !round.details?.length) {
+      return;
+    }
+    round.expanded = !round.expanded;
+    renderSearchAskMessages();
+    return;
+  }
+  if (!message.statusDetail) {
     return;
   }
   message.expanded = !message.expanded;

@@ -1327,11 +1327,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   white-space: pre-wrap;
 }
 
-.chat-tool-strip {
-  color: var(--ink-soft);
-  font-size: 0.76rem;
-}
-
 #search-section-ask .docs-table-wrap {
   margin-top: 10px;
 }
