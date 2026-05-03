@@ -3938,6 +3938,13 @@ function hydrateInitialPageDataForCurrentView() {
     return true;
   }
 
+  if (currentViewId === "section-document" && initialData.document_detail?.document?.id) {
+    currentDocumentId = String(initialData.document_detail.document.id || "");
+    logActivity(`Opened document ${currentDocumentId}`);
+    initialPageDataConsumed.add(currentViewId);
+    return true;
+  }
+
   return false;
 }
 

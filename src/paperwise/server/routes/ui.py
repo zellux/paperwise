@@ -9,13 +9,14 @@ from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
 
 from paperwise.application.interfaces import DocumentRepository
-from paperwise.domain.models import DocumentStatus, LLMParseResult, User
+from paperwise.domain.models import DocumentHistoryEvent, DocumentStatus, LLMParseResult, User
 from paperwise.server.dependencies import (
     document_repository_dependency,
     optional_current_user_dependency,
 )
 from paperwise.server.routes.documents import (
     _document_sort_key,
+    _get_owned_document_or_404,
     _iter_filtered_documents,
     _normalized_sort_direction,
     _normalized_sort_field,
@@ -297,9 +298,71 @@ def _pending_initial_data(repository: DocumentRepository, current_user: User | N
     }
 
 
+def _document_detail_initial_data(
+    repository: DocumentRepository,
+    current_user: User | None,
+    document_id: str | None,
+) -> dict:
+    initial_data = _page_initial_data(current_user)
+    if current_user is None or not document_id:
+        return {**initial_data, "document_detail": None, "document_history": []}
+    document = _get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
+    parse_result = repository.get_parse_result(document.id)
+    item = _document_list_item(repository, document.id)
+    if item is None:
+        return {**initial_data, "document_detail": None, "document_history": []}
+    return {
+        **initial_data,
+        "document_detail": {
+            "document": item,
+            "ocr_text_preview": parse_result.text_preview if parse_result is not None else None,
+            "ocr_parsed_at": parse_result.created_at.isoformat() if parse_result is not None else None,
+        },
+        "document_history": [
+            _history_event_item(event)
+            for event in repository.list_history(document_id=document.id, limit=100)
+        ],
+    }
+
+
 def _replace_table_body(html: str, element_id: str, rows_html: str) -> str:
     pattern = re.compile(_TABLE_BODY_RE_TEMPLATE.format(element_id=re.escape(element_id)), re.DOTALL)
     return pattern.sub(rf"\1\n{rows_html}\n              \2", html, count=1)
+
+
+def _replace_element_text(html: str, element_id: str, value: str) -> str:
+    pattern = re.compile(
+        rf'(<(?P<tag>[a-z0-9]+)\b[^>]*\bid="{re.escape(element_id)}"[^>]*>).*?(</(?P=tag)>)',
+        re.DOTALL | re.IGNORECASE,
+    )
+    escaped_value = escape(value)
+    return pattern.sub(lambda match: f"{match.group(1)}{escaped_value}{match.group(3)}", html, count=1)
+
+
+def _replace_element_html(html: str, element_id: str, value: str) -> str:
+    pattern = re.compile(
+        rf'(<(?P<tag>[a-z0-9]+)\b[^>]*\bid="{re.escape(element_id)}"[^>]*>).*?(</(?P=tag)>)',
+        re.DOTALL | re.IGNORECASE,
+    )
+    return pattern.sub(lambda match: f"{match.group(1)}{value}{match.group(3)}", html, count=1)
+
+
+def _replace_input_value(html: str, element_id: str, value: str) -> str:
+    pattern = re.compile(
+        rf'(<input\b(?=[^>]*\bid="{re.escape(element_id)}")[^>]*)(\s*/?>)',
+        re.DOTALL | re.IGNORECASE,
+    )
+    escaped_value = escape(value, quote=True)
+
+    def replace(match: re.Match[str]) -> str:
+        start = re.sub(r'\svalue="[^"]*"', "", match.group(1), count=1)
+        return f'{start} value="{escaped_value}"{match.group(2)}'
+
+    return pattern.sub(replace, html, count=1)
 
 
 def _tag_rows_html(tag_stats: list[dict]) -> str:
@@ -352,6 +415,154 @@ def _document_title(item: dict) -> str:
         if title:
             return title
     return str(item.get("filename") or "Untitled document")
+
+
+def _history_event_item(event: DocumentHistoryEvent) -> dict:
+    return {
+        "id": event.id,
+        "document_id": event.document_id,
+        "event_type": event.event_type.value,
+        "actor_type": event.actor_type.value,
+        "actor_id": event.actor_id,
+        "source": event.source,
+        "changes": event.changes,
+        "created_at": event.created_at.isoformat(),
+    }
+
+
+def _format_status(value: str) -> str:
+    return str(value or "-").replace("_", " ").upper()
+
+
+def _format_bytes(value: int | None) -> str:
+    bytes_value = int(value or 0)
+    if bytes_value <= 0:
+        return "0 B"
+    kb = bytes_value / 1024
+    if kb < 1024:
+        return f"{kb:.1f} KB"
+    mb = kb / 1024
+    return f"{mb:.2f} MB"
+
+
+def _relative_blob_path(blob_uri: str | None) -> str:
+    value = str(blob_uri or "").strip()
+    if not value:
+        return "-"
+    if value.startswith("local://"):
+        return value.removeprefix("local://")
+    return value
+
+
+def _format_history_event_type(value: str) -> str:
+    labels = {
+        "metadata_changed": "Metadata changed",
+        "tags_added": "Tags added",
+        "tags_removed": "Tags removed",
+        "file_moved": "File moved",
+        "processing_restarted": "Processing restarted",
+        "processing_completed": "Processing completed",
+        "processing_failed": "Processing failed",
+    }
+    return labels.get(value, _format_status(value or "update"))
+
+
+def _format_history_actor(event: dict) -> str:
+    if event.get("actor_type") == "user":
+        return f"User: {event['actor_id']}" if event.get("actor_id") else "User"
+    return "System"
+
+
+def _stringify_history_value(value: object) -> str:
+    if value is None or value == "":
+        return "(empty)"
+    return str(value)
+
+
+def _history_change_lines(event: dict) -> list[str]:
+    changes = event.get("changes") if isinstance(event.get("changes"), dict) else {}
+    event_type = str(event.get("event_type") or "")
+    if event_type == "metadata_changed":
+        lines: list[str] = []
+        for field, values in changes.items():
+            field_values = values if isinstance(values, dict) else {}
+            before = _stringify_history_value(field_values.get("before"))
+            after = _stringify_history_value(field_values.get("after"))
+            lines.append(f"{field}: {before} -> {after}")
+        return lines
+    if event_type == "tags_added":
+        tags = changes.get("tags") if isinstance(changes.get("tags"), list) else []
+        return [f"Added: {', '.join(str(tag) for tag in tags)}" if tags else "Added tags"]
+    if event_type == "tags_removed":
+        tags = changes.get("tags") if isinstance(changes.get("tags"), list) else []
+        return [f"Removed: {', '.join(str(tag) for tag in tags)}" if tags else "Removed tags"]
+    if event_type == "file_moved":
+        return [
+            f"From: {_relative_blob_path(str(changes.get('from_blob_uri') or ''))}",
+            f"To: {_relative_blob_path(str(changes.get('to_blob_uri') or ''))}",
+        ]
+    if event_type == "processing_restarted":
+        status_change = changes.get("status") if isinstance(changes.get("status"), dict) else {}
+        before = _stringify_history_value(status_change.get("before"))
+        after = _stringify_history_value(status_change.get("after"))
+        return [f"Status: {before} -> {after}"]
+    if event_type == "processing_failed":
+        status_change = changes.get("status") if isinstance(changes.get("status"), dict) else {}
+        before = _stringify_history_value(status_change.get("before"))
+        after = _stringify_history_value(status_change.get("after"))
+        lines = [f"Status: {before} -> {after}"]
+        error = changes.get("error") if isinstance(changes.get("error"), dict) else {}
+        if error.get("type"):
+            lines.append(f"Error type: {_stringify_history_value(error.get('type'))}")
+        if error.get("message"):
+            lines.append(f"Error: {_stringify_history_value(error.get('message'))}")
+        return lines
+    if event_type == "processing_completed":
+        status_change = changes.get("status") if isinstance(changes.get("status"), dict) else {}
+        before = _stringify_history_value(status_change.get("before"))
+        after = _stringify_history_value(status_change.get("after"))
+        lines = [f"Status: {before} -> {after}"]
+        parse = changes.get("parse") if isinstance(changes.get("parse"), dict) else {}
+        if parse.get("parser"):
+            lines.append(f"OCR parser: {parse['parser']}")
+        metadata_parse = changes.get("metadata_parse") if isinstance(changes.get("metadata_parse"), dict) else {}
+        if metadata_parse.get("provider"):
+            lines.append(f"Metadata provider: {metadata_parse['provider']}")
+        if metadata_parse.get("model"):
+            lines.append(f"Metadata model: {metadata_parse['model']}")
+        total_tokens = metadata_parse.get("total_tokens")
+        if isinstance(total_tokens, int | float) and total_tokens > 0:
+            lines.append(f"Metadata tokens: {int(total_tokens):,}")
+        return lines
+    try:
+        return [json.dumps(changes, ensure_ascii=True)]
+    except TypeError:
+        return ["Details unavailable"]
+
+
+def _history_html(events: list[dict]) -> str:
+    if not events:
+        return '<p class="document-history-empty">No history entries yet.</p>'
+    items: list[str] = []
+    for event in events:
+        event_type = escape(_format_history_event_type(str(event.get("event_type") or "")))
+        actor = escape(_format_history_actor(event))
+        source = escape(str(event.get("source") or "-"))
+        created_at = escape(str(event.get("created_at") or "-"))
+        changes = "\n".join(
+            f'                <p class="document-history-change">{escape(line)}</p>'
+            for line in _history_change_lines(event)
+        )
+        items.append(
+            '              <article class="document-history-item">\n'
+            '                <div class="document-history-header">\n'
+            f'                  <span class="document-history-type">{event_type}</span>\n'
+            f'                  <span class="document-history-meta">{actor} | {source} | {created_at}</span>\n'
+            "                </div>\n"
+            f'                <div class="document-history-changes">\n{changes}\n                </div>\n'
+            "              </article>"
+        )
+    return "\n".join(items)
 
 
 def _activity_rows_html(documents: list[dict]) -> str:
@@ -434,7 +645,51 @@ def _document_rows_html(documents: list[dict]) -> str:
     return "\n".join(rows)
 
 
+def _status_badge_html(status_value: str) -> str:
+    status = str(status_value or "").lower()
+    label = escape(_format_status(status))
+    return f'<span class="status-badge status-{escape(status)}">{label}</span>'
+
+
+def _render_document_detail_data(html: str, initial_data: dict) -> str:
+    detail = initial_data.get("document_detail")
+    if not isinstance(detail, dict):
+        return html
+    document = detail.get("document") if isinstance(detail.get("document"), dict) else {}
+    metadata = document.get("llm_metadata") if isinstance(document.get("llm_metadata"), dict) else {}
+    tags = metadata.get("tags") if isinstance(metadata.get("tags"), list) else []
+    document_id = str(document.get("id") or "")
+    size_bytes = int(document.get("size_bytes") or 0)
+
+    html = _replace_element_text(html, "detailDocId", document_id or "-")
+    html = _replace_element_text(html, "detailOwnerId", str(document.get("owner_id") or "-"))
+    html = _replace_element_text(html, "detailFilename", str(document.get("filename") or "-"))
+    html = _replace_element_html(html, "detailStatus", _status_badge_html(str(document.get("status") or "")))
+    html = _replace_element_text(html, "detailCreatedAt", str(document.get("created_at") or "-"))
+    html = _replace_element_text(html, "detailOcrParsedAt", str(detail.get("ocr_parsed_at") or "-"))
+    html = _replace_element_text(html, "detailContentType", str(document.get("content_type") or "-"))
+    html = _replace_element_text(html, "detailSizeBytes", f"{_format_bytes(size_bytes)} ({size_bytes} bytes)")
+    html = _replace_element_text(html, "detailChecksum", str(document.get("checksum_sha256") or "-"))
+    html = _replace_element_text(html, "detailBlobUri", _relative_blob_path(str(document.get("blob_uri") or "")))
+    html = _replace_element_text(html, "detailOcrContent", str(detail.get("ocr_text_preview") or "").strip() or "-")
+
+    html = _replace_input_value(
+        html,
+        "metaTitle",
+        str(metadata.get("suggested_title") or document.get("filename") or ""),
+    )
+    html = _replace_input_value(html, "metaDate", str(metadata.get("document_date") or ""))
+    html = _replace_input_value(html, "metaCorrespondent", str(metadata.get("correspondent") or ""))
+    html = _replace_input_value(html, "metaType", str(metadata.get("document_type") or ""))
+    html = _replace_input_value(html, "metaTags", ", ".join(str(tag) for tag in tags))
+
+    history = initial_data.get("document_history") if isinstance(initial_data.get("document_history"), list) else []
+    html = _replace_element_html(html, "documentHistoryList", _history_html(history))
+    return html
+
+
 def _render_initial_page_data(html: str, initial_data: dict) -> str:
+    html = _render_document_detail_data(html, initial_data)
     if isinstance(initial_data.get("documents"), list):
         html = _replace_table_body(html, "docsTableBody", _document_rows_html(initial_data["documents"]))
         total = int(initial_data.get("documents_total") or 0)
@@ -606,8 +861,15 @@ def documents_page(
 
 
 @router.get("/ui/document", include_in_schema=False)
-def document_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
-    return _render_ui_page("section-document", initial_data=_page_initial_data(current_user))
+def document_page(
+    id: str | None = Query(None),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User | None = Depends(optional_current_user_dependency),
+) -> HTMLResponse:
+    return _render_ui_page(
+        "section-document",
+        initial_data=_document_detail_initial_data(repository, current_user, id),
+    )
 
 
 @router.get("/ui/tags", include_in_schema=False)

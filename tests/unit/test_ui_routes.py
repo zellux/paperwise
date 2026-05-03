@@ -4,7 +4,17 @@ import re
 
 from fastapi.testclient import TestClient
 
-from paperwise.domain.models import ChatThread, Document, DocumentStatus, LLMParseResult, UserPreference
+from paperwise.domain.models import (
+    ChatThread,
+    Document,
+    DocumentHistoryEvent,
+    DocumentStatus,
+    HistoryActorType,
+    HistoryEventType,
+    LLMParseResult,
+    ParseResult,
+    UserPreference,
+)
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from paperwise.server.dependencies import document_repository_dependency
 from paperwise.server.main import app
@@ -272,6 +282,31 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             document_type="Notice",
             tags=["Tax", "Finance"],
         )
+        repository.save_parse_result(
+            ParseResult(
+                document_id="doc-tax",
+                parser="test-parser",
+                status="success",
+                size_bytes=123,
+                page_count=1,
+                text_preview="OCR preview for the tax notice.",
+                created_at=datetime(2026, 5, 2, 1, 2, 3, tzinfo=UTC),
+            )
+        )
+        repository.append_history_events(
+            [
+                DocumentHistoryEvent(
+                    id="history-tax",
+                    document_id="doc-tax",
+                    event_type=HistoryEventType.METADATA_CHANGED,
+                    actor_type=HistoryActorType.USER,
+                    actor_id=user_id,
+                    source="test.ui",
+                    changes={"suggested_title": {"before": "", "after": "Tax Notice"}},
+                    created_at=datetime(2026, 5, 2, 1, 3, 4, tzinfo=UTC),
+                )
+            ]
+        )
         _save_ready_document(
             repository,
             doc_id="doc-bill",
@@ -298,6 +333,17 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "Processing: 0" in documents_html
         assert 'data-doc-id="doc-tax"' in documents_html
         assert "Tax Notice" in documents_html
+
+        detail_html = client.get("/ui/document?id=doc-tax").text
+        detail_payload = _initial_data_from_response(detail_html)
+        assert detail_payload["document_detail"]["document"]["id"] == "doc-tax"
+        assert detail_payload["document_detail"]["ocr_text_preview"] == "OCR preview for the tax notice."
+        assert detail_payload["document_history"][0]["id"] == "history-tax"
+        assert '<code id="detailDocId" class="document-detail-value">doc-tax</code>' in detail_html
+        assert re.search(r'<input\b[^>]*id="metaTitle"[^>]*value="Tax Notice"', detail_html)
+        assert "OCR preview for the tax notice." in detail_html
+        assert "Metadata changed" in detail_html
+        assert "suggested_title: (empty) -&gt; Tax Notice" in detail_html
 
         filtered_documents_html = client.get("/ui/documents?tag=Tax").text
         filtered_documents_payload = _initial_data_from_response(filtered_documents_html)
