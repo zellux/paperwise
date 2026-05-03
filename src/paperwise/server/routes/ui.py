@@ -56,11 +56,6 @@ def search_page() -> HTMLResponse:
     return _render_ui_page("section-search")
 
 
-@router.get("/ui/collections", include_in_schema=False)
-def collections_page() -> HTMLResponse:
-    return _render_ui_page("section-search")
-
-
 @router.get("/ui/grounded-qa", include_in_schema=False)
 def grounded_qa_page() -> HTMLResponse:
     return _render_ui_page("section-search")

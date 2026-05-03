@@ -13,21 +13,6 @@ const pageIndicator = document.getElementById("pageIndicator");
 const docsTotalLabel = document.getElementById("docsTotalLabel");
 const docsProcessingLabel = document.getElementById("docsProcessingLabel");
 const settingsForm = document.getElementById("settingsForm");
-const searchCollectionCreateForm = document.getElementById("searchCollectionCreateForm");
-const searchCollectionNameInput = document.getElementById("searchCollectionName");
-const searchCollectionDescriptionInput = document.getElementById("searchCollectionDescription");
-const searchRefreshCollectionsBtn = document.getElementById("searchRefreshCollectionsBtn");
-const searchScopeSelect = document.getElementById("searchScopeSelect");
-const searchUseAllScopeBtn = document.getElementById("searchUseAllScopeBtn");
-const searchScopeTagsInput = document.getElementById("searchScopeTagsInput");
-const searchScopeTypesInput = document.getElementById("searchScopeTypesInput");
-const collectionsTableBody = document.getElementById("collectionsTableBody");
-const searchCollectionDocsLabel = document.getElementById("searchCollectionDocsLabel");
-const searchCollectionDocsCount = document.getElementById("searchCollectionDocsCount");
-const searchCollectionDocFilter = document.getElementById("searchCollectionDocFilter");
-const searchCollectionDocPicker = document.getElementById("searchCollectionDocPicker");
-const searchCollectionDocsTableBody = document.getElementById("searchCollectionDocsTableBody");
-const searchAddDocsBtn = document.getElementById("searchAddDocsBtn");
 const searchKeywordForm = document.getElementById("searchKeywordForm");
 const searchKeywordInput = document.getElementById("searchKeywordInput");
 const searchKeywordLimitSelect = document.getElementById("searchKeywordLimitSelect");
@@ -146,7 +131,6 @@ const VIEW_PARAM_TO_ID = Object.fromEntries(
 const PATH_TO_VIEW_ID = {
   "/ui/documents": "section-docs",
   "/ui/document": "section-document",
-  "/ui/collections": "section-search",
   "/ui/search": "section-search",
   "/ui/grounded-qa": "section-search",
   "/ui/tags": "section-tags",
@@ -232,11 +216,6 @@ let pendingDocsRequestSeq = 0;
 let processedActivityRequestSeq = 0;
 let tagStatsRequestSeq = 0;
 let documentTypeStatsRequestSeq = 0;
-let searchCollectionsRequestSeq = 0;
-let searchDocsCatalogRequestSeq = 0;
-let searchCollectionDocsRequestSeq = 0;
-let searchCollections = [];
-let searchDocsCatalog = [];
 let searchAskMessagesState = [];
 let searchAskInFlight = false;
 let searchAskMessageSeq = 0;
@@ -246,14 +225,11 @@ let searchAskThreadId = "";
 let searchAskThreads = [];
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
-let searchSelectedCollectionId = "";
-let searchSelectedCollectionDocumentIds = [];
 let searchActiveSectionId = "search-section-keyword";
 let settingsActiveSectionId = "settings-section-display";
 let uploadInProgress = false;
 let uploadSelectionContext = { source: "files", folderName: "" };
 const PATH_TO_SEARCH_SECTION_ID = {
-  "/ui/collections": "search-section-keyword",
   "/ui/search": "search-section-keyword",
   "/ui/grounded-qa": "search-section-ask",
 };
@@ -1699,22 +1675,15 @@ function clearSession() {
     document_type: [],
     status: ["ready"],
   });
-  searchCollections = [];
-  searchDocsCatalog = [];
   searchAskMessagesState = [];
   searchAskCurrentTokens = 0;
   searchAskThreadId = "";
   searchAskThreads = [];
-  searchSelectedCollectionId = "";
-  searchSelectedCollectionDocumentIds = [];
   searchActiveSectionId = "search-section-keyword";
   currentViewId = "section-docs";
   setActiveSearchSection(searchActiveSectionId);
-  renderSearchScopeOptions();
   renderSearchAskTokenUsage();
   renderSearchAskThreadSelect();
-  renderCollectionsTable();
-  renderSearchCollectionDocumentsTable();
   renderSearchResultsTable({ hits: [] });
   renderSearchResultsMeta("No search run yet.");
   renderSearchAskMessages();
@@ -1792,9 +1761,8 @@ function setActiveSearchSection(sectionId) {
   for (const section of searchSubsections) {
     section.classList.toggle("view-hidden", section.id !== nextSectionId);
   }
-  const showSharedHeader = nextSectionId === "search-section-collections";
-  searchSectionHeading?.classList.toggle("view-hidden", !showSharedHeader);
-  searchResultsMeta?.classList.toggle("view-hidden", !showSharedHeader);
+  searchSectionHeading?.classList.add("view-hidden");
+  searchResultsMeta?.classList.toggle("view-hidden", nextSectionId !== "search-section-keyword");
 }
 
 function setActiveSettingsSection(sectionId) {
@@ -1849,7 +1817,7 @@ function compareSortValues(left, right) {
   });
 }
 
-function sortCollection(items, sortState, valueGetters) {
+function sortRows(items, sortState, valueGetters) {
   const sorted = [...items];
   if (!sortState.field || !sortState.direction) {
     return sorted;
@@ -2610,7 +2578,7 @@ function renderDocsList(documents) {
 }
 
 function renderTagsList(tagStats) {
-  const sortedTagStats = sortCollection(tagStats, tagStatsSort, {
+  const sortedTagStats = sortRows(tagStats, tagStatsSort, {
     tag: (item) => item.tag,
     document_count: (item) => item.document_count,
   });
@@ -2660,7 +2628,7 @@ function renderTagsList(tagStats) {
 }
 
 function renderDocumentTypesList(typeStats) {
-  const sortedTypeStats = sortCollection(typeStats, documentTypesSort, {
+  const sortedTypeStats = sortRows(typeStats, documentTypesSort, {
     document_type: (item) => item.document_type,
     document_count: (item) => item.document_count,
   });
@@ -2822,244 +2790,6 @@ function renderProcessedDocsActivity(documents) {
     row.appendChild(actionCell);
     processedDocsTableBody.appendChild(row);
   }
-}
-
-function getCollectionById(collectionId) {
-  if (!collectionId) {
-    return null;
-  }
-  return searchCollections.find((item) => item.id === collectionId) || null;
-}
-
-function getSearchScopeLabel() {
-  return "All Documents";
-}
-
-function parseScopeList(value) {
-  const seen = new Set();
-  const output = [];
-  for (const part of String(value || "").split(",")) {
-    const cleaned = part.trim();
-    if (!cleaned) {
-      continue;
-    }
-    const key = cleaned.toLowerCase();
-    if (seen.has(key)) {
-      continue;
-    }
-    seen.add(key);
-    output.push(cleaned);
-  }
-  return output;
-}
-
-function readSearchScopeFilters() {
-  return {};
-}
-
-function formatSearchScopeSummary() {
-  return "All Documents";
-}
-
-function getSearchCatalogTitle(doc) {
-  if (doc.llm_metadata && doc.llm_metadata.suggested_title) {
-    return doc.llm_metadata.suggested_title;
-  }
-  return doc.filename || doc.id;
-}
-
-function renderSearchScopeOptions() {
-  if (!searchScopeSelect) {
-    return;
-  }
-  searchScopeSelect.innerHTML = "";
-  const allOption = document.createElement("option");
-  allOption.value = "";
-  allOption.textContent = "All Documents";
-  searchScopeSelect.appendChild(allOption);
-  for (const collection of searchCollections) {
-    const option = document.createElement("option");
-    option.value = collection.id;
-    option.textContent = `${collection.name} (${collection.document_count})`;
-    searchScopeSelect.appendChild(option);
-  }
-  searchScopeSelect.value = searchSelectedCollectionId;
-  if (searchUseAllScopeBtn) {
-    searchUseAllScopeBtn.disabled = !searchSelectedCollectionId;
-  }
-}
-
-function renderCollectionsTable() {
-  if (!collectionsTableBody) {
-    return;
-  }
-  if (!searchCollections.length) {
-    collectionsTableBody.innerHTML = '<tr><td colspan="3">No collections yet.</td></tr>';
-    return;
-  }
-  collectionsTableBody.innerHTML = "";
-  for (const collection of searchCollections) {
-    const row = document.createElement("tr");
-
-    const nameCell = document.createElement("td");
-    nameCell.setAttribute("data-label", "Name");
-    nameCell.textContent = collection.name;
-
-    const countCell = document.createElement("td");
-    countCell.setAttribute("data-label", "Documents");
-    countCell.textContent = String(collection.document_count || 0);
-
-    const actionCell = document.createElement("td");
-    actionCell.setAttribute("data-label", "Action");
-    const actionsWrap = document.createElement("div");
-    actionsWrap.className = "table-actions";
-
-    actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "eye",
-        label: `Use collection ${collection.name}`,
-        onClick: async () => {
-          searchSelectedCollectionId = collection.id;
-          renderSearchScopeOptions();
-          await loadSearchCollectionDocuments(collection.id);
-          logActivity(`Using collection scope: ${collection.name}`);
-        },
-      })
-    );
-    actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "file-text",
-        label: `Manage documents in ${collection.name}`,
-        onClick: async () => {
-          searchSelectedCollectionId = collection.id;
-          renderSearchScopeOptions();
-          await loadSearchCollectionDocuments(collection.id);
-        },
-      })
-    );
-    actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "trash",
-        label: `Delete collection ${collection.name}`,
-        onClick: async () => {
-          const confirmed = window.confirm(`Delete collection "${collection.name}"?`);
-          if (!confirmed) {
-            return;
-          }
-          await deleteSearchCollection(collection.id);
-        },
-      })
-    );
-    actionCell.appendChild(actionsWrap);
-
-    row.appendChild(nameCell);
-    row.appendChild(countCell);
-    row.appendChild(actionCell);
-    collectionsTableBody.appendChild(row);
-  }
-}
-
-function renderSearchCollectionDocPicker() {
-  if (!searchCollectionDocPicker) {
-    return;
-  }
-  searchCollectionDocPicker.innerHTML = "";
-  if (!searchSelectedCollectionId) {
-    searchCollectionDocPicker.disabled = true;
-    return;
-  }
-  searchCollectionDocPicker.disabled = false;
-  const selectedIds = new Set(searchSelectedCollectionDocumentIds);
-  const filterText = String(searchCollectionDocFilter?.value || "").trim().toLowerCase();
-  let visibleOptions = 0;
-  for (const doc of searchDocsCatalog) {
-    const title = getSearchCatalogTitle(doc);
-    const filename = String(doc.filename || "");
-    if (
-      filterText &&
-      !title.toLowerCase().includes(filterText) &&
-      !filename.toLowerCase().includes(filterText)
-    ) {
-      continue;
-    }
-    const option = document.createElement("option");
-    option.value = doc.id;
-    option.textContent = title;
-    option.disabled = selectedIds.has(doc.id);
-    searchCollectionDocPicker.appendChild(option);
-    visibleOptions += 1;
-  }
-  if (visibleOptions === 0) {
-    const option = document.createElement("option");
-    option.value = "";
-    option.textContent = "No matching documents";
-    option.disabled = true;
-    searchCollectionDocPicker.appendChild(option);
-  }
-}
-
-function renderSearchCollectionDocumentsTable() {
-  if (!searchCollectionDocsTableBody || !searchCollectionDocsLabel || !searchCollectionDocsCount) {
-    return;
-  }
-  if (!searchSelectedCollectionId) {
-    searchCollectionDocsLabel.textContent = "Select a collection to manage document scope.";
-    searchCollectionDocsCount.textContent = "Documents in collection: 0";
-    searchCollectionDocsTableBody.innerHTML = '<tr><td colspan="2">No collection selected.</td></tr>';
-    if (searchAddDocsBtn) {
-      searchAddDocsBtn.disabled = true;
-    }
-    renderSearchCollectionDocPicker();
-    return;
-  }
-  const collection = getCollectionById(searchSelectedCollectionId);
-  searchCollectionDocsLabel.textContent = collection
-    ? `Editing collection: ${collection.name}`
-    : "Editing selected collection";
-  searchCollectionDocsCount.textContent = `Documents in collection: ${searchSelectedCollectionDocumentIds.length}`;
-  if (searchAddDocsBtn) {
-    searchAddDocsBtn.disabled = false;
-  }
-  if (!searchSelectedCollectionDocumentIds.length) {
-    searchCollectionDocsTableBody.innerHTML = '<tr><td colspan="2">No documents in this collection.</td></tr>';
-    renderSearchCollectionDocPicker();
-    return;
-  }
-  const byId = new Map(searchDocsCatalog.map((doc) => [doc.id, doc]));
-  searchCollectionDocsTableBody.innerHTML = "";
-  for (const documentId of searchSelectedCollectionDocumentIds) {
-    const row = document.createElement("tr");
-    const doc = byId.get(documentId);
-    const title = doc ? getSearchCatalogTitle(doc) : documentId;
-    const titleCell = document.createElement("td");
-    titleCell.setAttribute("data-label", "Document");
-    const titleBtn = document.createElement("button");
-    titleBtn.type = "button";
-    titleBtn.className = "link-button";
-    titleBtn.textContent = title;
-    titleBtn.addEventListener("click", () => navigateToDocument(documentId));
-    titleCell.appendChild(titleBtn);
-
-    const actionCell = document.createElement("td");
-    actionCell.setAttribute("data-label", "Action");
-    const actionsWrap = document.createElement("div");
-    actionsWrap.className = "table-actions";
-    actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "trash",
-        label: "Remove from collection",
-        onClick: async () => {
-          await removeDocumentFromSearchCollection(searchSelectedCollectionId, documentId);
-        },
-      })
-    );
-    actionCell.appendChild(actionsWrap);
-
-    row.appendChild(titleCell);
-    row.appendChild(actionCell);
-    searchCollectionDocsTableBody.appendChild(row);
-  }
-  renderSearchCollectionDocPicker();
 }
 
 function renderSearchResultsMeta(message) {
@@ -3769,195 +3499,7 @@ function setButtonBusy(button, busy, busyLabel = "Loading...") {
   }
 }
 
-async function fetchAllDocumentsForSearchCatalog() {
-  const limit = 200;
-  const maxDocuments = 5000;
-  let offset = 0;
-  let allDocuments = [];
-  while (offset < maxDocuments) {
-    const response = await apiFetch(`/documents?limit=${limit}&offset=${offset}`);
-    const payload = await response.json();
-    if (!response.ok) {
-      throw new Error(payload.detail || response.statusText);
-    }
-    const page = Array.isArray(payload) ? payload : [];
-    allDocuments = allDocuments.concat(page);
-    if (page.length < limit) {
-      break;
-    }
-    offset += limit;
-  }
-  return allDocuments.slice(0, maxDocuments);
-}
-
-async function loadSearchCollections() {
-  const requestSeq = ++searchCollectionsRequestSeq;
-  renderTableLoading(collectionsTableBody, 3, "Loading collections...");
-  const response = await apiFetch("/collections");
-  if (requestSeq !== searchCollectionsRequestSeq) {
-    return;
-  }
-  const payload = await response.json();
-  if (requestSeq !== searchCollectionsRequestSeq) {
-    return;
-  }
-  if (!response.ok) {
-    logActivity(`Collections load failed: ${payload.detail || response.statusText}`);
-    collectionsTableBody.innerHTML = '<tr><td colspan="3">Failed to load collections.</td></tr>';
-    return;
-  }
-  searchCollections = Array.isArray(payload) ? payload : [];
-  if (searchSelectedCollectionId && !getCollectionById(searchSelectedCollectionId)) {
-    searchSelectedCollectionId = "";
-    searchSelectedCollectionDocumentIds = [];
-  }
-  renderSearchScopeOptions();
-  renderCollectionsTable();
-  renderSearchCollectionDocumentsTable();
-  renderSearchResultsMeta(formatSearchScopeSummary());
-}
-
-async function loadSearchDocumentsCatalog() {
-  const requestSeq = ++searchDocsCatalogRequestSeq;
-  if (searchCollectionDocPicker) {
-    searchCollectionDocPicker.innerHTML = "";
-    searchCollectionDocPicker.disabled = true;
-  }
-  try {
-    const payload = await fetchAllDocumentsForSearchCatalog();
-    if (requestSeq !== searchDocsCatalogRequestSeq) {
-      return;
-    }
-    searchDocsCatalog = payload;
-  } catch (error) {
-    if (requestSeq !== searchDocsCatalogRequestSeq) {
-      return;
-    }
-    logActivity(`Search document catalog load failed: ${error.message}`);
-    searchDocsCatalog = [];
-  }
-  renderSearchCollectionDocPicker();
-}
-
-async function loadSearchCollectionDocuments(collectionId) {
-  searchSelectedCollectionId = collectionId || "";
-  if (!searchSelectedCollectionId) {
-    searchSelectedCollectionDocumentIds = [];
-    renderSearchScopeOptions();
-    renderSearchCollectionDocumentsTable();
-    return;
-  }
-  const requestSeq = ++searchCollectionDocsRequestSeq;
-  renderSearchScopeOptions();
-  renderTableLoading(searchCollectionDocsTableBody, 2, "Loading collection documents...");
-  const response = await apiFetch(`/collections/${searchSelectedCollectionId}/documents`);
-  if (requestSeq !== searchCollectionDocsRequestSeq) {
-    return;
-  }
-  const payload = await response.json();
-  if (requestSeq !== searchCollectionDocsRequestSeq) {
-    return;
-  }
-  if (!response.ok) {
-    logActivity(`Collection documents load failed: ${payload.detail || response.statusText}`);
-    searchSelectedCollectionDocumentIds = [];
-    renderSearchCollectionDocumentsTable();
-    return;
-  }
-  searchSelectedCollectionDocumentIds = Array.isArray(payload.document_ids) ? payload.document_ids : [];
-  renderSearchCollectionDocumentsTable();
-}
-
-async function createSearchCollection() {
-  const name = String(searchCollectionNameInput?.value || "").trim();
-  const description = String(searchCollectionDescriptionInput?.value || "").trim();
-  if (!name) {
-    logActivity("Collection name is required.");
-    return;
-  }
-  setButtonBusy(searchCollectionCreateForm?.querySelector("button[type='submit']"), true, "Creating...");
-  try {
-    const response = await apiFetch("/collections", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, description }),
-    });
-    const payload = await response.json();
-    if (!response.ok) {
-      logActivity(`Collection create failed: ${payload.detail || response.statusText}`);
-      return;
-    }
-    if (searchCollectionNameInput) {
-      searchCollectionNameInput.value = "";
-    }
-    if (searchCollectionDescriptionInput) {
-      searchCollectionDescriptionInput.value = "";
-    }
-    searchSelectedCollectionId = payload.id || "";
-    await loadSearchCollections();
-    await loadSearchCollectionDocuments(searchSelectedCollectionId);
-    logActivity(`Created collection: ${payload.name}`);
-  } finally {
-    setButtonBusy(searchCollectionCreateForm?.querySelector("button[type='submit']"), false);
-  }
-}
-
-async function deleteSearchCollection(collectionId) {
-  const response = await apiFetch(`/collections/${collectionId}`, { method: "DELETE" });
-  if (!response.ok) {
-    const payload = await response.json().catch(() => ({}));
-    logActivity(`Collection delete failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-  if (searchSelectedCollectionId === collectionId) {
-    searchSelectedCollectionId = "";
-    searchSelectedCollectionDocumentIds = [];
-  }
-  await loadSearchCollections();
-  logActivity("Collection deleted.");
-}
-
-async function addDocumentsToSearchCollection() {
-  if (!searchSelectedCollectionId || !searchCollectionDocPicker) {
-    return;
-  }
-  const pickedIds = [...searchCollectionDocPicker.selectedOptions].map((option) => option.value);
-  if (!pickedIds.length) {
-    logActivity("Select one or more documents to add.");
-    return;
-  }
-  const merged = [...new Set([...searchSelectedCollectionDocumentIds, ...pickedIds])];
-  const response = await apiFetch(`/collections/${searchSelectedCollectionId}/documents`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ document_ids: merged }),
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Add to collection failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-  searchSelectedCollectionDocumentIds = Array.isArray(payload.document_ids) ? payload.document_ids : [];
-  await loadSearchCollections();
-  renderSearchCollectionDocumentsTable();
-  logActivity(`Added ${pickedIds.length} document(s) to collection.`);
-}
-
-async function removeDocumentFromSearchCollection(collectionId, documentId) {
-  const response = await apiFetch(`/collections/${collectionId}/documents/${documentId}`, {
-    method: "DELETE",
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Remove from collection failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-  searchSelectedCollectionDocumentIds = Array.isArray(payload.document_ids) ? payload.document_ids : [];
-  await loadSearchCollections();
-  renderSearchCollectionDocumentsTable();
-}
-
-async function runScopedKeywordSearch() {
+async function runKeywordSearch() {
   const query = String(searchKeywordInput?.value || "").trim();
   if (!query) {
     renderSearchResultsMeta("Enter a query.");
@@ -4192,7 +3734,7 @@ async function runSearchAskStream(requestBody, pendingMessage, activityMessage) 
   return finalPayload;
 }
 
-async function runScopedAsk() {
+async function runAsk() {
   const question = String(searchAskQuestion?.value || "").trim();
   if (searchAskInFlight) {
     appendSearchAskStatus("Still working", "Wait for the current request to finish.");
@@ -4275,12 +3817,8 @@ async function runScopedAsk() {
 }
 
 async function initializeSearchView() {
-  searchCollections = [];
-  searchSelectedCollectionId = "";
-  searchSelectedCollectionDocumentIds = [];
-  await Promise.all([loadSearchDocumentsCatalog(), loadSearchAskThreads()]);
+  await loadSearchAskThreads();
   setActiveSearchSection(searchActiveSectionId);
-  renderSearchCollectionDocumentsTable();
   renderSearchResultsMeta("Ready.");
 }
 
@@ -4745,53 +4283,14 @@ brandHomeBtn?.addEventListener("click", () => {
   window.location.href = "/ui/documents";
 });
 
-searchCollectionCreateForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await createSearchCollection();
-});
-
-searchRefreshCollectionsBtn?.addEventListener("click", async () => {
-  await initializeSearchView();
-  logActivity("Search collections refreshed.");
-});
-
-searchScopeSelect?.addEventListener("change", async () => {
-  searchSelectedCollectionId = String(searchScopeSelect.value || "");
-  await loadSearchCollectionDocuments(searchSelectedCollectionId);
-});
-
-searchUseAllScopeBtn?.addEventListener("click", async () => {
-  searchSelectedCollectionId = "";
-  renderSearchScopeOptions();
-  await loadSearchCollectionDocuments("");
-  renderSearchResultsMeta(`Scope set. ${formatSearchScopeSummary()}`);
-  logActivity("Search scope set to all documents.");
-});
-
-searchScopeTagsInput?.addEventListener("input", () => {
-  renderSearchResultsMeta(formatSearchScopeSummary());
-});
-
-searchScopeTypesInput?.addEventListener("input", () => {
-  renderSearchResultsMeta(formatSearchScopeSummary());
-});
-
-searchCollectionDocFilter?.addEventListener("input", () => {
-  renderSearchCollectionDocPicker();
-});
-
-searchAddDocsBtn?.addEventListener("click", async () => {
-  await addDocumentsToSearchCollection();
-});
-
 searchKeywordForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  await runScopedKeywordSearch();
+  await runKeywordSearch();
 });
 
 searchAskForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
-  await runScopedAsk();
+  await runAsk();
 });
 
 searchAskNewChatBtn?.addEventListener("click", () => {
@@ -4808,7 +4307,7 @@ searchAskQuestion?.addEventListener("keydown", async (event) => {
     return;
   }
   event.preventDefault();
-  await runScopedAsk();
+  await runAsk();
 });
 
 function autoResizeChatTextarea(el) {

@@ -1128,29 +1128,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   grid-column: 1 / -1;
 }
 
-.search-shared-scope {
-  border: 1px solid var(--stroke-soft);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.58);
-  padding: 12px;
-  margin-bottom: 12px;
-}
-
-.search-scope-filters {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
 .search-subsection.view-hidden {
   display: none;
-}
-
-.search-layout {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 12px;
 }
 
 .search-card {
@@ -1182,22 +1161,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   margin: 0 0 10px;
   color: var(--ink-soft);
   font-size: 0.84rem;
-}
-
-.search-scope-row {
-  display: grid;
-  gap: 6px;
-  margin: 0 0 10px;
-}
-
-.search-scope-actions {
-  margin-bottom: 8px;
-}
-
-.search-debug-output {
-  margin-top: 10px;
-  max-height: 320px;
-  overflow: auto;
 }
 
 .chat-header-row {
@@ -1517,13 +1480,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     gap: 12px;
   }
 
-  .search-layout {
-    grid-template-columns: 1fr;
-  }
-
-  .search-scope-filters {
-    grid-template-columns: 1fr;
-  }
 }
 
 .settings-inline-status {
