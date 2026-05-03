@@ -252,8 +252,12 @@ def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> No
         assert '<html lang="en" class="has-session">' in response.text
         payload = _initial_data_from_response(response.text)
         assert payload["authenticated"] is True
+        assert payload["current_user"]["email"] == "chat-ui@example.com"
         assert payload["chat_threads"][0]["id"] == "thread-ui"
         assert payload["chat_threads"][0]["title"] == "Server rendered chat"
+
+        search_payload = _initial_data_from_response(client.get("/ui/search").text)
+        assert search_payload["chat_threads"][0]["id"] == "thread-ui"
     finally:
         app.dependency_overrides.clear()
 
@@ -329,6 +333,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         documents_payload = _initial_data_from_response(documents_html)
         assert documents_payload["documents_total"] == 2
         assert documents_payload["documents_processing_count"] == 0
+        assert documents_payload["user_preferences"]["llm_total_tokens_processed"] == 42
         assert "Total documents: 2" in documents_html
         assert "Processing: 0" in documents_html
         assert 'data-doc-id="doc-tax"' in documents_html
@@ -394,8 +399,13 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         pending_html = client.get("/ui/pending").text
         pending_payload = _initial_data_from_response(pending_html)
         assert pending_payload["pending_documents"][0]["id"] == "doc-pending"
+        assert pending_payload["current_user"]["email"] == "catalog-ui@example.com"
         assert 'data-pending-doc-id="doc-pending"' in pending_html
         assert "Pending File" in pending_html
         assert '<span class="status-badge status-processing">PROCESSING</span>' in pending_html
+
+        settings_payload = _initial_data_from_response(client.get("/ui/settings/models").text)
+        assert settings_payload["current_user"]["email"] == "catalog-ui@example.com"
+        assert settings_payload["user_preferences"]["llm_total_tokens_processed"] == 42
     finally:
         app.dependency_overrides.clear()

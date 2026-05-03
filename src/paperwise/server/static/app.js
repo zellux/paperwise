@@ -196,6 +196,7 @@ let searchAskThreads = [];
 let initialDataCache;
 const initialPageDataConsumed = new Set();
 let initialChatThreadsConsumed = false;
+let initialUserPreferencesConsumed = false;
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
 let searchActiveSectionId = "search-section-keyword";
@@ -1063,6 +1064,16 @@ async function loadUserPreferences() {
   if (!currentUser) {
     return {};
   }
+  const initialData = readInitialData();
+  if (
+    !initialUserPreferencesConsumed &&
+    initialData.authenticated === true &&
+    initialData.user_preferences &&
+    typeof initialData.user_preferences === "object"
+  ) {
+    initialUserPreferencesConsumed = true;
+    return initialData.user_preferences;
+  }
   try {
     const response = await apiFetch("/users/me/preferences");
     const payload = await response.json();
@@ -1657,6 +1668,12 @@ async function apiFetch(url, options = {}) {
 }
 
 async function restoreSession() {
+  const initialData = readInitialData();
+  if (initialData.authenticated === true && initialData.current_user) {
+    currentUser = initialData.current_user;
+    renderSessionState();
+    return;
+  }
   try {
     const response = await apiFetch("/users/me");
     if (!response.ok) {
@@ -2351,6 +2368,21 @@ async function deleteDocumentById(documentId, options = {}) {
   await loadDataForCurrentView();
 
   logActivity(`Deleted document ${documentId}.`);
+  return true;
+}
+
+function hydrateSettingsFormFromInitialPreferences() {
+  const initialData = readInitialData();
+  if (
+    initialData.authenticated !== true ||
+    !initialData.user_preferences ||
+    typeof initialData.user_preferences !== "object"
+  ) {
+    return false;
+  }
+  applyUserPreferences(initialData.user_preferences);
+  renderSettingsForm();
+  syncUploadAvailability();
   return true;
 }
 
@@ -4047,7 +4079,9 @@ async function loadDataForCurrentView() {
     return;
   }
   if (currentViewId === "section-settings") {
-    renderSettingsForm();
+    if (!hydrateSettingsFormFromInitialPreferences()) {
+      renderSettingsForm();
+    }
     return;
   }
   if (currentViewId === "section-upload") {

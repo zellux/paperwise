@@ -70,8 +70,24 @@ _PAGE_SCRIPTS_BY_VIEW = {
 }
 
 
-def _page_initial_data(current_user: User | None) -> dict:
-    return {"authenticated": current_user is not None}
+def _page_initial_data(
+    current_user: User | None,
+    repository: DocumentRepository | None = None,
+) -> dict:
+    initial_data: dict = {"authenticated": current_user is not None}
+    if current_user is None:
+        return initial_data
+    initial_data["current_user"] = {
+        "id": current_user.id,
+        "email": current_user.email,
+        "full_name": current_user.full_name,
+        "is_active": current_user.is_active,
+        "created_at": current_user.created_at.isoformat(),
+    }
+    if repository is not None:
+        preference = repository.get_user_preference(current_user.id)
+        initial_data["user_preferences"] = preference.preferences if preference is not None else {}
+    return initial_data
 
 
 def _title_case_taxonomy_value(value: str) -> str:
@@ -130,7 +146,7 @@ def _owner_llm_results(repository: DocumentRepository, current_user: User) -> li
 
 
 def _tag_stats_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
-    initial_data = _page_initial_data(current_user)
+    initial_data = _page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "tag_stats": []}
     counts: dict[str, int] = {}
@@ -160,7 +176,7 @@ def _tag_stats_initial_data(repository: DocumentRepository, current_user: User |
 
 
 def _document_type_stats_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
-    initial_data = _page_initial_data(current_user)
+    initial_data = _page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "document_type_stats": []}
     counts: dict[str, int] = {}
@@ -185,7 +201,7 @@ def _document_type_stats_initial_data(repository: DocumentRepository, current_us
 
 
 def _activity_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
-    initial_data = _page_initial_data(current_user)
+    initial_data = _page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "activity_documents": [], "activity_total_tokens": 0}
     ready_documents = [
@@ -222,7 +238,7 @@ def _documents_initial_data(
     document_type: list[str] | None = None,
     status: list[str] | None = None,
 ) -> dict:
-    initial_data = _page_initial_data(current_user)
+    initial_data = _page_initial_data(current_user, repository)
     normalized_page = max(1, int(page or 1))
     normalized_page_size = min(100, max(1, int(page_size or 20)))
     if current_user is None:
@@ -280,7 +296,7 @@ def _documents_initial_data(
 
 
 def _pending_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
-    initial_data = _page_initial_data(current_user)
+    initial_data = _page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "pending_documents": []}
     pending_documents = [
@@ -303,7 +319,7 @@ def _document_detail_initial_data(
     current_user: User | None,
     document_id: str | None,
 ) -> dict:
-    initial_data = _page_initial_data(current_user)
+    initial_data = _page_initial_data(current_user, repository)
     if current_user is None or not document_id:
         return {**initial_data, "document_detail": None, "document_history": []}
     document = _get_owned_document_or_404(
@@ -758,10 +774,10 @@ def _render_active_nav(html: str, active_href: str) -> str:
 
 def _chat_thread_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     if current_user is None:
-        return {**_page_initial_data(current_user), "chat_threads": []}
+        return {**_page_initial_data(current_user, repository), "chat_threads": []}
     _migrate_legacy_chat_threads(repository, current_user)
     return {
-        **_page_initial_data(current_user),
+        **_page_initial_data(current_user, repository),
         "chat_threads": [
             {
                 "id": thread.id,
@@ -892,8 +908,11 @@ def document_types_page(
 
 
 @router.get("/ui/search", include_in_schema=False)
-def search_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
-    return _render_ui_page("section-search", initial_data=_page_initial_data(current_user))
+def search_page(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User | None = Depends(optional_current_user_dependency),
+) -> HTMLResponse:
+    return _render_ui_page("section-search", initial_data=_chat_thread_initial_data(repository, current_user))
 
 
 @router.get("/ui/grounded-qa", include_in_schema=False)
@@ -917,8 +936,11 @@ def pending_page(
 
 
 @router.get("/ui/upload", include_in_schema=False)
-def upload_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
-    return _render_ui_page("section-upload", initial_data=_page_initial_data(current_user))
+def upload_page(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User | None = Depends(optional_current_user_dependency),
+) -> HTMLResponse:
+    return _render_ui_page("section-upload", initial_data=_page_initial_data(current_user, repository))
 
 
 @router.get("/ui/activity", include_in_schema=False)
@@ -930,23 +952,35 @@ def activity_page(
 
 
 @router.get("/ui/settings", include_in_schema=False)
-def settings_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
-    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user))
+def settings_page(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User | None = Depends(optional_current_user_dependency),
+) -> HTMLResponse:
+    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user, repository))
 
 
 @router.get("/ui/settings/account", include_in_schema=False)
-def settings_account_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
-    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user))
+def settings_account_page(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User | None = Depends(optional_current_user_dependency),
+) -> HTMLResponse:
+    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user, repository))
 
 
 @router.get("/ui/settings/display", include_in_schema=False)
-def settings_display_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
-    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user))
+def settings_display_page(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User | None = Depends(optional_current_user_dependency),
+) -> HTMLResponse:
+    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user, repository))
 
 
 @router.get("/ui/settings/models", include_in_schema=False)
-def settings_models_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
-    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user))
+def settings_models_page(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User | None = Depends(optional_current_user_dependency),
+) -> HTMLResponse:
+    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user, repository))
 
 
 @router.get("/style-lab", include_in_schema=False)
