@@ -142,6 +142,21 @@ def test_ui_routes_render_active_nav_server_side() -> None:
         assert active_links == [active_href]
 
 
+def test_ui_routes_load_page_specific_scripts() -> None:
+    client = TestClient(app)
+
+    assert "/static/documents.js" in client.get("/ui/documents").text
+    assert "/static/document.js" in client.get("/ui/document").text
+    assert "/static/search.js" in client.get("/ui/search").text
+    assert "/static/search.js" in client.get("/ui/grounded-qa").text
+    assert "/static/catalog.js" in client.get("/ui/tags").text
+    assert "/static/catalog.js" in client.get("/ui/document-types").text
+    assert "/static/pending.js" in client.get("/ui/pending").text
+    assert "/static/upload.js" in client.get("/ui/upload").text
+    assert "/static/settings.js" in client.get("/ui/settings").text
+    assert "/static/pending.js" not in client.get("/ui/documents").text
+
+
 def test_static_assets_serve_clickable_tag_ui() -> None:
     client = TestClient(app)
 

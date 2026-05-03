@@ -1,0 +1,92 @@
+documentMetaForm?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!currentDocumentId) {
+    logActivity("No document selected.");
+    return;
+  }
+
+  const response = await apiFetch(`/documents/${currentDocumentId}/metadata`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      suggested_title: metaTitleInput.value.trim(),
+      document_date: metaDateInput.value || null,
+      correspondent: metaCorrespondentInput.value.trim(),
+      document_type: metaTypeInput.value.trim(),
+      tags: splitTags(metaTagsInput.value),
+    }),
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Metadata save failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+
+  logActivity(`Saved metadata for ${currentDocumentId}`);
+  await openDocumentView(currentDocumentId);
+  await loadDocumentsList();
+  await loadPendingDocuments();
+  await loadTagStats();
+  await loadDocumentTypeStats();
+});
+
+reprocessDocumentBtn?.addEventListener("click", async () => {
+  if (!currentDocumentId) {
+    logActivity("No document selected.");
+    return;
+  }
+
+  const response = await apiFetch(`/documents/${currentDocumentId}/reprocess`, {
+    method: "POST",
+  });
+  const payload = await response.json();
+  if (!response.ok) {
+    logActivity(`Reprocess failed: ${payload.detail || response.statusText}`);
+    return;
+  }
+
+  logActivity(
+    `Reprocessing queued for ${currentDocumentId} (job ${payload.job_id}).`
+  );
+  await openDocumentView(currentDocumentId);
+  await loadDocumentsList();
+  await loadPendingDocuments();
+  const completed = await waitForDocumentReady(currentDocumentId);
+  if (completed) {
+    logActivity(`Reprocessing completed for ${currentDocumentId}.`);
+    await openDocumentView(currentDocumentId);
+    await loadDocumentsList();
+    await loadPendingDocuments();
+    await loadTagStats();
+    await loadDocumentTypeStats();
+  } else {
+    logActivity(`Reprocessing still running for ${currentDocumentId}. Refresh to check later.`);
+  }
+});
+
+deleteDocumentBtn?.addEventListener("click", async () => {
+  if (!currentDocumentId) {
+    logActivity("No document selected.");
+    return;
+  }
+  await deleteDocumentById(currentDocumentId, {
+    documentLabel: metaTitleInput?.value?.trim() || detailFilename?.textContent || currentDocumentId,
+  });
+});
+
+viewDocumentFileBtn?.addEventListener("click", async () => {
+  if (!currentDocumentId) {
+    logActivity("No document selected.");
+    return;
+  }
+  try {
+    await openDocumentFile(currentDocumentId);
+  } catch (error) {
+    logActivity(`Failed to open file: ${error.message}`);
+  }
+});
+
+backToDocsBtn?.addEventListener("click", () => {
+  const url = new URL("/ui/documents", window.location.origin);
+  window.location.href = url.pathname;
+});

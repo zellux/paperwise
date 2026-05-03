@@ -57,6 +57,16 @@ _ACTIVE_NAV_BY_VIEW = {
     "section-activity": "/ui/activity",
     "section-settings": "/ui/settings",
 }
+_PAGE_SCRIPTS_BY_VIEW = {
+    "section-docs": ["documents.js"],
+    "section-document": ["document.js"],
+    "section-search": ["search.js"],
+    "section-tags": ["catalog.js"],
+    "section-document-types": ["catalog.js"],
+    "section-pending": ["pending.js"],
+    "section-upload": ["upload.js"],
+    "section-settings": ["settings.js"],
+}
 
 
 def _page_initial_data(current_user: User | None) -> dict:
@@ -517,14 +527,22 @@ def _render_ui_page(
     active_nav_href: str | None = None,
 ) -> HTMLResponse:
     html = (_STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    script_names = ["app.js", *_PAGE_SCRIPTS_BY_VIEW.get(view_id, [])]
     asset_version = str(
         max(
-            (_STATIC_DIR / "app.js").stat().st_mtime_ns,
             (_STATIC_DIR / "styles.css").stat().st_mtime_ns,
+            *[(_STATIC_DIR / script_name).stat().st_mtime_ns for script_name in script_names],
         )
     )
     html = html.replace('/static/styles.css"', f'/static/styles.css?v={asset_version}"')
     html = html.replace('/static/app.js"', f'/static/app.js?v={asset_version}"')
+    page_script_tags = "\n".join(
+        f'    <script src="/static/{script_name}?v={asset_version}" defer></script>'
+        for script_name in script_names[1:]
+    )
+    if page_script_tags:
+        app_script_tag = f'    <script src="/static/app.js?v={asset_version}" defer></script>'
+        html = html.replace(app_script_tag, f"{app_script_tag}\n{page_script_tags}", 1)
 
     def keep_active_view(match: re.Match[str]) -> str:
         if match.group("view_id") != view_id:
