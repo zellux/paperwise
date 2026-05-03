@@ -4,10 +4,95 @@ import re
 
 from fastapi.testclient import TestClient
 
-from paperwise.domain.models import ChatThread
+from paperwise.domain.models import ChatThread, Document, DocumentStatus, LLMParseResult, UserPreference
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from paperwise.server.dependencies import document_repository_dependency
 from paperwise.server.main import app
+
+
+def _initial_data_from_response(html: str) -> dict:
+    match = re.search(
+        r'<script id="paperwiseInitialData" type="application/json">(.+?)</script>',
+        html,
+    )
+    assert match is not None
+    return json.loads(match.group(1))
+
+
+def _save_ready_document(
+    repository: InMemoryDocumentRepository,
+    *,
+    doc_id: str,
+    owner_id: str,
+    title: str,
+    document_type: str,
+    tags: list[str],
+) -> None:
+    created_at = datetime(2026, 5, 2, tzinfo=UTC)
+    repository.save(
+        Document(
+            id=doc_id,
+            filename=f"{doc_id}.pdf",
+            owner_id=owner_id,
+            blob_uri=f"local://{doc_id}.pdf",
+            checksum_sha256=f"{doc_id:0<64}"[:64],
+            content_type="application/pdf",
+            size_bytes=100,
+            status=DocumentStatus.READY,
+            created_at=created_at,
+        )
+    )
+    repository.save_llm_parse_result(
+        LLMParseResult(
+            document_id=doc_id,
+            suggested_title=title,
+            document_date="2026-05-02",
+            correspondent="Paperwise",
+            document_type=document_type,
+            tags=tags,
+            created_correspondent=False,
+            created_document_type=False,
+            created_tags=[],
+            created_at=created_at,
+        )
+    )
+
+
+def _save_pending_document(
+    repository: InMemoryDocumentRepository,
+    *,
+    doc_id: str,
+    owner_id: str,
+    title: str,
+) -> None:
+    created_at = datetime(2026, 5, 3, tzinfo=UTC)
+    repository.save(
+        Document(
+            id=doc_id,
+            filename=f"{doc_id}.pdf",
+            owner_id=owner_id,
+            blob_uri=f"local://{doc_id}.pdf",
+            checksum_sha256=f"{doc_id:0<64}"[:64],
+            content_type="application/pdf",
+            size_bytes=100,
+            status=DocumentStatus.PROCESSING,
+            created_at=created_at,
+        )
+    )
+    repository.save_llm_parse_result(
+        LLMParseResult(
+            document_id=doc_id,
+            suggested_title=title,
+            document_date=None,
+            correspondent="",
+            document_type="",
+            tags=[],
+            created_correspondent=False,
+            created_document_type=False,
+            created_tags=[],
+            created_at=created_at,
+        )
+    )
 
 
 def test_ui_routes_serve_index_html() -> None:
@@ -117,14 +202,88 @@ def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> No
         response = client.get("/ui/grounded-qa")
         assert response.status_code == 200
         assert '<html lang="en" class="has-session">' in response.text
-        match = re.search(
-            r'<script id="paperwiseInitialData" type="application/json">(.+?)</script>',
-            response.text,
-        )
-        assert match is not None
-        payload = json.loads(match.group(1))
+        payload = _initial_data_from_response(response.text)
         assert payload["authenticated"] is True
         assert payload["chat_threads"][0]["id"] == "thread-ui"
         assert payload["chat_threads"][0]["title"] == "Server rendered chat"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "catalog-ui@example.com",
+                "full_name": "Catalog UI",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+        user_id = create_response.json()["id"]
+        _save_ready_document(
+            repository,
+            doc_id="doc-tax",
+            owner_id=user_id,
+            title="Tax Notice",
+            document_type="Notice",
+            tags=["Tax", "Finance"],
+        )
+        _save_ready_document(
+            repository,
+            doc_id="doc-bill",
+            owner_id=user_id,
+            title="Utility Bill",
+            document_type="Invoice",
+            tags=["Finance"],
+        )
+        repository.save_user_preference(
+            UserPreference(user_id=user_id, preferences={"llm_total_tokens_processed": 42})
+        )
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "catalog-ui@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+
+        tags_payload = _initial_data_from_response(client.get("/ui/tags").text)
+        assert tags_payload["tag_stats"] == [
+            {"tag": "Finance", "document_count": 2},
+            {"tag": "Tax", "document_count": 1},
+        ]
+        tags_html = client.get("/ui/tags").text
+        assert '<td data-label="Tag">Finance</td>' in tags_html
+        assert '<td data-label="Documents">2</td>' in tags_html
+
+        types_html = client.get("/ui/document-types").text
+        types_payload = _initial_data_from_response(types_html)
+        assert types_payload["document_type_stats"] == [
+            {"document_type": "Invoice", "document_count": 1},
+            {"document_type": "Notice", "document_count": 1},
+        ]
+        assert '<td data-label="Document Type">Invoice</td>' in types_html
+
+        activity_html = client.get("/ui/activity").text
+        activity_payload = _initial_data_from_response(activity_html)
+        assert activity_payload["activity_total_tokens"] == 42
+        assert [item["llm_metadata"]["suggested_title"] for item in activity_payload["activity_documents"]] == [
+            "Tax Notice",
+            "Utility Bill",
+        ]
+        assert "LLM tokens processed: 42" in activity_html
+        assert "Tax Notice" in activity_html
+
+        _save_pending_document(repository, doc_id="doc-pending", owner_id=user_id, title="Pending File")
+        pending_html = client.get("/ui/pending").text
+        pending_payload = _initial_data_from_response(pending_html)
+        assert pending_payload["pending_documents"][0]["id"] == "doc-pending"
+        assert 'data-pending-doc-id="doc-pending"' in pending_html
+        assert "Pending File" in pending_html
     finally:
         app.dependency_overrides.clear()

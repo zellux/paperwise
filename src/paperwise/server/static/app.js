@@ -208,6 +208,9 @@ let searchAskTimerId = 0;
 let searchAskThreadId = "";
 let searchAskThreads = [];
 let initialChatThreadsConsumed = false;
+let initialTagStatsConsumed = false;
+let initialDocumentTypeStatsConsumed = false;
+let initialActivityConsumed = false;
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
 let searchActiveSectionId = "search-section-keyword";
@@ -3985,6 +3988,18 @@ function renderTableLoading(tbody, colspan, message) {
 
 async function loadProcessedDocumentsActivity() {
   const requestSeq = ++processedActivityRequestSeq;
+  const initialData = readInitialData();
+  if (
+    !initialActivityConsumed &&
+    initialData.authenticated === true &&
+    Array.isArray(initialData.activity_documents)
+  ) {
+    initialActivityConsumed = true;
+    renderProcessedDocsActivity(initialData.activity_documents);
+    renderActivityTokenTotal(Number(initialData.activity_total_tokens || 0));
+    logActivity(`Loaded ${initialData.activity_documents.length} latest processed document(s).`);
+    return;
+  }
   const limit = Math.max(1, normalizePageSize(docsPageSize));
   renderTableLoading(processedDocsTableBody, 4, "Loading processed documents...");
   renderActivityTokenLoading();
@@ -4013,6 +4028,14 @@ async function loadProcessedDocumentsActivity() {
 
 async function loadTagStats() {
   const requestSeq = ++tagStatsRequestSeq;
+  const initialData = readInitialData();
+  if (!initialTagStatsConsumed && initialData.authenticated === true && Array.isArray(initialData.tag_stats)) {
+    initialTagStatsConsumed = true;
+    currentTagStats = [...initialData.tag_stats];
+    renderTagsList(currentTagStats);
+    logActivity(`Loaded ${currentTagStats.length} tag(s)`);
+    return;
+  }
   renderTableLoading(tagsTableBody, 3, "Loading tags...");
   renderSortHeaders();
   const response = await apiFetch("/documents/metadata/tag-stats");
@@ -4034,6 +4057,18 @@ async function loadTagStats() {
 
 async function loadDocumentTypeStats() {
   const requestSeq = ++documentTypeStatsRequestSeq;
+  const initialData = readInitialData();
+  if (
+    !initialDocumentTypeStatsConsumed &&
+    initialData.authenticated === true &&
+    Array.isArray(initialData.document_type_stats)
+  ) {
+    initialDocumentTypeStatsConsumed = true;
+    currentDocumentTypeStats = [...initialData.document_type_stats];
+    renderDocumentTypesList(currentDocumentTypeStats);
+    logActivity(`Loaded ${currentDocumentTypeStats.length} document type(s)`);
+    return;
+  }
   renderTableLoading(documentTypesTableBody, 3, "Loading document types...");
   renderSortHeaders();
   const response = await apiFetch("/documents/metadata/document-type-stats");
