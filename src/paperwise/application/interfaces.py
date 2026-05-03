@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from paperwise.domain.models import (
+    ChatThread,
     Collection,
     DocumentChunk,
     DocumentChunkSearchHit,
@@ -162,6 +163,18 @@ class DocumentRepository(Protocol):
 
     def get_user_preference(self, user_id: str) -> UserPreference | None:
         """Load user preferences by user ID."""
+
+    def save_chat_thread(self, thread: ChatThread) -> None:
+        """Persist one user-owned chat thread."""
+
+    def get_chat_thread(self, owner_id: str, thread_id: str) -> ChatThread | None:
+        """Load one user-owned chat thread."""
+
+    def list_chat_threads(self, owner_id: str, limit: int = 20) -> list[ChatThread]:
+        """List chat threads for a user ordered newest-first."""
+
+    def delete_chat_thread(self, owner_id: str, thread_id: str) -> bool:
+        """Delete one user-owned chat thread if present."""
 
     def create_collection(self, collection: Collection) -> None:
         """Persist a user-owned collection."""

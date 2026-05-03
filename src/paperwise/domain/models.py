@@ -96,6 +96,17 @@ class UserPreference:
 
 
 @dataclass(slots=True)
+class ChatThread:
+    id: str
+    owner_id: str
+    title: str
+    messages: list[dict[str, Any]]
+    token_usage: dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(slots=True)
 class Collection:
     id: str
     owner_id: str

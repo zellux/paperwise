@@ -17,13 +17,24 @@ _VIEW_ARTICLE_RE = re.compile(
 
 def _render_ui_page(view_id: str) -> HTMLResponse:
     html = (_STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    asset_version = str(
+        max(
+            (_STATIC_DIR / "app.js").stat().st_mtime_ns,
+            (_STATIC_DIR / "styles.css").stat().st_mtime_ns,
+        )
+    )
+    html = html.replace('/static/styles.css"', f'/static/styles.css?v={asset_version}"')
+    html = html.replace('/static/app.js"', f'/static/app.js?v={asset_version}"')
 
     def keep_active_view(match: re.Match[str]) -> str:
         if match.group("view_id") != view_id:
             return ""
         return match.group(0).replace(" view-hidden", "", 1)
 
-    return HTMLResponse(_VIEW_ARTICLE_RE.sub(keep_active_view, html))
+    return HTMLResponse(
+        _VIEW_ARTICLE_RE.sub(keep_active_view, html),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/", include_in_schema=False)

@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.llm_preferences import LLM_TASK_GROUNDED_QA
-from paperwise.domain.models import User, UserPreference
+from paperwise.domain.models import ChatThread, User, UserPreference
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
@@ -172,8 +172,19 @@ CHAT_TOOLS: list[dict[str, Any]] = [
 ]
 
 
-def _utc_now_iso() -> str:
-    return datetime.now(UTC).isoformat()
+def _parse_chat_datetime(value: Any, *, fallback: datetime) -> datetime:
+    if isinstance(value, datetime):
+        return value
+    text = str(value or "").strip()
+    if not text:
+        return fallback
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        return fallback
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed
 
 
 def _chat_threads_from_preferences(preferences: dict[str, Any]) -> list[dict[str, Any]]:
@@ -186,6 +197,45 @@ def _chat_threads_from_preferences(preferences: dict[str, Any]) -> list[dict[str
         key=lambda item: str(item.get("updated_at") or item.get("created_at") or ""),
         reverse=True,
     )
+
+
+def _legacy_chat_thread_to_model(current_user: User, thread: dict[str, Any]) -> ChatThread | None:
+    thread_id = str(thread.get("id") or "").strip()
+    if not thread_id:
+        return None
+    raw_messages = thread.get("messages", [])
+    messages = [dict(message) for message in raw_messages if isinstance(message, dict)] if isinstance(raw_messages, list) else []
+    raw_usage = thread.get("token_usage", {})
+    token_usage = dict(raw_usage) if isinstance(raw_usage, dict) else {}
+    now = datetime.now(UTC)
+    created_at = _parse_chat_datetime(thread.get("created_at"), fallback=now)
+    updated_at = _parse_chat_datetime(thread.get("updated_at"), fallback=created_at)
+    title = str(thread.get("title") or "").strip() or _thread_title_from_messages(messages)
+    return ChatThread(
+        id=thread_id,
+        owner_id=current_user.id,
+        title=title[:256] or "Untitled chat",
+        messages=messages[-MAX_STORED_CHAT_MESSAGES:],
+        token_usage=token_usage,
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+
+
+def _migrate_legacy_chat_threads(repository: DocumentRepository, current_user: User) -> None:
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    legacy_threads = _chat_threads_from_preferences(preferences)
+    if not legacy_threads:
+        return
+    for legacy_thread in legacy_threads:
+        thread = _legacy_chat_thread_to_model(current_user, legacy_thread)
+        if thread is None:
+            continue
+        if repository.get_chat_thread(current_user.id, thread.id) is None:
+            repository.save_chat_thread(thread)
+    preferences.pop(CHAT_THREADS_PREFERENCE_KEY, None)
+    repository.save_user_preference(UserPreference(user_id=current_user.id, preferences=preferences))
 
 
 def _thread_title_from_messages(messages: list[dict[str, Any]]) -> str:
@@ -230,51 +280,43 @@ def _save_chat_thread(
     payload: ChatRequest,
     response: ChatResponse,
 ) -> ChatResponse:
-    existing = repository.get_user_preference(current_user.id)
-    preferences = dict(existing.preferences) if existing is not None else {}
-    threads = _chat_threads_from_preferences(preferences)
+    _migrate_legacy_chat_threads(repository, current_user)
     thread_id = (payload.thread_id or "").strip() or str(uuid4())
-    now = _utc_now_iso()
-    previous = next((thread for thread in threads if thread.get("id") == thread_id), None)
+    now = datetime.now(UTC)
+    previous = repository.get_chat_thread(current_user.id, thread_id)
     messages = _stored_chat_messages(payload, response)
-    thread = {
-        "id": thread_id,
-        "title": str(previous.get("title") or "").strip() if previous else _thread_title_from_messages(messages),
-        "messages": messages,
-        "token_usage": response.token_usage.model_dump(mode="json"),
-        "created_at": str(previous.get("created_at") or now) if previous else now,
-        "updated_at": now,
-    }
-    if not thread["title"]:
-        thread["title"] = _thread_title_from_messages(messages)
-    remaining = [item for item in threads if item.get("id") != thread_id]
-    preferences[CHAT_THREADS_PREFERENCE_KEY] = [thread, *remaining][:MAX_CHAT_THREADS]
-    repository.save_user_preference(UserPreference(user_id=current_user.id, preferences=preferences))
+    title = previous.title.strip() if previous is not None else _thread_title_from_messages(messages)
+    repository.save_chat_thread(
+        ChatThread(
+            id=thread_id,
+            owner_id=current_user.id,
+            title=(title or _thread_title_from_messages(messages))[:256],
+            messages=messages,
+            token_usage=response.token_usage.model_dump(mode="json"),
+            created_at=previous.created_at if previous is not None else now,
+            updated_at=now,
+        )
+    )
     response.thread_id = thread_id
     return response
 
 
-def _to_chat_thread_summary(thread: dict[str, Any]) -> ChatThreadSummaryResponse:
-    messages = thread.get("messages", [])
-    message_count = len(messages) if isinstance(messages, list) else 0
+def _to_chat_thread_summary(thread: ChatThread) -> ChatThreadSummaryResponse:
     return ChatThreadSummaryResponse(
-        id=str(thread.get("id") or ""),
-        title=str(thread.get("title") or "Untitled chat"),
-        message_count=message_count,
-        created_at=str(thread.get("created_at") or ""),
-        updated_at=str(thread.get("updated_at") or ""),
+        id=thread.id,
+        title=thread.title or "Untitled chat",
+        message_count=len(thread.messages),
+        created_at=thread.created_at.isoformat(),
+        updated_at=thread.updated_at.isoformat(),
     )
 
 
-def _to_chat_thread_response(thread: dict[str, Any]) -> ChatThreadResponse:
+def _to_chat_thread_response(thread: ChatThread) -> ChatThreadResponse:
     summary = _to_chat_thread_summary(thread)
-    raw_usage = thread.get("token_usage", {})
-    usage = raw_usage if isinstance(raw_usage, dict) else {}
-    raw_messages = thread.get("messages", [])
-    messages = [message for message in raw_messages if isinstance(message, dict)] if isinstance(raw_messages, list) else []
+    usage = dict(thread.token_usage or {})
     return ChatThreadResponse(
         **summary.model_dump(mode="json"),
-        messages=messages,
+        messages=[dict(message) for message in thread.messages],
         token_usage=ChatTokenUsageResponse(
             total_tokens=int(usage.get("total_tokens") or 0),
             llm_requests=int(usage.get("llm_requests") or 0),
@@ -287,9 +329,8 @@ def list_chat_threads_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[ChatThreadSummaryResponse]:
-    preference = repository.get_user_preference(current_user.id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    return [_to_chat_thread_summary(thread) for thread in _chat_threads_from_preferences(preferences)]
+    _migrate_legacy_chat_threads(repository, current_user)
+    return [_to_chat_thread_summary(thread) for thread in repository.list_chat_threads(current_user.id, MAX_CHAT_THREADS)]
 
 
 @router.get("/chat/threads/{thread_id}", response_model=ChatThreadResponse)
@@ -298,11 +339,10 @@ def get_chat_thread_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> ChatThreadResponse:
-    preference = repository.get_user_preference(current_user.id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    for thread in _chat_threads_from_preferences(preferences):
-        if thread.get("id") == thread_id:
-            return _to_chat_thread_response(thread)
+    _migrate_legacy_chat_threads(repository, current_user)
+    thread = repository.get_chat_thread(current_user.id, thread_id)
+    if thread is not None:
+        return _to_chat_thread_response(thread)
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat thread not found.")
 
 
@@ -312,14 +352,9 @@ def delete_chat_thread_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> Response:
-    preference = repository.get_user_preference(current_user.id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    threads = _chat_threads_from_preferences(preferences)
-    remaining = [thread for thread in threads if thread.get("id") != thread_id]
-    if len(remaining) == len(threads):
+    _migrate_legacy_chat_threads(repository, current_user)
+    if not repository.delete_chat_thread(current_user.id, thread_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat thread not found.")
-    preferences[CHAT_THREADS_PREFERENCE_KEY] = remaining
-    repository.save_user_preference(UserPreference(user_id=current_user.id, preferences=preferences))
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

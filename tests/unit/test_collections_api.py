@@ -11,6 +11,7 @@ from paperwise.domain.models import (
     LLMParseResult,
     ParseResult,
     User,
+    UserPreference,
 )
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from paperwise.server.dependencies import (
@@ -521,6 +522,8 @@ def test_chat_queries_all_documents_with_tool_calls() -> None:
         assert payload["citations"][0]["document_id"] == "doc-sonic"
         thread_id = payload["thread_id"]
         assert thread_id
+        saved_preferences = repository.get_user_preference(TEST_USER.id)
+        assert saved_preferences is None or "chat_threads" not in saved_preferences.preferences
 
         threads_response = client.get("/query/chat/threads")
         assert threads_response.status_code == 200
@@ -548,6 +551,56 @@ def test_chat_queries_all_documents_with_tool_calls() -> None:
 
         missing_thread_response = client.get(f"/query/chat/threads/{thread_id}")
         assert missing_thread_response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_chat_thread_list_migrates_legacy_preference_threads() -> None:
+    repository = InMemoryDocumentRepository()
+    repository.save_user_preference(
+        UserPreference(
+            user_id=TEST_USER.id,
+            preferences={
+                "ui_theme": "dark",
+                "chat_threads": [
+                    {
+                        "id": "legacy-thread",
+                        "title": "Legacy chat",
+                        "messages": [
+                            {"role": "user", "content": "What did I ask?"},
+                            {"role": "assistant", "content": "A saved answer."},
+                        ],
+                        "token_usage": {"total_tokens": 12, "llm_requests": 1},
+                        "created_at": "2026-05-01T10:00:00+00:00",
+                        "updated_at": "2026-05-01T10:05:00+00:00",
+                    }
+                ],
+            },
+        )
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+
+    try:
+        client = TestClient(app)
+        response = client.get("/query/chat/threads")
+        assert response.status_code == 200
+        assert response.json() == [
+            {
+                "id": "legacy-thread",
+                "title": "Legacy chat",
+                "message_count": 2,
+                "created_at": "2026-05-01T10:00:00+00:00",
+                "updated_at": "2026-05-01T10:05:00+00:00",
+            }
+        ]
+
+        thread_response = client.get("/query/chat/threads/legacy-thread")
+        assert thread_response.status_code == 200
+        assert thread_response.json()["token_usage"]["total_tokens"] == 12
+        assert repository.get_user_preference(TEST_USER.id).preferences == {"ui_theme": "dark"}
+        assert repository.get_chat_thread(TEST_USER.id, "legacy-thread") is not None
     finally:
         app.dependency_overrides.clear()
 

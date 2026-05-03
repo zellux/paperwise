@@ -94,6 +94,18 @@ class UserPreferenceRow(Base):
     preferences: Mapped[dict] = mapped_column(JSON)
 
 
+class ChatThreadRow(Base):
+    __tablename__ = "chat_threads"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(256))
+    messages: Mapped[list[dict]] = mapped_column(JSON)
+    token_usage: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+
+
 class CollectionRow(Base):
     __tablename__ = "collections"
 

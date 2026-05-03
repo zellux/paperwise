@@ -4,6 +4,7 @@ from threading import RLock
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.domain.models import (
+    ChatThread,
     Collection,
     DocumentChunk,
     DocumentChunkSearchHit,
@@ -81,6 +82,7 @@ class InMemoryDocumentRepository(DocumentRepository):
         self._users: dict[str, User] = {}
         self._users_by_email: dict[str, User] = {}
         self._user_preferences: dict[str, UserPreference] = {}
+        self._chat_threads: dict[str, ChatThread] = {}
         self._parse_results: dict[str, ParseResult] = {}
         self._llm_parse_results: dict[str, LLMParseResult] = {}
         self._history: dict[str, list[DocumentHistoryEvent]] = {}
@@ -285,6 +287,58 @@ class InMemoryDocumentRepository(DocumentRepository):
                 user_id=preference.user_id,
                 preferences=dict(preference.preferences or {}),
             )
+
+    def save_chat_thread(self, thread: ChatThread) -> None:
+        with self._lock:
+            self._chat_threads[thread.id] = ChatThread(
+                id=thread.id,
+                owner_id=thread.owner_id,
+                title=thread.title,
+                messages=[dict(message) for message in thread.messages],
+                token_usage=dict(thread.token_usage or {}),
+                created_at=thread.created_at,
+                updated_at=thread.updated_at,
+            )
+
+    def get_chat_thread(self, owner_id: str, thread_id: str) -> ChatThread | None:
+        with self._lock:
+            thread = self._chat_threads.get(thread_id)
+            if thread is None or thread.owner_id != owner_id:
+                return None
+            return ChatThread(
+                id=thread.id,
+                owner_id=thread.owner_id,
+                title=thread.title,
+                messages=[dict(message) for message in thread.messages],
+                token_usage=dict(thread.token_usage or {}),
+                created_at=thread.created_at,
+                updated_at=thread.updated_at,
+            )
+
+    def list_chat_threads(self, owner_id: str, limit: int = 20) -> list[ChatThread]:
+        with self._lock:
+            threads = [thread for thread in self._chat_threads.values() if thread.owner_id == owner_id]
+            threads.sort(key=lambda item: item.updated_at, reverse=True)
+            return [
+                ChatThread(
+                    id=thread.id,
+                    owner_id=thread.owner_id,
+                    title=thread.title,
+                    messages=[dict(message) for message in thread.messages],
+                    token_usage=dict(thread.token_usage or {}),
+                    created_at=thread.created_at,
+                    updated_at=thread.updated_at,
+                )
+                for thread in threads[: max(0, limit)]
+            ]
+
+    def delete_chat_thread(self, owner_id: str, thread_id: str) -> bool:
+        with self._lock:
+            thread = self._chat_threads.get(thread_id)
+            if thread is None or thread.owner_id != owner_id:
+                return False
+            del self._chat_threads[thread_id]
+            return True
 
     def create_collection(self, collection: Collection) -> None:
         with self._lock:
