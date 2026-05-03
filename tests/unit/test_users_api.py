@@ -93,6 +93,7 @@ def test_login_user_success_and_failure() -> None:
         assert good_login.json()["user"]["email"] == "login@example.com"
         assert good_login.json()["access_token"]
         assert good_login.json()["token_type"] == "bearer"
+        assert good_login.cookies.get("paperwise_session")
 
         me_response = client.get(
             "/users/me",
@@ -100,6 +101,14 @@ def test_login_user_success_and_failure() -> None:
         )
         assert me_response.status_code == 200
         assert me_response.json()["email"] == "login@example.com"
+
+        cookie_me_response = client.get("/users/me")
+        assert cookie_me_response.status_code == 200
+        assert cookie_me_response.json()["email"] == "login@example.com"
+
+        logout_response = client.post("/users/logout")
+        assert logout_response.status_code == 204
+        assert logout_response.headers["set-cookie"].startswith("paperwise_session=\"\";")
     finally:
         app.dependency_overrides.clear()
 

@@ -1,5 +1,12 @@
+from datetime import UTC, datetime
+import json
+import re
+
 from fastapi.testclient import TestClient
 
+from paperwise.domain.models import ChatThread
+from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
+from paperwise.server.dependencies import document_repository_dependency
 from paperwise.server.main import app
 
 
@@ -71,3 +78,53 @@ def test_static_assets_serve_upload_progress_ui() -> None:
     styles = client.get("/static/styles.css")
     assert styles.status_code == 200
     assert ".upload-progress" in styles.text
+
+
+def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "chat-ui@example.com",
+                "full_name": "Chat UI",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+        user_id = create_response.json()["id"]
+        repository.save_chat_thread(
+            ChatThread(
+                id="thread-ui",
+                owner_id=user_id,
+                title="Server rendered chat",
+                messages=[{"role": "user", "content": "hello"}],
+                token_usage={"total_tokens": 3, "llm_requests": 1},
+                created_at=datetime(2026, 5, 2, tzinfo=UTC),
+                updated_at=datetime(2026, 5, 2, 1, tzinfo=UTC),
+            )
+        )
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "chat-ui@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+
+        response = client.get("/ui/grounded-qa")
+        assert response.status_code == 200
+        assert '<html lang="en" class="has-session">' in response.text
+        match = re.search(
+            r'<script id="paperwiseInitialData" type="application/json">(.+?)</script>',
+            response.text,
+        )
+        assert match is not None
+        payload = json.loads(match.group(1))
+        assert payload["authenticated"] is True
+        assert payload["chat_threads"][0]["id"] == "thread-ui"
+        assert payload["chat_threads"][0]["title"] == "Server rendered chat"
+    finally:
+        app.dependency_overrides.clear()

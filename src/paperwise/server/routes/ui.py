@@ -1,10 +1,19 @@
 from pathlib import Path
+import json
 import re
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
+
+from paperwise.application.interfaces import DocumentRepository
+from paperwise.domain.models import User
+from paperwise.server.dependencies import (
+    document_repository_dependency,
+    optional_current_user_dependency,
+)
+from paperwise.server.routes.query import _migrate_legacy_chat_threads
 
 router = APIRouter(tags=["ui"])
 
@@ -15,7 +24,30 @@ _VIEW_ARTICLE_RE = re.compile(
 )
 
 
-def _render_ui_page(view_id: str) -> HTMLResponse:
+def _chat_thread_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
+    if current_user is None:
+        return {"authenticated": False, "chat_threads": []}
+    _migrate_legacy_chat_threads(repository, current_user)
+    return {
+        "authenticated": True,
+        "chat_threads": [
+            {
+                "id": thread.id,
+                "title": thread.title or "Untitled chat",
+                "message_count": len(thread.messages),
+                "created_at": thread.created_at.isoformat(),
+                "updated_at": thread.updated_at.isoformat(),
+            }
+            for thread in repository.list_chat_threads(current_user.id, 20)
+        ]
+    }
+
+
+def _render_ui_page(
+    view_id: str,
+    *,
+    initial_data: dict | None = None,
+) -> HTMLResponse:
     html = (_STATIC_DIR / "index.html").read_text(encoding="utf-8")
     asset_version = str(
         max(
@@ -31,8 +63,19 @@ def _render_ui_page(view_id: str) -> HTMLResponse:
             return ""
         return match.group(0).replace(" view-hidden", "", 1)
 
+    html = _VIEW_ARTICLE_RE.sub(keep_active_view, html)
+    if initial_data is not None:
+        if initial_data.get("authenticated") is True:
+            html = html.replace('<html lang="en">', '<html lang="en" class="has-session">', 1)
+        payload = json.dumps(initial_data, ensure_ascii=True).replace("</", "<\\/")
+        html = html.replace(
+            "  </body>",
+            f'    <script id="paperwiseInitialData" type="application/json">{payload}</script>\n'
+            "  </body>",
+        )
+
     return HTMLResponse(
-        _VIEW_ARTICLE_RE.sub(keep_active_view, html),
+        html,
         headers={"Cache-Control": "no-store"},
     )
 
@@ -68,8 +111,14 @@ def search_page() -> HTMLResponse:
 
 
 @router.get("/ui/grounded-qa", include_in_schema=False)
-def grounded_qa_page() -> HTMLResponse:
-    return _render_ui_page("section-search")
+def grounded_qa_page(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User | None = Depends(optional_current_user_dependency),
+) -> HTMLResponse:
+    return _render_ui_page(
+        "section-search",
+        initial_data=_chat_thread_initial_data(repository, current_user),
+    )
 
 
 @router.get("/ui/pending", include_in_schema=False)

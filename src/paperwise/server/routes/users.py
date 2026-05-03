@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from paperwise.server.dependencies import (
+    SESSION_COOKIE_NAME,
     current_user_dependency,
     document_repository_dependency,
     settings_dependency,
@@ -143,6 +144,7 @@ def get_user_endpoint(
 @router.post("/login", response_model=LoginResponse)
 def login_user_endpoint(
     payload: LoginRequest,
+    response: Response,
     repository: DocumentRepository = Depends(document_repository_dependency),
     settings: Settings = Depends(settings_dependency),
 ) -> LoginResponse:
@@ -161,7 +163,23 @@ def login_user_endpoint(
         secret=settings.auth_secret,
         ttl_seconds=settings.auth_token_ttl_seconds,
     )
+    response.set_cookie(
+        key=SESSION_COOKIE_NAME,
+        value=token,
+        max_age=max(settings.auth_token_ttl_seconds, 60),
+        httponly=True,
+        samesite="lax",
+        secure=settings.env.lower() not in {"local", "dev", "development", "test"},
+        path="/",
+    )
     return LoginResponse(access_token=token, user=_to_user_response(user))
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+def logout_user_endpoint(response: Response) -> Response:
+    response.status_code = status.HTTP_204_NO_CONTENT
+    response.delete_cookie(key=SESSION_COOKIE_NAME, path="/", httponly=True, samesite="lax")
+    return response
 
 
 @router.get("/me/preferences", response_model=UserPreferenceResponse)

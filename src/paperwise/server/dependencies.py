@@ -1,4 +1,4 @@
-from fastapi import Depends, Header, HTTPException, status
+from fastapi import Cookie, Depends, Header, HTTPException, status
 
 from paperwise.application.services.auth_tokens import decode_access_token
 from paperwise.application.interfaces import (
@@ -30,6 +30,7 @@ else:
     _document_repository = InMemoryDocumentRepository()
 _storage: StorageProvider = LocalStorageAdapter(_settings.object_store_root)
 _llm_provider: LLMProvider = MissingOpenAIProvider()
+SESSION_COOKIE_NAME = "paperwise_session"
 
 
 def settings_dependency() -> Settings:
@@ -54,14 +55,19 @@ def llm_provider_dependency() -> LLMProvider:
 
 def current_user_dependency(
     authorization: str | None = Header(default=None),
+    session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
     repository: DocumentRepository = Depends(document_repository_dependency),
 ) -> User:
-    if not authorization or not authorization.lower().startswith("bearer "):
+    token = ""
+    if authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
+    elif session_token:
+        token = session_token.strip()
+    if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
-    token = authorization.split(" ", 1)[1].strip()
     payload = decode_access_token(token=token, secret=_settings.auth_secret)
     if payload is None:
         raise HTTPException(
@@ -75,3 +81,18 @@ def current_user_dependency(
             detail="Invalid user",
         )
     return user
+
+
+def optional_current_user_dependency(
+    authorization: str | None = Header(default=None),
+    session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+) -> User | None:
+    try:
+        return current_user_dependency(
+            authorization=authorization,
+            session_token=session_token,
+            repository=repository,
+        )
+    except HTTPException:
+        return None

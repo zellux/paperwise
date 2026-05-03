@@ -208,6 +208,7 @@ let searchAskCurrentTokens = 0;
 let searchAskTimerId = 0;
 let searchAskThreadId = "";
 let searchAskThreads = [];
+let initialChatThreadsConsumed = false;
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
 let searchActiveSectionId = "search-section-keyword";
@@ -1620,18 +1621,36 @@ function setActiveAuthTab(tab) {
   authPanelSignUp?.classList.toggle("view-hidden", !isSignUp);
 }
 
-function persistSession(token, user) {
-  authToken = token || "";
-  currentUser = user || null;
-  if (authToken) {
-    window.localStorage.setItem("paperwise.auth.token", authToken);
-  } else {
-    window.localStorage.removeItem("paperwise.auth.token");
+function readInitialData() {
+  const element = document.getElementById("paperwiseInitialData");
+  if (!element) {
+    return {};
+  }
+  try {
+    return JSON.parse(element.textContent || "{}") || {};
+  } catch {
+    return {};
   }
 }
 
+function normalizeChatThreadSummary(thread) {
+  return {
+    id: String(thread?.id || ""),
+    title: String(thread?.title || "Untitled chat"),
+    message_count: Number(thread?.message_count || 0),
+    created_at: String(thread?.created_at || ""),
+    updated_at: String(thread?.updated_at || ""),
+  };
+}
+
+function persistSession(token, user) {
+  authToken = token || "";
+  currentUser = user || null;
+  window.localStorage.removeItem("paperwise.auth.token");
+}
+
 function renderSessionState() {
-  const signedIn = Boolean(authToken && currentUser);
+  const signedIn = Boolean(currentUser);
   authGate.classList.toggle("view-hidden", signedIn);
   appShell.classList.toggle("view-hidden", !signedIn);
   if (sessionUserLabel) {
@@ -1689,7 +1708,7 @@ async function apiFetch(url, options = {}) {
   }
   const allowUnauthorized = options.allowUnauthorized === true;
   const { allowUnauthorized: _allowUnauthorized, ...fetchOptions } = options;
-  const response = await window.fetch(url, { ...fetchOptions, headers });
+  const response = await window.fetch(url, { credentials: "same-origin", ...fetchOptions, headers });
   if (response.status === 401 && !allowUnauthorized) {
     clearSession();
     throw new Error("Authentication required");
@@ -1698,10 +1717,6 @@ async function apiFetch(url, options = {}) {
 }
 
 async function restoreSession() {
-  if (!authToken) {
-    renderSessionState();
-    return;
-  }
   try {
     const response = await apiFetch("/users/me");
     if (!response.ok) {
@@ -3009,6 +3024,19 @@ async function loadSearchAskThreads() {
   if (!searchAskThreadSelect) {
     return;
   }
+  const initialData = readInitialData();
+  if (
+    !initialChatThreadsConsumed &&
+    initialData.authenticated === true &&
+    Array.isArray(initialData.chat_threads)
+  ) {
+    initialChatThreadsConsumed = true;
+    searchAskThreads = initialData.chat_threads
+      .map(normalizeChatThreadSummary)
+      .filter((thread) => thread.id);
+    renderSearchAskThreadSelect();
+    return;
+  }
   const response = await apiFetch("/query/chat/threads");
   const payload = await response.json();
   if (!response.ok) {
@@ -4231,7 +4259,8 @@ authTabSignUp?.addEventListener("click", () => {
   setActiveAuthTab("signup");
 });
 
-signOutBtn?.addEventListener("click", () => {
+signOutBtn?.addEventListener("click", async () => {
+  await apiFetch("/users/logout", { method: "POST", allowUnauthorized: true }).catch(() => {});
   clearSession();
   setAuthMessage("Signed out.");
 });
