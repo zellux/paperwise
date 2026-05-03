@@ -25,8 +25,6 @@ const searchAskNewChatBtn = document.getElementById("searchAskNewChatBtn");
 const searchAskThreadSelect = document.getElementById("searchAskThreadSelect");
 const searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
 const searchAskMessages = document.getElementById("searchAskMessages");
-const searchAskAnswer = document.getElementById("searchAskAnswer");
-const searchAskCitationsBody = document.getElementById("searchAskCitationsBody");
 const searchSubsections = [...document.querySelectorAll(".search-subsection")];
 const settingsSubsections = [...document.querySelectorAll(".settings-subsection")];
 const settingsSubnavLinks = [...document.querySelectorAll(".settings-subnav-link")];
@@ -114,20 +112,6 @@ const sortableHeaders = [...document.querySelectorAll("th[data-sort-table][data-
 const filterDropdownState = new Map();
 let activeFilterDropdown = null;
 let currentViewId = "section-docs";
-const VIEW_ID_TO_PARAM = {
-  "section-docs": "docs",
-  "section-document": "document",
-  "section-search": "search",
-  "section-tags": "tags",
-  "section-document-types": "document-types",
-  "section-pending": "pending",
-  "section-upload": "upload",
-  "section-activity": "activity",
-  "section-settings": "settings",
-};
-const VIEW_PARAM_TO_ID = Object.fromEntries(
-  Object.entries(VIEW_ID_TO_PARAM).map(([viewId, param]) => [param, viewId])
-);
 const PATH_TO_VIEW_ID = {
   "/ui/documents": "section-docs",
   "/ui/document": "section-document",
@@ -1687,7 +1671,6 @@ function clearSession() {
   renderSearchResultsTable({ hits: [] });
   renderSearchResultsMeta("No search run yet.");
   renderSearchAskMessages();
-  renderSearchAskAnswer(null);
   renderSettingsForm();
   renderSortHeaders();
   renderActivityTokenTotal(0);
@@ -2240,16 +2223,11 @@ function readFiltersFromUrl() {
     },
     DOCS_SORT_FIELDS
   );
-  const viewFromUrl = params.get("view");
-  const mappedViewId = viewFromUrl ? (VIEW_PARAM_TO_ID[viewFromUrl] || viewFromUrl) : "";
   const pathViewId = getCurrentPathViewId();
   const pathSearchSectionId = PATH_TO_SEARCH_SECTION_ID[path];
   const pathSettingsSectionId = PATH_TO_SETTINGS_SECTION_ID[path];
   if (pathViewId && views.some((view) => view.id === pathViewId)) {
     currentViewId = pathViewId;
-  } else if (mappedViewId && views.some((view) => view.id === mappedViewId)) {
-    // Backward compatibility for old links that use ?view=...
-    currentViewId = mappedViewId;
   } else {
     currentViewId = "section-docs";
   }
@@ -2851,54 +2829,6 @@ function renderSearchResultsTable(payload) {
   }
 }
 
-function renderSearchAskAnswer(payload) {
-  if (!searchAskAnswer && !searchAskCitationsBody) {
-    return;
-  }
-  if (!payload) {
-    if (searchAskAnswer) {
-      searchAskAnswer.innerHTML = "<p>No answer yet.</p>";
-    }
-    if (searchAskCitationsBody) {
-      searchAskCitationsBody.innerHTML = '<tr><td colspan="2">No citations.</td></tr>';
-    }
-    return;
-  }
-  const answer = String(payload.answer || "").trim();
-  const note = payload.insufficient_evidence ? "\n\n_Insufficient evidence in selected scope._" : "";
-  const markdown = answer ? `${answer}${note}` : "No answer returned.";
-  if (searchAskAnswer) {
-    searchAskAnswer.innerHTML = renderMarkdown(markdown);
-  }
-  if (!searchAskCitationsBody) {
-    return;
-  }
-  const citations = Array.isArray(payload.citations) ? payload.citations : [];
-  if (!citations.length) {
-    searchAskCitationsBody.innerHTML = '<tr><td colspan="2">No citations.</td></tr>';
-    return;
-  }
-  searchAskCitationsBody.innerHTML = "";
-  for (const citation of citations) {
-    const row = document.createElement("tr");
-    const sourceCell = document.createElement("td");
-    sourceCell.setAttribute("data-label", "Source");
-    const sourceBtn = document.createElement("button");
-    sourceBtn.type = "button";
-    sourceBtn.className = "link-button";
-    sourceBtn.textContent = citation.title || citation.document_id;
-    sourceBtn.addEventListener("click", () => navigateToDocument(citation.document_id));
-    sourceCell.appendChild(sourceBtn);
-
-    const quoteCell = document.createElement("td");
-    quoteCell.setAttribute("data-label", "Quote");
-    quoteCell.textContent = citation.quote || "-";
-    row.appendChild(sourceCell);
-    row.appendChild(quoteCell);
-    searchAskCitationsBody.appendChild(row);
-  }
-}
-
 function appendSearchAskMessage(role, content, options = {}) {
   const normalizedRole = role === "user" || role === "status" ? role : "assistant";
   const message = {
@@ -3303,7 +3233,6 @@ function resetSearchAskChat() {
   renderSearchAskTokenUsage();
   renderSearchAskThreadSelect();
   renderSearchAskMessages();
-  renderSearchAskAnswer(null);
   if (searchAskQuestion) {
     searchAskQuestion.value = "";
     autoResizeChatTextarea(searchAskQuestion);
@@ -3665,7 +3594,6 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMes
     finishAllSearchAskRounds(activityMessage);
     const detail = data.detail || "Chat failed.";
     updatePendingSearchAskMessage(pendingMessage, detail);
-    renderSearchAskAnswer({ answer: detail, insufficient_evidence: true, citations: [] });
     return { error: detail };
   }
   if (eventType === "final") {
@@ -3676,11 +3604,6 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMes
       data?.message?.content || "No answer returned.",
       { citations: data?.citations || [], toolCalls: data?.tool_calls || [] },
     );
-    renderSearchAskAnswer({
-      answer: data?.message?.content || "",
-      insufficient_evidence: !Array.isArray(data?.citations) || !data.citations.length,
-      citations: data?.citations || [],
-    });
     return { final: data };
   }
   return null;
@@ -3785,7 +3708,6 @@ async function runAsk() {
     const payload = await response.json();
     if (!response.ok) {
       updatePendingSearchAskMessage(pendingMessage, payload.detail || response.statusText);
-      renderSearchAskAnswer({ answer: payload.detail || response.statusText, insufficient_evidence: true, citations: [] });
       logActivity(`Ask failed: ${payload.detail || response.statusText}`);
       return;
     }
@@ -3796,18 +3718,12 @@ async function runAsk() {
       payload?.message?.content || "No answer returned.",
       { citations: payload?.citations || [], toolCalls: payload?.tool_calls || [] },
     );
-    renderSearchAskAnswer({
-      answer: payload?.message?.content || "",
-      insufficient_evidence: !Array.isArray(payload?.citations) || !payload.citations.length,
-      citations: payload?.citations || [],
-    });
     await loadSearchAskThreads();
     logActivity("Ask Your Docs chat completed.");
   } catch (error) {
     finishAllSearchAskRounds(activityMessage);
     const message = error instanceof Error ? error.message : String(error || "Chat failed.");
     updatePendingSearchAskMessage(pendingMessage, message);
-    renderSearchAskAnswer({ answer: message, insufficient_evidence: true, citations: [] });
     logActivity(`Ask failed: ${message}`);
   } finally {
     searchAskInFlight = false;
