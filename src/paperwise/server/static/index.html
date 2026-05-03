@@ -448,15 +448,15 @@
               <div class="grounded-qa-layout">
                 <aside class="qa-sidebar" aria-label="Ask Your Docs chat controls">
                   <div class="qa-panel-head">
-                    <span class="qa-eyebrow">Workspace</span>
-                    <h3>Ask Your Docs</h3>
+                    <span class="qa-eyebrow">Conversations</span>
+                    <h3>Recent chats</h3>
                   </div>
                   <button id="searchAskNewChatBtn" type="button" class="btn btn-primary qa-new-chat-btn">New Chat</button>
-                  <label class="qa-field-label" for="searchAskThreadSelect">Recent Chats</label>
-                  <select id="searchAskThreadSelect" class="chat-thread-select" aria-label="Chat history">
-                    <option value="">Recent chats</option>
-                  </select>
-                  <button id="searchAskDeleteChatBtn" type="button" class="btn btn-muted qa-delete-chat-btn" disabled>Delete Chat</button>
+                  <div class="threads-search">
+                    <span aria-hidden="true">⌕</span>
+                    <input id="searchAskThreadSearch" type="search" placeholder="Search chats..." autocomplete="off" />
+                  </div>
+                  <div id="searchAskThreadList" class="thread-list-wrap" aria-label="Recent chats"></div>
                 </aside>
 
                 <div class="qa-conversation">

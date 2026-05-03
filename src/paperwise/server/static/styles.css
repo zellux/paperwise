@@ -1197,11 +1197,8 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px;
+  padding: 12px 6px;
   background: color-mix(in srgb, var(--bg-panel) 82%, white);
-}
-
-.qa-sidebar {
   border-right: 1px solid var(--stroke-soft);
 }
 
@@ -1232,19 +1229,151 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   text-transform: uppercase;
 }
 
-.qa-new-chat-btn,
-.qa-delete-chat-btn {
-  width: 100%;
+.qa-new-chat-btn {
+  width: calc(100% - 12px);
+  margin: 0 6px;
   justify-content: center;
 }
 
-.qa-field-label {
-  margin-bottom: -6px;
+.threads-search {
+  position: relative;
+  padding: 0 6px;
+}
+
+.threads-search span {
+  position: absolute;
+  left: 17px;
+  top: 50%;
+  transform: translateY(-50%);
   color: var(--ink-soft);
   font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
+  font-size: 0.78rem;
+  pointer-events: none;
+}
+
+.threads-search input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 7px 10px 7px 30px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.thread-list-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 0 8px;
+}
+
+.thread-group {
+  display: grid;
+  gap: 2px;
+}
+
+.thread-group-label {
+  margin: 10px 8px 4px;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 500;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.thread-list {
+  display: grid;
+  gap: 1px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.thread-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  margin: 0 6px;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.thread-item:hover {
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.thread-item.active {
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.thread-button {
+  min-width: 0;
+  border: 0;
+  padding: 8px 9px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  display: grid;
+  gap: 3px;
+  font: inherit;
+  text-align: left;
+}
+
+.thread-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.thread-meta {
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+}
+
+.thread-action {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0;
+  transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
+}
+
+.thread-item:hover .thread-action,
+.thread-item.active .thread-action {
+  opacity: 1;
+}
+
+.thread-action:hover {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--ink);
+}
+
+.thread-empty {
+  margin: 8px 6px;
+  border: 1px dashed var(--stroke);
+  border-radius: 10px;
+  padding: 10px;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .chat-header-row {
@@ -1274,13 +1403,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-size: 0.7rem;
   font-family: var(--mono);
   white-space: nowrap;
-}
-
-.chat-thread-select {
-  width: 100%;
-  min-height: 38px;
-  padding: 7px 30px 7px 10px;
-  font-size: 0.82rem;
 }
 
 #section-search {

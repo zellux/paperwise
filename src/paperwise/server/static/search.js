@@ -13,12 +13,20 @@ searchAskNewChatBtn?.addEventListener("click", () => {
   logActivity("Ask Your Docs chat reset.");
 });
 
-searchAskDeleteChatBtn?.addEventListener("click", async () => {
-  await deleteSearchAskThread(searchAskThreadId || searchAskThreadSelect?.value || "");
+searchAskThreadSearch?.addEventListener("input", () => {
+  renderSearchAskThreadSelect();
 });
 
-searchAskThreadSelect?.addEventListener("change", async () => {
-  await loadSearchAskThread(searchAskThreadSelect.value);
+searchAskThreadList?.addEventListener("click", async (event) => {
+  const deleteButton = event.target instanceof Element ? event.target.closest("[data-delete-thread-id]") : null;
+  if (deleteButton instanceof HTMLElement) {
+    await deleteSearchAskThread(deleteButton.dataset.deleteThreadId || "");
+    return;
+  }
+  const threadButton = event.target instanceof Element ? event.target.closest("[data-thread-id]") : null;
+  if (threadButton instanceof HTMLElement) {
+    await loadSearchAskThread(threadButton.dataset.threadId || "");
+  }
 });
 
 searchAskQuestion?.addEventListener("keydown", async (event) => {

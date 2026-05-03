@@ -22,8 +22,8 @@ const searchResultsTableBody = document.getElementById("searchResultsTableBody")
 const searchAskForm = document.getElementById("searchAskForm");
 const searchAskQuestion = document.getElementById("searchAskQuestion");
 const searchAskNewChatBtn = document.getElementById("searchAskNewChatBtn");
-const searchAskDeleteChatBtn = document.getElementById("searchAskDeleteChatBtn");
-const searchAskThreadSelect = document.getElementById("searchAskThreadSelect");
+const searchAskThreadSearch = document.getElementById("searchAskThreadSearch");
+const searchAskThreadList = document.getElementById("searchAskThreadList");
 const searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
 const searchAskMessages = document.getElementById("searchAskMessages");
 const searchSubsections = [...document.querySelectorAll(".search-subsection")];
@@ -1139,7 +1139,7 @@ function applyUserPreferences(preferences) {
 async function hydrateUserPreferencesForSession() {
   const preferences = await loadUserPreferences();
   applyUserPreferences(preferences);
-  if (searchAskThreadSelect) {
+  if (searchAskThreadList) {
     await loadSearchAskThreads();
   }
   readFiltersFromUrl();
@@ -2929,29 +2929,116 @@ function updateSearchAskTokenUsage(tokenUsage) {
   renderSearchAskTokenUsage();
 }
 
+function formatSearchAskThreadTime(value) {
+  const date = new Date(value || "");
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const now = new Date();
+  const elapsedMs = now.getTime() - date.getTime();
+  const elapsedDays = Math.floor(elapsedMs / 86400000);
+  if (elapsedDays <= 0 && date.toDateString() === now.toDateString()) {
+    const elapsedMinutes = Math.max(1, Math.floor(elapsedMs / 60000));
+    if (elapsedMinutes < 60) {
+      return `${elapsedMinutes} min ago`;
+    }
+    return `${Math.floor(elapsedMinutes / 60)} hr ago`;
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return "Yesterday";
+  }
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function getSearchAskThreadBucket(thread) {
+  const date = new Date(thread?.updated_at || thread?.created_at || "");
+  if (Number.isNaN(date.getTime())) {
+    return "earlier";
+  }
+  const now = new Date();
+  if (date.toDateString() === now.toDateString()) {
+    return "today";
+  }
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (date.toDateString() === yesterday.toDateString()) {
+    return "yesterday";
+  }
+  return "earlier";
+}
+
 function renderSearchAskThreadSelect() {
   const currentValue = searchAskThreadId;
-  if (searchAskThreadSelect) {
-    searchAskThreadSelect.innerHTML = "";
-    const placeholder = document.createElement("option");
-    placeholder.value = "";
-    placeholder.textContent = "Recent chats";
-    searchAskThreadSelect.appendChild(placeholder);
-    for (const thread of searchAskThreads) {
-      const option = document.createElement("option");
-      option.value = thread.id;
-      option.textContent = thread.title || "Untitled chat";
-      searchAskThreadSelect.appendChild(option);
+  if (searchAskThreadList) {
+    searchAskThreadList.innerHTML = "";
+    const query = String(searchAskThreadSearch?.value || "").trim().toLowerCase();
+    const filteredThreads = searchAskThreads.filter((thread) =>
+      !query || String(thread.title || "").toLowerCase().includes(query)
+    );
+    if (!filteredThreads.length) {
+      const empty = document.createElement("p");
+      empty.className = "thread-empty";
+      empty.textContent = query ? "No chats match that search." : "No recent chats yet.";
+      searchAskThreadList.appendChild(empty);
+    } else {
+      const groups = [
+        ["today", "Today"],
+        ["yesterday", "Yesterday"],
+        ["earlier", "Earlier"],
+      ];
+      for (const [bucket, label] of groups) {
+        const items = filteredThreads.filter((thread) => getSearchAskThreadBucket(thread) === bucket);
+        if (!items.length) {
+          continue;
+        }
+        const group = document.createElement("section");
+        group.className = "thread-group";
+        const heading = document.createElement("h4");
+        heading.className = "thread-group-label";
+        heading.textContent = label;
+        const list = document.createElement("ul");
+        list.className = "thread-list";
+        for (const thread of items) {
+          const item = document.createElement("li");
+          item.className = `thread-item${thread.id === currentValue ? " active" : ""}`;
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "thread-button";
+          button.dataset.threadId = thread.id;
+          const title = document.createElement("span");
+          title.className = "thread-title";
+          title.textContent = thread.title || "Untitled chat";
+          const meta = document.createElement("span");
+          meta.className = "thread-meta";
+          const updated = formatSearchAskThreadTime(thread.updated_at || thread.created_at);
+          const count = Number(thread.message_count || 0);
+          meta.textContent = [updated, `${count} msg${count === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
+          button.appendChild(title);
+          button.appendChild(meta);
+          const deleteButton = document.createElement("button");
+          deleteButton.type = "button";
+          deleteButton.className = "thread-action";
+          deleteButton.dataset.deleteThreadId = thread.id;
+          deleteButton.title = "Delete chat";
+          deleteButton.setAttribute("aria-label", `Delete ${thread.title || "chat"}`);
+          deleteButton.disabled = searchAskInFlight;
+          deleteButton.textContent = "×";
+          item.appendChild(button);
+          item.appendChild(deleteButton);
+          list.appendChild(item);
+        }
+        group.appendChild(heading);
+        group.appendChild(list);
+        searchAskThreadList.appendChild(group);
+      }
     }
-    searchAskThreadSelect.value = currentValue || "";
-  }
-  if (searchAskDeleteChatBtn) {
-    searchAskDeleteChatBtn.disabled = searchAskInFlight || !currentValue;
   }
 }
 
 async function loadSearchAskThreads() {
-  if (!searchAskThreadSelect) {
+  if (!searchAskThreadList) {
     return;
   }
   const initialData = readInitialData();
@@ -3033,9 +3120,6 @@ async function deleteSearchAskThread(threadId) {
   const confirmed = window.confirm(`Delete "${title}" from chat history?`);
   if (!confirmed) {
     return;
-  }
-  if (searchAskDeleteChatBtn) {
-    searchAskDeleteChatBtn.disabled = true;
   }
   const response = await apiFetch(`/query/chat/threads/${encodeURIComponent(id)}`, {
     method: "DELETE",
