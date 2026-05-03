@@ -3255,6 +3255,29 @@ function renderChatCitations(message, item) {
   item.appendChild(details);
 }
 
+function getCurrentUserInitials() {
+  const source = String(currentUser?.full_name || currentUser?.email || "You").trim();
+  const parts = source
+    .replace(/@.*/, "")
+    .split(/[\s._-]+/)
+    .filter(Boolean);
+  const initials = parts.slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("");
+  return initials || "Y";
+}
+
+function appendSearchAskRoleMeta(item, message) {
+  const role = document.createElement("div");
+  role.className = "chat-message-role";
+  const dot = document.createElement("span");
+  dot.className = "chat-role-dot";
+  dot.textContent = message.role === "user" ? getCurrentUserInitials() : "P";
+  const label = document.createElement("span");
+  label.textContent = message.role === "user" ? "You" : "Paperwise";
+  role.appendChild(dot);
+  role.appendChild(label);
+  item.appendChild(role);
+}
+
 function renderSearchAskMessages() {
   if (!searchAskMessages) {
     return;
@@ -3264,7 +3287,7 @@ function renderSearchAskMessages() {
   if (!searchAskMessagesState.length) {
     searchAskMessages.innerHTML = `
       <div class="chat-message chat-message-assistant">
-        <div class="chat-message-role">Paperwise</div>
+        <div class="chat-message-role"><span class="chat-role-dot">P</span><span>Paperwise</span></div>
         <div class="chat-message-body markdown-output">Ask a question to begin.</div>
       </div>
     `;
@@ -3286,13 +3309,10 @@ function renderSearchAskMessages() {
       searchAskMessages.appendChild(item);
       continue;
     }
-    const role = document.createElement("div");
-    role.className = "chat-message-role";
-    role.textContent = message.role === "user" ? "You" : message.role === "status" ? "Status" : "Paperwise";
     const body = document.createElement("div");
     body.className = "chat-message-body markdown-output";
     body.innerHTML = renderMarkdown(message.pending ? "Working..." : message.content || "No response.");
-    item.appendChild(role);
+    appendSearchAskRoleMeta(item, message);
     item.appendChild(body);
     renderChatCitations(message, item);
     searchAskMessages.appendChild(item);

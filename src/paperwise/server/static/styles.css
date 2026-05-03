@@ -1448,6 +1448,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .chat-message-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   color: var(--ink-soft);
   font-size: 0.7rem;
   font-weight: 600;
@@ -1456,7 +1459,27 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 .chat-message-user .chat-message-role {
-  text-align: right;
+  justify-self: end;
+}
+
+.chat-role-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+.chat-message-user .chat-role-dot {
+  order: 2;
+  background: linear-gradient(135deg, #5b6f6a, #2e3a36);
 }
 
 .chat-message-body {
