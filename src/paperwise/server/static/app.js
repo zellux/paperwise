@@ -1110,10 +1110,7 @@ function syncUploadAvailability(options = {}) {
       logActivity(`Upload blocked: ${reason} Go to Settings first.`);
     }
     if (navigateToSettings) {
-      setActiveView("section-settings");
-      setActiveNav("section-settings");
-      syncUrlFromFilters();
-      renderSettingsForm();
+      window.location.href = "/ui/settings/models";
     }
     return false;
   }
@@ -1455,6 +1452,9 @@ function toRelativeBlobPath(blobUri) {
 }
 
 function logActivity(message) {
+  if (!activityOutput) {
+    return;
+  }
   const now = new Date().toLocaleTimeString();
   activityOutput.textContent = `[${now}] ${message}\n${activityOutput.textContent}`;
 }
@@ -1814,6 +1814,10 @@ function setActiveSettingsSection(sectionId) {
 function getCurrentPathViewId() {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   return PATH_TO_VIEW_ID[path] || "section-docs";
+}
+
+function hasRenderedView(viewId) {
+  return views.some((view) => view.id === viewId);
 }
 
 function splitTags(value) {
@@ -2188,6 +2192,21 @@ function refreshFilterOptionsFromDocuments(documents) {
 
 function syncUrlFromFilters() {
   const url = new URL(window.location.href);
+  applyDocsStateToUrl(url);
+  let viewPath = VIEW_ID_TO_PATH[currentViewId];
+  if (currentViewId === "section-settings") {
+    viewPath = SETTINGS_SECTION_ID_TO_PATH[settingsActiveSectionId] || "/ui/settings/account";
+  }
+  if (viewPath) {
+    url.pathname = viewPath;
+  }
+
+  const qs = url.searchParams.toString();
+  window.history.replaceState(null, "", qs ? `${url.pathname}?${qs}` : url.pathname);
+  scheduleUserPreferenceSave();
+}
+
+function applyDocsStateToUrl(url) {
   url.searchParams.delete("q");
   url.searchParams.delete("tag");
   url.searchParams.delete("correspondent");
@@ -2224,17 +2243,13 @@ function syncUrlFromFilters() {
     url.searchParams.set("sort_by", docsSort.field);
     url.searchParams.set("sort_dir", docsSort.direction);
   }
-  let viewPath = VIEW_ID_TO_PATH[currentViewId];
-  if (currentViewId === "section-settings") {
-    viewPath = SETTINGS_SECTION_ID_TO_PATH[settingsActiveSectionId] || "/ui/settings/account";
-  }
-  if (viewPath) {
-    url.pathname = viewPath;
-  }
+}
 
+function buildDocumentsUrl() {
+  const url = new URL("/ui/documents", window.location.origin);
+  applyDocsStateToUrl(url);
   const qs = url.searchParams.toString();
-  window.history.replaceState(null, "", qs ? `${url.pathname}?${qs}` : url.pathname);
-  scheduleUserPreferenceSave();
+  return qs ? `${url.pathname}?${qs}` : url.pathname;
 }
 
 function readFiltersFromUrl() {
@@ -2303,6 +2318,10 @@ async function openDocumentsWithFilters(nextFilters, activityMessage = "") {
   }
   docsPage = 1;
   applyFiltersToControls();
+  if (!hasRenderedView("section-docs")) {
+    window.location.href = buildDocumentsUrl();
+    return;
+  }
   setActiveView("section-docs");
   setActiveNav("section-docs");
   syncUrlFromFilters();
@@ -2462,29 +2481,20 @@ async function deleteDocumentById(documentId, options = {}) {
   }
   if (currentDocumentId === documentId) {
     currentDocumentId = "";
-    setActiveView("section-docs");
-    setActiveNav("section-docs");
-    syncUrlFromFilters();
+    window.location.href = buildDocumentsUrl();
+    return true;
   }
 
-  await loadDocumentsList();
-  await loadPendingDocuments();
-
-  if (currentViewId === "section-activity") {
-    await loadProcessedDocumentsActivity();
-  }
-  if (currentViewId === "section-tags") {
-    await loadTagStats();
-  }
-  if (currentViewId === "section-document-types") {
-    await loadDocumentTypeStats();
-  }
+  await loadDataForCurrentView();
 
   logActivity(`Deleted document ${documentId}.`);
   return true;
 }
 
 function renderDocsList(documents) {
+  if (!docsTableBody) {
+    return;
+  }
   renderSortHeaders();
   if (!documents.length) {
     docsTableBody.innerHTML = '<tr><td colspan="7">No documents found.</td></tr>';
@@ -4731,13 +4741,8 @@ signOutBtn?.addEventListener("click", () => {
   setAuthMessage("Signed out.");
 });
 
-brandHomeBtn?.addEventListener("click", async () => {
-  currentDocumentId = "";
-  currentViewId = "section-docs";
-  setActiveView("section-docs");
-  setActiveNav("section-docs");
-  syncUrlFromFilters();
-  await loadDataForCurrentView();
+brandHomeBtn?.addEventListener("click", () => {
+  window.location.href = "/ui/documents";
 });
 
 searchCollectionCreateForm?.addEventListener("submit", async (event) => {
@@ -5048,11 +5053,7 @@ uploadForm?.addEventListener("submit", async (event) => {
     return;
   }
   logActivity(`Uploaded ${uploadedIds.length} files.`);
-  setActiveView("section-docs");
-  setActiveNav("section-docs");
-  syncUrlFromFilters();
-  await loadDocumentsList();
-  await loadPendingDocuments();
+  window.location.href = "/ui/documents";
 });
 
 fileInput?.addEventListener("change", () => {
