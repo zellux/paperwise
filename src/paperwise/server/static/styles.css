@@ -1255,6 +1255,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   min-height: min(580px, 78dvh);
 }
 
+#section-search.view-hidden {
+  display: none;
+}
+
 .chat-messages {
   display: grid;
   gap: 16px;

@@ -2700,6 +2700,9 @@ function renderDocumentTypesList(typeStats) {
 }
 
 function renderPendingList(documents) {
+  if (!pendingTableBody) {
+    return;
+  }
   if (!documents.length) {
     pendingTableBody.innerHTML = '<tr><td colspan="4">No pending documents.</td></tr>';
     return;
@@ -4550,6 +4553,9 @@ async function loadDataForCurrentView() {
     renderSettingsForm();
     return;
   }
+  if (currentViewId === "section-upload") {
+    return;
+  }
   await Promise.all([loadDocumentsList(), loadPendingDocuments()]);
 }
 
@@ -4965,7 +4971,7 @@ settingsChangePasswordBtn?.addEventListener("click", async () => {
   }
 });
 
-uploadForm.addEventListener("submit", async (event) => {
+uploadForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
     return;
@@ -5133,7 +5139,7 @@ uploadDropzone?.addEventListener("drop", (event) => {
   logActivity(`Ready to upload ${dropped.length} file(s).`);
 });
 
-documentMetaForm.addEventListener("submit", async (event) => {
+documentMetaForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!currentDocumentId) {
     logActivity("No document selected.");
@@ -5221,22 +5227,28 @@ viewDocumentFileBtn?.addEventListener("click", async () => {
   }
 });
 
-backToDocsBtn.addEventListener("click", () => {
+backToDocsBtn?.addEventListener("click", () => {
   const url = new URL("/ui/documents", window.location.origin);
   window.location.href = `${url.pathname}?${url.searchParams.toString()}`;
 });
 
-docsFilterForm.addEventListener("submit", (event) => {
+docsFilterForm?.addEventListener("submit", (event) => {
   event.preventDefault();
 });
 
 for (const selectEl of filterSelects) {
+  if (!selectEl) {
+    continue;
+  }
   selectEl.addEventListener("change", async () => {
     await applyFiltersFromControls();
   });
 }
 
 for (const selectEl of filterSelects) {
+  if (!selectEl) {
+    continue;
+  }
   setupFilterDropdown(selectEl);
 }
 
@@ -5284,7 +5296,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-clearFiltersBtn.addEventListener("click", async () => {
+clearFiltersBtn?.addEventListener("click", async () => {
   docsFilters.q = "";
   docsFilters.tag = [];
   docsFilters.correspondent = [];

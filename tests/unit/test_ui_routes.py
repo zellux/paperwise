@@ -45,9 +45,21 @@ def test_upload_ui_includes_batch_progress_shell() -> None:
     response = client.get("/ui/upload")
 
     assert response.status_code == 200
+    assert 'id="section-upload"' in response.text
+    assert 'id="section-search"' not in response.text
+    assert 'id="section-docs"' not in response.text
     assert 'id="uploadProgressWrap"' in response.text
     assert 'id="uploadProgressBar"' in response.text
     assert 'id="uploadProgressStatus"' in response.text
+
+
+def test_search_ui_does_not_include_upload_shell() -> None:
+    client = TestClient(app)
+    response = client.get("/ui/search")
+
+    assert response.status_code == 200
+    assert 'id="section-search"' in response.text
+    assert 'id="section-upload"' not in response.text
 
 
 def test_static_assets_serve_upload_progress_ui() -> None:
