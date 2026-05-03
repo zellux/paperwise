@@ -1183,6 +1183,9 @@ async function hydrateUserPreferencesForSession() {
   const explicitPath = path !== "/" && Object.prototype.hasOwnProperty.call(PATH_TO_VIEW_ID, path);
   const preferences = await loadUserPreferences();
   applyUserPreferences(preferences, { includeLastView: !explicitPath });
+  if (searchAskThreadSelect) {
+    await loadSearchAskThreads();
+  }
   if (hasExplicitNavigationState()) {
     readFiltersFromUrl();
     return;
