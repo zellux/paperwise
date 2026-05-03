@@ -3,7 +3,7 @@ from html import escape
 import json
 import re
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
 from fastapi.responses import RedirectResponse
@@ -13,6 +13,13 @@ from paperwise.domain.models import DocumentStatus, LLMParseResult, User
 from paperwise.server.dependencies import (
     document_repository_dependency,
     optional_current_user_dependency,
+)
+from paperwise.server.routes.documents import (
+    _document_sort_key,
+    _iter_filtered_documents,
+    _normalized_sort_direction,
+    _normalized_sort_field,
+    _normalized_values,
 )
 from paperwise.server.routes.query import _migrate_legacy_chat_threads
 
@@ -34,6 +41,22 @@ _ACTIVITY_TOKEN_RE = re.compile(
     r"(</p>)",
     re.DOTALL,
 )
+_NAV_LINK_RE = re.compile(
+    r'(<a\b(?=[^>]*\bclass="(?P<class>[^"]*\bnav-link\b[^"]*)")'
+    r'(?=[^>]*\bhref="(?P<href>[^"]+)")[^>]*>)',
+    re.DOTALL,
+)
+_ACTIVE_NAV_BY_VIEW = {
+    "section-docs": "/ui/documents",
+    "section-document": "/ui/documents",
+    "section-search": "/ui/search",
+    "section-tags": "/ui/tags",
+    "section-document-types": "/ui/document-types",
+    "section-pending": "/ui/pending",
+    "section-upload": "/ui/upload",
+    "section-activity": "/ui/activity",
+    "section-settings": "/ui/settings",
+}
 
 
 def _page_initial_data(current_user: User | None) -> dict:
@@ -174,21 +197,55 @@ def _activity_initial_data(repository: DocumentRepository, current_user: User | 
     }
 
 
-def _documents_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
+def _documents_initial_data(
+    repository: DocumentRepository,
+    current_user: User | None,
+    *,
+    page: int = 1,
+    page_size: int = 20,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
+    q: str | None = None,
+    tag: list[str] | None = None,
+    correspondent: list[str] | None = None,
+    document_type: list[str] | None = None,
+    status: list[str] | None = None,
+) -> dict:
     initial_data = _page_initial_data(current_user)
+    normalized_page = max(1, int(page or 1))
+    normalized_page_size = min(100, max(1, int(page_size or 20)))
     if current_user is None:
         return {
             **initial_data,
             "documents": [],
             "documents_total": 0,
             "documents_processing_count": 0,
-            "documents_page_size": 20,
+            "documents_page": normalized_page,
+            "documents_page_size": normalized_page_size,
         }
-    ready_documents = [
-        document
-        for document in repository.list_documents(limit=10_000)
-        if document.owner_id == current_user.id and document.status == DocumentStatus.READY
-    ]
+
+    normalized_statuses = _normalized_values(status)
+    if not normalized_statuses:
+        normalized_statuses = {"ready"}
+    matching_documents = list(
+        _iter_filtered_documents(
+            repository=repository,
+            current_user=current_user,
+            query=q,
+            normalized_tags=_normalized_values(tag),
+            normalized_correspondents=_normalized_values(correspondent),
+            normalized_document_types=_normalized_values(document_type),
+            normalized_statuses=normalized_statuses,
+        )
+    )
+    normalized_sort_field = _normalized_sort_field(sort_by)
+    normalized_sort_direction = _normalized_sort_direction(sort_dir)
+    if normalized_sort_field and normalized_sort_direction:
+        matching_documents.sort(
+            key=lambda item: _document_sort_key(item[0], item[1], normalized_sort_field),
+            reverse=normalized_sort_direction == "desc",
+        )
+    offset = (normalized_page - 1) * normalized_page_size
     processing_count = sum(
         1
         for document in repository.list_documents(limit=10_000)
@@ -198,12 +255,16 @@ def _documents_initial_data(repository: DocumentRepository, current_user: User |
         **initial_data,
         "documents": [
             item
-            for item in (_document_list_item(repository, document.id) for document in ready_documents[:20])
+            for item in (
+                _document_list_item(repository, document.id)
+                for document, _llm_result in matching_documents[offset : offset + normalized_page_size]
+            )
             if item is not None
         ],
-        "documents_total": len(ready_documents),
+        "documents_total": len(matching_documents),
         "documents_processing_count": processing_count,
-        "documents_page_size": 20,
+        "documents_page": normalized_page,
+        "documents_page_size": normalized_page_size,
     }
 
 
@@ -368,6 +429,7 @@ def _render_initial_page_data(html: str, initial_data: dict) -> str:
         html = _replace_table_body(html, "docsTableBody", _document_rows_html(initial_data["documents"]))
         total = int(initial_data.get("documents_total") or 0)
         processing_count = int(initial_data.get("documents_processing_count") or 0)
+        page = max(1, int(initial_data.get("documents_page") or 1))
         page_size = max(1, int(initial_data.get("documents_page_size") or 20))
         total_pages = max(1, (total + page_size - 1) // page_size)
         html = re.sub(
@@ -384,7 +446,7 @@ def _render_initial_page_data(html: str, initial_data: dict) -> str:
         )
         html = re.sub(
             r'(<span id="pageIndicator" class="page-indicator">).*?(</span>)',
-            rf"\1Page 1 / {total_pages}\2",
+            rf"\1Page {min(page, total_pages)} / {total_pages}\2",
             html,
             count=1,
         )
@@ -417,6 +479,18 @@ def _render_initial_page_data(html: str, initial_data: dict) -> str:
     return html
 
 
+def _render_active_nav(html: str, active_href: str) -> str:
+    def replace_link(match: re.Match[str]) -> str:
+        tag = match.group(0)
+        original_classes = match.group("class")
+        classes = [class_name for class_name in original_classes.split() if class_name != "active"]
+        if match.group("href") == active_href:
+            classes.append("active")
+        return tag.replace(f'class="{original_classes}"', f'class="{" ".join(classes)}"', 1)
+
+    return _NAV_LINK_RE.sub(replace_link, html)
+
+
 def _chat_thread_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     if current_user is None:
         return {**_page_initial_data(current_user), "chat_threads": []}
@@ -440,6 +514,7 @@ def _render_ui_page(
     view_id: str,
     *,
     initial_data: dict | None = None,
+    active_nav_href: str | None = None,
 ) -> HTMLResponse:
     html = (_STATIC_DIR / "index.html").read_text(encoding="utf-8")
     asset_version = str(
@@ -457,6 +532,7 @@ def _render_ui_page(
         return match.group(0).replace(" view-hidden", "", 1)
 
     html = _VIEW_ARTICLE_RE.sub(keep_active_view, html)
+    html = _render_active_nav(html, active_nav_href or _ACTIVE_NAV_BY_VIEW.get(view_id, "/ui/documents"))
     if initial_data is not None:
         html = _render_initial_page_data(html, initial_data)
         if initial_data.get("authenticated") is True:
@@ -481,10 +557,34 @@ def root() -> RedirectResponse:
 
 @router.get("/ui/documents", include_in_schema=False)
 def documents_page(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    sort_by: str | None = Query(None),
+    sort_dir: str | None = Query(None),
+    q: str | None = Query(None),
+    tag: list[str] | None = Query(None),
+    correspondent: list[str] | None = Query(None),
+    document_type: list[str] | None = Query(None),
+    status: list[str] | None = Query(None),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
-    return _render_ui_page("section-docs", initial_data=_documents_initial_data(repository, current_user))
+    return _render_ui_page(
+        "section-docs",
+        initial_data=_documents_initial_data(
+            repository,
+            current_user,
+            page=page,
+            page_size=page_size,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            q=q,
+            tag=tag,
+            correspondent=correspondent,
+            document_type=document_type,
+            status=status,
+        ),
+    )
 
 
 @router.get("/ui/document", include_in_schema=False)
@@ -524,6 +624,7 @@ def grounded_qa_page(
     return _render_ui_page(
         "section-search",
         initial_data=_chat_thread_initial_data(repository, current_user),
+        active_nav_href="/ui/grounded-qa",
     )
 
 

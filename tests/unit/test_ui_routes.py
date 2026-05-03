@@ -119,6 +119,29 @@ def test_ui_routes_serve_index_html() -> None:
         assert "<!doctype html>" in response.text.lower()
 
 
+def test_ui_routes_render_active_nav_server_side() -> None:
+    client = TestClient(app)
+    expected_active_hrefs = {
+        "/ui/documents": "/ui/documents",
+        "/ui/document": "/ui/documents",
+        "/ui/tags": "/ui/tags",
+        "/ui/document-types": "/ui/document-types",
+        "/ui/pending": "/ui/pending",
+        "/ui/upload": "/ui/upload",
+        "/ui/activity": "/ui/activity",
+        "/ui/search": "/ui/search",
+        "/ui/grounded-qa": "/ui/grounded-qa",
+        "/ui/settings": "/ui/settings",
+        "/ui/settings/account": "/ui/settings",
+    }
+
+    for route, active_href in expected_active_hrefs.items():
+        response = client.get(route)
+        assert response.status_code == 200
+        active_links = re.findall(r'<a\b[^>]*class="[^"]*\bactive\b[^"]*"[^>]*href="([^"]+)"', response.text)
+        assert active_links == [active_href]
+
+
 def test_static_assets_serve_clickable_tag_ui() -> None:
     client = TestClient(app)
 
@@ -260,6 +283,20 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "Processing: 0" in documents_html
         assert 'data-doc-id="doc-tax"' in documents_html
         assert "Tax Notice" in documents_html
+
+        filtered_documents_html = client.get("/ui/documents?tag=Tax").text
+        filtered_documents_payload = _initial_data_from_response(filtered_documents_html)
+        assert filtered_documents_payload["documents_total"] == 1
+        assert [item["id"] for item in filtered_documents_payload["documents"]] == ["doc-tax"]
+        assert "Tax Notice" in filtered_documents_html
+        assert "Utility Bill" not in filtered_documents_html
+
+        paged_documents_html = client.get("/ui/documents?page_size=1&page=2").text
+        paged_documents_payload = _initial_data_from_response(paged_documents_html)
+        assert paged_documents_payload["documents_page"] == 2
+        assert paged_documents_payload["documents_page_size"] == 1
+        assert paged_documents_payload["documents_total"] == 2
+        assert "Page 2 / 2" in paged_documents_html
 
         tags_payload = _initial_data_from_response(client.get("/ui/tags").text)
         assert tags_payload["tag_stats"] == [

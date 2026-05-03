@@ -107,8 +107,6 @@ const documentTypesTableBody = document.getElementById("documentTypesTableBody")
 const pendingTableBody = document.getElementById("pendingTableBody");
 const processedDocsTableBody = document.getElementById("processedDocsTableBody");
 const activityTokenTotal = document.getElementById("activityTokenTotal");
-const navLinks = [...document.querySelectorAll(".nav-link")];
-const views = [...document.querySelectorAll(".view")];
 const sortableHeaders = [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
 const filterDropdownState = new Map();
 let activeFilterDropdown = null;
@@ -128,21 +126,8 @@ const PATH_TO_VIEW_ID = {
   "/ui/settings/display": "section-settings",
   "/ui/settings/models": "section-settings",
 };
-const VIEW_ID_TO_PATH = {
-  "section-docs": "/ui/documents",
-  "section-document": "/ui/document",
-  "section-search": "/ui/search",
-  "section-tags": "/ui/tags",
-  "section-document-types": "/ui/document-types",
-  "section-pending": "/ui/pending",
-  "section-upload": "/ui/upload",
-  "section-activity": "/ui/activity",
-  "section-settings": "/ui/settings",
-};
-
 let currentDocumentId = "";
 let currentUser = null;
-let userPreferenceSaveTimer = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember", "folio", "forge"];
 const THEME_STORAGE_KEY = "paperwise.ui.theme";
 let currentTheme = "forge";
@@ -190,6 +175,7 @@ let docsPage = 1;
 let docsPageSize = 20;
 const DOCS_SORT_FIELDS = new Set(["title", "document_type", "correspondent", "tags", "document_date", "status"]);
 let docsSort = { field: "", direction: "" };
+let docsFilterNavigateTimer = 0;
 let tagStatsSort = { field: "", direction: "" };
 let documentTypesSort = { field: "", direction: "" };
 let groundedQaTopK = 18;
@@ -207,10 +193,9 @@ let searchAskCurrentTokens = 0;
 let searchAskTimerId = 0;
 let searchAskThreadId = "";
 let searchAskThreads = [];
+let initialDataCache;
+const initialPageDataConsumed = new Set();
 let initialChatThreadsConsumed = false;
-let initialTagStatsConsumed = false;
-let initialDocumentTypeStatsConsumed = false;
-let initialActivityConsumed = false;
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
 let searchActiveSectionId = "search-section-keyword";
@@ -312,15 +297,6 @@ function sanitizeDocsFilters(filters) {
     normalized.status = ["ready"];
   }
   return normalized;
-}
-
-function hasExplicitNavigationState() {
-  const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  const params = new URLSearchParams(window.location.search);
-  if (params.toString()) {
-    return true;
-  }
-  return path !== "/" && Object.prototype.hasOwnProperty.call(PATH_TO_VIEW_ID, path);
 }
 
 function normalizeThemeName(value) {
@@ -1107,11 +1083,7 @@ async function saveUserPreferences() {
   }
   const payload = {
     preferences: {
-      docs_filters: sanitizeDocsFilters(docsFilters),
-      docs_sort: normalizeSortState(docsSort, DOCS_SORT_FIELDS),
-      last_view: currentViewId,
       ui_theme: currentTheme,
-      docs_page_size: docsPageSize,
       grounded_qa_top_k_chunks: groundedQaTopK,
       grounded_qa_max_documents: groundedQaMaxDocuments,
       llm_connections: llmConnections,
@@ -1136,40 +1108,12 @@ async function saveUserPreferences() {
   }
 }
 
-function scheduleUserPreferenceSave() {
-  if (!currentUser) {
-    return;
-  }
-  if (userPreferenceSaveTimer) {
-    window.clearTimeout(userPreferenceSaveTimer);
-  }
-  userPreferenceSaveTimer = window.setTimeout(() => {
-    userPreferenceSaveTimer = null;
-    saveUserPreferences().catch(() => {});
-  }, 250);
-}
-
-function applyUserPreferences(preferences, options = {}) {
-  const includeLastView = options.includeLastView !== false;
+function applyUserPreferences(preferences) {
   if (!preferences || typeof preferences !== "object") {
     return;
   }
-  if (preferences.docs_filters && typeof preferences.docs_filters === "object") {
-    docsFilters = sanitizeDocsFilters(preferences.docs_filters);
-  }
-  docsSort = normalizeSortState(preferences.docs_sort, DOCS_SORT_FIELDS);
-  if (
-    includeLastView &&
-    typeof preferences.last_view === "string" &&
-    views.some((view) => view.id === preferences.last_view)
-  ) {
-    currentViewId = preferences.last_view;
-  }
   if (typeof preferences.ui_theme === "string") {
     applyTheme(preferences.ui_theme);
-  }
-  if (preferences.docs_page_size !== undefined) {
-    docsPageSize = normalizePageSize(preferences.docs_page_size);
   }
   groundedQaTopK = normalizeGroundedQaTopK(preferences.grounded_qa_top_k_chunks);
   groundedQaMaxDocuments = normalizeGroundedQaMaxDocuments(preferences.grounded_qa_max_documents);
@@ -1182,18 +1126,12 @@ function applyUserPreferences(preferences, options = {}) {
 }
 
 async function hydrateUserPreferencesForSession() {
-  const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  const explicitPath = path !== "/" && Object.prototype.hasOwnProperty.call(PATH_TO_VIEW_ID, path);
   const preferences = await loadUserPreferences();
-  applyUserPreferences(preferences, { includeLastView: !explicitPath });
+  applyUserPreferences(preferences);
   if (searchAskThreadSelect) {
     await loadSearchAskThreads();
   }
-  if (hasExplicitNavigationState()) {
-    readFiltersFromUrl();
-    return;
-  }
-  syncUrlFromFilters();
+  readFiltersFromUrl();
 }
 
 // Avoid auth-gate flash on page load when the server rendered an authenticated shell.
@@ -1201,8 +1139,6 @@ if (document.documentElement.classList.contains("has-session") && authGate && ap
   readFiltersFromUrl();
   setActiveSearchSection(searchActiveSectionId);
   setActiveSettingsSection(settingsActiveSectionId);
-  setActiveView(currentViewId);
-  setActiveNav(currentViewId);
   renderSortHeaders();
   authGate.classList.add("view-hidden");
   appShell.classList.remove("view-hidden");
@@ -1624,15 +1560,20 @@ function setActiveAuthTab(tab) {
 }
 
 function readInitialData() {
+  if (initialDataCache !== undefined) {
+    return initialDataCache;
+  }
   const element = document.getElementById("paperwiseInitialData");
   if (!element) {
-    return {};
+    initialDataCache = {};
+    return initialDataCache;
   }
   try {
-    return JSON.parse(element.textContent || "{}") || {};
+    initialDataCache = JSON.parse(element.textContent || "{}") || {};
   } catch {
-    return {};
+    initialDataCache = {};
   }
+  return initialDataCache;
 }
 
 function normalizeChatThreadSummary(thread) {
@@ -1730,29 +1671,6 @@ async function restoreSession() {
   renderSessionState();
 }
 
-function setActiveNav(targetId) {
-  const currentPath = window.location.pathname.replace(/\/+$/, "") || "/";
-  for (const link of navLinks) {
-    const linkTarget = link.dataset.target;
-    if (targetId === "section-search" && linkTarget === "section-search") {
-      const linkPath = (link.getAttribute("href") || "").replace(/\/+$/, "") || "/";
-      link.classList.toggle("active", linkPath === currentPath);
-      continue;
-    }
-    link.classList.toggle("active", linkTarget === targetId);
-  }
-}
-
-function setActiveView(targetId) {
-  if (!views.some((view) => view.id === targetId)) {
-    return;
-  }
-  currentViewId = targetId;
-  for (const view of views) {
-    view.classList.toggle("view-hidden", view.id !== targetId);
-  }
-}
-
 function setActiveSearchSection(sectionId) {
   const defaultSectionId = "search-section-keyword";
   const nextSectionId = searchSubsections.some((section) => section.id === sectionId)
@@ -1783,10 +1701,6 @@ function setActiveSettingsSection(sectionId) {
 function getCurrentPathViewId() {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
   return PATH_TO_VIEW_ID[path] || "section-docs";
-}
-
-function hasRenderedView(viewId) {
-  return views.some((view) => view.id === viewId);
 }
 
 function splitTags(value) {
@@ -2159,22 +2073,6 @@ function refreshFilterOptionsFromDocuments(documents) {
   setSelectOptions(filterStatus, ["received", "processing", "failed", "ready", ...statuses]);
 }
 
-function syncUrlFromFilters() {
-  const url = new URL(window.location.href);
-  applyDocsStateToUrl(url);
-  let viewPath = VIEW_ID_TO_PATH[currentViewId];
-  if (currentViewId === "section-settings") {
-    viewPath = SETTINGS_SECTION_ID_TO_PATH[settingsActiveSectionId] || "/ui/settings/account";
-  }
-  if (viewPath) {
-    url.pathname = viewPath;
-  }
-
-  const qs = url.searchParams.toString();
-  window.history.replaceState(null, "", qs ? `${url.pathname}?${qs}` : url.pathname);
-  scheduleUserPreferenceSave();
-}
-
 function applyDocsStateToUrl(url) {
   url.searchParams.delete("q");
   url.searchParams.delete("tag");
@@ -2244,11 +2142,7 @@ function readFiltersFromUrl() {
   const pathViewId = getCurrentPathViewId();
   const pathSearchSectionId = PATH_TO_SEARCH_SECTION_ID[path];
   const pathSettingsSectionId = PATH_TO_SETTINGS_SECTION_ID[path];
-  if (pathViewId && views.some((view) => view.id === pathViewId)) {
-    currentViewId = pathViewId;
-  } else {
-    currentViewId = "section-docs";
-  }
+  currentViewId = pathViewId || "section-docs";
   if (pathSearchSectionId) {
     searchActiveSectionId = pathSearchSectionId;
   }
@@ -2257,14 +2151,17 @@ function readFiltersFromUrl() {
   }
 }
 
-async function applyFiltersFromControls() {
-  readFiltersFromControls();
-  docsPage = 1;
-  syncUrlFromFilters();
-  await loadDocumentsList();
+function navigateToDocumentsPageFromState() {
+  window.location.href = buildDocumentsUrl();
 }
 
-async function openDocumentsWithFilters(nextFilters, activityMessage = "") {
+function applyFiltersFromControls() {
+  readFiltersFromControls();
+  docsPage = 1;
+  navigateToDocumentsPageFromState();
+}
+
+function openDocumentsWithFilters(nextFilters, activityMessage = "") {
   if (Object.prototype.hasOwnProperty.call(nextFilters, "q")) {
     docsFilters.q = String(nextFilters.q || "").trim();
   }
@@ -2282,17 +2179,10 @@ async function openDocumentsWithFilters(nextFilters, activityMessage = "") {
   }
   docsPage = 1;
   applyFiltersToControls();
-  if (!hasRenderedView("section-docs")) {
-    window.location.href = buildDocumentsUrl();
-    return;
-  }
-  setActiveView("section-docs");
-  setActiveNav("section-docs");
-  syncUrlFromFilters();
-  await loadDocumentsList();
   if (activityMessage) {
     logActivity(activityMessage);
   }
+  navigateToDocumentsPageFromState();
 }
 
 function navigateToDocument(documentId) {
@@ -3986,20 +3876,64 @@ function renderTableLoading(tbody, colspan, message) {
   tbody.innerHTML = `<tr><td colspan="${colspan}">${message}</td></tr>`;
 }
 
-async function loadProcessedDocumentsActivity() {
-  const requestSeq = ++processedActivityRequestSeq;
+function hydrateInitialPageDataForCurrentView() {
+  if (initialPageDataConsumed.has(currentViewId)) {
+    return true;
+  }
   const initialData = readInitialData();
-  if (
-    !initialActivityConsumed &&
-    initialData.authenticated === true &&
-    Array.isArray(initialData.activity_documents)
-  ) {
-    initialActivityConsumed = true;
-    renderProcessedDocsActivity(initialData.activity_documents);
+  if (initialData.authenticated !== true) {
+    return false;
+  }
+
+  if (currentViewId === "section-docs" && Array.isArray(initialData.documents)) {
+    docsTotalCount = Number(initialData.documents_total || initialData.documents.length || 0);
+    docsPage = Math.max(1, Number(initialData.documents_page || docsPage || 1));
+    docsPageSize = normalizePageSize(initialData.documents_page_size || docsPageSize);
+    refreshFilterOptionsFromDocuments(initialData.documents);
+    renderPaginationControls(initialData.documents.length, { hasExactTotal: true });
+    renderDocsProcessingCount(Number(initialData.documents_processing_count || 0));
+    logActivity(`Loaded ${initialData.documents.length} document(s) of ${docsTotalCount} total`);
+    initialPageDataConsumed.add(currentViewId);
+    return true;
+  }
+
+  if (currentViewId === "section-tags" && Array.isArray(initialData.tag_stats)) {
+    currentTagStats = [...initialData.tag_stats];
+    renderSortHeaders();
+    logActivity(`Loaded ${currentTagStats.length} tag(s)`);
+    initialPageDataConsumed.add(currentViewId);
+    return true;
+  }
+
+  if (currentViewId === "section-document-types" && Array.isArray(initialData.document_type_stats)) {
+    currentDocumentTypeStats = [...initialData.document_type_stats];
+    renderSortHeaders();
+    logActivity(`Loaded ${currentDocumentTypeStats.length} document type(s)`);
+    initialPageDataConsumed.add(currentViewId);
+    return true;
+  }
+
+  if (currentViewId === "section-activity" && Array.isArray(initialData.activity_documents)) {
     renderActivityTokenTotal(Number(initialData.activity_total_tokens || 0));
     logActivity(`Loaded ${initialData.activity_documents.length} latest processed document(s).`);
-    return;
+    initialPageDataConsumed.add(currentViewId);
+    return true;
   }
+
+  if (currentViewId === "section-pending" && Array.isArray(initialData.pending_documents)) {
+    const hasRestartable = initialData.pending_documents.some((doc) => isRestartablePendingDocument(doc));
+    renderDocsProcessingCount(initialData.pending_documents.length);
+    setRestartPendingButtonEnabled(hasRestartable);
+    logActivity(`Loaded ${initialData.pending_documents.length} pending document(s)`);
+    initialPageDataConsumed.add(currentViewId);
+    return true;
+  }
+
+  return false;
+}
+
+async function loadProcessedDocumentsActivity() {
+  const requestSeq = ++processedActivityRequestSeq;
   const limit = Math.max(1, normalizePageSize(docsPageSize));
   renderTableLoading(processedDocsTableBody, 4, "Loading processed documents...");
   renderActivityTokenLoading();
@@ -4028,14 +3962,6 @@ async function loadProcessedDocumentsActivity() {
 
 async function loadTagStats() {
   const requestSeq = ++tagStatsRequestSeq;
-  const initialData = readInitialData();
-  if (!initialTagStatsConsumed && initialData.authenticated === true && Array.isArray(initialData.tag_stats)) {
-    initialTagStatsConsumed = true;
-    currentTagStats = [...initialData.tag_stats];
-    renderTagsList(currentTagStats);
-    logActivity(`Loaded ${currentTagStats.length} tag(s)`);
-    return;
-  }
   renderTableLoading(tagsTableBody, 3, "Loading tags...");
   renderSortHeaders();
   const response = await apiFetch("/documents/metadata/tag-stats");
@@ -4057,18 +3983,6 @@ async function loadTagStats() {
 
 async function loadDocumentTypeStats() {
   const requestSeq = ++documentTypeStatsRequestSeq;
-  const initialData = readInitialData();
-  if (
-    !initialDocumentTypeStatsConsumed &&
-    initialData.authenticated === true &&
-    Array.isArray(initialData.document_type_stats)
-  ) {
-    initialDocumentTypeStatsConsumed = true;
-    currentDocumentTypeStats = [...initialData.document_type_stats];
-    renderDocumentTypesList(currentDocumentTypeStats);
-    logActivity(`Loaded ${currentDocumentTypeStats.length} document type(s)`);
-    return;
-  }
   renderTableLoading(documentTypesTableBody, 3, "Loading document types...");
   renderSortHeaders();
   const response = await apiFetch("/documents/metadata/document-type-stats");
@@ -4089,6 +4003,9 @@ async function loadDocumentTypeStats() {
 }
 
 async function loadDataForCurrentView() {
+  if (hydrateInitialPageDataForCurrentView()) {
+    return;
+  }
   if (currentViewId === "section-tags") {
     await loadTagStats();
     return;
@@ -4165,9 +4082,6 @@ async function openDocumentView(documentId) {
     renderDocumentHistory(historyPayload);
   }
 
-  setActiveView("section-document");
-  setActiveNav("section-document");
-  syncUrlFromFilters();
   logActivity(`Opened document ${documentId}`);
 }
 
@@ -4229,8 +4143,6 @@ signInForm?.addEventListener("submit", async (event) => {
     setAuthMessage(`Signed in as ${payload.user.email}.`);
     await hydrateUserPreferencesForSession();
     applyFiltersToControls();
-    setActiveView(currentViewId);
-    setActiveNav(currentViewId);
     await loadDataForCurrentView();
   } catch (error) {
     setAuthMessage(error.message || "Failed to sign in.", true);
@@ -4274,8 +4186,6 @@ registerForm?.addEventListener("submit", async (event) => {
     setAuthMessage(`Registered ${registerPayload.email}.`);
     await hydrateUserPreferencesForSession();
     applyFiltersToControls();
-    setActiveView(currentViewId);
-    setActiveNav(currentViewId);
     await loadDataForCurrentView();
   } catch (error) {
     setAuthMessage(error.message || "Failed to create account.", true);
@@ -4401,11 +4311,7 @@ settingsForm?.addEventListener("submit", async (event) => {
   applyTheme(nextTheme);
   docsPageSize = nextPageSize;
   docsPage = 1;
-  syncUrlFromFilters();
   await saveUserPreferences();
-  if (currentViewId === "section-docs") {
-    await loadDocumentsList();
-  }
   logActivity("Saved settings.");
   window.location.reload();
 });
@@ -4750,7 +4656,7 @@ viewDocumentFileBtn?.addEventListener("click", async () => {
 
 backToDocsBtn?.addEventListener("click", () => {
   const url = new URL("/ui/documents", window.location.origin);
-  window.location.href = `${url.pathname}?${url.searchParams.toString()}`;
+  window.location.href = url.pathname;
 });
 
 docsFilterForm?.addEventListener("submit", (event) => {
@@ -4761,8 +4667,8 @@ for (const selectEl of filterSelects) {
   if (!selectEl) {
     continue;
   }
-  selectEl.addEventListener("change", async () => {
-    await applyFiltersFromControls();
+  selectEl.addEventListener("change", () => {
+    applyFiltersFromControls();
   });
 }
 
@@ -4775,15 +4681,14 @@ for (const selectEl of filterSelects) {
 
 for (const header of sortableHeaders) {
   const button = header.querySelector(".table-sort-button");
-  button?.addEventListener("click", async () => {
+  button?.addEventListener("click", () => {
     const tableName = header.dataset.sortTable || "";
     const field = header.dataset.sortField || "";
     if (tableName === "docs") {
       docsSort = getNextSortState(docsSort, field);
       docsPage = 1;
-      syncUrlFromFilters();
       renderSortHeaders();
-      await loadDocumentsList();
+      navigateToDocumentsPageFromState();
       return;
     }
     if (tableName === "tags") {
@@ -4817,7 +4722,7 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-clearFiltersBtn?.addEventListener("click", async () => {
+clearFiltersBtn?.addEventListener("click", () => {
   docsFilters.q = "";
   docsFilters.tag = [];
   docsFilters.correspondent = [];
@@ -4825,27 +4730,30 @@ clearFiltersBtn?.addEventListener("click", async () => {
   docsFilters.status = ["ready"];
   docsPage = 1;
   applyFiltersToControls();
-  syncUrlFromFilters();
-  await loadDocumentsList();
+  navigateToDocumentsPageFromState();
 });
 
-filterQuery?.addEventListener("input", async () => {
-  await applyFiltersFromControls();
+filterQuery?.addEventListener("input", () => {
+  if (docsFilterNavigateTimer) {
+    window.clearTimeout(docsFilterNavigateTimer);
+  }
+  docsFilterNavigateTimer = window.setTimeout(() => {
+    docsFilterNavigateTimer = 0;
+    applyFiltersFromControls();
+  }, 350);
 });
 
-pagePrevBtn?.addEventListener("click", async () => {
+pagePrevBtn?.addEventListener("click", () => {
   if (docsPage <= 1) {
     return;
   }
   docsPage -= 1;
-  syncUrlFromFilters();
-  await loadDocumentsList();
+  navigateToDocumentsPageFromState();
 });
 
-pageNextBtn?.addEventListener("click", async () => {
+pageNextBtn?.addEventListener("click", () => {
   docsPage += 1;
-  syncUrlFromFilters();
-  await loadDocumentsList();
+  navigateToDocumentsPageFromState();
 });
 
 restartPendingBtn?.addEventListener("click", async () => {
@@ -4876,22 +4784,6 @@ restartPendingBtn?.addEventListener("click", async () => {
   await loadDocumentsList();
 });
 
-window.addEventListener("popstate", async () => {
-  if (!currentUser) {
-    return;
-  }
-  readFiltersFromUrl();
-  applyFiltersToControls();
-  renderSettingsForm();
-  renderSortHeaders();
-  setActiveView(currentViewId);
-  setActiveNav(currentViewId);
-  if (currentViewId === "section-document") {
-    currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";
-  }
-  await loadDataForCurrentView();
-});
-
 async function initializeApp() {
   await restoreSession();
   if (!currentUser) {
@@ -4904,8 +4796,6 @@ async function initializeApp() {
   renderSettingsForm();
   renderSortHeaders();
   syncUploadAvailability();
-  setActiveView(currentViewId);
-  setActiveNav(currentViewId);
   if (currentViewId === "section-document") {
     currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";
   }
