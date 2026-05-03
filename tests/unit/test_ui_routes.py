@@ -333,6 +333,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "Processing: 0" in documents_html
         assert 'data-doc-id="doc-tax"' in documents_html
         assert "Tax Notice" in documents_html
+        assert '<span class="status-badge status-ready">READY</span>' in documents_html
 
         detail_html = client.get("/ui/document?id=doc-tax").text
         detail_payload = _initial_data_from_response(detail_html)
@@ -385,6 +386,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         ]
         assert "LLM tokens processed: 42" in activity_html
         assert "Tax Notice" in activity_html
+        assert '<span class="status-badge status-ready">READY</span>' in activity_html
 
         _save_pending_document(repository, doc_id="doc-pending", owner_id=user_id, title="Pending File")
         documents_with_pending_html = client.get("/ui/documents").text
@@ -394,5 +396,6 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert pending_payload["pending_documents"][0]["id"] == "doc-pending"
         assert 'data-pending-doc-id="doc-pending"' in pending_html
         assert "Pending File" in pending_html
+        assert '<span class="status-badge status-processing">PROCESSING</span>' in pending_html
     finally:
         app.dependency_overrides.clear()

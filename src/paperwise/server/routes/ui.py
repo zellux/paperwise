@@ -572,12 +572,12 @@ def _activity_rows_html(documents: list[dict]) -> str:
     for item in documents:
         document_id = escape(str(item.get("id") or ""))
         title = escape(_document_title(item))
-        status_text = escape(str(item.get("status") or ""))
+        status_html = _status_badge_html(str(item.get("status") or ""))
         created_at = escape(str(item.get("created_at") or "-"))
         rows.append(
             "                <tr>"
             f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id}">{title}</a></td>'
-            f'<td data-label="Status">{status_text}</td>'
+            f'<td data-label="Status">{status_html}</td>'
             f'<td data-label="Uploaded">{created_at}</td>'
             '<td data-label="Action"><div class="table-actions">'
             f'<a class="icon-action-button" href="/ui/document?id={document_id}" title="Open document">'
@@ -596,12 +596,12 @@ def _pending_rows_html(documents: list[dict]) -> str:
     for item in documents:
         document_id = escape(str(item.get("id") or ""))
         title = escape(_document_title(item))
-        status_text = escape(str(item.get("status") or ""))
+        status_html = _status_badge_html(str(item.get("status") or ""))
         created_at = escape(str(item.get("created_at") or "-"))
         rows.append(
             f'                <tr data-pending-doc-id="{document_id}">'
             f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id}">{title}</a></td>'
-            f'<td data-label="Status">{status_text}</td>'
+            f'<td data-label="Status">{status_html}</td>'
             f'<td data-label="Created">{created_at}</td>'
             '<td data-label="Action"><div class="table-actions">'
             f'<a class="icon-action-button" href="/ui/document?id={document_id}" title="Open document">'
@@ -626,7 +626,7 @@ def _document_rows_html(documents: list[dict]) -> str:
         tags = metadata.get("tags") if isinstance(metadata.get("tags"), list) else []
         tags_text = escape(", ".join(str(tag) for tag in tags) if tags else "-")
         document_date = escape(str(metadata.get("document_date") or "-"))
-        status_text = escape(str(item.get("status") or ""))
+        status_html = _status_badge_html(str(item.get("status") or ""))
         rows.append(
             f'                <tr data-doc-id="{document_id}">'
             f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id}">{title}</a></td>'
@@ -634,7 +634,7 @@ def _document_rows_html(documents: list[dict]) -> str:
             f'<td data-label="Correspondent">{correspondent}</td>'
             f'<td data-label="Tags">{tags_text}</td>'
             f'<td data-label="Date">{document_date}</td>'
-            f'<td data-label="Status">{status_text}</td>'
+            f'<td data-label="Status">{status_html}</td>'
             '<td data-label="Action"><div class="table-actions">'
             f'<a class="icon-action-button" href="/ui/document?id={document_id}" title="Open document">'
             '<span class="icon-action-label">Open</span>'
