@@ -22,6 +22,7 @@ const searchResultsTableBody = document.getElementById("searchResultsTableBody")
 const searchAskForm = document.getElementById("searchAskForm");
 const searchAskQuestion = document.getElementById("searchAskQuestion");
 const searchAskNewChatBtn = document.getElementById("searchAskNewChatBtn");
+const searchAskDeleteChatBtn = document.getElementById("searchAskDeleteChatBtn");
 const searchAskThreadSelect = document.getElementById("searchAskThreadSelect");
 const searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
 const searchAskMessages = document.getElementById("searchAskMessages");
@@ -2981,22 +2982,24 @@ function updateSearchAskTokenUsage(tokenUsage) {
 }
 
 function renderSearchAskThreadSelect() {
-  if (!searchAskThreadSelect) {
-    return;
-  }
   const currentValue = searchAskThreadId;
-  searchAskThreadSelect.innerHTML = "";
-  const placeholder = document.createElement("option");
-  placeholder.value = "";
-  placeholder.textContent = "Recent chats";
-  searchAskThreadSelect.appendChild(placeholder);
-  for (const thread of searchAskThreads) {
-    const option = document.createElement("option");
-    option.value = thread.id;
-    option.textContent = thread.title || "Untitled chat";
-    searchAskThreadSelect.appendChild(option);
+  if (searchAskThreadSelect) {
+    searchAskThreadSelect.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Recent chats";
+    searchAskThreadSelect.appendChild(placeholder);
+    for (const thread of searchAskThreads) {
+      const option = document.createElement("option");
+      option.value = thread.id;
+      option.textContent = thread.title || "Untitled chat";
+      searchAskThreadSelect.appendChild(option);
+    }
+    searchAskThreadSelect.value = currentValue || "";
   }
-  searchAskThreadSelect.value = currentValue || "";
+  if (searchAskDeleteChatBtn) {
+    searchAskDeleteChatBtn.disabled = searchAskInFlight || !currentValue;
+  }
 }
 
 async function loadSearchAskThreads() {
@@ -3057,6 +3060,39 @@ async function loadSearchAskThread(threadId) {
   hydrateSearchAskMessages(payload.messages || []);
   renderSearchAskThreadSelect();
   logActivity(`Loaded chat: ${payload.title || "Untitled chat"}`);
+}
+
+async function deleteSearchAskThread(threadId) {
+  const id = String(threadId || "").trim();
+  if (!id || searchAskInFlight) {
+    return;
+  }
+  const thread = searchAskThreads.find((item) => item.id === id);
+  const title = thread?.title || "this chat";
+  const confirmed = window.confirm(`Delete "${title}" from chat history?`);
+  if (!confirmed) {
+    return;
+  }
+  if (searchAskDeleteChatBtn) {
+    searchAskDeleteChatBtn.disabled = true;
+  }
+  const response = await apiFetch(`/query/chat/threads/${encodeURIComponent(id)}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    logActivity(`Delete chat failed: ${payload.detail || response.statusText}`);
+    renderSearchAskThreadSelect();
+    return;
+  }
+  searchAskThreads = searchAskThreads.filter((item) => item.id !== id);
+  if (searchAskThreadId === id) {
+    resetSearchAskChat();
+  } else {
+    renderSearchAskThreadSelect();
+  }
+  await loadSearchAskThreads();
+  logActivity(`Deleted chat: ${title}`);
 }
 
 function formatSearchAskJsonDetail(value) {
@@ -3678,6 +3714,7 @@ async function runAsk() {
   }
   setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), true, "Asking...");
   searchAskInFlight = true;
+  renderSearchAskThreadSelect();
   const requestBody = {
     thread_id: searchAskThreadId || null,
     messages: searchAskMessagesState
@@ -3728,6 +3765,7 @@ async function runAsk() {
   } finally {
     searchAskInFlight = false;
     syncSearchAskTimer();
+    renderSearchAskThreadSelect();
     setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), false);
   }
 }
@@ -4212,6 +4250,10 @@ searchAskForm?.addEventListener("submit", async (event) => {
 searchAskNewChatBtn?.addEventListener("click", () => {
   resetSearchAskChat();
   logActivity("Ask Your Docs chat reset.");
+});
+
+searchAskDeleteChatBtn?.addEventListener("click", async () => {
+  await deleteSearchAskThread(searchAskThreadId || searchAskThreadSelect?.value || "");
 });
 
 searchAskThreadSelect?.addEventListener("change", async () => {

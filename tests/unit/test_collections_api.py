@@ -537,6 +537,17 @@ def test_chat_queries_all_documents_with_tool_calls() -> None:
         }
         assert thread["messages"][1]["role"] == "assistant"
         assert thread["messages"][1]["citations"][0]["document_id"] == "doc-sonic"
+
+        delete_response = client.delete(f"/query/chat/threads/{thread_id}")
+        assert delete_response.status_code == 204
+        assert delete_response.content == b""
+
+        threads_after_delete_response = client.get("/query/chat/threads")
+        assert threads_after_delete_response.status_code == 200
+        assert threads_after_delete_response.json() == []
+
+        missing_thread_response = client.get(f"/query/chat/threads/{thread_id}")
+        assert missing_thread_response.status_code == 404
     finally:
         app.dependency_overrides.clear()
 

@@ -5,7 +5,7 @@ from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
+from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
@@ -304,6 +304,23 @@ def get_chat_thread_endpoint(
         if thread.get("id") == thread_id:
             return _to_chat_thread_response(thread)
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat thread not found.")
+
+
+@router.delete("/chat/threads/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_chat_thread_endpoint(
+    thread_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> Response:
+    preference = repository.get_user_preference(current_user.id)
+    preferences = dict(preference.preferences) if preference is not None else {}
+    threads = _chat_threads_from_preferences(preferences)
+    remaining = [thread for thread in threads if thread.get("id") != thread_id]
+    if len(remaining) == len(threads):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat thread not found.")
+    preferences[CHAT_THREADS_PREFERENCE_KEY] = remaining
+    repository.save_user_preference(UserPreference(user_id=current_user.id, preferences=preferences))
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 def _merge_tool_filters(scope: ChatScopeRequest, arguments: dict[str, Any]) -> dict[str, Any]:
