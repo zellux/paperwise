@@ -95,16 +95,17 @@ def test_login_user_success_and_failure() -> None:
         assert good_login.json()["token_type"] == "bearer"
         assert good_login.cookies.get("paperwise_session")
 
-        me_response = client.get(
-            "/users/me",
-            headers={"Authorization": f"Bearer {good_login.json()['access_token']}"},
-        )
+        me_response = client.get("/users/me")
         assert me_response.status_code == 200
         assert me_response.json()["email"] == "login@example.com"
 
-        cookie_me_response = client.get("/users/me")
-        assert cookie_me_response.status_code == 200
-        assert cookie_me_response.json()["email"] == "login@example.com"
+        machine_client = TestClient(app)
+        bearer_me_response = machine_client.get(
+            "/users/me",
+            headers={"Authorization": f"Bearer {good_login.json()['access_token']}"},
+        )
+        assert bearer_me_response.status_code == 200
+        assert bearer_me_response.json()["email"] == "login@example.com"
 
         logout_response = client.post("/users/logout")
         assert logout_response.status_code == 204
@@ -134,12 +135,8 @@ def test_change_password_success_and_requires_current_password() -> None:
             json={"email": "password@example.com", "password": "strong-pass-123"},
         )
         assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
-
         bad_change = client.post(
             "/users/me/password",
-            headers=headers,
             json={
                 "current_password": "wrong-pass",
                 "new_password": "new-pass-123",
@@ -150,7 +147,6 @@ def test_change_password_success_and_requires_current_password() -> None:
 
         change_response = client.post(
             "/users/me/password",
-            headers=headers,
             json={
                 "current_password": "strong-pass-123",
                 "new_password": "new-pass-123",
@@ -195,16 +191,12 @@ def test_user_preferences_round_trip() -> None:
             json={"email": "prefs@example.com", "password": "strong-pass-123"},
         )
         assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
-
-        get_empty = client.get("/users/me/preferences", headers=headers)
+        get_empty = client.get("/users/me/preferences")
         assert get_empty.status_code == 200
         assert get_empty.json()["preferences"] == {}
 
         put_response = client.put(
             "/users/me/preferences",
-            headers=headers,
             json={
                 "preferences": {
                     "last_view": "section-tags",
@@ -244,7 +236,7 @@ def test_user_preferences_round_trip() -> None:
         assert put_response.json()["preferences"]["ocr_llm_provider"] == "gemini"
         assert put_response.json()["preferences"]["ocr_llm_model"] == "gemini-2.5-flash"
 
-        get_saved = client.get("/users/me/preferences", headers=headers)
+        get_saved = client.get("/users/me/preferences")
         assert get_saved.status_code == 200
         assert get_saved.json()["preferences"]["last_view"] == "section-tags"
         assert get_saved.json()["preferences"]["ui_theme"] == "ledger"
@@ -283,12 +275,8 @@ def test_user_preferences_put_merges_without_dropping_existing_keys() -> None:
             json={"email": "prefs-merge@example.com", "password": "strong-pass-123"},
         )
         assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
-
         seed_response = client.put(
             "/users/me/preferences",
-            headers=headers,
             json={"preferences": {"llm_total_tokens_processed": 1234}},
         )
         assert seed_response.status_code == 200
@@ -296,7 +284,6 @@ def test_user_preferences_put_merges_without_dropping_existing_keys() -> None:
 
         update_response = client.put(
             "/users/me/preferences",
-            headers=headers,
             json={"preferences": {"last_view": "section-settings"}},
         )
         assert update_response.status_code == 200
@@ -328,12 +315,8 @@ def test_user_preferences_rejects_openai_style_key_for_gemini() -> None:
             json={"email": "prefs-gemini@example.com", "password": "strong-pass-123"},
         )
         assert login_response.status_code == 200
-        token = login_response.json()["access_token"]
-        headers = {"Authorization": f"Bearer {token}"}
-
         put_response = client.put(
             "/users/me/preferences",
-            headers=headers,
             json={
                 "preferences": {
                     "ocr_provider": "llm_separate",

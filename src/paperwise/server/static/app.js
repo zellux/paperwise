@@ -141,7 +141,6 @@ const VIEW_ID_TO_PATH = {
 };
 
 let currentDocumentId = "";
-let authToken = window.localStorage.getItem("paperwise.auth.token") || "";
 let currentUser = null;
 let userPreferenceSaveTimer = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember", "folio", "forge"];
@@ -1082,7 +1081,7 @@ function syncUploadAvailability(options = {}) {
 }
 
 async function loadUserPreferences() {
-  if (!authToken || !currentUser) {
+  if (!currentUser) {
     return {};
   }
   try {
@@ -1100,7 +1099,7 @@ async function loadUserPreferences() {
 }
 
 async function saveUserPreferences() {
-  if (!authToken || !currentUser) {
+  if (!currentUser) {
     return;
   }
   const payload = {
@@ -1135,7 +1134,7 @@ async function saveUserPreferences() {
 }
 
 function scheduleUserPreferenceSave() {
-  if (!authToken || !currentUser) {
+  if (!currentUser) {
     return;
   }
   if (userPreferenceSaveTimer) {
@@ -1194,8 +1193,8 @@ async function hydrateUserPreferencesForSession() {
   syncUrlFromFilters();
 }
 
-// Avoid auth-gate flash on page load when we already have a stored token.
-if (authToken && authGate && appShell) {
+// Avoid auth-gate flash on page load when the server rendered an authenticated shell.
+if (document.documentElement.classList.contains("has-session") && authGate && appShell) {
   readFiltersFromUrl();
   setActiveSearchSection(searchActiveSectionId);
   setActiveSettingsSection(settingsActiveSectionId);
@@ -1644,7 +1643,7 @@ function normalizeChatThreadSummary(thread) {
 }
 
 function persistSession(token, user) {
-  authToken = token || "";
+  void token;
   currentUser = user || null;
   window.localStorage.removeItem("paperwise.auth.token");
 }
@@ -1703,9 +1702,6 @@ function clearSession() {
 
 async function apiFetch(url, options = {}) {
   const headers = new Headers(options.headers || {});
-  if (authToken) {
-    headers.set("Authorization", `Bearer ${authToken}`);
-  }
   const allowUnauthorized = options.allowUnauthorized === true;
   const { allowUnauthorized: _allowUnauthorized, ...fetchOptions } = options;
   const response = await window.fetch(url, { credentials: "same-origin", ...fetchOptions, headers });
@@ -4846,7 +4842,7 @@ restartPendingBtn?.addEventListener("click", async () => {
 });
 
 window.addEventListener("popstate", async () => {
-  if (!authToken || !currentUser) {
+  if (!currentUser) {
     return;
   }
   readFiltersFromUrl();
@@ -4863,7 +4859,7 @@ window.addEventListener("popstate", async () => {
 
 async function initializeApp() {
   await restoreSession();
-  if (!authToken || !currentUser) {
+  if (!currentUser) {
     renderSortHeaders();
     return;
   }

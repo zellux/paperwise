@@ -59,10 +59,10 @@ def current_user_dependency(
     repository: DocumentRepository = Depends(document_repository_dependency),
 ) -> User:
     token = ""
-    if authorization and authorization.lower().startswith("bearer "):
-        token = authorization.split(" ", 1)[1].strip()
-    elif session_token:
+    if session_token:
         token = session_token.strip()
+    elif authorization and authorization.lower().startswith("bearer "):
+        token = authorization.split(" ", 1)[1].strip()
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

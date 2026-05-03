@@ -24,12 +24,16 @@ _VIEW_ARTICLE_RE = re.compile(
 )
 
 
+def _page_initial_data(current_user: User | None) -> dict:
+    return {"authenticated": current_user is not None}
+
+
 def _chat_thread_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     if current_user is None:
-        return {"authenticated": False, "chat_threads": []}
+        return {**_page_initial_data(current_user), "chat_threads": []}
     _migrate_legacy_chat_threads(repository, current_user)
     return {
-        "authenticated": True,
+        **_page_initial_data(current_user),
         "chat_threads": [
             {
                 "id": thread.id,
@@ -86,28 +90,28 @@ def root() -> RedirectResponse:
 
 
 @router.get("/ui/documents", include_in_schema=False)
-def documents_page() -> HTMLResponse:
-    return _render_ui_page("section-docs")
+def documents_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-docs", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/document", include_in_schema=False)
-def document_page() -> HTMLResponse:
-    return _render_ui_page("section-document")
+def document_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-document", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/tags", include_in_schema=False)
-def tags_page() -> HTMLResponse:
-    return _render_ui_page("section-tags")
+def tags_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-tags", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/document-types", include_in_schema=False)
-def document_types_page() -> HTMLResponse:
-    return _render_ui_page("section-document-types")
+def document_types_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-document-types", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/search", include_in_schema=False)
-def search_page() -> HTMLResponse:
-    return _render_ui_page("section-search")
+def search_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-search", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/grounded-qa", include_in_schema=False)
@@ -122,38 +126,38 @@ def grounded_qa_page(
 
 
 @router.get("/ui/pending", include_in_schema=False)
-def pending_page() -> HTMLResponse:
-    return _render_ui_page("section-pending")
+def pending_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-pending", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/upload", include_in_schema=False)
-def upload_page() -> HTMLResponse:
-    return _render_ui_page("section-upload")
+def upload_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-upload", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/activity", include_in_schema=False)
-def activity_page() -> HTMLResponse:
-    return _render_ui_page("section-activity")
+def activity_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-activity", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/settings", include_in_schema=False)
-def settings_page() -> HTMLResponse:
-    return _render_ui_page("section-settings")
+def settings_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/settings/account", include_in_schema=False)
-def settings_account_page() -> HTMLResponse:
-    return _render_ui_page("section-settings")
+def settings_account_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/settings/display", include_in_schema=False)
-def settings_display_page() -> HTMLResponse:
-    return _render_ui_page("section-settings")
+def settings_display_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/ui/settings/models", include_in_schema=False)
-def settings_models_page() -> HTMLResponse:
-    return _render_ui_page("section-settings")
+def settings_models_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
+    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user))
 
 
 @router.get("/style-lab", include_in_schema=False)

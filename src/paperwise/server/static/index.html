@@ -15,10 +15,6 @@
     <script>
       (() => {
         try {
-          const authToken = String(window.localStorage.getItem("paperwise.auth.token") || "").trim();
-          if (authToken) {
-            document.documentElement.classList.add("has-session");
-          }
           const key = "paperwise.ui.theme";
           const supported = new Set(["atlas", "ledger", "moss", "ember", "folio", "forge"]);
           const stored = String(window.localStorage.getItem(key) || "").trim().toLowerCase();
