@@ -174,6 +174,39 @@ def _activity_initial_data(repository: DocumentRepository, current_user: User | 
     }
 
 
+def _documents_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
+    initial_data = _page_initial_data(current_user)
+    if current_user is None:
+        return {
+            **initial_data,
+            "documents": [],
+            "documents_total": 0,
+            "documents_processing_count": 0,
+            "documents_page_size": 20,
+        }
+    ready_documents = [
+        document
+        for document in repository.list_documents(limit=10_000)
+        if document.owner_id == current_user.id and document.status == DocumentStatus.READY
+    ]
+    processing_count = sum(
+        1
+        for document in repository.list_documents(limit=10_000)
+        if document.owner_id == current_user.id and document.status != DocumentStatus.READY
+    )
+    return {
+        **initial_data,
+        "documents": [
+            item
+            for item in (_document_list_item(repository, document.id) for document in ready_documents[:20])
+            if item is not None
+        ],
+        "documents_total": len(ready_documents),
+        "documents_processing_count": processing_count,
+        "documents_page_size": 20,
+    }
+
+
 def _pending_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     initial_data = _page_initial_data(current_user)
     if current_user is None:
@@ -298,7 +331,63 @@ def _pending_rows_html(documents: list[dict]) -> str:
     return "\n".join(rows)
 
 
+def _document_rows_html(documents: list[dict]) -> str:
+    if not documents:
+        return '                <tr><td colspan="7">No documents found.</td></tr>'
+    rows: list[str] = []
+    for item in documents:
+        document_id = escape(str(item.get("id") or ""))
+        title = escape(_document_title(item))
+        metadata = item.get("llm_metadata") if isinstance(item.get("llm_metadata"), dict) else {}
+        document_type = escape(str(metadata.get("document_type") or "-"))
+        correspondent = escape(str(metadata.get("correspondent") or "-"))
+        tags = metadata.get("tags") if isinstance(metadata.get("tags"), list) else []
+        tags_text = escape(", ".join(str(tag) for tag in tags) if tags else "-")
+        document_date = escape(str(metadata.get("document_date") or "-"))
+        status_text = escape(str(item.get("status") or ""))
+        rows.append(
+            f'                <tr data-doc-id="{document_id}">'
+            f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id}">{title}</a></td>'
+            f'<td data-label="Type">{document_type}</td>'
+            f'<td data-label="Correspondent">{correspondent}</td>'
+            f'<td data-label="Tags">{tags_text}</td>'
+            f'<td data-label="Date">{document_date}</td>'
+            f'<td data-label="Status">{status_text}</td>'
+            '<td data-label="Action"><div class="table-actions">'
+            f'<a class="icon-action-button" href="/ui/document?id={document_id}" title="Open document">'
+            '<span class="icon-action-label">Open</span>'
+            "</a>"
+            "</div></td>"
+            "</tr>"
+        )
+    return "\n".join(rows)
+
+
 def _render_initial_page_data(html: str, initial_data: dict) -> str:
+    if isinstance(initial_data.get("documents"), list):
+        html = _replace_table_body(html, "docsTableBody", _document_rows_html(initial_data["documents"]))
+        total = int(initial_data.get("documents_total") or 0)
+        processing_count = int(initial_data.get("documents_processing_count") or 0)
+        page_size = max(1, int(initial_data.get("documents_page_size") or 20))
+        total_pages = max(1, (total + page_size - 1) // page_size)
+        html = re.sub(
+            r'(<span id="docsTotalLabel" class="docs-total-label">).*?(</span>)',
+            rf"\1Total documents: {total:,}\2",
+            html,
+            count=1,
+        )
+        html = re.sub(
+            r'(<span id="docsProcessingLabel" class="docs-total-label">).*?(</span>)',
+            rf"\1Processing: {processing_count:,}\2",
+            html,
+            count=1,
+        )
+        html = re.sub(
+            r'(<span id="pageIndicator" class="page-indicator">).*?(</span>)',
+            rf"\1Page 1 / {total_pages}\2",
+            html,
+            count=1,
+        )
     if isinstance(initial_data.get("tag_stats"), list):
         html = _replace_table_body(html, "tagsTableBody", _tag_rows_html(initial_data["tag_stats"]))
     if isinstance(initial_data.get("document_type_stats"), list):
@@ -391,8 +480,11 @@ def root() -> RedirectResponse:
 
 
 @router.get("/ui/documents", include_in_schema=False)
-def documents_page(current_user: User | None = Depends(optional_current_user_dependency)) -> HTMLResponse:
-    return _render_ui_page("section-docs", initial_data=_page_initial_data(current_user))
+def documents_page(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User | None = Depends(optional_current_user_dependency),
+) -> HTMLResponse:
+    return _render_ui_page("section-docs", initial_data=_documents_initial_data(repository, current_user))
 
 
 @router.get("/ui/document", include_in_schema=False)

@@ -252,6 +252,15 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         )
         assert login_response.status_code == 200
 
+        documents_html = client.get("/ui/documents").text
+        documents_payload = _initial_data_from_response(documents_html)
+        assert documents_payload["documents_total"] == 2
+        assert documents_payload["documents_processing_count"] == 0
+        assert "Total documents: 2" in documents_html
+        assert "Processing: 0" in documents_html
+        assert 'data-doc-id="doc-tax"' in documents_html
+        assert "Tax Notice" in documents_html
+
         tags_payload = _initial_data_from_response(client.get("/ui/tags").text)
         assert tags_payload["tag_stats"] == [
             {"tag": "Finance", "document_count": 2},
@@ -280,6 +289,8 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "Tax Notice" in activity_html
 
         _save_pending_document(repository, doc_id="doc-pending", owner_id=user_id, title="Pending File")
+        documents_with_pending_html = client.get("/ui/documents").text
+        assert "Processing: 1" in documents_with_pending_html
         pending_html = client.get("/ui/pending").text
         pending_payload = _initial_data_from_response(pending_html)
         assert pending_payload["pending_documents"][0]["id"] == "doc-pending"
