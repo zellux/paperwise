@@ -3563,6 +3563,7 @@ function resetSearchAskChat() {
   renderSearchAskAnswer(null);
   if (searchAskQuestion) {
     searchAskQuestion.value = "";
+    autoResizeChatTextarea(searchAskQuestion);
     searchAskQuestion.focus();
   }
 }
@@ -4195,6 +4196,7 @@ async function runScopedAsk() {
   const pendingMessage = appendSearchAskMessage("assistant", "", { pending: true });
   if (searchAskQuestion) {
     searchAskQuestion.value = "";
+    autoResizeChatTextarea(searchAskQuestion);
   }
   setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), true, "Asking...");
   searchAskInFlight = true;
@@ -4797,6 +4799,15 @@ searchAskQuestion?.addEventListener("keydown", async (event) => {
   event.preventDefault();
   await runScopedAsk();
 });
+
+function autoResizeChatTextarea(el) {
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 200) + "px";
+}
+
+if (searchAskQuestion) {
+  searchAskQuestion.addEventListener("input", () => autoResizeChatTextarea(searchAskQuestion));
+}
 
 searchAskMessages?.addEventListener("click", (event) => {
   const button = event.target instanceof Element ? event.target.closest(".chat-status-summary") : null;

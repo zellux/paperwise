@@ -27,6 +27,7 @@ coverage.xml
 .logs/
 .claude/
 .playwright-cli/
+.playwright-mcp/
 *.log
 
 # Editor temp files
