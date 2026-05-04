@@ -191,9 +191,16 @@ def test_user_preferences_round_trip() -> None:
             json={"email": "prefs@example.com", "password": "strong-pass-123"},
         )
         assert login_response.status_code == 200
+        access_token = login_response.json()["access_token"]
         get_empty = client.get("/users/me/preferences")
         assert get_empty.status_code == 200
         assert get_empty.json()["preferences"] == {}
+        bearer_get_empty = TestClient(app).get(
+            "/users/me/preferences",
+            headers={"Authorization": f"Bearer {access_token}"},
+        )
+        assert bearer_get_empty.status_code == 200
+        assert bearer_get_empty.json()["preferences"] == {}
 
         put_response = client.put(
             "/users/me/preferences",

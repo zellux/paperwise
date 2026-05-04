@@ -130,6 +130,7 @@ let currentDocumentId = "";
 let currentUser = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember", "folio", "forge"];
 const THEME_STORAGE_KEY = "paperwise.ui.theme";
+const AUTH_TOKEN_STORAGE_KEY = "paperwise.auth.token";
 let currentTheme = "forge";
 const SUPPORTED_LLM_PROVIDERS = ["openai", "gemini", "custom"];
 const LLM_PROVIDER_DEFAULTS = {
@@ -1598,9 +1599,12 @@ function normalizeChatThreadSummary(thread) {
 }
 
 function persistSession(token, user) {
-  void token;
   currentUser = user || null;
-  window.localStorage.removeItem("paperwise.auth.token");
+  if (token) {
+    window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+  } else {
+    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  }
 }
 
 function renderSessionState() {
@@ -1659,6 +1663,10 @@ async function apiFetch(url, options = {}) {
   const headers = new Headers(options.headers || {});
   const allowUnauthorized = options.allowUnauthorized === true;
   const { allowUnauthorized: _allowUnauthorized, ...fetchOptions } = options;
+  const token = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  if (token && !headers.has("Authorization")) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
   const response = await window.fetch(url, { credentials: "same-origin", ...fetchOptions, headers });
   if (response.status === 401 && !allowUnauthorized) {
     clearSession();
