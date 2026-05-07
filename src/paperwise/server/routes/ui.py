@@ -1,4 +1,5 @@
 from pathlib import Path
+from datetime import UTC, datetime, timedelta
 from html import escape
 import json
 import re
@@ -870,6 +871,12 @@ def _render_initial_page_data(html: str, initial_data: dict) -> str:
             "pendingTableBody",
             _pending_rows_html(initial_data["pending_documents"]),
         )
+    if isinstance(initial_data.get("chat_threads"), list):
+        html = _replace_element_html(
+            html,
+            "searchAskThreadList",
+            _chat_thread_list_html(initial_data["chat_threads"]),
+        )
     return html
 
 
@@ -940,6 +947,112 @@ def _chat_thread_initial_data(repository: DocumentRepository, current_user: User
             }
             for thread in repository.list_chat_threads(current_user.id, 20)
         ]
+    }
+
+
+def _chat_thread_time_label(value: str) -> str:
+    try:
+        date = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    if date.tzinfo is None:
+        date = date.replace(tzinfo=UTC)
+    now = datetime.now(UTC)
+    if date.date() == now.date():
+        elapsed_minutes = max(1, int((now - date.astimezone(UTC)).total_seconds() // 60))
+        if elapsed_minutes < 60:
+            return f"{elapsed_minutes} min ago"
+        return f"{elapsed_minutes // 60} hr ago"
+    if date.date() == (now - timedelta(days=1)).date():
+        return "Yesterday"
+    try:
+        return date.strftime("%b %-d")
+    except ValueError:
+        return date.strftime("%b %d").replace(" 0", " ")
+
+
+def _chat_thread_bucket(thread: dict) -> str:
+    value = str(thread.get("updated_at") or thread.get("created_at") or "")
+    try:
+        date = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return "earlier"
+    if date.tzinfo is None:
+        date = date.replace(tzinfo=UTC)
+    now = datetime.now(UTC)
+    if date.date() == now.date():
+        return "today"
+    if date.date() == (now - timedelta(days=1)).date():
+        return "yesterday"
+    return "earlier"
+
+
+def _chat_thread_list_html(
+    threads: list[dict],
+    *,
+    active_thread_id: str = "",
+    query: str = "",
+) -> str:
+    normalized_query = str(query or "").strip().casefold()
+    filtered_threads = [
+        thread
+        for thread in threads
+        if not normalized_query or normalized_query in str(thread.get("title") or "").casefold()
+    ]
+    if not filtered_threads:
+        message = "No chats match that search." if normalized_query else "No recent chats yet."
+        return f'<p class="thread-empty">{escape(message)}</p>'
+
+    sections: list[str] = []
+    for bucket, label in (("today", "Today"), ("yesterday", "Yesterday"), ("earlier", "Earlier")):
+        items = [thread for thread in filtered_threads if _chat_thread_bucket(thread) == bucket]
+        if not items:
+            continue
+        rows: list[str] = []
+        for thread in items:
+            raw_thread_id = str(thread.get("id") or "")
+            thread_id = escape(raw_thread_id)
+            title = escape(str(thread.get("title") or "Untitled chat"))
+            updated = _chat_thread_time_label(str(thread.get("updated_at") or thread.get("created_at") or ""))
+            count = int(thread.get("message_count") or 0)
+            count_label = f"{count} msg" if count == 1 else f"{count} msgs"
+            meta = escape(" | ".join(item for item in (updated, count_label) if item))
+            active_class = " active" if raw_thread_id == active_thread_id else ""
+            rows.append(
+                f'<li class="thread-item{active_class}">'
+                f'<button type="button" class="thread-button" data-thread-id="{thread_id}">'
+                f'<span class="thread-title">{title}</span>'
+                f'<span class="thread-meta">{meta}</span>'
+                "</button>"
+                f'<button type="button" class="thread-action" data-delete-thread-id="{thread_id}" '
+                f'title="Delete chat" aria-label="Delete {title}">&times;</button>'
+                "</li>"
+            )
+        sections.append(
+            '<section class="thread-group">'
+            f'<h4 class="thread-group-label">{escape(label)}</h4>'
+            f'<ul class="thread-list">{"".join(rows)}</ul>'
+            "</section>"
+        )
+    return "".join(sections)
+
+
+def _chat_threads_partial_data(
+    repository: DocumentRepository,
+    current_user: User,
+    *,
+    active_thread_id: str = "",
+    query: str = "",
+) -> dict:
+    data = _chat_thread_initial_data(repository, current_user)
+    threads = data["chat_threads"]
+    return {
+        "chat_threads": threads,
+        "thread_list_html": _chat_thread_list_html(
+            threads,
+            active_thread_id=active_thread_id,
+            query=query,
+        ),
     }
 
 
@@ -1259,6 +1372,24 @@ def document_partial(
     data = _document_detail_initial_data(repository, current_user, id)
     return JSONResponse(
         _document_detail_fragments(data),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/ui/partials/chat-threads", include_in_schema=False)
+def chat_threads_partial(
+    active_thread_id: str = Query(""),
+    q: str = Query(""),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> JSONResponse:
+    return JSONResponse(
+        _chat_threads_partial_data(
+            repository,
+            current_user,
+            active_thread_id=active_thread_id,
+            query=q,
+        ),
         headers={"Cache-Control": "no-store"},
     )
 

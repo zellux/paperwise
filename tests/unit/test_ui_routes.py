@@ -281,6 +281,15 @@ def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> No
         assert payload["current_user"]["email"] == "chat-ui@example.com"
         assert payload["chat_threads"][0]["id"] == "thread-ui"
         assert payload["chat_threads"][0]["title"] == "Server rendered chat"
+        assert '<button type="button" class="thread-button" data-thread-id="thread-ui">' in response.text
+        assert '<span class="thread-title">Server rendered chat</span>' in response.text
+
+        threads_partial = client.get("/ui/partials/chat-threads?active_thread_id=thread-ui&q=server")
+        assert threads_partial.status_code == 200
+        threads_partial_payload = threads_partial.json()
+        assert threads_partial_payload["chat_threads"][0]["id"] == "thread-ui"
+        assert '<li class="thread-item active">' in threads_partial_payload["thread_list_html"]
+        assert "Server rendered chat" in threads_partial_payload["thread_list_html"]
 
         search_payload = _initial_data_from_response(client.get("/ui/search").text)
         assert "chat_threads" not in search_payload

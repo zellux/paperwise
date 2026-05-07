@@ -14,7 +14,9 @@ searchAskNewChatBtn?.addEventListener("click", () => {
 });
 
 searchAskThreadSearch?.addEventListener("input", () => {
-  renderSearchAskThreadSelect();
+  loadSearchAskThreads().catch((error) => {
+    logActivity(`Chat history failed: ${error.message}`);
+  });
 });
 
 searchAskThreadList?.addEventListener("click", async (event) => {

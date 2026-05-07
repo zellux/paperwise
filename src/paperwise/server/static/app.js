@@ -2284,112 +2284,29 @@ function updateSearchAskTokenUsage(tokenUsage) {
   renderSearchAskTokenUsage();
 }
 
-function formatSearchAskThreadTime(value) {
-  const date = new Date(value || "");
-  if (Number.isNaN(date.getTime())) {
-    return "";
+function syncSearchAskThreadSelect() {
+  if (!searchAskThreadList) {
+    return;
   }
-  const now = new Date();
-  const elapsedMs = now.getTime() - date.getTime();
-  const elapsedDays = Math.floor(elapsedMs / 86400000);
-  if (elapsedDays <= 0 && date.toDateString() === now.toDateString()) {
-    const elapsedMinutes = Math.max(1, Math.floor(elapsedMs / 60000));
-    if (elapsedMinutes < 60) {
-      return `${elapsedMinutes} min ago`;
-    }
-    return `${Math.floor(elapsedMinutes / 60)} hr ago`;
+  for (const item of searchAskThreadList.querySelectorAll(".thread-item")) {
+    const button = item.querySelector("[data-thread-id]");
+    item.classList.toggle("active", button?.dataset.threadId === searchAskThreadId);
   }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
+  for (const button of searchAskThreadList.querySelectorAll("[data-delete-thread-id]")) {
+    button.disabled = searchAskInFlight;
   }
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function getSearchAskThreadBucket(thread) {
-  const date = new Date(thread?.updated_at || thread?.created_at || "");
-  if (Number.isNaN(date.getTime())) {
-    return "earlier";
-  }
-  const now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return "today";
-  }
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (date.toDateString() === yesterday.toDateString()) {
-    return "yesterday";
-  }
-  return "earlier";
 }
 
 function renderSearchAskThreadSelect() {
-  const currentValue = searchAskThreadId;
-  if (searchAskThreadList) {
-    searchAskThreadList.innerHTML = "";
-    const query = String(searchAskThreadSearch?.value || "").trim().toLowerCase();
-    const filteredThreads = searchAskThreads.filter((thread) =>
-      !query || String(thread.title || "").toLowerCase().includes(query)
-    );
-    if (!filteredThreads.length) {
-      const empty = document.createElement("p");
-      empty.className = "thread-empty";
-      empty.textContent = query ? "No chats match that search." : "No recent chats yet.";
-      searchAskThreadList.appendChild(empty);
-    } else {
-      const groups = [
-        ["today", "Today"],
-        ["yesterday", "Yesterday"],
-        ["earlier", "Earlier"],
-      ];
-      for (const [bucket, label] of groups) {
-        const items = filteredThreads.filter((thread) => getSearchAskThreadBucket(thread) === bucket);
-        if (!items.length) {
-          continue;
-        }
-        const group = document.createElement("section");
-        group.className = "thread-group";
-        const heading = document.createElement("h4");
-        heading.className = "thread-group-label";
-        heading.textContent = label;
-        const list = document.createElement("ul");
-        list.className = "thread-list";
-        for (const thread of items) {
-          const item = document.createElement("li");
-          item.className = `thread-item${thread.id === currentValue ? " active" : ""}`;
-          const button = document.createElement("button");
-          button.type = "button";
-          button.className = "thread-button";
-          button.dataset.threadId = thread.id;
-          const title = document.createElement("span");
-          title.className = "thread-title";
-          title.textContent = thread.title || "Untitled chat";
-          const meta = document.createElement("span");
-          meta.className = "thread-meta";
-          const updated = formatSearchAskThreadTime(thread.updated_at || thread.created_at);
-          const count = Number(thread.message_count || 0);
-          meta.textContent = [updated, `${count} msg${count === 1 ? "" : "s"}`].filter(Boolean).join(" · ");
-          button.appendChild(title);
-          button.appendChild(meta);
-          const deleteButton = document.createElement("button");
-          deleteButton.type = "button";
-          deleteButton.className = "thread-action";
-          deleteButton.dataset.deleteThreadId = thread.id;
-          deleteButton.title = "Delete chat";
-          deleteButton.setAttribute("aria-label", `Delete ${thread.title || "chat"}`);
-          deleteButton.disabled = searchAskInFlight;
-          deleteButton.textContent = "×";
-          item.appendChild(button);
-          item.appendChild(deleteButton);
-          list.appendChild(item);
-        }
-        group.appendChild(heading);
-        group.appendChild(list);
-        searchAskThreadList.appendChild(group);
-      }
-    }
-  }
+  syncSearchAskThreadSelect();
+}
+
+function applySearchAskThreadsPartial(payload) {
+  searchAskThreads = Array.isArray(payload.chat_threads)
+    ? payload.chat_threads.map(normalizeChatThreadSummary).filter((thread) => thread.id)
+    : [];
+  replaceElementHtml(searchAskThreadList, payload.thread_list_html);
+  syncSearchAskThreadSelect();
 }
 
 async function loadSearchAskThreads() {
@@ -2406,17 +2323,26 @@ async function loadSearchAskThreads() {
     searchAskThreads = initialData.chat_threads
       .map(normalizeChatThreadSummary)
       .filter((thread) => thread.id);
-    renderSearchAskThreadSelect();
+    syncSearchAskThreadSelect();
     return;
   }
-  const response = await apiFetch("/query/chat/threads");
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Chat history failed: ${payload.detail || response.statusText}`);
+  const query = new URLSearchParams();
+  if (searchAskThreadId) {
+    query.set("active_thread_id", searchAskThreadId);
+  }
+  const search = String(searchAskThreadSearch?.value || "").trim();
+  if (search) {
+    query.set("q", search);
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  let payload;
+  try {
+    payload = await fetchUiPartial(`/ui/partials/chat-threads${suffix}`);
+  } catch (error) {
+    logActivity(`Chat history failed: ${error.message}`);
     return;
   }
-  searchAskThreads = Array.isArray(payload) ? payload : [];
-  renderSearchAskThreadSelect();
+  applySearchAskThreadsPartial(payload);
 }
 
 function hydrateSearchAskMessages(messages) {
@@ -2461,7 +2387,7 @@ async function loadSearchAskThread(threadId) {
   searchAskThreadId = payload.id || "";
   updateSearchAskTokenUsage(payload.token_usage);
   hydrateSearchAskMessages(payload.messages || []);
-  renderSearchAskThreadSelect();
+  await loadSearchAskThreads();
   logActivity(`Loaded chat: ${payload.title || "Untitled chat"}`);
 }
 
@@ -2485,11 +2411,10 @@ async function deleteSearchAskThread(threadId) {
     renderSearchAskThreadSelect();
     return;
   }
-  searchAskThreads = searchAskThreads.filter((item) => item.id !== id);
   if (searchAskThreadId === id) {
     resetSearchAskChat();
   } else {
-    renderSearchAskThreadSelect();
+    syncSearchAskThreadSelect();
   }
   await loadSearchAskThreads();
   logActivity(`Deleted chat: ${title}`);
