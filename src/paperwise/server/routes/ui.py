@@ -2,6 +2,7 @@ from pathlib import Path
 from html import escape
 import json
 import re
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
@@ -387,15 +388,17 @@ def _tag_rows_html(tag_stats: list[dict]) -> str:
         return '                <tr><td colspan="3">No tags found.</td></tr>'
     rows: list[str] = []
     for stat in tag_stats:
-        tag = escape(str(stat.get("tag") or ""))
+        raw_tag = str(stat.get("tag") or "")
+        tag = escape(raw_tag)
+        tag_query = quote(raw_tag, safe="")
         count = int(stat.get("document_count") or 0)
         rows.append(
             "                <tr>"
             f'<td data-label="Tag">{tag}</td>'
             f'<td data-label="Documents">{count}</td>'
             '<td data-label="Action"><div class="table-actions">'
-            f'<a class="icon-action-button" href="/ui/documents?tag={tag}" title="View documents for tag {tag}">'
-            '<span class="icon-action-label">View</span>'
+            f'<a class="btn" href="/ui/documents?tag={tag_query}" title="View documents for tag {tag}">'
+            "View Docs"
             "</a>"
             "</div></td>"
             "</tr>"
@@ -408,16 +411,18 @@ def _document_type_rows_html(type_stats: list[dict]) -> str:
         return '                <tr><td colspan="3">No document types found.</td></tr>'
     rows: list[str] = []
     for stat in type_stats:
-        document_type = escape(str(stat.get("document_type") or ""))
+        raw_document_type = str(stat.get("document_type") or "")
+        document_type = escape(raw_document_type)
+        document_type_query = quote(raw_document_type, safe="")
         count = int(stat.get("document_count") or 0)
         rows.append(
             "                <tr>"
             f'<td data-label="Document Type">{document_type}</td>'
             f'<td data-label="Documents">{count}</td>'
             '<td data-label="Action"><div class="table-actions">'
-            f'<a class="icon-action-button" href="/ui/documents?document_type={document_type}" '
+            f'<a class="btn" href="/ui/documents?document_type={document_type_query}" '
             f'title="View documents for type {document_type}">'
-            '<span class="icon-action-label">View</span>'
+            "View Docs"
             "</a>"
             "</div></td>"
             "</tr>"
@@ -587,18 +592,24 @@ def _activity_rows_html(documents: list[dict]) -> str:
         return '                <tr><td colspan="4">No processed documents.</td></tr>'
     rows: list[str] = []
     for item in documents:
-        document_id = escape(str(item.get("id") or ""))
+        raw_document_id = str(item.get("id") or "")
+        document_id = escape(raw_document_id)
+        document_id_query = quote(raw_document_id, safe="")
         title = escape(_document_title(item))
         status_html = _status_badge_html(str(item.get("status") or ""))
         created_at = escape(str(item.get("created_at") or "-"))
         rows.append(
             "                <tr>"
-            f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id}">{title}</a></td>'
+            f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id_query}">{title}</a></td>'
             f'<td data-label="Status">{status_html}</td>'
             f'<td data-label="Uploaded">{created_at}</td>'
             '<td data-label="Action"><div class="table-actions">'
-            f'<a class="icon-action-button" href="/ui/document?id={document_id}" title="Open document">'
-            '<span class="icon-action-label">Open</span>'
+            f'<a class="btn" href="/ui/document?id={document_id_query}" title="Open document">'
+            "Open"
+            "</a>"
+            f'<a class="btn btn-muted" href="/documents/{document_id_query}/file" '
+            'target="_blank" rel="noopener noreferrer" title="View file">'
+            "View"
             "</a>"
             "</div></td>"
             "</tr>"
@@ -635,7 +646,9 @@ def _document_rows_html(documents: list[dict]) -> str:
         return '                <tr><td colspan="7">No documents found.</td></tr>'
     rows: list[str] = []
     for item in documents:
-        document_id = escape(str(item.get("id") or ""))
+        raw_document_id = str(item.get("id") or "")
+        document_id = escape(raw_document_id)
+        document_id_query = quote(raw_document_id, safe="")
         title = escape(_document_title(item))
         metadata = item.get("llm_metadata") if isinstance(item.get("llm_metadata"), dict) else {}
         document_type = escape(str(metadata.get("document_type") or "-"))
@@ -653,9 +666,15 @@ def _document_rows_html(documents: list[dict]) -> str:
             f'<td data-label="Date">{document_date}</td>'
             f'<td data-label="Status">{status_html}</td>'
             '<td data-label="Action"><div class="table-actions">'
-            f'<a class="icon-action-button" href="/ui/document?id={document_id}" title="Open document">'
-            '<span class="icon-action-label">Open</span>'
+            f'<a class="btn" href="/ui/document?id={document_id_query}" title="Open document">'
+            "Open"
             "</a>"
+            f'<a class="btn btn-muted" href="/documents/{document_id_query}/file" '
+            'target="_blank" rel="noopener noreferrer" title="View file">'
+            "View"
+            "</a>"
+            f'<button class="btn btn-muted" type="button" data-delete-doc-id="{document_id}" '
+            f'data-delete-doc-title="{title}" title="Delete document">Delete</button>'
             "</div></td>"
             "</tr>"
         )

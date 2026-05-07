@@ -2291,6 +2291,15 @@ function createIconActionButton({ icon, label, onClick }) {
   return button;
 }
 
+function createTableActionButton({ label, className = "btn", onClick }) {
+  const button = document.createElement("button");
+  button.className = className;
+  button.type = "button";
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  return button;
+}
+
 function getSuggestedTitle(doc) {
   if (doc.llm_metadata && doc.llm_metadata.suggested_title) {
     return doc.llm_metadata.suggested_title;
@@ -2332,6 +2341,26 @@ async function deleteDocumentById(documentId, options = {}) {
   logActivity(`Deleted document ${documentId}.`);
   return true;
 }
+
+window.document.addEventListener("click", async (event) => {
+  const button =
+    event.target instanceof Element ? event.target.closest("[data-delete-doc-id]") : null;
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+  const documentId = button.dataset.deleteDocId || "";
+  if (!documentId) {
+    return;
+  }
+  button.disabled = true;
+  try {
+    await deleteDocumentById(documentId, {
+      documentLabel: button.dataset.deleteDocTitle || documentId,
+    });
+  } finally {
+    button.disabled = false;
+  }
+});
 
 function hydrateSettingsFormFromInitialPreferences() {
   const initialData = readInitialData();
@@ -2423,16 +2452,15 @@ function renderDocsList(documents) {
     const actionsWrap = document.createElement("div");
     actionsWrap.className = "table-actions";
     actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "edit",
-        label: "Open document",
+      createTableActionButton({
+        label: "Open",
         onClick: () => navigateToDocument(doc.id),
       })
     );
     actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "eye",
-        label: "View file",
+      createTableActionButton({
+        label: "View",
+        className: "btn btn-muted",
         onClick: async () => {
           try {
             await openDocumentFile(doc.id);
@@ -2443,9 +2471,9 @@ function renderDocsList(documents) {
       })
     );
     actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "trash",
-        label: "Delete document",
+      createTableActionButton({
+        label: "Delete",
+        className: "btn btn-muted",
         onClick: async () => {
           await deleteDocumentById(doc.id, {
             documentLabel: getSuggestedTitle(doc),
@@ -2491,9 +2519,8 @@ function renderTagsList(tagStats) {
     const actionsWrap = document.createElement("div");
     actionsWrap.className = "table-actions";
     actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "eye",
-        label: `View documents for tag ${stat.tag}`,
+      createTableActionButton({
+        label: "View Docs",
         onClick: async () => {
           await openDocumentsWithFilters(
             {
@@ -2541,9 +2568,8 @@ function renderDocumentTypesList(typeStats) {
     const actionsWrap = document.createElement("div");
     actionsWrap.className = "table-actions";
     actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "eye",
-        label: `View documents for type ${stat.document_type}`,
+      createTableActionButton({
+        label: "View Docs",
         onClick: async () => {
           await openDocumentsWithFilters(
             {
@@ -2652,16 +2678,15 @@ function renderProcessedDocsActivity(documents) {
     const actionsWrap = document.createElement("div");
     actionsWrap.className = "table-actions";
     actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "edit",
-        label: "Open document",
+      createTableActionButton({
+        label: "Open",
         onClick: () => navigateToDocument(doc.id),
       })
     );
     actionsWrap.appendChild(
-      createIconActionButton({
-        icon: "eye",
-        label: "View file",
+      createTableActionButton({
+        label: "View",
+        className: "btn btn-muted",
         onClick: async () => {
           try {
             await openDocumentFile(doc.id);

@@ -365,6 +365,13 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'data-doc-id="doc-tax"' in documents_html
         assert "Tax Notice" in documents_html
         assert '<span class="status-badge status-ready">READY</span>' in documents_html
+        assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in documents_html
+        assert (
+            '<a class="btn btn-muted" href="/documents/doc-tax/file" target="_blank" '
+            'rel="noopener noreferrer" title="View file">View</a>'
+        ) in documents_html
+        assert 'data-delete-doc-id="doc-tax"' in documents_html
+        assert "icon-action-button" not in documents_html
 
         detail_html = client.get("/ui/document?id=doc-tax").text
         detail_payload = _initial_data_from_response(detail_html)
@@ -399,6 +406,11 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         tags_html = client.get("/ui/tags").text
         assert '<td data-label="Tag">Finance</td>' in tags_html
         assert '<td data-label="Documents">2</td>' in tags_html
+        assert (
+            '<a class="btn" href="/ui/documents?tag=Finance" '
+            'title="View documents for tag Finance">View Docs</a>'
+        ) in tags_html
+        assert "icon-action-button" not in tags_html
 
         types_html = client.get("/ui/document-types").text
         types_payload = _initial_data_from_response(types_html)
@@ -407,6 +419,11 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             {"document_type": "Notice", "document_count": 1},
         ]
         assert '<td data-label="Document Type">Invoice</td>' in types_html
+        assert (
+            '<a class="btn" href="/ui/documents?document_type=Invoice" '
+            'title="View documents for type Invoice">View Docs</a>'
+        ) in types_html
+        assert "icon-action-button" not in types_html
 
         activity_html = client.get("/ui/activity").text
         activity_payload = _initial_data_from_response(activity_html)
@@ -418,6 +435,12 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "LLM tokens processed: 42" in activity_html
         assert "Tax Notice" in activity_html
         assert '<span class="status-badge status-ready">READY</span>' in activity_html
+        assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in activity_html
+        assert (
+            '<a class="btn btn-muted" href="/documents/doc-tax/file" target="_blank" '
+            'rel="noopener noreferrer" title="View file">View</a>'
+        ) in activity_html
+        assert "icon-action-button" not in activity_html
 
         _save_pending_document(repository, doc_id="doc-pending", owner_id=user_id, title="Pending File")
         documents_with_pending_html = client.get("/ui/documents").text
