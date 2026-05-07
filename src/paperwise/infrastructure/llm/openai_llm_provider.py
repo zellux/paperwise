@@ -35,6 +35,28 @@ _RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
 _DEFAULT_CHAT_COMPLETIONS_ATTEMPTS = 3
 
 
+def _parse_json_content(content: str) -> Any:
+    text = str(content or "").strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].lstrip().startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        start_positions = [position for position in (text.find("{"), text.find("[")) if position >= 0]
+        if not start_positions:
+            raise
+        start = min(start_positions)
+        end = max(text.rfind("}"), text.rfind("]"))
+        if end <= start:
+            raise
+        return json.loads(text[start : end + 1])
+
+
 class OpenAILLMProvider(LLMProvider):
     def __init__(
         self,
@@ -161,7 +183,7 @@ class OpenAILLMProvider(LLMProvider):
         response.raise_for_status()
         payload = response_payload if isinstance(response_payload, dict) else response.json()
         content = payload["choices"][0]["message"]["content"]
-        parsed = json.loads(content)
+        parsed = _parse_json_content(content)
         usage = payload.get("usage", {})
 
         result = extract_metadata_result(parsed)
@@ -238,7 +260,7 @@ class OpenAILLMProvider(LLMProvider):
         payload = response_payload if isinstance(response_payload, dict) else response.json()
         content = str(payload["choices"][0]["message"]["content"]).strip()
         try:
-            parsed = json.loads(content)
+            parsed = _parse_json_content(content)
         except json.JSONDecodeError:
             return content
 
@@ -349,7 +371,7 @@ class OpenAILLMProvider(LLMProvider):
             payload = response_payload if isinstance(response_payload, dict) else response.json()
             content = str(payload["choices"][0]["message"]["content"]).strip()
             try:
-                parsed = json.loads(content)
+                parsed = _parse_json_content(content)
                 extracted = extract_ocr_text_result(parsed)
             except json.JSONDecodeError:
                 extracted = content
@@ -424,7 +446,7 @@ class OpenAILLMProvider(LLMProvider):
         response.raise_for_status()
         payload = response_payload if isinstance(response_payload, dict) else response.json()
         content = str(payload["choices"][0]["message"]["content"]).strip()
-        parsed = json.loads(content)
+        parsed = _parse_json_content(content)
         result = extract_grounded_qa_result(parsed)
         usage = payload.get("usage", {})
         total_tokens = usage.get("total_tokens")
@@ -458,7 +480,7 @@ class OpenAILLMProvider(LLMProvider):
         response.raise_for_status()
         payload = response_payload if isinstance(response_payload, dict) else response.json()
         content = str(payload["choices"][0]["message"]["content"]).strip()
-        parsed = json.loads(content)
+        parsed = _parse_json_content(content)
         return extract_retrieval_query_result(parsed, fallback_question=question)
 
     def answer_with_tools(

@@ -57,6 +57,58 @@ def test_openai_provider_parses_json_response(monkeypatch) -> None:
     assert result["llm_total_tokens"] == 321
 
 
+def test_openai_provider_parses_fenced_json_response(monkeypatch) -> None:
+    class FakeClient:
+        def post(self, _path: str, json: dict):
+            del json
+
+            class Response:
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": (
+                                        "```json\n"
+                                        "{\n"
+                                        '  "suggested_title": "Monthly Parking License Agreement",\n'
+                                        '  "document_date": "2016-06-11",\n'
+                                        '  "correspondent": "Westlake Village Apartments",\n'
+                                        '  "document_type": "Lease Agreement",\n'
+                                        '  "tags": ["Lease Agreement", "Parking Space"]\n'
+                                        "}\n"
+                                        "```"
+                                    )
+                                }
+                            }
+                        ]
+                    }
+
+            return Response()
+
+    provider = OpenAILLMProvider(api_key="k", model="m")
+    monkeypatch.setattr(provider, "_client", FakeClient())
+
+    result = provider.suggest_metadata(
+        filename="daly city parking.pdf",
+        text_preview="sample",
+        current_correspondent=None,
+        current_document_type=None,
+        existing_correspondents=[],
+        existing_document_types=[],
+        existing_tags=[],
+    )
+
+    assert result["suggested_title"] == "Monthly Parking License Agreement"
+    assert result["document_date"] == "2016-06-11"
+    assert result["correspondent"] == "Westlake Village Apartments"
+    assert result["document_type"] == "Lease Agreement"
+    assert result["tags"] == ["Lease Agreement", "Parking Space"]
+
+
 def test_openai_provider_omits_missing_keys(monkeypatch) -> None:
     class FakeClient:
         def post(self, _path: str, json: dict):
