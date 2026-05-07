@@ -26,7 +26,6 @@ const searchAskThreadSearch = document.getElementById("searchAskThreadSearch");
 const searchAskThreadList = document.getElementById("searchAskThreadList");
 const searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
 const searchAskMessages = document.getElementById("searchAskMessages");
-const searchSubsections = [...document.querySelectorAll(".search-subsection")];
 const settingsSubsections = [...document.querySelectorAll(".settings-subsection")];
 const settingsSubnavLinks = [...document.querySelectorAll(".settings-subnav-link")];
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
@@ -199,14 +198,9 @@ let initialChatThreadsConsumed = false;
 let initialUserPreferencesConsumed = false;
 let currentTagStats = [];
 let currentDocumentTypeStats = [];
-let searchActiveSectionId = "search-section-keyword";
 let settingsActiveSectionId = "settings-section-display";
 let uploadInProgress = false;
 let uploadSelectionContext = { source: "files", folderName: "" };
-const PATH_TO_SEARCH_SECTION_ID = {
-  "/ui/search": "search-section-keyword",
-  "/ui/grounded-qa": "search-section-ask",
-};
 const PATH_TO_SETTINGS_SECTION_ID = {
   "/ui/settings": "settings-section-display",
   "/ui/settings/account": "settings-section-account",
@@ -1148,7 +1142,6 @@ async function hydrateUserPreferencesForSession() {
 // Avoid auth-gate flash on page load when the server rendered an authenticated shell.
 if (document.documentElement.classList.contains("has-session") && authGate && appShell) {
   readFiltersFromUrl();
-  setActiveSearchSection(searchActiveSectionId);
   setActiveSettingsSection(settingsActiveSectionId);
   renderSortHeaders();
   authGate.classList.add("view-hidden");
@@ -1639,9 +1632,7 @@ function clearSession() {
   searchAskCurrentTokens = 0;
   searchAskThreadId = "";
   searchAskThreads = [];
-  searchActiveSectionId = "search-section-keyword";
   currentViewId = "section-docs";
-  setActiveSearchSection(searchActiveSectionId);
   renderSearchAskTokenUsage();
   renderSearchAskThreadSelect();
   renderSearchResultsTable({ hits: [] });
@@ -1674,19 +1665,6 @@ function restoreSession() {
     return;
   }
   clearSession();
-}
-
-function setActiveSearchSection(sectionId) {
-  const defaultSectionId = "search-section-keyword";
-  const nextSectionId = searchSubsections.some((section) => section.id === sectionId)
-    ? sectionId
-    : defaultSectionId;
-  searchActiveSectionId = nextSectionId;
-  for (const section of searchSubsections) {
-    section.classList.toggle("view-hidden", section.id !== nextSectionId);
-  }
-  searchSectionHeading?.classList.add("view-hidden");
-  searchResultsMeta?.classList.toggle("view-hidden", nextSectionId !== "search-section-keyword");
 }
 
 function setActiveSettingsSection(sectionId) {
@@ -2154,12 +2132,8 @@ function readFiltersFromUrl() {
     DOCS_SORT_FIELDS
   );
   const pathViewId = getCurrentPathViewId();
-  const pathSearchSectionId = PATH_TO_SEARCH_SECTION_ID[path];
   const pathSettingsSectionId = PATH_TO_SETTINGS_SECTION_ID[path];
   currentViewId = pathViewId || "section-docs";
-  if (pathSearchSectionId) {
-    searchActiveSectionId = pathSearchSectionId;
-  }
   if (pathSettingsSectionId) {
     settingsActiveSectionId = pathSettingsSectionId;
   }
@@ -3825,7 +3799,6 @@ async function runAsk() {
 
 async function initializeSearchView() {
   await loadSearchAskThreads();
-  setActiveSearchSection(searchActiveSectionId);
   renderSearchResultsMeta("Ready.");
 }
 
@@ -4373,7 +4346,6 @@ async function initializeApp() {
 }
 
 applyTheme(currentTheme);
-setActiveSearchSection(searchActiveSectionId);
 
 initializeApp().catch((error) => {
   setAuthMessage(error.message || "Failed to initialize app.", true);

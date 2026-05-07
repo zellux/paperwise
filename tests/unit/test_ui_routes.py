@@ -210,7 +210,21 @@ def test_search_ui_does_not_include_upload_shell() -> None:
 
     assert response.status_code == 200
     assert 'id="section-search"' in response.text
+    assert 'id="search-section-keyword"' in response.text
+    assert 'id="search-section-ask"' not in response.text
+    assert "Search and Ask Your Docs" not in response.text
     assert 'id="section-upload"' not in response.text
+
+
+def test_grounded_qa_ui_does_not_include_keyword_search_shell() -> None:
+    client = TestClient(app)
+    response = client.get("/ui/grounded-qa")
+
+    assert response.status_code == 200
+    assert 'id="section-search"' in response.text
+    assert 'id="search-section-ask"' in response.text
+    assert 'id="search-section-keyword"' not in response.text
+    assert "Keyword Search" not in response.text
 
 
 def test_static_assets_serve_upload_progress_ui() -> None:
@@ -269,7 +283,7 @@ def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> No
         assert payload["chat_threads"][0]["title"] == "Server rendered chat"
 
         search_payload = _initial_data_from_response(client.get("/ui/search").text)
-        assert search_payload["chat_threads"][0]["id"] == "thread-ui"
+        assert "chat_threads" not in search_payload
     finally:
         app.dependency_overrides.clear()
 

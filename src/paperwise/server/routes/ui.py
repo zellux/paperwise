@@ -47,6 +47,7 @@ _NAV_LINK_RE = re.compile(
     r'(?=[^>]*\bhref="(?P<href>[^"]+)")[^>]*>)',
     re.DOTALL,
 )
+_SEARCH_SUBSECTION_IDS = ("search-section-keyword", "search-section-ask")
 _ACTIVE_NAV_BY_VIEW = {
     "section-docs": "/ui/documents",
     "section-document": "/ui/documents",
@@ -772,6 +773,45 @@ def _render_active_nav(html: str, active_href: str) -> str:
     return _NAV_LINK_RE.sub(replace_link, html)
 
 
+def _find_balanced_element_end(html: str, start_pos: int, tag_name: str) -> int | None:
+    tag_re = re.compile(rf"</?{tag_name}\b[^>]*>", re.IGNORECASE)
+    depth = 1
+    for match in tag_re.finditer(html, start_pos):
+        if match.group(0).startswith("</"):
+            depth -= 1
+            if depth == 0:
+                return match.end()
+            continue
+        depth += 1
+    return None
+
+
+def _render_active_search_subsection(html: str, active_section_id: str | None) -> str:
+    if active_section_id not in _SEARCH_SUBSECTION_IDS:
+        return html
+
+    spans: list[tuple[int, int, str]] = []
+    for section_id in _SEARCH_SUBSECTION_IDS:
+        start_re = re.compile(
+            rf'\n\s*<section\b(?=[^>]*\bid="{re.escape(section_id)}")[^>]*>',
+            re.IGNORECASE,
+        )
+        match = start_re.search(html)
+        if match is None:
+            continue
+        end = _find_balanced_element_end(html, match.end(), "section")
+        if end is not None:
+            spans.append((match.start(), end, section_id))
+
+    for start, end, section_id in sorted(spans, reverse=True):
+        if section_id != active_section_id:
+            html = html[:start] + html[end:]
+            continue
+        section_html = html[start:end].replace(" view-hidden", "", 1)
+        html = html[:start] + section_html + html[end:]
+    return html
+
+
 def _chat_thread_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     if current_user is None:
         return {**_page_initial_data(current_user, repository), "chat_threads": []}
@@ -796,6 +836,7 @@ def _render_ui_page(
     *,
     initial_data: dict | None = None,
     active_nav_href: str | None = None,
+    active_search_section_id: str | None = None,
 ) -> HTMLResponse:
     html = (_STATIC_DIR / "index.html").read_text(encoding="utf-8")
     script_names = ["app.js", *_PAGE_SCRIPTS_BY_VIEW.get(view_id, [])]
@@ -821,6 +862,7 @@ def _render_ui_page(
         return match.group(0).replace(" view-hidden", "", 1)
 
     html = _VIEW_ARTICLE_RE.sub(keep_active_view, html)
+    html = _render_active_search_subsection(html, active_search_section_id)
     html = _render_active_nav(html, active_nav_href or _ACTIVE_NAV_BY_VIEW.get(view_id, "/ui/documents"))
     if initial_data is not None:
         html = _render_initial_page_data(html, initial_data)
@@ -912,7 +954,11 @@ def search_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
-    return _render_ui_page("section-search", initial_data=_chat_thread_initial_data(repository, current_user))
+    return _render_ui_page(
+        "section-search",
+        initial_data=_page_initial_data(current_user, repository),
+        active_search_section_id="search-section-keyword",
+    )
 
 
 @router.get("/ui/grounded-qa", include_in_schema=False)
@@ -924,6 +970,7 @@ def grounded_qa_page(
         "section-search",
         initial_data=_chat_thread_initial_data(repository, current_user),
         active_nav_href="/ui/grounded-qa",
+        active_search_section_id="search-section-ask",
     )
 
 
