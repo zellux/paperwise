@@ -11,7 +11,7 @@ from paperwise.server.dependencies import (
     settings_dependency,
 )
 from paperwise.application.interfaces import DocumentRepository
-from paperwise.application.services.auth_tokens import create_access_token
+from paperwise.application.services.session_tokens import create_session_token
 from paperwise.application.services.llm_preferences import get_normalized_llm_preferences, validate_api_key_for_provider
 from paperwise.application.services.users import (
     CreateUserCommand,
@@ -46,8 +46,6 @@ class LoginRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
     user: UserResponse
 
 
@@ -158,21 +156,21 @@ def login_user_endpoint(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email or password",
         )
-    token = create_access_token(
+    token = create_session_token(
         user_id=user.id,
         secret=settings.auth_secret,
-        ttl_seconds=settings.auth_token_ttl_seconds,
+        ttl_seconds=settings.session_ttl_seconds,
     )
     response.set_cookie(
         key=SESSION_COOKIE_NAME,
         value=token,
-        max_age=max(settings.auth_token_ttl_seconds, 60),
+        max_age=max(settings.session_ttl_seconds, 60),
         httponly=True,
         samesite="lax",
         secure=settings.env.lower() not in {"local", "dev", "development", "test"},
         path="/",
     )
-    return LoginResponse(access_token=token, user=_to_user_response(user))
+    return LoginResponse(user=_to_user_response(user))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)

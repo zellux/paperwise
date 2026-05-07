@@ -90,9 +90,9 @@ def test_login_user_success_and_failure() -> None:
             json={"email": "LOGIN@example.com", "password": "strong-pass-123"},
         )
         assert good_login.status_code == 200
-        assert good_login.json()["user"]["email"] == "login@example.com"
-        assert good_login.json()["access_token"]
-        assert good_login.json()["token_type"] == "bearer"
+        login_payload = good_login.json()
+        assert set(login_payload) == {"user"}
+        assert login_payload["user"]["email"] == "login@example.com"
         assert good_login.cookies.get("paperwise_session")
 
         me_response = client.get("/users/me")
@@ -100,12 +100,7 @@ def test_login_user_success_and_failure() -> None:
         assert me_response.json()["email"] == "login@example.com"
 
         machine_client = TestClient(app)
-        bearer_me_response = machine_client.get(
-            "/users/me",
-            headers={"Authorization": f"Bearer {good_login.json()['access_token']}"},
-        )
-        assert bearer_me_response.status_code == 200
-        assert bearer_me_response.json()["email"] == "login@example.com"
+        assert machine_client.get("/users/me").status_code == 401
 
         logout_response = client.post("/users/logout")
         assert logout_response.status_code == 204
@@ -191,16 +186,10 @@ def test_user_preferences_round_trip() -> None:
             json={"email": "prefs@example.com", "password": "strong-pass-123"},
         )
         assert login_response.status_code == 200
-        access_token = login_response.json()["access_token"]
         get_empty = client.get("/users/me/preferences")
         assert get_empty.status_code == 200
         assert get_empty.json()["preferences"] == {}
-        bearer_get_empty = TestClient(app).get(
-            "/users/me/preferences",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-        assert bearer_get_empty.status_code == 200
-        assert bearer_get_empty.json()["preferences"] == {}
+        assert TestClient(app).get("/users/me/preferences").status_code == 401
 
         put_response = client.put(
             "/users/me/preferences",

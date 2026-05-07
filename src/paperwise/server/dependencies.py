@@ -1,6 +1,6 @@
-from fastapi import Cookie, Depends, Header, HTTPException, status
+from fastapi import Cookie, Depends, HTTPException, status
 
-from paperwise.application.services.auth_tokens import decode_access_token
+from paperwise.application.services.session_tokens import decode_session_token
 from paperwise.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
@@ -54,21 +54,18 @@ def llm_provider_dependency() -> LLMProvider:
 
 
 def current_user_dependency(
-    authorization: str | None = Header(default=None),
     session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
     repository: DocumentRepository = Depends(document_repository_dependency),
 ) -> User:
     token = ""
     if session_token:
         token = session_token.strip()
-    elif authorization and authorization.lower().startswith("bearer "):
-        token = authorization.split(" ", 1)[1].strip()
     if not token:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
-    payload = decode_access_token(token=token, secret=_settings.auth_secret)
+    payload = decode_session_token(token=token, secret=_settings.auth_secret)
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -84,13 +81,11 @@ def current_user_dependency(
 
 
 def optional_current_user_dependency(
-    authorization: str | None = Header(default=None),
     session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
     repository: DocumentRepository = Depends(document_repository_dependency),
 ) -> User | None:
     try:
         return current_user_dependency(
-            authorization=authorization,
             session_token=session_token,
             repository=repository,
         )

@@ -184,12 +184,10 @@ def test_static_assets_keep_auth_state_cookie_only() -> None:
 
     html = client.get("/ui/documents")
     assert html.status_code == 200
-    assert 'window.localStorage.getItem("paperwise.auth.token")' not in html.text
 
     app_js = client.get("/static/app.js")
     assert app_js.status_code == 200
     assert 'document.documentElement.classList.toggle("has-session", signedIn)' in app_js.text
-    assert 'headers.set("Authorization"' not in app_js.text
     assert 'apiFetch("/users/me")' not in app_js.text
 
 

@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     llm_debug_log_path: str = "local/logs/llm-debug.log"
     llm_debug_log_max_bytes: int = 100 * 1024 * 1024
     auth_secret: str = "paperwise-dev-secret-change-me"
-    auth_token_ttl_seconds: int = 60 * 60 * 12
+    session_ttl_seconds: int = 60 * 60 * 12
 
 
 @lru_cache

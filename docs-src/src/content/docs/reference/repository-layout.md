@@ -27,5 +27,5 @@ Uploaded files and processed artifacts live under the local object-store layout 
 Paperwise requires authenticated users. Guest access is disabled.
 
 - `POST /users` creates a user
-- `POST /users/login` returns a bearer token
-- document endpoints require `Authorization: Bearer <token>`
+- `POST /users/login` sets the `paperwise_session` cookie
+- document endpoints require a valid `paperwise_session` cookie

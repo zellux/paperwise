@@ -14,7 +14,7 @@ def _b64url_decode(value: str) -> bytes:
     return base64.urlsafe_b64decode((value + padding).encode("ascii"))
 
 
-def create_access_token(*, user_id: str, secret: str, ttl_seconds: int) -> str:
+def create_session_token(*, user_id: str, secret: str, ttl_seconds: int) -> str:
     payload = {
         "sub": user_id,
         "exp": int(datetime.now(UTC).timestamp()) + max(ttl_seconds, 60),
@@ -29,7 +29,7 @@ def create_access_token(*, user_id: str, secret: str, ttl_seconds: int) -> str:
     return f"{payload_part}.{_b64url_encode(signature)}"
 
 
-def decode_access_token(token: str, secret: str) -> dict | None:
+def decode_session_token(token: str, secret: str) -> dict | None:
     try:
         payload_part, signature_part = token.split(".", 1)
     except ValueError:

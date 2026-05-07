@@ -38,7 +38,7 @@ services:
       PAPERWISE_POSTGRES_URL: postgresql+psycopg://paperwise:paperwise@postgres:5432/paperwise
       PAPERWISE_OBJECT_STORE_ROOT: /data/object-store
       PAPERWISE_AUTH_SECRET: replace-with-a-strong-secret
-      PAPERWISE_AUTH_TOKEN_TTL_SECONDS: "43200"
+      PAPERWISE_SESSION_TTL_SECONDS: "43200"
     depends_on:
       redis:
         condition: service_healthy
@@ -67,7 +67,7 @@ services:
       PAPERWISE_POSTGRES_URL: postgresql+psycopg://paperwise:paperwise@postgres:5432/paperwise
       PAPERWISE_OBJECT_STORE_ROOT: /data/object-store
       PAPERWISE_AUTH_SECRET: replace-with-a-strong-secret
-      PAPERWISE_AUTH_TOKEN_TTL_SECONDS: "43200"
+      PAPERWISE_SESSION_TTL_SECONDS: "43200"
     depends_on:
       redis:
         condition: service_healthy

@@ -130,7 +130,6 @@ let currentDocumentId = "";
 let currentUser = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember", "folio", "forge"];
 const THEME_STORAGE_KEY = "paperwise.ui.theme";
-const LEGACY_AUTH_TOKEN_STORAGE_KEY = "paperwise.auth.token";
 let currentTheme = "forge";
 const SUPPORTED_LLM_PROVIDERS = ["openai", "gemini", "custom"];
 const LLM_PROVIDER_DEFAULTS = {
@@ -1600,7 +1599,6 @@ function normalizeChatThreadSummary(thread) {
 
 function persistSession(user) {
   currentUser = user || null;
-  window.localStorage.removeItem(LEGACY_AUTH_TOKEN_STORAGE_KEY);
 }
 
 function renderSessionState() {
