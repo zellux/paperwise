@@ -130,7 +130,7 @@ let currentDocumentId = "";
 let currentUser = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember", "folio", "forge"];
 const THEME_STORAGE_KEY = "paperwise.ui.theme";
-const AUTH_TOKEN_STORAGE_KEY = "paperwise.auth.token";
+const LEGACY_AUTH_TOKEN_STORAGE_KEY = "paperwise.auth.token";
 let currentTheme = "forge";
 const SUPPORTED_LLM_PROVIDERS = ["openai", "gemini", "custom"];
 const LLM_PROVIDER_DEFAULTS = {
@@ -1598,17 +1598,14 @@ function normalizeChatThreadSummary(thread) {
   };
 }
 
-function persistSession(token, user) {
+function persistSession(user) {
   currentUser = user || null;
-  if (token) {
-    window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
-  } else {
-    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
-  }
+  window.localStorage.removeItem(LEGACY_AUTH_TOKEN_STORAGE_KEY);
 }
 
 function renderSessionState() {
   const signedIn = Boolean(currentUser);
+  document.documentElement.classList.toggle("has-session", signedIn);
   authGate.classList.toggle("view-hidden", signedIn);
   appShell.classList.toggle("view-hidden", !signedIn);
   if (sessionUserLabel) {
@@ -1619,7 +1616,7 @@ function renderSessionState() {
 }
 
 function clearSession() {
-  persistSession("", null);
+  persistSession(null);
   applyTheme("forge");
   llmConnections = [];
   llmRouting = createDefaultLlmRouting();
@@ -1663,10 +1660,6 @@ async function apiFetch(url, options = {}) {
   const headers = new Headers(options.headers || {});
   const allowUnauthorized = options.allowUnauthorized === true;
   const { allowUnauthorized: _allowUnauthorized, ...fetchOptions } = options;
-  const token = window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
-  if (token && !headers.has("Authorization")) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
   const response = await window.fetch(url, { credentials: "same-origin", ...fetchOptions, headers });
   if (response.status === 401 && !allowUnauthorized) {
     clearSession();
@@ -1675,25 +1668,14 @@ async function apiFetch(url, options = {}) {
   return response;
 }
 
-async function restoreSession() {
+function restoreSession() {
   const initialData = readInitialData();
   if (initialData.authenticated === true && initialData.current_user) {
-    currentUser = initialData.current_user;
+    persistSession(initialData.current_user);
     renderSessionState();
     return;
   }
-  try {
-    const response = await apiFetch("/users/me");
-    if (!response.ok) {
-      clearSession();
-      return;
-    }
-    currentUser = await response.json();
-  } catch {
-    clearSession();
-    return;
-  }
-  renderSessionState();
+  clearSession();
 }
 
 function setActiveSearchSection(sectionId) {
@@ -4300,7 +4282,7 @@ signInForm?.addEventListener("submit", async (event) => {
       setAuthMessage(payload.detail || response.statusText, true);
       return;
     }
-    persistSession(payload.access_token, payload.user);
+    persistSession(payload.user);
     renderSessionState();
     setAuthMessage(`Signed in as ${payload.user.email}.`);
     await hydrateUserPreferencesForSession();
@@ -4343,7 +4325,7 @@ registerForm?.addEventListener("submit", async (event) => {
       setAuthMessage(loginPayload.detail || loginResponse.statusText, true);
       return;
     }
-    persistSession(loginPayload.access_token, loginPayload.user);
+    persistSession(loginPayload.user);
     renderSessionState();
     setAuthMessage(`Registered ${registerPayload.email}.`);
     await hydrateUserPreferencesForSession();
@@ -4373,7 +4355,7 @@ brandHomeBtn?.addEventListener("click", () => {
 });
 
 async function initializeApp() {
-  await restoreSession();
+  restoreSession();
   if (!currentUser) {
     renderSortHeaders();
     return;

@@ -179,6 +179,20 @@ def test_static_assets_serve_clickable_tag_ui() -> None:
     assert ".tag-pill-button" in styles.text
 
 
+def test_static_assets_keep_auth_state_cookie_only() -> None:
+    client = TestClient(app)
+
+    html = client.get("/ui/documents")
+    assert html.status_code == 200
+    assert 'window.localStorage.getItem("paperwise.auth.token")' not in html.text
+
+    app_js = client.get("/static/app.js")
+    assert app_js.status_code == 200
+    assert 'document.documentElement.classList.toggle("has-session", signedIn)' in app_js.text
+    assert 'headers.set("Authorization"' not in app_js.text
+    assert 'apiFetch("/users/me")' not in app_js.text
+
+
 def test_upload_ui_includes_batch_progress_shell() -> None:
     client = TestClient(app)
     response = client.get("/ui/upload")
