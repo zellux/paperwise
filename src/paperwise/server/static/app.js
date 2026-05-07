@@ -196,8 +196,6 @@ let initialDataCache;
 const initialPageDataConsumed = new Set();
 let initialChatThreadsConsumed = false;
 let initialUserPreferencesConsumed = false;
-let currentTagStats = [];
-let currentDocumentTypeStats = [];
 let settingsActiveSectionId = "settings-section-display";
 let uploadInProgress = false;
 let uploadSelectionContext = { source: "files", folderName: "" };
@@ -1158,206 +1156,6 @@ function formatStatus(value) {
     .toUpperCase();
 }
 
-function renderStatusBadge(value) {
-  if (!value) return '<span class="status-badge">—</span>';
-  const cls = `status-badge status-${String(value).toLowerCase()}`;
-  return `<span class="${cls}">${escapeHtml(formatStatus(value))}</span>`;
-}
-
-function formatBytes(value) {
-  const bytes = Number(value || 0);
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return "0 B";
-  }
-  if (bytes < 1024) {
-    return `${bytes} B`;
-  }
-  const kb = bytes / 1024;
-  if (kb < 1024) {
-    return `${kb.toFixed(1)} KB`;
-  }
-  const mb = kb / 1024;
-  return `${mb.toFixed(2)} MB`;
-}
-
-function formatHistoryEventType(value) {
-  const labels = {
-    metadata_changed: "Metadata changed",
-    tags_added: "Tags added",
-    tags_removed: "Tags removed",
-    file_moved: "File moved",
-    processing_restarted: "Processing restarted",
-    processing_completed: "Processing completed",
-  };
-  return labels[value] || formatStatus(value || "update");
-}
-
-function formatHistoryActor(event) {
-  if (event.actor_type === "user") {
-    return event.actor_id ? `User: ${event.actor_id}` : "User";
-  }
-  return "System";
-}
-
-function stringifyHistoryValue(value) {
-  if (value === null || value === undefined || value === "") {
-    return "(empty)";
-  }
-  return String(value);
-}
-
-function buildHistoryChangeLines(event) {
-  const changes = event.changes || {};
-  if (event.event_type === "metadata_changed") {
-    const lines = [];
-    for (const [field, values] of Object.entries(changes)) {
-      const before = stringifyHistoryValue(values?.before);
-      const after = stringifyHistoryValue(values?.after);
-      lines.push(`${field}: ${before} -> ${after}`);
-    }
-    return lines;
-  }
-  if (event.event_type === "tags_added") {
-    const tags = Array.isArray(changes.tags) ? changes.tags : [];
-    return [tags.length ? `Added: ${tags.join(", ")}` : "Added tags"];
-  }
-  if (event.event_type === "tags_removed") {
-    const tags = Array.isArray(changes.tags) ? changes.tags : [];
-    return [tags.length ? `Removed: ${tags.join(", ")}` : "Removed tags"];
-  }
-  if (event.event_type === "file_moved") {
-    const fromPath = toRelativeBlobPath(changes.from_blob_uri || "");
-    const toPath = toRelativeBlobPath(changes.to_blob_uri || "");
-    return [`From: ${fromPath}`, `To: ${toPath}`];
-  }
-  if (event.event_type === "processing_restarted") {
-    const before = stringifyHistoryValue(changes.status?.before);
-    const after = stringifyHistoryValue(changes.status?.after);
-    return [`Status: ${before} -> ${after}`];
-  }
-  if (event.event_type === "processing_failed") {
-    const before = stringifyHistoryValue(changes.status?.before);
-    const after = stringifyHistoryValue(changes.status?.after);
-    const lines = [`Status: ${before} -> ${after}`];
-    const error = changes.error || {};
-    if (error.type) {
-      lines.push(`Error type: ${stringifyHistoryValue(error.type)}`);
-    }
-    if (error.message) {
-      lines.push(`Error: ${stringifyHistoryValue(error.message)}`);
-    }
-    return lines;
-  }
-  if (event.event_type === "processing_completed") {
-    const before = stringifyHistoryValue(changes.status?.before);
-    const after = stringifyHistoryValue(changes.status?.after);
-    const lines = [`Status: ${before} -> ${after}`];
-    const parse = changes.parse || {};
-    if (parse.parser) {
-      lines.push(`OCR parser: ${parse.parser}`);
-    }
-    const ocrProcess = parse.ocr_process || parse.ocr?.process || null;
-    if (ocrProcess && typeof ocrProcess === "object") {
-      const location = stringifyHistoryValue(ocrProcess.location);
-      const engine = stringifyHistoryValue(ocrProcess.engine);
-      const method = stringifyHistoryValue(ocrProcess.method);
-      lines.push(`OCR path: ${location} | ${engine} | ${method}`);
-      if (ocrProcess.provider) {
-        lines.push(`OCR provider: ${ocrProcess.provider}`);
-      }
-      if (ocrProcess.model) {
-        lines.push(`OCR model: ${ocrProcess.model}`);
-      }
-      if (Number.isFinite(ocrProcess.result_size_bytes)) {
-        lines.push(`OCR result size: ${Number(ocrProcess.result_size_bytes).toLocaleString()} bytes`);
-      }
-    }
-    const metadataParse = changes.metadata_parse || null;
-    if (metadataParse && typeof metadataParse === "object") {
-      if (metadataParse.provider) {
-        lines.push(`Metadata provider: ${metadataParse.provider}`);
-      }
-      if (metadataParse.model) {
-        lines.push(`Metadata model: ${metadataParse.model}`);
-      }
-      if (Number.isFinite(metadataParse.total_tokens) && Number(metadataParse.total_tokens) > 0) {
-        lines.push(`Metadata tokens: ${Number(metadataParse.total_tokens).toLocaleString()}`);
-      }
-    }
-    return lines;
-  }
-  try {
-    return [JSON.stringify(changes)];
-  } catch {
-    return ["Details unavailable"];
-  }
-}
-
-function renderDocumentHistory(events) {
-  if (!documentHistoryList) {
-    return;
-  }
-  if (!Array.isArray(events) || !events.length) {
-    documentHistoryList.innerHTML =
-      '<p class="document-history-empty">No history entries yet.</p>';
-    return;
-  }
-
-  documentHistoryList.innerHTML = "";
-  for (const event of events) {
-    const item = document.createElement("article");
-    item.className = "document-history-item";
-
-    const header = document.createElement("div");
-    header.className = "document-history-header";
-
-    const type = document.createElement("span");
-    type.className = "document-history-type";
-    type.textContent = formatHistoryEventType(event.event_type);
-
-    const meta = document.createElement("span");
-    meta.className = "document-history-meta";
-    const timestamp = event.created_at ? new Date(event.created_at).toLocaleString() : "-";
-    meta.textContent = `${formatHistoryActor(event)} | ${event.source || "-"} | ${timestamp}`;
-
-    const changes = document.createElement("div");
-    changes.className = "document-history-changes";
-    for (const line of buildHistoryChangeLines(event)) {
-      const changeLine = document.createElement("p");
-      changeLine.className = "document-history-change";
-      changeLine.textContent = line;
-      changes.appendChild(changeLine);
-    }
-
-    header.appendChild(type);
-    header.appendChild(meta);
-    item.appendChild(header);
-    item.appendChild(changes);
-    documentHistoryList.appendChild(item);
-  }
-}
-
-function toRelativeBlobPath(blobUri) {
-  if (!blobUri) {
-    return "-";
-  }
-  try {
-    const url = new URL(blobUri);
-    if (url.protocol !== "file:") {
-      return blobUri;
-    }
-    const absolutePath = decodeURIComponent(url.pathname);
-    const marker = "/local/object-store/";
-    const idx = absolutePath.indexOf(marker);
-    if (idx >= 0) {
-      return absolutePath.slice(idx + marker.length);
-    }
-    return absolutePath.replace(/^\/+/, "");
-  } catch {
-    return blobUri;
-  }
-}
-
 function logActivity(message) {
   if (!activityOutput) {
     return;
@@ -1620,8 +1418,6 @@ function clearSession() {
   docsSort = { field: "", direction: "" };
   tagStatsSort = { field: "", direction: "" };
   documentTypesSort = { field: "", direction: "" };
-  currentTagStats = [];
-  currentDocumentTypeStats = [];
   docsFilters = sanitizeDocsFilters({
     tag: [],
     correspondent: [],
@@ -1635,7 +1431,7 @@ function clearSession() {
   currentViewId = "section-docs";
   renderSearchAskTokenUsage();
   renderSearchAskThreadSelect();
-  renderSearchResultsTable({ hits: [] });
+  replaceElementHtml(searchResultsTableBody, '<tr><td colspan="6">No matches found.</td></tr>');
   renderSearchResultsMeta("No search run yet.");
   renderSearchAskMessages();
   renderSettingsForm();
@@ -1655,6 +1451,22 @@ async function apiFetch(url, options = {}) {
     throw new Error("Authentication required");
   }
   return response;
+}
+
+async function fetchUiPartial(url) {
+  const response = await apiFetch(url);
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.detail || response.statusText);
+  }
+  return payload;
+}
+
+function replaceElementHtml(element, html) {
+  if (!element) {
+    return;
+  }
+  element.innerHTML = String(html || "");
 }
 
 function restoreSession() {
@@ -1699,36 +1511,6 @@ function unique(values) {
 
 function sortValues(values) {
   return [...values].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
-}
-
-function compareSortValues(left, right) {
-  const leftNumber = Number(left);
-  const rightNumber = Number(right);
-  const leftIsNumber = Number.isFinite(leftNumber) && String(left).trim() !== "";
-  const rightIsNumber = Number.isFinite(rightNumber) && String(right).trim() !== "";
-  if (leftIsNumber && rightIsNumber) {
-    return leftNumber - rightNumber;
-  }
-  return String(left || "").localeCompare(String(right || ""), undefined, {
-    sensitivity: "base",
-    numeric: true,
-  });
-}
-
-function sortRows(items, sortState, valueGetters) {
-  const sorted = [...items];
-  if (!sortState.field || !sortState.direction) {
-    return sorted;
-  }
-  const getValue = valueGetters[sortState.field];
-  if (typeof getValue !== "function") {
-    return sorted;
-  }
-  sorted.sort((left, right) => {
-    const comparison = compareSortValues(getValue(left), getValue(right));
-    return sortState.direction === "desc" ? -comparison : comparison;
-  });
-  return sorted;
 }
 
 function getSortStateForTable(tableName) {
@@ -2149,55 +1931,10 @@ function applyFiltersFromControls() {
   navigateToDocumentsPageFromState();
 }
 
-function openDocumentsWithFilters(nextFilters, activityMessage = "") {
-  if (Object.prototype.hasOwnProperty.call(nextFilters, "q")) {
-    docsFilters.q = String(nextFilters.q || "").trim();
-  }
-  if (Object.prototype.hasOwnProperty.call(nextFilters, "tag")) {
-    docsFilters.tag = unique(nextFilters.tag || []);
-  }
-  if (Object.prototype.hasOwnProperty.call(nextFilters, "correspondent")) {
-    docsFilters.correspondent = unique(nextFilters.correspondent || []);
-  }
-  if (Object.prototype.hasOwnProperty.call(nextFilters, "document_type")) {
-    docsFilters.document_type = unique(nextFilters.document_type || []);
-  }
-  if (Object.prototype.hasOwnProperty.call(nextFilters, "status")) {
-    docsFilters.status = unique(nextFilters.status || []);
-  }
-  docsPage = 1;
-  applyFiltersToControls();
-  if (activityMessage) {
-    logActivity(activityMessage);
-  }
-  navigateToDocumentsPageFromState();
-}
-
 function navigateToDocument(documentId) {
   const url = new URL("/ui/document", window.location.origin);
   url.searchParams.set("id", documentId);
   window.location.href = `${url.pathname}?${url.searchParams.toString()}`;
-}
-
-function createTagFilterButton(tag) {
-  const button = document.createElement("button");
-  button.type = "button";
-  button.className = "tag-pill tag-pill-button";
-  button.textContent = tag;
-  button.title = `Show documents tagged ${tag}`;
-  button.addEventListener("click", async () => {
-    await openDocumentsWithFilters(
-      {
-        q: "",
-        tag: [tag],
-        correspondent: [],
-        document_type: [],
-        status: [],
-      },
-      `Filtered documents by tag: ${tag}`
-    );
-  });
-  return button;
 }
 
 async function openDocumentFile(documentId) {
@@ -2210,101 +1947,6 @@ async function openDocumentFile(documentId) {
   const url = window.URL.createObjectURL(blob);
   window.open(url, "_blank", "noopener,noreferrer");
   window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
-}
-
-function createActionIcon(name) {
-  const ns = "http://www.w3.org/2000/svg";
-  const svg = document.createElementNS(ns, "svg");
-  svg.setAttribute("viewBox", "0 0 24 24");
-  svg.setAttribute("fill", "none");
-  svg.setAttribute("stroke", "currentColor");
-  svg.setAttribute("stroke-width", "2");
-  svg.setAttribute("stroke-linecap", "round");
-  svg.setAttribute("stroke-linejoin", "round");
-  svg.classList.add("action-icon-svg");
-
-  const addPath = (d) => {
-    const path = document.createElementNS(ns, "path");
-    path.setAttribute("d", d);
-    svg.appendChild(path);
-  };
-  const addLine = (x1, y1, x2, y2) => {
-    const line = document.createElementNS(ns, "line");
-    line.setAttribute("x1", x1);
-    line.setAttribute("y1", y1);
-    line.setAttribute("x2", x2);
-    line.setAttribute("y2", y2);
-    svg.appendChild(line);
-  };
-  const addPolyline = (points) => {
-    const polyline = document.createElementNS(ns, "polyline");
-    polyline.setAttribute("points", points);
-    svg.appendChild(polyline);
-  };
-
-  if (name === "external-link") {
-    addPath("M15 3h6v6");
-    addPath("M10 14 21 3");
-    addPath("M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6");
-    return svg;
-  }
-  if (name === "file-text") {
-    addPath("M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z");
-    addPolyline("14 2 14 8 20 8");
-    addLine("16", "13", "8", "13");
-    addLine("16", "17", "8", "17");
-    addPolyline("10 9 9 9 8 9");
-    return svg;
-  }
-  if (name === "eye") {
-    addPath("M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0");
-    addPath("M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6");
-    return svg;
-  }
-  if (name === "edit") {
-    addPath("M12 20h9");
-    addPath("M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z");
-    return svg;
-  }
-  if (name === "trash") {
-    addPath("M3 6h18");
-    addPath("M8 6V4h8v2");
-    addPath("M19 6l-1 14H6L5 6");
-    addLine("10", "11", "10", "17");
-    addLine("14", "11", "14", "17");
-    return svg;
-  }
-
-  addPath("M12 5v14");
-  addPath("M5 12h14");
-  return svg;
-}
-
-function createIconActionButton({ icon, label, onClick }) {
-  const button = document.createElement("button");
-  button.className = "action-icon-btn";
-  button.type = "button";
-  button.title = label;
-  button.setAttribute("aria-label", label);
-  button.appendChild(createActionIcon(icon));
-  button.addEventListener("click", onClick);
-  return button;
-}
-
-function createTableActionButton({ label, className = "btn", onClick }) {
-  const button = document.createElement("button");
-  button.className = className;
-  button.type = "button";
-  button.textContent = label;
-  button.addEventListener("click", onClick);
-  return button;
-}
-
-function getSuggestedTitle(doc) {
-  if (doc.llm_metadata && doc.llm_metadata.suggested_title) {
-    return doc.llm_metadata.suggested_title;
-  }
-  return "(Pending title)";
 }
 
 async function deleteDocumentById(documentId, options = {}) {
@@ -2377,332 +2019,58 @@ function hydrateSettingsFormFromInitialPreferences() {
   return true;
 }
 
-function renderDocsList(documents) {
-  if (!docsTableBody) {
-    return;
-  }
+function applyDocumentsPartial(payload) {
+  replaceElementHtml(docsTableBody, payload.table_body_html);
+  docsTotalCount = Number(payload.documents_total || 0);
+  docsPage = Math.max(1, Number(payload.documents_page || docsPage || 1));
+  docsPageSize = normalizePageSize(payload.documents_page_size || docsPageSize);
+  refreshFilterOptionsFromDocuments(Array.isArray(payload.documents) ? payload.documents : []);
+  renderPaginationControls(Number(payload.documents?.length || 0), { hasExactTotal: true });
+  renderDocsProcessingCount(Number(payload.documents_processing_count || 0));
+}
+
+function applyTagsPartial(payload) {
+  replaceElementHtml(tagsTableBody, payload.table_body_html);
   renderSortHeaders();
-  if (!documents.length) {
-    docsTableBody.innerHTML = '<tr><td colspan="7">No documents found.</td></tr>';
-    return;
-  }
-  docsTableBody.innerHTML = "";
-  for (const doc of documents) {
-    const row = document.createElement("tr");
-    row.setAttribute("data-doc-id", doc.id);
-
-    let suggestedTitle = "-";
-    let documentType = "-";
-    let correspondent = "-";
-    let tags = "-";
-    let documentDate = "-";
-    if (doc.llm_metadata) {
-      const m = doc.llm_metadata;
-      suggestedTitle = m.suggested_title || "-";
-      documentType = m.document_type || "-";
-      correspondent = m.correspondent || "-";
-      tags = Array.isArray(m.tags) && m.tags.length ? m.tags.join(", ") : "-";
-      documentDate = m.document_date || "-";
-    }
-
-    const titleCell = document.createElement("td");
-    titleCell.setAttribute("data-label", "Title");
-    const titleButton = document.createElement("button");
-    titleButton.className = "link-button";
-    titleButton.type = "button";
-    titleButton.textContent = suggestedTitle;
-    titleButton.addEventListener("click", () => {
-      navigateToDocument(doc.id);
-    });
-    titleCell.appendChild(titleButton);
-
-    const typeCell = document.createElement("td");
-    typeCell.setAttribute("data-label", "Type");
-    typeCell.textContent = documentType;
-    const correspondentCell = document.createElement("td");
-    correspondentCell.setAttribute("data-label", "Correspondent");
-    correspondentCell.textContent = correspondent;
-    const tagsCell = document.createElement("td");
-    tagsCell.setAttribute("data-label", "Tags");
-    if (doc.llm_metadata && Array.isArray(doc.llm_metadata.tags) && doc.llm_metadata.tags.length) {
-      const pills = document.createElement("div");
-      pills.className = "tag-pills";
-      for (const tag of doc.llm_metadata.tags) {
-        pills.appendChild(createTagFilterButton(tag));
-      }
-      tagsCell.appendChild(pills);
-    } else {
-      tagsCell.textContent = tags;
-    }
-    const dateCell = document.createElement("td");
-    dateCell.setAttribute("data-label", "Date");
-    dateCell.textContent = documentDate;
-    const statusCell = document.createElement("td");
-    statusCell.setAttribute("data-label", "Status");
-    statusCell.innerHTML = renderStatusBadge(doc.status);
-    if (doc.status === "failed") {
-      const note = document.createElement("div");
-      note.className = "pending-error-note";
-      note.textContent = "Open document history for failure details.";
-      statusCell.appendChild(note);
-    }
-
-    const actionCell = document.createElement("td");
-    actionCell.setAttribute("data-label", "Action");
-    const actionsWrap = document.createElement("div");
-    actionsWrap.className = "table-actions";
-    actionsWrap.appendChild(
-      createTableActionButton({
-        label: "Open",
-        onClick: () => navigateToDocument(doc.id),
-      })
-    );
-    actionsWrap.appendChild(
-      createTableActionButton({
-        label: "View",
-        className: "btn btn-muted",
-        onClick: async () => {
-          try {
-            await openDocumentFile(doc.id);
-          } catch (error) {
-            logActivity(`Failed to open file: ${error.message}`);
-          }
-        },
-      })
-    );
-    actionsWrap.appendChild(
-      createTableActionButton({
-        label: "Delete",
-        className: "btn btn-muted",
-        onClick: async () => {
-          await deleteDocumentById(doc.id, {
-            documentLabel: getSuggestedTitle(doc),
-          });
-        },
-      })
-    );
-    actionCell.appendChild(actionsWrap);
-
-    row.appendChild(titleCell);
-    row.appendChild(typeCell);
-    row.appendChild(correspondentCell);
-    row.appendChild(tagsCell);
-    row.appendChild(dateCell);
-    row.appendChild(statusCell);
-    row.appendChild(actionCell);
-    docsTableBody.appendChild(row);
-  }
 }
 
-function renderTagsList(tagStats) {
-  const sortedTagStats = sortRows(tagStats, tagStatsSort, {
-    tag: (item) => item.tag,
-    document_count: (item) => item.document_count,
-  });
+function applyDocumentTypesPartial(payload) {
+  replaceElementHtml(documentTypesTableBody, payload.table_body_html);
   renderSortHeaders();
-  if (!sortedTagStats.length) {
-    tagsTableBody.innerHTML = '<tr><td colspan="3">No tags found.</td></tr>';
-    return;
-  }
-  tagsTableBody.innerHTML = "";
-  for (const stat of sortedTagStats) {
-    const row = document.createElement("tr");
-    const tagCell = document.createElement("td");
-    tagCell.setAttribute("data-label", "Tag");
-    tagCell.textContent = stat.tag;
-    const countCell = document.createElement("td");
-    countCell.setAttribute("data-label", "Documents");
-    countCell.textContent = String(stat.document_count);
-    const actionCell = document.createElement("td");
-    actionCell.setAttribute("data-label", "Action");
-
-    const actionsWrap = document.createElement("div");
-    actionsWrap.className = "table-actions";
-    actionsWrap.appendChild(
-      createTableActionButton({
-        label: "View Docs",
-        onClick: async () => {
-          await openDocumentsWithFilters(
-            {
-              q: "",
-              tag: [stat.tag],
-              correspondent: [],
-              document_type: [],
-              status: [],
-            },
-            `Filtered documents by tag: ${stat.tag}`
-          );
-        },
-      })
-    );
-    actionCell.appendChild(actionsWrap);
-    row.appendChild(tagCell);
-    row.appendChild(countCell);
-    row.appendChild(actionCell);
-    tagsTableBody.appendChild(row);
-  }
 }
 
-function renderDocumentTypesList(typeStats) {
-  const sortedTypeStats = sortRows(typeStats, documentTypesSort, {
-    document_type: (item) => item.document_type,
-    document_count: (item) => item.document_count,
-  });
-  renderSortHeaders();
-  if (!sortedTypeStats.length) {
-    documentTypesTableBody.innerHTML = '<tr><td colspan="3">No document types found.</td></tr>';
-    return;
-  }
-  documentTypesTableBody.innerHTML = "";
-  for (const stat of sortedTypeStats) {
-    const row = document.createElement("tr");
-    const typeCell = document.createElement("td");
-    typeCell.setAttribute("data-label", "Document Type");
-    typeCell.textContent = stat.document_type;
-    const countCell = document.createElement("td");
-    countCell.setAttribute("data-label", "Documents");
-    countCell.textContent = String(stat.document_count);
-    const actionCell = document.createElement("td");
-    actionCell.setAttribute("data-label", "Action");
-
-    const actionsWrap = document.createElement("div");
-    actionsWrap.className = "table-actions";
-    actionsWrap.appendChild(
-      createTableActionButton({
-        label: "View Docs",
-        onClick: async () => {
-          await openDocumentsWithFilters(
-            {
-              q: "",
-              tag: [],
-              correspondent: [],
-              document_type: [stat.document_type],
-              status: [],
-            },
-            `Filtered documents by type: ${stat.document_type}`
-          );
-        },
-      })
-    );
-    actionCell.appendChild(actionsWrap);
-    row.appendChild(typeCell);
-    row.appendChild(countCell);
-    row.appendChild(actionCell);
-    documentTypesTableBody.appendChild(row);
-  }
+function applyPendingPartial(payload) {
+  const documents = Array.isArray(payload.pending_documents) ? payload.pending_documents : [];
+  replaceElementHtml(pendingTableBody, payload.table_body_html);
+  renderDocsProcessingCount(documents.length);
+  setRestartPendingButtonEnabled(documents.some((doc) => isRestartablePendingDocument(doc)));
 }
 
-function renderPendingList(documents) {
-  if (!pendingTableBody) {
-    return;
-  }
-  if (!documents.length) {
-    pendingTableBody.innerHTML = '<tr><td colspan="4">No pending documents.</td></tr>';
-    return;
-  }
-  pendingTableBody.innerHTML = "";
-  for (const doc of documents) {
-    const row = document.createElement("tr");
-    row.dataset.pendingDocId = doc.id || "";
-
-    const titleCell = document.createElement("td");
-    titleCell.setAttribute("data-label", "Title");
-    const titleButton = document.createElement("button");
-    titleButton.className = "link-button";
-    titleButton.type = "button";
-    titleButton.textContent = getSuggestedTitle(doc);
-    titleButton.addEventListener("click", () => {
-      navigateToDocument(doc.id);
-    });
-    titleCell.appendChild(titleButton);
-
-    const statusCell = document.createElement("td");
-    statusCell.setAttribute("data-label", "Status");
-    statusCell.innerHTML = renderStatusBadge(doc.status);
-    const createdCell = document.createElement("td");
-    createdCell.setAttribute("data-label", "Created");
-    createdCell.textContent = new Date(doc.created_at).toLocaleString();
-    const actionCell = document.createElement("td");
-    actionCell.setAttribute("data-label", "Action");
-
-    const button = document.createElement("button");
-    button.className = "btn";
-    button.type = "button";
-    button.textContent = "Open";
-    button.addEventListener("click", () => {
-      navigateToDocument(doc.id);
-    });
-    actionCell.appendChild(button);
-
-    row.appendChild(titleCell);
-    row.appendChild(statusCell);
-    row.appendChild(createdCell);
-    row.appendChild(actionCell);
-    pendingTableBody.appendChild(row);
-  }
+function applyActivityPartial(payload) {
+  replaceElementHtml(processedDocsTableBody, payload.table_body_html);
+  renderActivityTokenTotal(Number(payload.activity_total_tokens || 0));
 }
 
-function renderProcessedDocsActivity(documents) {
-  if (!processedDocsTableBody) {
-    return;
+function applyDocumentDetailPartial(payload) {
+  currentDocumentId = String(payload.document_id || "");
+  for (const [elementId, value] of Object.entries(payload.text || {})) {
+    const element = document.getElementById(elementId);
+    if (element) {
+      element.textContent = value;
+    }
   }
-  if (!documents.length) {
-    processedDocsTableBody.innerHTML = '<tr><td colspan="4">No processed documents.</td></tr>';
-    return;
+  for (const [elementId, value] of Object.entries(payload.html || {})) {
+    replaceElementHtml(document.getElementById(elementId), value);
   }
-  processedDocsTableBody.innerHTML = "";
-  for (const doc of documents) {
-    const row = document.createElement("tr");
-
-    const titleCell = document.createElement("td");
-    titleCell.setAttribute("data-label", "Title");
-    const titleButton = document.createElement("button");
-    titleButton.className = "link-button";
-    titleButton.type = "button";
-    titleButton.textContent = getSuggestedTitle(doc);
-    titleButton.addEventListener("click", () => {
-      navigateToDocument(doc.id);
-    });
-    titleCell.appendChild(titleButton);
-
-    const statusCell = document.createElement("td");
-    statusCell.setAttribute("data-label", "Status");
-    statusCell.innerHTML = renderStatusBadge(doc.status);
-
-    const uploadedCell = document.createElement("td");
-    uploadedCell.setAttribute("data-label", "Uploaded");
-    uploadedCell.textContent = doc.created_at ? new Date(doc.created_at).toLocaleString() : "-";
-
-    const actionCell = document.createElement("td");
-    actionCell.setAttribute("data-label", "Action");
-    const actionsWrap = document.createElement("div");
-    actionsWrap.className = "table-actions";
-    actionsWrap.appendChild(
-      createTableActionButton({
-        label: "Open",
-        onClick: () => navigateToDocument(doc.id),
-      })
-    );
-    actionsWrap.appendChild(
-      createTableActionButton({
-        label: "View",
-        className: "btn btn-muted",
-        onClick: async () => {
-          try {
-            await openDocumentFile(doc.id);
-          } catch (error) {
-            logActivity(`Failed to open file: ${error.message}`);
-          }
-        },
-      })
-    );
-    actionCell.appendChild(actionsWrap);
-
-    row.appendChild(titleCell);
-    row.appendChild(statusCell);
-    row.appendChild(uploadedCell);
-    row.appendChild(actionCell);
-    processedDocsTableBody.appendChild(row);
+  for (const [elementId, value] of Object.entries(payload.inputs || {})) {
+    const element = document.getElementById(elementId);
+    if (element instanceof HTMLInputElement) {
+      element.value = value;
+    }
+  }
+  replaceElementHtml(documentHistoryList, payload.history_html);
+  if (detailBlobUri && payload.blob_uri) {
+    detailBlobUri.title = payload.blob_uri;
   }
 }
 
@@ -3852,8 +3220,8 @@ async function loadDocumentsList() {
   renderSortHeaders();
   renderPaginationControls(0, { hasExactTotal: false });
   const query = new URLSearchParams({
-    limit: String(docsPageSize),
-    offset: String((docsPage - 1) * docsPageSize),
+    page: String(docsPage),
+    page_size: String(docsPageSize),
   });
   if (docsSort.field && docsSort.direction) {
     query.set("sort_by", docsSort.field);
@@ -3875,38 +3243,18 @@ async function loadDocumentsList() {
     query.append("status", value);
   }
 
-  const listResponse = await apiFetch(`/documents?${query.toString()}`);
+  let payload;
+  try {
+    payload = await fetchUiPartial(`/ui/partials/documents?${query.toString()}`);
+  } catch (error) {
+    logActivity(`Document list failed: ${error.message}`);
+    return;
+  }
   if (requestSeq !== docsListRequestSeq) {
     return;
   }
-  const payload = await listResponse.json();
-  if (requestSeq !== docsListRequestSeq) {
-    return;
-  }
-  if (!listResponse.ok) {
-    logActivity(`Document list failed: ${payload.detail || listResponse.statusText}`);
-    return;
-  }
-  renderDocsList(payload);
-  refreshFilterOptionsFromDocuments(payload);
-  renderPaginationControls(payload.length, { hasExactTotal: false });
-
-  const countResponse = await apiFetch(`/documents/count?${query.toString()}`);
-  if (requestSeq !== docsListRequestSeq) {
-    return;
-  }
-  const countPayload = await countResponse.json();
-  if (requestSeq !== docsListRequestSeq) {
-    return;
-  }
-  if (!countResponse.ok) {
-    renderPaginationControls(payload.length, { hasExactTotal: false });
-    logActivity(`Document count failed: ${countPayload.detail || countResponse.statusText}`);
-    return;
-  }
-  docsTotalCount = Number(countPayload.total || 0);
-  renderPaginationControls(payload.length, { hasExactTotal: true });
-  logActivity(`Loaded ${payload.length} document(s) of ${docsTotalCount} total`);
+  applyDocumentsPartial(payload);
+  logActivity(`Loaded ${payload.documents.length} document(s) of ${docsTotalCount} total`);
 }
 
 function renderPaginationControls(currentCount, options = {}) {
@@ -3963,26 +3311,21 @@ async function loadPendingDocuments() {
   const requestSeq = ++pendingDocsRequestSeq;
   renderDocsProcessingCount(0, { loading: true });
   renderTableLoading(pendingTableBody, 4, "Loading pending documents...");
-  const response = await apiFetch("/documents/pending?limit=200");
-  if (requestSeq !== pendingDocsRequestSeq) {
-    return;
-  }
-  const payload = await response.json();
-  if (requestSeq !== pendingDocsRequestSeq) {
-    return;
-  }
-  if (!response.ok) {
+  let payload;
+  try {
+    payload = await fetchUiPartial("/ui/partials/pending");
+  } catch (error) {
     // Keep restart enabled if the UI still has visible pending rows.
     setRestartPendingButtonEnabled(getVisiblePendingRowCount() > 0);
     renderDocsProcessingCount(0, { unavailable: true });
-    logActivity(`Pending list failed: ${payload.detail || response.statusText}`);
+    logActivity(`Pending list failed: ${error.message}`);
     return;
   }
-  renderPendingList(payload);
-  renderDocsProcessingCount(payload.length);
-  const hasRestartable = Array.isArray(payload) && payload.some((doc) => isRestartablePendingDocument(doc));
-  setRestartPendingButtonEnabled(hasRestartable);
-  logActivity(`Loaded ${payload.length} pending document(s)`);
+  if (requestSeq !== pendingDocsRequestSeq) {
+    return;
+  }
+  applyPendingPartial(payload);
+  logActivity(`Loaded ${payload.pending_documents.length} pending document(s)`);
 }
 
 function renderActivityTokenTotal(totalTokens) {
@@ -4029,17 +3372,15 @@ function hydrateInitialPageDataForCurrentView() {
   }
 
   if (currentViewId === "section-tags" && Array.isArray(initialData.tag_stats)) {
-    currentTagStats = [...initialData.tag_stats];
     renderSortHeaders();
-    logActivity(`Loaded ${currentTagStats.length} tag(s)`);
+    logActivity(`Loaded ${initialData.tag_stats.length} tag(s)`);
     initialPageDataConsumed.add(currentViewId);
     return true;
   }
 
   if (currentViewId === "section-document-types" && Array.isArray(initialData.document_type_stats)) {
-    currentDocumentTypeStats = [...initialData.document_type_stats];
     renderSortHeaders();
-    logActivity(`Loaded ${currentDocumentTypeStats.length} document type(s)`);
+    logActivity(`Loaded ${initialData.document_type_stats.length} document type(s)`);
     initialPageDataConsumed.add(currentViewId);
     return true;
   }
@@ -4075,69 +3416,66 @@ async function loadProcessedDocumentsActivity() {
   const limit = Math.max(1, normalizePageSize(docsPageSize));
   renderTableLoading(processedDocsTableBody, 4, "Loading processed documents...");
   renderActivityTokenLoading();
-  const preferencesPromise = loadUserPreferences().catch(() => ({}));
-  const response = await apiFetch(`/documents?status=ready&limit=${limit}&offset=0`);
+  let payload;
+  try {
+    payload = await fetchUiPartial(`/ui/partials/activity?limit=${encodeURIComponent(String(limit))}`);
+  } catch (error) {
+    logActivity(`Processed documents load failed: ${error.message}`);
+    return;
+  }
   if (requestSeq !== processedActivityRequestSeq) {
     return;
   }
-  const payload = await response.json();
-  if (requestSeq !== processedActivityRequestSeq) {
-    return;
-  }
-  if (!response.ok) {
-    logActivity(`Processed documents load failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-  renderProcessedDocsActivity(payload);
-  const preferences = await preferencesPromise;
-  if (requestSeq !== processedActivityRequestSeq) {
-    return;
-  }
-  const totalTokens = Number(preferences.llm_total_tokens_processed || 0);
-  renderActivityTokenTotal(totalTokens);
-  logActivity(`Loaded ${payload.length} latest processed document(s).`);
+  applyActivityPartial(payload);
+  logActivity(`Loaded ${payload.activity_documents.length} latest processed document(s).`);
 }
 
 async function loadTagStats() {
   const requestSeq = ++tagStatsRequestSeq;
   renderTableLoading(tagsTableBody, 3, "Loading tags...");
   renderSortHeaders();
-  const response = await apiFetch("/documents/metadata/tag-stats");
+  const query = new URLSearchParams();
+  if (tagStatsSort.field && tagStatsSort.direction) {
+    query.set("sort_by", tagStatsSort.field);
+    query.set("sort_dir", tagStatsSort.direction);
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  let payload;
+  try {
+    payload = await fetchUiPartial(`/ui/partials/tags${suffix}`);
+  } catch (error) {
+    logActivity(`Tag stats load failed: ${error.message}`);
+    return;
+  }
   if (requestSeq !== tagStatsRequestSeq) {
     return;
   }
-  const payload = await response.json();
-  if (requestSeq !== tagStatsRequestSeq) {
-    return;
-  }
-  if (!response.ok) {
-    logActivity(`Tag stats load failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-  currentTagStats = [...payload];
-  renderTagsList(payload);
-  logActivity(`Loaded ${payload.length} tag(s)`);
+  applyTagsPartial(payload);
+  logActivity(`Loaded ${payload.tag_stats.length} tag(s)`);
 }
 
 async function loadDocumentTypeStats() {
   const requestSeq = ++documentTypeStatsRequestSeq;
   renderTableLoading(documentTypesTableBody, 3, "Loading document types...");
   renderSortHeaders();
-  const response = await apiFetch("/documents/metadata/document-type-stats");
+  const query = new URLSearchParams();
+  if (documentTypesSort.field && documentTypesSort.direction) {
+    query.set("sort_by", documentTypesSort.field);
+    query.set("sort_dir", documentTypesSort.direction);
+  }
+  const suffix = query.toString() ? `?${query.toString()}` : "";
+  let payload;
+  try {
+    payload = await fetchUiPartial(`/ui/partials/document-types${suffix}`);
+  } catch (error) {
+    logActivity(`Document type stats load failed: ${error.message}`);
+    return;
+  }
   if (requestSeq !== documentTypeStatsRequestSeq) {
     return;
   }
-  const payload = await response.json();
-  if (requestSeq !== documentTypeStatsRequestSeq) {
-    return;
-  }
-  if (!response.ok) {
-    logActivity(`Document type stats load failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-  currentDocumentTypeStats = [...payload];
-  renderDocumentTypesList(payload);
-  logActivity(`Loaded ${payload.length} document type(s)`);
+  applyDocumentTypesPartial(payload);
+  logActivity(`Loaded ${payload.document_type_stats.length} document type(s)`);
 }
 
 async function loadDataForCurrentView() {
@@ -4181,47 +3519,9 @@ async function loadDataForCurrentView() {
 }
 
 async function openDocumentView(documentId) {
-  const response = await apiFetch(`/documents/${documentId}/detail`);
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.detail || "Failed to load document detail");
-  }
-
-  const doc = payload.document;
-  const metadata = payload.llm_metadata;
-  currentDocumentId = doc.id;
-
-  metaTitleInput.value = metadata?.suggested_title || doc.filename;
-  metaDateInput.value = metadata?.document_date || "";
-  metaCorrespondentInput.value = metadata?.correspondent || "";
-  metaTypeInput.value = metadata?.document_type || "";
-  metaTagsInput.value = metadata?.tags?.join(", ") || "";
-  detailDocId.textContent = doc.id || "-";
-  detailOwnerId.textContent = doc.owner_id || "-";
-  detailFilename.textContent = doc.filename || "-";
-  detailStatus.innerHTML = renderStatusBadge(doc.status);
-  detailOcrContent.textContent = String(payload.ocr_text_preview || "").trim() || "-";
-  detailCreatedAt.textContent = doc.created_at
-    ? new Date(doc.created_at).toLocaleString()
-    : "-";
-  detailOcrParsedAt.textContent = payload.ocr_parsed_at
-    ? new Date(payload.ocr_parsed_at).toLocaleString()
-    : "-";
-  detailContentType.textContent = doc.content_type || "-";
-  detailSizeBytes.textContent = `${formatBytes(doc.size_bytes)} (${doc.size_bytes || 0} bytes)`;
-  detailChecksum.textContent = doc.checksum_sha256 || "-";
-  detailBlobUri.textContent = toRelativeBlobPath(doc.blob_uri);
-  detailBlobUri.title = doc.blob_uri || "";
-
-  const historyResponse = await apiFetch(`/documents/${documentId}/history?limit=100`);
-  const historyPayload = await historyResponse.json();
-  if (!historyResponse.ok) {
-    renderDocumentHistory([]);
-    logActivity(`History load failed: ${historyPayload.detail || historyResponse.statusText}`);
-  } else {
-    renderDocumentHistory(historyPayload);
-  }
-
+  const query = new URLSearchParams({ id: documentId });
+  const payload = await fetchUiPartial(`/ui/partials/document?${query.toString()}`);
+  applyDocumentDetailPartial(payload);
   logActivity(`Opened document ${documentId}`);
 }
 

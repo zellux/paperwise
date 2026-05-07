@@ -5,12 +5,16 @@ for (const header of sortableHeaders) {
     const field = header.dataset.sortField || "";
     if (tableName === "tags") {
       tagStatsSort = getNextSortState(tagStatsSort, field);
-      renderTagsList(currentTagStats);
+      loadTagStats().catch((error) => {
+        logActivity(`Tag stats load failed: ${error.message}`);
+      });
       return;
     }
     if (tableName === "document-types") {
       documentTypesSort = getNextSortState(documentTypesSort, field);
-      renderDocumentTypesList(currentDocumentTypeStats);
+      loadDocumentTypeStats().catch((error) => {
+        logActivity(`Document type stats load failed: ${error.message}`);
+      });
     }
   });
 }

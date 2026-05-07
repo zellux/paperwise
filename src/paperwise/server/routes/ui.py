@@ -7,11 +7,13 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
+from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.domain.models import DocumentHistoryEvent, DocumentStatus, LLMParseResult, User
 from paperwise.server.dependencies import (
+    current_user_dependency,
     document_repository_dependency,
     optional_current_user_dependency,
 )
@@ -226,6 +228,34 @@ def _activity_initial_data(repository: DocumentRepository, current_user: User | 
     }
 
 
+def _activity_partial_data(
+    repository: DocumentRepository,
+    current_user: User,
+    *,
+    limit: int = 20,
+) -> dict:
+    initial_data = _page_initial_data(current_user, repository)
+    normalized_limit = min(100, max(1, int(limit or 20)))
+    ready_documents = [
+        document
+        for document in repository.list_documents(limit=10_000)
+        if document.owner_id == current_user.id and document.status == DocumentStatus.READY
+    ][:normalized_limit]
+    preference = repository.get_user_preference(current_user.id)
+    total_tokens = 0
+    if preference is not None:
+        total_tokens = int(preference.preferences.get("llm_total_tokens_processed") or 0)
+    return {
+        **initial_data,
+        "activity_documents": [
+            item
+            for item in (_document_list_item(repository, document.id) for document in ready_documents)
+            if item is not None
+        ],
+        "activity_total_tokens": total_tokens,
+    }
+
+
 def _documents_initial_data(
     repository: DocumentRepository,
     current_user: User | None,
@@ -383,6 +413,22 @@ def _replace_input_value(html: str, element_id: str, value: str) -> str:
     return pattern.sub(replace, html, count=1)
 
 
+def _sort_stat_rows(items: list[dict], *, sort_by: str | None, sort_dir: str | None) -> list[dict]:
+    field = str(sort_by or "").strip()
+    direction = str(sort_dir or "").strip().lower()
+    if direction not in {"asc", "desc"}:
+        return items
+    if field not in {"tag", "document_type", "document_count"}:
+        return items
+    return sorted(
+        items,
+        key=lambda item: (
+            item.get(field, "") if field == "document_count" else str(item.get(field, "")).casefold()
+        ),
+        reverse=direction == "desc",
+    )
+
+
 def _tag_rows_html(tag_stats: list[dict]) -> str:
     if not tag_stats:
         return '                <tr><td colspan="3">No tags found.</td></tr>'
@@ -460,6 +506,8 @@ def _format_bytes(value: int | None) -> str:
     bytes_value = int(value or 0)
     if bytes_value <= 0:
         return "0 B"
+    if bytes_value < 1024:
+        return f"{bytes_value} B"
     kb = bytes_value / 1024
     if kb < 1024:
         return f"{kb:.1f} KB"
@@ -547,6 +595,23 @@ def _history_change_lines(event: dict) -> list[str]:
         parse = changes.get("parse") if isinstance(changes.get("parse"), dict) else {}
         if parse.get("parser"):
             lines.append(f"OCR parser: {parse['parser']}")
+        ocr_process = None
+        if isinstance(parse.get("ocr_process"), dict):
+            ocr_process = parse["ocr_process"]
+        elif isinstance(parse.get("ocr"), dict) and isinstance(parse["ocr"].get("process"), dict):
+            ocr_process = parse["ocr"]["process"]
+        if ocr_process is not None:
+            location = _stringify_history_value(ocr_process.get("location"))
+            engine = _stringify_history_value(ocr_process.get("engine"))
+            method = _stringify_history_value(ocr_process.get("method"))
+            lines.append(f"OCR path: {location} | {engine} | {method}")
+            if ocr_process.get("provider"):
+                lines.append(f"OCR provider: {ocr_process['provider']}")
+            if ocr_process.get("model"):
+                lines.append(f"OCR model: {ocr_process['model']}")
+            result_size_bytes = ocr_process.get("result_size_bytes")
+            if isinstance(result_size_bytes, int | float):
+                lines.append(f"OCR result size: {int(result_size_bytes):,} bytes")
         metadata_parse = changes.get("metadata_parse") if isinstance(changes.get("metadata_parse"), dict) else {}
         if metadata_parse.get("provider"):
             lines.append(f"Metadata provider: {metadata_parse['provider']}")
@@ -622,17 +687,19 @@ def _pending_rows_html(documents: list[dict]) -> str:
         return '                <tr><td colspan="4">No pending documents.</td></tr>'
     rows: list[str] = []
     for item in documents:
-        document_id = escape(str(item.get("id") or ""))
+        raw_document_id = str(item.get("id") or "")
+        document_id = escape(raw_document_id)
+        document_id_query = quote(raw_document_id, safe="")
         title = escape(_document_title(item))
         status_html = _status_badge_html(str(item.get("status") or ""))
         created_at = escape(str(item.get("created_at") or "-"))
         rows.append(
             f'                <tr data-pending-doc-id="{document_id}">'
-            f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id}">{title}</a></td>'
+            f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id_query}">{title}</a></td>'
             f'<td data-label="Status">{status_html}</td>'
             f'<td data-label="Created">{created_at}</td>'
             '<td data-label="Action"><div class="table-actions">'
-            f'<a class="icon-action-button" href="/ui/document?id={document_id}" title="Open document">'
+            f'<a class="icon-action-button" href="/ui/document?id={document_id_query}" title="Open document">'
             '<span class="icon-action-label">Open</span>'
             "</a>"
             "</div></td>"
@@ -659,7 +726,7 @@ def _document_rows_html(documents: list[dict]) -> str:
         status_html = _status_badge_html(str(item.get("status") or ""))
         rows.append(
             f'                <tr data-doc-id="{document_id}">'
-            f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id}">{title}</a></td>'
+            f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id_query}">{title}</a></td>'
             f'<td data-label="Type">{document_type}</td>'
             f'<td data-label="Correspondent">{correspondent}</td>'
             f'<td data-label="Tags">{tags_text}</td>'
@@ -687,40 +754,66 @@ def _status_badge_html(status_value: str) -> str:
     return f'<span class="status-badge status-{escape(status)}">{label}</span>'
 
 
-def _render_document_detail_data(html: str, initial_data: dict) -> str:
+def _document_detail_fragments(initial_data: dict) -> dict:
     detail = initial_data.get("document_detail")
     if not isinstance(detail, dict):
-        return html
+        return {
+            "document_id": "",
+            "text": {},
+            "html": {},
+            "inputs": {},
+            "history_html": _history_html([]),
+            "document_label": "",
+            "blob_uri": "",
+        }
     document = detail.get("document") if isinstance(detail.get("document"), dict) else {}
     metadata = document.get("llm_metadata") if isinstance(document.get("llm_metadata"), dict) else {}
     tags = metadata.get("tags") if isinstance(metadata.get("tags"), list) else []
     document_id = str(document.get("id") or "")
     size_bytes = int(document.get("size_bytes") or 0)
-
-    html = _replace_element_text(html, "detailDocId", document_id or "-")
-    html = _replace_element_text(html, "detailOwnerId", str(document.get("owner_id") or "-"))
-    html = _replace_element_text(html, "detailFilename", str(document.get("filename") or "-"))
-    html = _replace_element_html(html, "detailStatus", _status_badge_html(str(document.get("status") or "")))
-    html = _replace_element_text(html, "detailCreatedAt", str(document.get("created_at") or "-"))
-    html = _replace_element_text(html, "detailOcrParsedAt", str(detail.get("ocr_parsed_at") or "-"))
-    html = _replace_element_text(html, "detailContentType", str(document.get("content_type") or "-"))
-    html = _replace_element_text(html, "detailSizeBytes", f"{_format_bytes(size_bytes)} ({size_bytes} bytes)")
-    html = _replace_element_text(html, "detailChecksum", str(document.get("checksum_sha256") or "-"))
-    html = _replace_element_text(html, "detailBlobUri", _relative_blob_path(str(document.get("blob_uri") or "")))
-    html = _replace_element_text(html, "detailOcrContent", str(detail.get("ocr_text_preview") or "").strip() or "-")
-
-    html = _replace_input_value(
-        html,
-        "metaTitle",
-        str(metadata.get("suggested_title") or document.get("filename") or ""),
-    )
-    html = _replace_input_value(html, "metaDate", str(metadata.get("document_date") or ""))
-    html = _replace_input_value(html, "metaCorrespondent", str(metadata.get("correspondent") or ""))
-    html = _replace_input_value(html, "metaType", str(metadata.get("document_type") or ""))
-    html = _replace_input_value(html, "metaTags", ", ".join(str(tag) for tag in tags))
-
     history = initial_data.get("document_history") if isinstance(initial_data.get("document_history"), list) else []
-    html = _replace_element_html(html, "documentHistoryList", _history_html(history))
+    return {
+        "document_id": document_id,
+        "document_label": str(metadata.get("suggested_title") or document.get("filename") or document_id),
+        "blob_uri": str(document.get("blob_uri") or ""),
+        "text": {
+            "detailDocId": document_id or "-",
+            "detailOwnerId": str(document.get("owner_id") or "-"),
+            "detailFilename": str(document.get("filename") or "-"),
+            "detailCreatedAt": str(document.get("created_at") or "-"),
+            "detailOcrParsedAt": str(detail.get("ocr_parsed_at") or "-"),
+            "detailContentType": str(document.get("content_type") or "-"),
+            "detailSizeBytes": f"{_format_bytes(size_bytes)} ({size_bytes} bytes)",
+            "detailChecksum": str(document.get("checksum_sha256") or "-"),
+            "detailBlobUri": _relative_blob_path(str(document.get("blob_uri") or "")),
+            "detailOcrContent": str(detail.get("ocr_text_preview") or "").strip() or "-",
+        },
+        "html": {
+            "detailStatus": _status_badge_html(str(document.get("status") or "")),
+        },
+        "inputs": {
+            "metaTitle": str(metadata.get("suggested_title") or document.get("filename") or ""),
+            "metaDate": str(metadata.get("document_date") or ""),
+            "metaCorrespondent": str(metadata.get("correspondent") or ""),
+            "metaType": str(metadata.get("document_type") or ""),
+            "metaTags": ", ".join(str(tag) for tag in tags),
+        },
+        "history_html": _history_html(history),
+    }
+
+
+def _render_document_detail_data(html: str, initial_data: dict) -> str:
+    fragments = _document_detail_fragments(initial_data)
+    if not fragments["document_id"]:
+        return html
+    for element_id, value in fragments["text"].items():
+        html = _replace_element_text(html, element_id, value)
+    for element_id, value in fragments["html"].items():
+        html = _replace_element_html(html, element_id, value)
+    for element_id, value in fragments["inputs"].items():
+        html = _replace_input_value(html, element_id, value)
+
+    html = _replace_element_html(html, "documentHistoryList", fragments["history_html"])
     return html
 
 
@@ -1047,6 +1140,127 @@ def settings_models_page(
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
     return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user, repository))
+
+
+@router.get("/ui/partials/documents", include_in_schema=False)
+def documents_partial(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    sort_by: str | None = Query(None),
+    sort_dir: str | None = Query(None),
+    q: str | None = Query(None),
+    tag: list[str] | None = Query(None),
+    correspondent: list[str] | None = Query(None),
+    document_type: list[str] | None = Query(None),
+    status: list[str] | None = Query(None),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> JSONResponse:
+    data = _documents_initial_data(
+        repository,
+        current_user,
+        page=page,
+        page_size=page_size,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        q=q,
+        tag=tag,
+        correspondent=correspondent,
+        document_type=document_type,
+        status=status,
+    )
+    return JSONResponse(
+        {
+            "table_body_html": _document_rows_html(data["documents"]),
+            "documents": data["documents"],
+            "documents_total": data["documents_total"],
+            "documents_processing_count": data["documents_processing_count"],
+            "documents_page": data["documents_page"],
+            "documents_page_size": data["documents_page_size"],
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/ui/partials/tags", include_in_schema=False)
+def tags_partial(
+    sort_by: str | None = Query(None),
+    sort_dir: str | None = Query(None),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> JSONResponse:
+    data = _tag_stats_initial_data(repository, current_user)
+    tag_stats = _sort_stat_rows(data["tag_stats"], sort_by=sort_by, sort_dir=sort_dir)
+    return JSONResponse(
+        {
+            "table_body_html": _tag_rows_html(tag_stats),
+            "tag_stats": tag_stats,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/ui/partials/document-types", include_in_schema=False)
+def document_types_partial(
+    sort_by: str | None = Query(None),
+    sort_dir: str | None = Query(None),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> JSONResponse:
+    data = _document_type_stats_initial_data(repository, current_user)
+    document_type_stats = _sort_stat_rows(data["document_type_stats"], sort_by=sort_by, sort_dir=sort_dir)
+    return JSONResponse(
+        {
+            "table_body_html": _document_type_rows_html(document_type_stats),
+            "document_type_stats": document_type_stats,
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/ui/partials/pending", include_in_schema=False)
+def pending_partial(
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> JSONResponse:
+    data = _pending_initial_data(repository, current_user)
+    return JSONResponse(
+        {
+            "table_body_html": _pending_rows_html(data["pending_documents"]),
+            "pending_documents": data["pending_documents"],
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/ui/partials/activity", include_in_schema=False)
+def activity_partial(
+    limit: int = Query(20, ge=1, le=100),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> JSONResponse:
+    data = _activity_partial_data(repository, current_user, limit=limit)
+    return JSONResponse(
+        {
+            "table_body_html": _activity_rows_html(data["activity_documents"]),
+            "activity_documents": data["activity_documents"],
+            "activity_total_tokens": data["activity_total_tokens"],
+        },
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+@router.get("/ui/partials/document", include_in_schema=False)
+def document_partial(
+    id: str = Query(...),
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> JSONResponse:
+    data = _document_detail_initial_data(repository, current_user, id)
+    return JSONResponse(
+        _document_detail_fragments(data),
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 @router.get("/style-lab", include_in_schema=False)

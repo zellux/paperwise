@@ -167,16 +167,16 @@ def test_ui_routes_load_page_specific_scripts() -> None:
     assert "/static/pending.js" not in client.get("/ui/documents").text
 
 
-def test_static_assets_serve_clickable_tag_ui() -> None:
+def test_static_assets_do_not_keep_legacy_tag_renderers() -> None:
     client = TestClient(app)
 
     app_js = client.get("/static/app.js")
     assert app_js.status_code == 200
-    assert "createTagFilterButton" in app_js.text
+    assert "createTagFilterButton" not in app_js.text
 
     styles = client.get("/static/styles.css")
     assert styles.status_code == 200
-    assert ".tag-pill-button" in styles.text
+    assert ".tag-pill-button" not in styles.text
 
 
 def test_static_assets_keep_auth_state_cookie_only() -> None:
@@ -452,6 +452,50 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'data-pending-doc-id="doc-pending"' in pending_html
         assert "Pending File" in pending_html
         assert '<span class="status-badge status-processing">PROCESSING</span>' in pending_html
+
+        documents_partial = client.get("/ui/partials/documents?page_size=1&page=1")
+        assert documents_partial.status_code == 200
+        documents_partial_payload = documents_partial.json()
+        assert documents_partial_payload["documents_total"] == 2
+        assert documents_partial_payload["documents_processing_count"] == 1
+        assert 'data-doc-id="doc-tax"' in documents_partial_payload["table_body_html"]
+        assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in documents_partial_payload["table_body_html"]
+
+        tags_partial = client.get("/ui/partials/tags?sort_by=tag&sort_dir=desc")
+        assert tags_partial.status_code == 200
+        tags_partial_payload = tags_partial.json()
+        assert [item["tag"] for item in tags_partial_payload["tag_stats"]] == ["Tax", "Finance"]
+        assert '<a class="btn" href="/ui/documents?tag=Tax" ' in tags_partial_payload["table_body_html"]
+
+        types_partial = client.get("/ui/partials/document-types?sort_by=document_type&sort_dir=asc")
+        assert types_partial.status_code == 200
+        types_partial_payload = types_partial.json()
+        assert [item["document_type"] for item in types_partial_payload["document_type_stats"]] == [
+            "Invoice",
+            "Notice",
+        ]
+        assert '<td data-label="Document Type">Invoice</td>' in types_partial_payload["table_body_html"]
+
+        activity_partial = client.get("/ui/partials/activity?limit=1")
+        assert activity_partial.status_code == 200
+        activity_partial_payload = activity_partial.json()
+        assert activity_partial_payload["activity_total_tokens"] == 42
+        assert len(activity_partial_payload["activity_documents"]) == 1
+        assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in activity_partial_payload["table_body_html"]
+
+        pending_partial = client.get("/ui/partials/pending")
+        assert pending_partial.status_code == 200
+        pending_partial_payload = pending_partial.json()
+        assert pending_partial_payload["pending_documents"][0]["id"] == "doc-pending"
+        assert 'data-pending-doc-id="doc-pending"' in pending_partial_payload["table_body_html"]
+
+        document_partial = client.get("/ui/partials/document?id=doc-tax")
+        assert document_partial.status_code == 200
+        document_partial_payload = document_partial.json()
+        assert document_partial_payload["document_id"] == "doc-tax"
+        assert document_partial_payload["text"]["detailSizeBytes"] == "100 B (100 bytes)"
+        assert document_partial_payload["inputs"]["metaTitle"] == "Tax Notice"
+        assert "suggested_title: (empty) -&gt; Tax Notice" in document_partial_payload["history_html"]
 
         settings_payload = _initial_data_from_response(client.get("/ui/settings/models").text)
         assert settings_payload["current_user"]["email"] == "catalog-ui@example.com"
