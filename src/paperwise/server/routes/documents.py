@@ -1,5 +1,4 @@
 import json
-import re
 import shutil
 from typing import Any
 from datetime import UTC, datetime
@@ -31,6 +30,7 @@ from paperwise.application.services.documents import (
     get_document,
 )
 from paperwise.application.services.file_relocation import move_blob_to_processed
+from paperwise.application.services.filenames import sanitize_storage_filename
 from paperwise.application.services.history import (
     build_file_moved_history_event,
     build_metadata_history_events,
@@ -436,15 +436,6 @@ def _matches_document_filters(
     if not _matches_text_query(query=query, document=document, llm_result=llm_result):
         return False
     return True
-
-
-def _sanitize_filename(value: str) -> str:
-    cleaned = Path(value).name.strip()
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", cleaned)
-    cleaned = re.sub(r"_+", "_", cleaned).strip("._")
-    if not cleaned:
-        return "uploaded-document.bin"
-    return cleaned
 
 
 def _is_supported_upload(*, filename: str, content_type: str | None) -> bool:
@@ -895,7 +886,8 @@ def create_document_endpoint(
     now = datetime.now(UTC)
     date_path = now.strftime("%Y/%m/%d")
     storage_token = str(uuid4())
-    storage_key = f"incoming/{date_path}/{storage_token}_{_sanitize_filename(filename)}"
+    storage_basename = sanitize_storage_filename(filename, reserved_prefix=f"{storage_token}_")
+    storage_key = f"incoming/{date_path}/{storage_token}_{storage_basename}"
     blob_uri = storage.put(
         key=storage_key,
         data=content,

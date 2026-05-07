@@ -1,21 +1,12 @@
 from __future__ import annotations
 
 import json
-import re
 import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
+from paperwise.application.services.filenames import sanitize_storage_filename
 from paperwise.application.services.storage_paths import blob_ref_to_path, path_to_blob_ref
-
-
-def _sanitize_filename(value: str) -> str:
-    cleaned = Path(value).name.strip()
-    cleaned = re.sub(r"[^A-Za-z0-9._-]+", "_", cleaned)
-    cleaned = re.sub(r"_+", "_", cleaned).strip("._")
-    if not cleaned:
-        return "uploaded-document.bin"
-    return cleaned
 
 
 def move_blob_to_processed(
@@ -32,7 +23,12 @@ def move_blob_to_processed(
     source_path = blob_ref_to_path(blob_uri, object_store_root)
     if source_path is None:
         return blob_uri
-    target_filename = f"{document_id}_{_sanitize_filename(original_filename)}"
+    target_basename = sanitize_storage_filename(
+        original_filename,
+        reserved_prefix=f"{document_id}_",
+        reserved_suffix=".metadata.json",
+    )
+    target_filename = f"{document_id}_{target_basename}"
     target_path = root_dir / "processed" / document_id / target_filename
     target_path.parent.mkdir(parents=True, exist_ok=True)
 

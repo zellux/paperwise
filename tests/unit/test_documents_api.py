@@ -212,6 +212,36 @@ def test_create_and_get_document() -> None:
         app.dependency_overrides.clear()
 
 
+def test_create_document_truncates_long_storage_filename(tmp_path: Path) -> None:
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(tmp_path / "object-store"))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    long_filename = f"{'hospital-bill-complaint-program-' * 12}.pdf"
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={"file": (long_filename, b"%PDF-long-name", "application/pdf")},
+        )
+        assert create_response.status_code == 201
+        document = repository.get(create_response.json()["id"])
+        assert document is not None
+        assert document.filename == long_filename
+
+        blob_path = tmp_path / "object-store" / document.blob_uri
+        assert blob_path.exists()
+        assert len(blob_path.name.encode("utf-8")) <= 255
+        assert blob_path.name.endswith(".pdf")
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_create_and_get_image_document() -> None:
     store_dir = Path("local/test-object-store")
     if store_dir.exists():
