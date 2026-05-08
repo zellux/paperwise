@@ -1,3 +1,16 @@
+async function refreshDocumentRelatedLists(options = {}) {
+  await loadDocumentsList();
+  if (typeof loadPendingDocuments === "function") {
+    await loadPendingDocuments();
+  }
+  if (options.catalog === true && typeof loadTagStats === "function") {
+    await loadTagStats();
+  }
+  if (options.catalog === true && typeof loadDocumentTypeStats === "function") {
+    await loadDocumentTypeStats();
+  }
+}
+
 documentMetaForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!currentDocumentId) {
@@ -24,10 +37,7 @@ documentMetaForm?.addEventListener("submit", async (event) => {
 
   logActivity(`Saved metadata for ${currentDocumentId}`);
   await openDocumentView(currentDocumentId);
-  await loadDocumentsList();
-  await loadPendingDocuments();
-  await loadTagStats();
-  await loadDocumentTypeStats();
+  await refreshDocumentRelatedLists({ catalog: true });
 });
 
 reprocessDocumentBtn?.addEventListener("click", async () => {
@@ -49,16 +59,12 @@ reprocessDocumentBtn?.addEventListener("click", async () => {
     `Reprocessing queued for ${currentDocumentId} (job ${payload.job_id}).`
   );
   await openDocumentView(currentDocumentId);
-  await loadDocumentsList();
-  await loadPendingDocuments();
+  await refreshDocumentRelatedLists();
   const completed = await waitForDocumentReady(currentDocumentId);
   if (completed) {
     logActivity(`Reprocessing completed for ${currentDocumentId}.`);
     await openDocumentView(currentDocumentId);
-    await loadDocumentsList();
-    await loadPendingDocuments();
-    await loadTagStats();
-    await loadDocumentTypeStats();
+    await refreshDocumentRelatedLists({ catalog: true });
   } else {
     logActivity(`Reprocessing still running for ${currentDocumentId}. Refresh to check later.`);
   }
