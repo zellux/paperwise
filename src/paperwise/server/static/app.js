@@ -78,8 +78,6 @@ const activityOutput = document.getElementById("activityOutput");
 const docsTableBody = document.getElementById("docsTableBody");
 const tagsTableBody = document.getElementById("tagsTableBody");
 const documentTypesTableBody = document.getElementById("documentTypesTableBody");
-const processedDocsTableBody = document.getElementById("processedDocsTableBody");
-const activityTokenTotal = document.getElementById("activityTokenTotal");
 const sortableHeaders = [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
 const filterDropdownState = new Map();
 let activeFilterDropdown = null;
@@ -155,7 +153,6 @@ let groundedQaTopK = 18;
 let groundedQaMaxDocuments = 12;
 let docsTotalCount = 0;
 let docsListRequestSeq = 0;
-let processedActivityRequestSeq = 0;
 let tagStatsRequestSeq = 0;
 let documentTypeStatsRequestSeq = 0;
 let initialDataCache;
@@ -1185,7 +1182,9 @@ function clearSession() {
   }
   renderSettingsForm();
   renderSortHeaders();
-  renderActivityTokenTotal(0);
+  if (typeof renderActivityTokenTotal === "function") {
+    renderActivityTokenTotal(0);
+  }
   renderSessionState();
   refreshUploadAvailability();
 }
@@ -1788,11 +1787,6 @@ function applyDocumentTypesPartial(payload) {
   renderSortHeaders();
 }
 
-function applyActivityPartial(payload) {
-  replaceElementHtml(processedDocsTableBody, payload.table_body_html);
-  renderActivityTokenTotal(Number(payload.activity_total_tokens || 0));
-}
-
 function applyDocumentDetailPartial(payload) {
   currentDocumentId = String(payload.document_id || "");
   for (const [elementId, value] of Object.entries(payload.text || {})) {
@@ -1909,21 +1903,6 @@ function renderDocsProcessingCount(count, options = {}) {
   docsProcessingLabel.textContent = `Processing: ${Math.max(0, Number(count) || 0).toLocaleString()}`;
 }
 
-function renderActivityTokenTotal(totalTokens) {
-  if (!activityTokenTotal) {
-    return;
-  }
-  const value = Number.isFinite(totalTokens) && totalTokens > 0 ? Math.floor(totalTokens) : 0;
-  activityTokenTotal.textContent = `LLM tokens processed: ${value.toLocaleString()}`;
-}
-
-function renderActivityTokenLoading() {
-  if (!activityTokenTotal) {
-    return;
-  }
-  activityTokenTotal.textContent = "LLM tokens processed: loading...";
-}
-
 function renderTableLoading(tbody, colspan, message) {
   if (!tbody) {
     return;
@@ -1967,7 +1946,9 @@ function hydrateInitialPageDataForCurrentView() {
   }
 
   if (currentViewId === "section-activity" && Array.isArray(initialData.activity_documents)) {
-    renderActivityTokenTotal(Number(initialData.activity_total_tokens || 0));
+    if (typeof renderActivityTokenTotal === "function") {
+      renderActivityTokenTotal(Number(initialData.activity_total_tokens || 0));
+    }
     logActivity(`Loaded ${initialData.activity_documents.length} latest processed document(s).`);
     initialPageDataConsumed.add(currentViewId);
     return true;
@@ -1994,25 +1975,6 @@ function hydrateInitialPageDataForCurrentView() {
   }
 
   return false;
-}
-
-async function loadProcessedDocumentsActivity() {
-  const requestSeq = ++processedActivityRequestSeq;
-  const limit = Math.max(1, normalizePageSize(docsPageSize));
-  renderTableLoading(processedDocsTableBody, 4, "Loading processed documents...");
-  renderActivityTokenLoading();
-  let payload;
-  try {
-    payload = await fetchUiPartial(`/ui/partials/activity?limit=${encodeURIComponent(String(limit))}`);
-  } catch (error) {
-    logActivity(`Processed documents load failed: ${error.message}`);
-    return;
-  }
-  if (requestSeq !== processedActivityRequestSeq) {
-    return;
-  }
-  applyActivityPartial(payload);
-  logActivity(`Loaded ${payload.activity_documents.length} latest processed document(s).`);
 }
 
 async function loadTagStats() {
@@ -2076,7 +2038,9 @@ async function loadDataForCurrentView() {
     return;
   }
   if (currentViewId === "section-activity") {
-    await loadProcessedDocumentsActivity();
+    if (typeof initializeActivityView === "function") {
+      await initializeActivityView();
+    }
     return;
   }
   if (currentViewId === "section-pending") {

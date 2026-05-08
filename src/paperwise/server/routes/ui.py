@@ -71,6 +71,7 @@ _PAGE_SCRIPTS_BY_VIEW = {
     "section-document-types": ["catalog.js"],
     "section-pending": ["pending.js"],
     "section-upload": ["upload.js"],
+    "section-activity": ["activity.js"],
     "section-settings": ["settings.js"],
 }
 

@@ -163,6 +163,7 @@ def test_ui_routes_load_page_specific_scripts() -> None:
     assert "/static/catalog.js" in client.get("/ui/document-types").text
     assert "/static/pending.js" in client.get("/ui/pending").text
     assert "/static/upload.js" in client.get("/ui/upload").text
+    assert "/static/activity.js" in client.get("/ui/activity").text
     assert "/static/settings.js" in client.get("/ui/settings").text
     assert "/static/pending.js" not in client.get("/ui/documents").text
 
