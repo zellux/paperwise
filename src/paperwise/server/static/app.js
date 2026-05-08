@@ -5,7 +5,6 @@ const deleteDocumentBtn = document.getElementById("deleteDocumentBtn");
 const viewDocumentFileBtn = document.getElementById("viewDocumentFileBtn");
 const docsFilterForm = document.getElementById("docsFilterForm");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
-const restartPendingBtn = document.getElementById("restartPendingBtn");
 const pagePrevBtn = document.getElementById("pagePrevBtn");
 const pageNextBtn = document.getElementById("pageNextBtn");
 const pageIndicator = document.getElementById("pageIndicator");
@@ -79,7 +78,6 @@ const activityOutput = document.getElementById("activityOutput");
 const docsTableBody = document.getElementById("docsTableBody");
 const tagsTableBody = document.getElementById("tagsTableBody");
 const documentTypesTableBody = document.getElementById("documentTypesTableBody");
-const pendingTableBody = document.getElementById("pendingTableBody");
 const processedDocsTableBody = document.getElementById("processedDocsTableBody");
 const activityTokenTotal = document.getElementById("activityTokenTotal");
 const sortableHeaders = [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
@@ -157,7 +155,6 @@ let groundedQaTopK = 18;
 let groundedQaMaxDocuments = 12;
 let docsTotalCount = 0;
 let docsListRequestSeq = 0;
-let pendingDocsRequestSeq = 0;
 let processedActivityRequestSeq = 0;
 let tagStatsRequestSeq = 0;
 let documentTypeStatsRequestSeq = 0;
@@ -1791,13 +1788,6 @@ function applyDocumentTypesPartial(payload) {
   renderSortHeaders();
 }
 
-function applyPendingPartial(payload) {
-  const documents = Array.isArray(payload.pending_documents) ? payload.pending_documents : [];
-  replaceElementHtml(pendingTableBody, payload.table_body_html);
-  renderDocsProcessingCount(documents.length);
-  setRestartPendingButtonEnabled(documents.some((doc) => isRestartablePendingDocument(doc)));
-}
-
 function applyActivityPartial(payload) {
   replaceElementHtml(processedDocsTableBody, payload.table_body_html);
   renderActivityTokenTotal(Number(payload.activity_total_tokens || 0));
@@ -1824,25 +1814,6 @@ function applyDocumentDetailPartial(payload) {
   if (detailBlobUri && payload.blob_uri) {
     detailBlobUri.title = payload.blob_uri;
   }
-}
-
-function setRestartPendingButtonEnabled(enabled) {
-  if (!restartPendingBtn) {
-    return;
-  }
-  restartPendingBtn.disabled = !enabled;
-}
-
-function isRestartablePendingDocument(doc) {
-  const status = String(doc?.status || "").trim().toLowerCase();
-  return status.length > 0 && status !== "ready";
-}
-
-function getVisiblePendingRowCount() {
-  if (!pendingTableBody) {
-    return 0;
-  }
-  return pendingTableBody.querySelectorAll("tr[data-pending-doc-id]").length;
 }
 
 async function loadDocumentsList() {
@@ -1938,27 +1909,6 @@ function renderDocsProcessingCount(count, options = {}) {
   docsProcessingLabel.textContent = `Processing: ${Math.max(0, Number(count) || 0).toLocaleString()}`;
 }
 
-async function loadPendingDocuments() {
-  const requestSeq = ++pendingDocsRequestSeq;
-  renderDocsProcessingCount(0, { loading: true });
-  renderTableLoading(pendingTableBody, 4, "Loading pending documents...");
-  let payload;
-  try {
-    payload = await fetchUiPartial("/ui/partials/pending");
-  } catch (error) {
-    // Keep restart enabled if the UI still has visible pending rows.
-    setRestartPendingButtonEnabled(getVisiblePendingRowCount() > 0);
-    renderDocsProcessingCount(0, { unavailable: true });
-    logActivity(`Pending list failed: ${error.message}`);
-    return;
-  }
-  if (requestSeq !== pendingDocsRequestSeq) {
-    return;
-  }
-  applyPendingPartial(payload);
-  logActivity(`Loaded ${payload.pending_documents.length} pending document(s)`);
-}
-
 function renderActivityTokenTotal(totalTokens) {
   if (!activityTokenTotal) {
     return;
@@ -2024,9 +1974,13 @@ function hydrateInitialPageDataForCurrentView() {
   }
 
   if (currentViewId === "section-pending" && Array.isArray(initialData.pending_documents)) {
-    const hasRestartable = initialData.pending_documents.some((doc) => isRestartablePendingDocument(doc));
+    const hasRestartable =
+      typeof isRestartablePendingDocument === "function" &&
+      initialData.pending_documents.some((doc) => isRestartablePendingDocument(doc));
     renderDocsProcessingCount(initialData.pending_documents.length);
-    setRestartPendingButtonEnabled(hasRestartable);
+    if (typeof setRestartPendingButtonEnabled === "function") {
+      setRestartPendingButtonEnabled(hasRestartable);
+    }
     logActivity(`Loaded ${initialData.pending_documents.length} pending document(s)`);
     initialPageDataConsumed.add(currentViewId);
     return true;
@@ -2126,7 +2080,9 @@ async function loadDataForCurrentView() {
     return;
   }
   if (currentViewId === "section-pending") {
-    await loadPendingDocuments();
+    if (typeof initializePendingView === "function") {
+      await initializePendingView();
+    }
     return;
   }
   if (currentViewId === "section-search") {
@@ -2148,7 +2104,7 @@ async function loadDataForCurrentView() {
   if (currentViewId === "section-upload") {
     return;
   }
-  await Promise.all([loadDocumentsList(), loadPendingDocuments()]);
+  await loadDocumentsList();
 }
 
 async function openDocumentView(documentId) {
