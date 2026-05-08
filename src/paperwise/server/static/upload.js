@@ -1,3 +1,231 @@
+const uploadForm = document.getElementById("uploadForm");
+const fileInput = document.getElementById("fileInput");
+const folderInput = document.getElementById("folderInput");
+const uploadFolderBtn = document.getElementById("uploadFolderBtn");
+const uploadDropzone = document.getElementById("uploadDropzone");
+const uploadSelectionLabel = document.getElementById("uploadSelectionLabel");
+const uploadSubmitBtn = document.getElementById("uploadSubmitBtn");
+const uploadProgressWrap = document.getElementById("uploadProgressWrap");
+const uploadProgressBar = document.getElementById("uploadProgressBar");
+const uploadProgressStatus = document.getElementById("uploadProgressStatus");
+
+let uploadInProgress = false;
+let uploadSelectionContext = { source: "files", folderName: "" };
+
+const SUPPORTED_UPLOAD_LABEL = "Supports: PDF, TXT, MD, DOCX, DOC, PNG, JPG, WEBP, GIF";
+const SUPPORTED_UPLOAD_EXTENSIONS = new Set([
+  ".pdf",
+  ".txt",
+  ".md",
+  ".markdown",
+  ".doc",
+  ".docx",
+  ".png",
+  ".jpg",
+  ".jpeg",
+  ".webp",
+  ".gif",
+]);
+const SUPPORTED_UPLOAD_MIME_TYPES = new Set([
+  "application/msword",
+  "application/octet-stream",
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "image/gif",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "text/markdown",
+  "text/plain",
+]);
+
+function isSupportedUploadFile(file) {
+  const name = (file?.name || "").toLowerCase();
+  const ext = name.includes(".") ? `.${name.split(".").pop()}` : "";
+  const type = String(file?.type || "").split(";")[0].trim().toLowerCase();
+  return SUPPORTED_UPLOAD_EXTENSIONS.has(ext) || SUPPORTED_UPLOAD_MIME_TYPES.has(type);
+}
+
+function collectSupportedFiles(fileList) {
+  return [...(fileList || [])].filter((file) => isSupportedUploadFile(file));
+}
+
+function getFolderNameFromFiles(files) {
+  for (const file of files || []) {
+    const relativePath = String(file?.webkitRelativePath || "").trim();
+    if (!relativePath) {
+      continue;
+    }
+    const folderName = relativePath.split("/")[0]?.trim();
+    if (folderName) {
+      return folderName;
+    }
+  }
+  return "";
+}
+
+async function collectFilesFromDirectoryHandle(directoryHandle) {
+  const files = [];
+
+  async function visit(handle) {
+    for await (const entry of handle.values()) {
+      if (entry.kind === "file") {
+        files.push(await entry.getFile());
+        continue;
+      }
+      if (entry.kind === "directory") {
+        await visit(entry);
+      }
+    }
+  }
+
+  await visit(directoryHandle);
+  return files;
+}
+
+function applyFolderSelection(selectedFiles, folderName = "") {
+  const supportedFiles = collectSupportedFiles(selectedFiles);
+  const ignoredCount = selectedFiles.length - supportedFiles.length;
+
+  if (!supportedFiles.length) {
+    setSelectedFiles([], { source: "folder", folderName });
+    if (selectedFiles.length) {
+      logActivity("Folder selection ignored: no supported files were found.");
+    }
+    return;
+  }
+
+  setSelectedFiles(supportedFiles, { source: "folder", folderName });
+  if (ignoredCount > 0) {
+    logActivity(`Folder selection skipped ${ignoredCount} unsupported file(s).`);
+  }
+  logActivity(`Ready to upload ${supportedFiles.length} file(s) from folder selection.`);
+}
+
+function updateSelectedFilesLabel() {
+  if (!uploadSelectionLabel || !fileInput) {
+    return;
+  }
+  const files = fileInput.files ? [...fileInput.files] : [];
+  if (!files.length) {
+    uploadSelectionLabel.textContent = SUPPORTED_UPLOAD_LABEL;
+    return;
+  }
+  if (files.length === 1) {
+    uploadSelectionLabel.textContent = `Selected: ${files[0].name}`;
+    return;
+  }
+  if (uploadSelectionContext.source === "folder" && uploadSelectionContext.folderName) {
+    uploadSelectionLabel.textContent = `Selected ${files.length} files from ${uploadSelectionContext.folderName}`;
+    return;
+  }
+  uploadSelectionLabel.textContent = `Selected ${files.length} files`;
+}
+
+function hideUploadProgress() {
+  if (uploadProgressWrap) {
+    uploadProgressWrap.hidden = true;
+  }
+  if (uploadProgressBar) {
+    uploadProgressBar.max = 1;
+    uploadProgressBar.value = 0;
+  }
+  if (uploadProgressStatus) {
+    uploadProgressStatus.textContent = "Ready.";
+  }
+}
+
+function showUploadProgress(processed, total, message) {
+  if (!uploadProgressWrap || !uploadProgressBar || !uploadProgressStatus) {
+    return;
+  }
+  uploadProgressWrap.hidden = false;
+  uploadProgressBar.max = Math.max(total, 1);
+  uploadProgressBar.value = Math.max(0, Math.min(processed, total));
+  uploadProgressStatus.textContent = message;
+}
+
+function syncUploadProgressFromSelection() {
+  if (!fileInput || uploadInProgress) {
+    return;
+  }
+  const files = fileInput.files ? [...fileInput.files] : [];
+  if (files.length <= 1) {
+    hideUploadProgress();
+    return;
+  }
+  showUploadProgress(0, files.length, `Ready to upload ${files.length} files.`);
+}
+
+function setSelectedFiles(files, options = {}) {
+  if (!fileInput) {
+    return;
+  }
+  const data = new DataTransfer();
+  for (const file of files) {
+    data.items.add(file);
+  }
+  fileInput.files = data.files;
+  uploadSelectionContext = {
+    source: options.source === "folder" ? "folder" : "files",
+    folderName: String(options.folderName || "").trim(),
+  };
+  updateSelectedFilesLabel();
+  syncUploadProgressFromSelection();
+}
+
+async function uploadDocumentFile(file) {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await apiFetch("/documents", { method: "POST", body: form });
+  const payload = await response.json();
+  if (!response.ok) {
+    throw new Error(payload.detail || response.statusText);
+  }
+  return payload;
+}
+
+function syncUploadAvailability(options = {}) {
+  const announce = options.announce === true;
+  const navigateToSettings = options.navigateToSettings === true;
+  const reason = getLlmUploadBlockReason();
+  const blocked = Boolean(reason);
+
+  if (uploadSubmitBtn) {
+    uploadSubmitBtn.disabled = blocked;
+  }
+  if (fileInput) {
+    fileInput.disabled = blocked;
+  }
+  if (folderInput) {
+    folderInput.disabled = blocked;
+  }
+  if (uploadFolderBtn) {
+    uploadFolderBtn.disabled = blocked;
+  }
+  if (uploadDropzone) {
+    uploadDropzone.classList.toggle("is-disabled", blocked);
+    uploadDropzone.setAttribute("aria-disabled", blocked ? "true" : "false");
+    uploadDropzone.tabIndex = blocked ? -1 : 0;
+  }
+
+  if (blocked) {
+    if (uploadSelectionLabel) {
+      uploadSelectionLabel.textContent = "Upload disabled: update LLM settings first.";
+    }
+    if (announce) {
+      logActivity(`Upload blocked: ${reason} Go to Settings first.`);
+    }
+    if (navigateToSettings) {
+      window.location.href = "/ui/settings/models";
+    }
+    return false;
+  }
+
+  updateSelectedFilesLabel();
+  return true;
+}
+
 uploadForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {

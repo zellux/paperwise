@@ -1,4 +1,3 @@
-const uploadForm = document.getElementById("uploadForm");
 const documentMetaForm = document.getElementById("documentMetaForm");
 const backToDocsBtn = document.getElementById("backToDocsBtn");
 const reprocessDocumentBtn = document.getElementById("reprocessDocumentBtn");
@@ -65,16 +64,6 @@ const authMessage = document.getElementById("authMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const sessionUserLabel = document.getElementById("sessionUserLabel");
 const brandHomeBtn = document.getElementById("brandHomeBtn");
-const fileInput = document.getElementById("fileInput");
-const folderInput = document.getElementById("folderInput");
-const uploadFolderBtn = document.getElementById("uploadFolderBtn");
-const uploadDropzone = document.getElementById("uploadDropzone");
-const uploadSelectionLabel = document.getElementById("uploadSelectionLabel");
-const uploadSubmitBtn = document.getElementById("uploadSubmitBtn");
-const uploadProgressWrap = document.getElementById("uploadProgressWrap");
-const uploadProgressBar = document.getElementById("uploadProgressBar");
-const uploadProgressStatus = document.getElementById("uploadProgressStatus");
-
 const metaTitleInput = document.getElementById("metaTitle");
 const metaDateInput = document.getElementById("metaDate");
 const metaCorrespondentInput = document.getElementById("metaCorrespondent");
@@ -197,8 +186,6 @@ const initialPageDataConsumed = new Set();
 let initialChatThreadsConsumed = false;
 let initialUserPreferencesConsumed = false;
 let settingsActiveSectionId = "settings-section-display";
-let uploadInProgress = false;
-let uploadSelectionContext = { source: "files", folderName: "" };
 const PATH_TO_SETTINGS_SECTION_ID = {
   "/ui/settings": "settings-section-display",
   "/ui/settings/account": "settings-section-account",
@@ -473,7 +460,7 @@ function renderSettingsForm() {
   setActiveSettingsSection(settingsActiveSectionId);
   refreshLocalOcrStatus().catch(() => {});
   setSettingsPasswordStatus("");
-  syncUploadAvailability();
+  refreshUploadAvailability();
 }
 
 function formatModelSummaryRow(label, settings, extra = "") {
@@ -726,6 +713,13 @@ function getLlmUploadBlockReason() {
 function setConnectionTestStatus(connectionId, message, tone = "") {
   connectionTestStatuses.set(connectionId, { message, tone });
   renderConnectionsList();
+}
+
+function refreshUploadAvailability(options = {}) {
+  if (typeof syncUploadAvailability === "function") {
+    return syncUploadAvailability(options);
+  }
+  return true;
 }
 
 function renderConnectionSelect(selectEl, selectedValue) {
@@ -1011,47 +1005,6 @@ async function refreshLocalOcrStatus() {
   }
 }
 
-function syncUploadAvailability(options = {}) {
-  const announce = options.announce === true;
-  const navigateToSettings = options.navigateToSettings === true;
-  const reason = getLlmUploadBlockReason();
-  const blocked = Boolean(reason);
-
-  if (uploadSubmitBtn) {
-    uploadSubmitBtn.disabled = blocked;
-  }
-  if (fileInput) {
-    fileInput.disabled = blocked;
-  }
-  if (folderInput) {
-    folderInput.disabled = blocked;
-  }
-  if (uploadFolderBtn) {
-    uploadFolderBtn.disabled = blocked;
-  }
-  if (uploadDropzone) {
-    uploadDropzone.classList.toggle("is-disabled", blocked);
-    uploadDropzone.setAttribute("aria-disabled", blocked ? "true" : "false");
-    uploadDropzone.tabIndex = blocked ? -1 : 0;
-  }
-
-  if (blocked) {
-    if (uploadSelectionLabel) {
-      uploadSelectionLabel.textContent = "Upload disabled: update LLM settings first.";
-    }
-    if (announce) {
-      logActivity(`Upload blocked: ${reason} Go to Settings first.`);
-    }
-    if (navigateToSettings) {
-      window.location.href = "/ui/settings/models";
-    }
-    return false;
-  }
-
-  updateSelectedFilesLabel();
-  return true;
-}
-
 async function loadUserPreferences() {
   if (!currentUser) {
     return {};
@@ -1131,7 +1084,7 @@ function applyUserPreferences(preferences) {
 async function hydrateUserPreferencesForSession() {
   const preferences = await loadUserPreferences();
   applyUserPreferences(preferences);
-  if (searchAskThreadList) {
+  if (typeof searchAskThreadList !== "undefined" && searchAskThreadList) {
     await loadSearchAskThreads();
   }
   readFiltersFromUrl();
@@ -1168,179 +1121,6 @@ function delay(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
-}
-
-const SUPPORTED_UPLOAD_LABEL = "Supports: PDF, TXT, MD, DOCX, DOC, PNG, JPG, WEBP, GIF";
-const SUPPORTED_UPLOAD_EXTENSIONS = new Set([
-  ".pdf",
-  ".txt",
-  ".md",
-  ".markdown",
-  ".doc",
-  ".docx",
-  ".png",
-  ".jpg",
-  ".jpeg",
-  ".webp",
-  ".gif",
-]);
-const SUPPORTED_UPLOAD_MIME_TYPES = new Set([
-  "application/msword",
-  "application/octet-stream",
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "image/gif",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "text/markdown",
-  "text/plain",
-]);
-
-function isSupportedUploadFile(file) {
-  const name = (file?.name || "").toLowerCase();
-  const ext = name.includes(".") ? `.${name.split(".").pop()}` : "";
-  const type = String(file?.type || "").split(";")[0].trim().toLowerCase();
-  return SUPPORTED_UPLOAD_EXTENSIONS.has(ext) || SUPPORTED_UPLOAD_MIME_TYPES.has(type);
-}
-
-function collectSupportedFiles(fileList) {
-  return [...(fileList || [])].filter((file) => isSupportedUploadFile(file));
-}
-
-function getFolderNameFromFiles(files) {
-  for (const file of files || []) {
-    const relativePath = String(file?.webkitRelativePath || "").trim();
-    if (!relativePath) {
-      continue;
-    }
-    const folderName = relativePath.split("/")[0]?.trim();
-    if (folderName) {
-      return folderName;
-    }
-  }
-  return "";
-}
-
-async function collectFilesFromDirectoryHandle(directoryHandle) {
-  const files = [];
-
-  async function visit(handle) {
-    for await (const entry of handle.values()) {
-      if (entry.kind === "file") {
-        files.push(await entry.getFile());
-        continue;
-      }
-      if (entry.kind === "directory") {
-        await visit(entry);
-      }
-    }
-  }
-
-  await visit(directoryHandle);
-  return files;
-}
-
-function applyFolderSelection(selectedFiles, folderName = "") {
-  const supportedFiles = collectSupportedFiles(selectedFiles);
-  const ignoredCount = selectedFiles.length - supportedFiles.length;
-
-  if (!supportedFiles.length) {
-    setSelectedFiles([], { source: "folder", folderName });
-    if (selectedFiles.length) {
-      logActivity("Folder selection ignored: no supported files were found.");
-    }
-    return;
-  }
-
-  setSelectedFiles(supportedFiles, { source: "folder", folderName });
-  if (ignoredCount > 0) {
-    logActivity(`Folder selection skipped ${ignoredCount} unsupported file(s).`);
-  }
-  logActivity(`Ready to upload ${supportedFiles.length} file(s) from folder selection.`);
-}
-
-function updateSelectedFilesLabel() {
-  if (!uploadSelectionLabel || !fileInput) {
-    return;
-  }
-  const files = fileInput.files ? [...fileInput.files] : [];
-  if (!files.length) {
-    uploadSelectionLabel.textContent = SUPPORTED_UPLOAD_LABEL;
-    return;
-  }
-  if (files.length === 1) {
-    uploadSelectionLabel.textContent = `Selected: ${files[0].name}`;
-    return;
-  }
-  if (uploadSelectionContext.source === "folder" && uploadSelectionContext.folderName) {
-    uploadSelectionLabel.textContent = `Selected ${files.length} files from ${uploadSelectionContext.folderName}`;
-    return;
-  }
-  uploadSelectionLabel.textContent = `Selected ${files.length} files`;
-}
-
-function hideUploadProgress() {
-  if (uploadProgressWrap) {
-    uploadProgressWrap.hidden = true;
-  }
-  if (uploadProgressBar) {
-    uploadProgressBar.max = 1;
-    uploadProgressBar.value = 0;
-  }
-  if (uploadProgressStatus) {
-    uploadProgressStatus.textContent = "Ready.";
-  }
-}
-
-function showUploadProgress(processed, total, message) {
-  if (!uploadProgressWrap || !uploadProgressBar || !uploadProgressStatus) {
-    return;
-  }
-  uploadProgressWrap.hidden = false;
-  uploadProgressBar.max = Math.max(total, 1);
-  uploadProgressBar.value = Math.max(0, Math.min(processed, total));
-  uploadProgressStatus.textContent = message;
-}
-
-function syncUploadProgressFromSelection() {
-  if (!fileInput || uploadInProgress) {
-    return;
-  }
-  const files = fileInput.files ? [...fileInput.files] : [];
-  if (files.length <= 1) {
-    hideUploadProgress();
-    return;
-  }
-  showUploadProgress(0, files.length, `Ready to upload ${files.length} files.`);
-}
-
-function setSelectedFiles(files, options = {}) {
-  if (!fileInput) {
-    return;
-  }
-  const data = new DataTransfer();
-  for (const file of files) {
-    data.items.add(file);
-  }
-  fileInput.files = data.files;
-  uploadSelectionContext = {
-    source: options.source === "folder" ? "folder" : "files",
-    folderName: String(options.folderName || "").trim(),
-  };
-  updateSelectedFilesLabel();
-  syncUploadProgressFromSelection();
-}
-
-async function uploadDocumentFile(file) {
-  const form = new FormData();
-  form.append("file", file);
-  const response = await apiFetch("/documents", { method: "POST", body: form });
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.detail || response.statusText);
-  }
-  return payload;
 }
 
 function setAuthMessage(message, isError = false) {
@@ -1429,16 +1209,24 @@ function clearSession() {
   searchAskThreadId = "";
   searchAskThreads = [];
   currentViewId = "section-docs";
-  renderSearchAskTokenUsage();
-  renderSearchAskThreadSelect();
+  if (typeof renderSearchAskTokenUsage === "function") {
+    renderSearchAskTokenUsage();
+  }
+  if (typeof renderSearchAskThreadSelect === "function") {
+    renderSearchAskThreadSelect();
+  }
   replaceElementHtml(searchResultsTableBody, '<tr><td colspan="6">No matches found.</td></tr>');
-  renderSearchResultsMeta("No search run yet.");
-  renderSearchAskMessages();
+  if (typeof renderSearchResultsMeta === "function") {
+    renderSearchResultsMeta("No search run yet.");
+  }
+  if (typeof renderSearchAskMessages === "function") {
+    renderSearchAskMessages();
+  }
   renderSettingsForm();
   renderSortHeaders();
   renderActivityTokenTotal(0);
   renderSessionState();
-  syncUploadAvailability();
+  refreshUploadAvailability();
 }
 
 async function apiFetch(url, options = {}) {
@@ -2015,7 +1803,7 @@ function hydrateSettingsFormFromInitialPreferences() {
   }
   applyUserPreferences(initialData.user_preferences);
   renderSettingsForm();
-  syncUploadAvailability();
+  refreshUploadAvailability();
   return true;
 }
 
@@ -3586,7 +3374,7 @@ async function initializeApp() {
   applyFiltersToControls();
   renderSettingsForm();
   renderSortHeaders();
-  syncUploadAvailability();
+  refreshUploadAvailability();
   if (currentViewId === "section-document") {
     currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";
   }
@@ -3597,6 +3385,8 @@ async function initializeApp() {
 
 applyTheme(currentTheme);
 
-initializeApp().catch((error) => {
-  setAuthMessage(error.message || "Failed to initialize app.", true);
+document.addEventListener("DOMContentLoaded", () => {
+  initializeApp().catch((error) => {
+    setAuthMessage(error.message || "Failed to initialize app.", true);
+  });
 });

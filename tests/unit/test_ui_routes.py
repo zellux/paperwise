@@ -230,9 +230,9 @@ def test_grounded_qa_ui_does_not_include_keyword_search_shell() -> None:
 def test_static_assets_serve_upload_progress_ui() -> None:
     client = TestClient(app)
 
-    app_js = client.get("/static/app.js")
-    assert app_js.status_code == 200
-    assert "showUploadProgress" in app_js.text
+    upload_js = client.get("/static/upload.js")
+    assert upload_js.status_code == 200
+    assert "showUploadProgress" in upload_js.text
 
     styles = client.get("/static/styles.css")
     assert styles.status_code == 200

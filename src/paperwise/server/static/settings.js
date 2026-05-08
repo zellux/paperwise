@@ -29,7 +29,7 @@ settingsForm?.addEventListener("submit", async (event) => {
   ocrImageDetail = normalizeOcrImageDetail(settingsOcrImageDetailSelect?.value || ocrImageDetail);
   renderTaskRoutingControls();
   syncTaskRoutingVisibility();
-  syncUploadAvailability();
+  refreshUploadAvailability();
   applyTheme(nextTheme);
   docsPageSize = nextPageSize;
   docsPage = 1;
