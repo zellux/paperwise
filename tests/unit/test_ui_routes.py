@@ -179,6 +179,20 @@ def test_static_assets_do_not_keep_legacy_tag_renderers() -> None:
     assert ".tag-pill-button" not in styles.text
 
 
+def test_static_assets_keep_search_logic_in_page_script() -> None:
+    client = TestClient(app)
+
+    app_js = client.get("/static/app.js")
+    assert app_js.status_code == 200
+    assert "runKeywordSearch" not in app_js.text
+    assert "renderSearchAskMessages" not in app_js.text
+
+    search_js = client.get("/static/search.js")
+    assert search_js.status_code == 200
+    assert "runKeywordSearch" in search_js.text
+    assert "renderSearchAskMessages" in search_js.text
+
+
 def test_static_assets_keep_auth_state_cookie_only() -> None:
     client = TestClient(app)
 
