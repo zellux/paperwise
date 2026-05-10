@@ -14,7 +14,7 @@ from paperwise.application.services.chat_threads import (
 )
 from paperwise.application.services.llm_preferences import LLM_TASK_GROUNDED_QA
 from paperwise.domain.models import User
-from paperwise.server.chat_schemas import (
+from paperwise.server.schemas.chat import (
     ChatCitationResponse,
     ChatMessageRequest,
     ChatRequest,

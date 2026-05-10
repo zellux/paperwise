@@ -1,5 +1,5 @@
 from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult
-from paperwise.server.document_responses import (
+from paperwise.server.schemas.documents import (
     DocumentHistoryEventResponse,
     DocumentListItemResponse,
 )

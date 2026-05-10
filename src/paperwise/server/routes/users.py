@@ -23,7 +23,7 @@ from paperwise.application.services.users import (
 from paperwise.domain.models import User
 from paperwise.domain.models import UserPreference
 from paperwise.infrastructure.config import Settings
-from paperwise.server.user_schemas import (
+from paperwise.server.schemas.users import (
     ChangePasswordRequest,
     ChangePasswordResponse,
     CreateUserRequest,

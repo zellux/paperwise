@@ -19,16 +19,14 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
 )
 from paperwise.server.collection_access import get_collection_or_404
-from paperwise.server.collection_requests import (
+from paperwise.server.schemas.collections import (
+    AskResponse,
     AskRequest,
     CollectionCreateRequest,
-    CollectionDocumentsRequest,
-    SearchRequest,
-)
-from paperwise.server.collection_responses import (
-    AskResponse,
     CollectionDocumentIdsResponse,
+    CollectionDocumentsRequest,
     CollectionResponse,
+    SearchRequest,
     SearchResponse,
 )
 from paperwise.server.llm_provider import resolve_http_llm_provider_for_user

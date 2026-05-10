@@ -20,7 +20,7 @@ from paperwise.server.llm_provider import (
     resolve_http_ocr_llm_provider_for_user,
 )
 from paperwise.server.document_access import get_owned_document_or_404
-from paperwise.server.document_responses import (
+from paperwise.server.schemas.documents import (
     CountResponse,
     CreateDocumentResponse,
     DocumentDetailResponse,
@@ -35,8 +35,9 @@ from paperwise.server.document_responses import (
     RestartPendingResponse,
     TagStatResponse,
     TaxonomyResponse,
+    LLMConnectionTestRequest,
+    MetadataUpdateRequest,
 )
-from paperwise.server.document_requests import LLMConnectionTestRequest, MetadataUpdateRequest
 from paperwise.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
