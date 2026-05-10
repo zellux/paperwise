@@ -1,0 +1,71 @@
+<article id="section-settings" class="panel panel-section view">
+          <h2>Settings</h2>
+          <nav class="settings-subnav" aria-label="Settings sections">
+            <a class="settings-subnav-link active" data-settings-section="settings-section-display" href="/ui/settings/display">Preferences</a>
+            <a class="settings-subnav-link" data-settings-section="settings-section-models" href="/ui/settings/models">Model Config</a>
+            <a class="settings-subnav-link" data-settings-section="settings-section-account" href="/ui/settings/account">User Account</a>
+          </nav>
+          <form id="settingsForm" class="stack settings-form">
+<section id="settings-section-display" class="settings-subsection">
+              <div class="settings-column">
+                <section class="settings-group">
+                  <h3 class="settings-group-title">Display</h3>
+                  <p class="settings-group-note">Visual theme and list density.</p>
+                  <div class="settings-group-fields">
+                    <label class="label" for="settingsThemeSelect">Theme</label>
+                    <select id="settingsThemeSelect" name="settingsThemeSelect">
+                      <option value="atlas">Atlas</option>
+                      <option value="ledger">Ledger</option>
+                      <option value="moss">Moss</option>
+                      <option value="ember">Ember</option>
+                      <option value="folio">Folio</option>
+                      <option value="forge">Forge</option>
+                    </select>
+
+                    <label class="label" for="settingsPageSizeSelect">Documents per page</label>
+                    <select id="settingsPageSizeSelect" name="settingsPageSizeSelect">
+                      <option value="10">10</option>
+                      <option value="20">20</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                    </select>
+                  </div>
+                </section>
+
+                <section class="settings-group">
+                  <h3 class="settings-group-title">Ask Your Docs</h3>
+                  <p class="settings-group-note">Control retrieval context size and how many source documents are sent to the LLM for each answer.</p>
+                  <div class="settings-group-fields settings-compact-number-grid">
+                    <div class="settings-compact-field">
+                      <label class="label" for="settingsGroundedQaTopKInput">Context Chunks</label>
+                      <input
+                        id="settingsGroundedQaTopKInput"
+                        name="settingsGroundedQaTopKInput"
+                        type="number"
+                        min="3"
+                        max="60"
+                        value="18"
+                      />
+                    </div>
+
+                    <div class="settings-compact-field">
+                      <label class="label" for="settingsGroundedQaMaxDocsInput">Max Source Documents</label>
+                      <input
+                        id="settingsGroundedQaMaxDocsInput"
+                        name="settingsGroundedQaMaxDocsInput"
+                        type="number"
+                        min="1"
+                        max="50"
+                        value="12"
+                      />
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <div class="actions settings-form-actions">
+              <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>
+            </div>
+          </form>
+        </article>

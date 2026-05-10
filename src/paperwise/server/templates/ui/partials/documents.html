@@ -1,0 +1,123 @@
+<article id="section-docs" class="panel panel-section view">
+          <h2>Documents</h2>
+          <form id="docsFilterForm" class="filters-toolbar">
+            <div class="filter-chip filter-chip-search">
+              <span class="chip-prefix">Search</span>
+              <input
+                id="filterQuery"
+                name="filterQuery"
+                type="text"
+                placeholder="Title, correspondent, type, tags..."
+              />
+            </div>
+            <div class="filter-chip">
+              <span class="chip-prefix">Tags</span>
+              <select
+                id="filterTag"
+                name="filterTag"
+                class="filter-select"
+                multiple
+                title="Select one or more tags"
+              >
+              </select>
+            </div>
+            <div class="filter-chip">
+              <span class="chip-prefix">Correspondent</span>
+              <select
+                id="filterCorrespondent"
+                name="filterCorrespondent"
+                class="filter-select"
+                multiple
+                title="Select one or more correspondents"
+              >
+              </select>
+            </div>
+            <div class="filter-chip">
+              <span class="chip-prefix">Document Type</span>
+              <select
+                id="filterType"
+                name="filterType"
+                class="filter-select"
+                multiple
+                title="Select one or more document types"
+              >
+              </select>
+            </div>
+            <div class="filter-chip">
+              <span class="chip-prefix">Status</span>
+              <select
+                id="filterStatus"
+                name="filterStatus"
+                class="filter-select"
+                multiple
+                title="Select one or more statuses"
+              >
+                <option value="received">Received</option>
+                <option value="processing">Processing</option>
+                <option value="ready">Ready</option>
+              </select>
+            </div>
+            <button id="clearFiltersBtn" type="button" class="btn btn-muted">Reset Filters</button>
+          </form>
+          <div class="pagination-toolbar">
+            <div class="docs-summary">
+              <span id="docsTotalLabel" class="docs-total-label">Total documents: 0</span>
+              <span id="docsProcessingLabel" class="docs-total-label">Processing: 0</span>
+            </div>
+            <div class="pagination-controls">
+              <button id="pagePrevBtn" type="button" class="btn btn-muted">Prev</button>
+              <span id="pageIndicator" class="page-indicator">Page 1</span>
+              <button id="pageNextBtn" type="button" class="btn btn-muted">Next</button>
+            </div>
+          </div>
+          <div class="docs-table-wrap">
+            <table class="docs-table">
+              <thead>
+                <tr>
+                  <th data-sort-table="docs" data-sort-field="title" aria-sort="none">
+                    <button type="button" class="table-sort-button">
+                      <span>Title</span>
+                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
+                    </button>
+                  </th>
+                  <th data-sort-table="docs" data-sort-field="document_type" aria-sort="none">
+                    <button type="button" class="table-sort-button">
+                      <span>Type</span>
+                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
+                    </button>
+                  </th>
+                  <th data-sort-table="docs" data-sort-field="correspondent" aria-sort="none">
+                    <button type="button" class="table-sort-button">
+                      <span>Correspondent</span>
+                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
+                    </button>
+                  </th>
+                  <th data-sort-table="docs" data-sort-field="tags" aria-sort="none">
+                    <button type="button" class="table-sort-button">
+                      <span>Tags</span>
+                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
+                    </button>
+                  </th>
+                  <th data-sort-table="docs" data-sort-field="document_date" aria-sort="none">
+                    <button type="button" class="table-sort-button">
+                      <span>Date</span>
+                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
+                    </button>
+                  </th>
+                  <th data-sort-table="docs" data-sort-field="status" aria-sort="none">
+                    <button type="button" class="table-sort-button">
+                      <span>Status</span>
+                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
+                    </button>
+                  </th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="docsTableBody">
+                <tr>
+                  <td colspan="7">No documents loaded.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>

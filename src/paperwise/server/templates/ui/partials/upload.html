@@ -1,0 +1,42 @@
+<article id="section-upload" class="panel panel-section view">
+          <h2>Upload Documents</h2>
+          <form id="uploadForm" class="stack">
+            <label class="label" for="fileInput">Document and image files</label>
+            <div id="uploadDropzone" class="upload-dropzone" role="button" tabindex="0">
+              <p class="upload-dropzone-title">Drag and drop documents or images here</p>
+              <p id="uploadSelectionLabel" class="upload-dropzone-subtitle">
+                Supports: PDF, TXT, MD, DOCX, DOC, PNG, JPG, WEBP, GIF
+              </p>
+              <input
+                id="fileInput"
+                name="fileInput"
+                type="file"
+                accept=".pdf,.txt,.md,.markdown,.doc,.docx,.png,.jpg,.jpeg,.webp,.gif,text/plain,text/markdown,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp,image/gif,application/octet-stream"
+                multiple
+                required
+              />
+              <input
+                id="folderInput"
+                name="folderInput"
+                type="file"
+                webkitdirectory
+                directory
+                multiple
+                hidden
+                tabindex="-1"
+              />
+            </div>
+
+            <div class="actions">
+              <button id="uploadFolderBtn" type="button" class="btn btn-muted">Choose Folder</button>
+              <button id="uploadSubmitBtn" type="submit" class="btn btn-primary">Upload Selected Files</button>
+            </div>
+            <div id="uploadProgressWrap" class="upload-progress" hidden>
+              <div class="upload-progress-header">
+                <span class="upload-progress-label">Batch upload progress</span>
+                <span id="uploadProgressStatus" class="upload-progress-status">Ready.</span>
+              </div>
+              <progress id="uploadProgressBar" class="upload-progress-bar" value="0" max="1"></progress>
+            </div>
+          </form>
+        </article>

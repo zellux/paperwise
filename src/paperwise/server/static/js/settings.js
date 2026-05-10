@@ -28,7 +28,6 @@ function renderSettingsForm() {
   renderModelConfigSummary();
   syncTaskRoutingVisibility();
   bindModelConfigSummaryActions();
-  setActiveSettingsSection(settingsActiveSectionId);
   refreshLocalOcrStatus().catch(() => {});
   setSettingsPasswordStatus("");
   refreshUploadAvailability();

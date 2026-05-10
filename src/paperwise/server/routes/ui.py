@@ -31,10 +31,11 @@ from paperwise.server.routes.query import _migrate_legacy_chat_threads
 router = APIRouter(tags=["ui"])
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
-_VIEW_ARTICLE_RE = re.compile(
-    r"\n\s*<article id=\"(?P<view_id>section-[^\"]+)\"(?P<attrs>[^>]*)>.*?\n\s*</article>",
-    re.DOTALL,
-)
+_STATIC_CSS_DIR = _STATIC_DIR / "css"
+_STATIC_JS_DIR = _STATIC_DIR / "js"
+_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "ui"
+_LAYOUT_TEMPLATE = _TEMPLATE_DIR / "layout.html"
+_PARTIALS_DIR = _TEMPLATE_DIR / "partials"
 _TABLE_BODY_RE_TEMPLATE = (
     r'(<tbody id="{element_id}"[^>]*>)'
     r'.*?'
@@ -51,7 +52,6 @@ _NAV_LINK_RE = re.compile(
     r'(?=[^>]*\bhref="(?P<href>[^"]+)")[^>]*>)',
     re.DOTALL,
 )
-_SEARCH_SUBSECTION_IDS = ("search-section-keyword", "search-section-ask")
 _ACTIVE_NAV_BY_VIEW = {
     "section-docs": "/ui/documents",
     "section-document": "/ui/documents",
@@ -62,6 +62,20 @@ _ACTIVE_NAV_BY_VIEW = {
     "section-upload": "/ui/upload",
     "section-activity": "/ui/activity",
     "section-settings": "/ui/settings",
+}
+_PAGE_PARTIAL_BY_NAME = {
+    "documents": "documents.html",
+    "document": "document.html",
+    "search": "search.html",
+    "grounded-qa": "grounded_qa.html",
+    "tags": "tags.html",
+    "document-types": "document_types.html",
+    "pending": "pending.html",
+    "upload": "upload.html",
+    "activity": "activity.html",
+    "settings-display": "settings_display.html",
+    "settings-account": "settings_account.html",
+    "settings-models": "settings_models.html",
 }
 _PAGE_SCRIPTS_BY_VIEW = {
     "section-docs": ["documents.js"],
@@ -893,45 +907,6 @@ def _render_active_nav(html: str, active_href: str) -> str:
     return _NAV_LINK_RE.sub(replace_link, html)
 
 
-def _find_balanced_element_end(html: str, start_pos: int, tag_name: str) -> int | None:
-    tag_re = re.compile(rf"</?{tag_name}\b[^>]*>", re.IGNORECASE)
-    depth = 1
-    for match in tag_re.finditer(html, start_pos):
-        if match.group(0).startswith("</"):
-            depth -= 1
-            if depth == 0:
-                return match.end()
-            continue
-        depth += 1
-    return None
-
-
-def _render_active_search_subsection(html: str, active_section_id: str | None) -> str:
-    if active_section_id not in _SEARCH_SUBSECTION_IDS:
-        return html
-
-    spans: list[tuple[int, int, str]] = []
-    for section_id in _SEARCH_SUBSECTION_IDS:
-        start_re = re.compile(
-            rf'\n\s*<section\b(?=[^>]*\bid="{re.escape(section_id)}")[^>]*>',
-            re.IGNORECASE,
-        )
-        match = start_re.search(html)
-        if match is None:
-            continue
-        end = _find_balanced_element_end(html, match.end(), "section")
-        if end is not None:
-            spans.append((match.start(), end, section_id))
-
-    for start, end, section_id in sorted(spans, reverse=True):
-        if section_id != active_section_id:
-            html = html[:start] + html[end:]
-            continue
-        section_html = html[start:end].replace(" view-hidden", "", 1)
-        html = html[:start] + section_html + html[end:]
-    return html
-
-
 def _chat_thread_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     if current_user is None:
         return {**_page_initial_data(current_user, repository), "chat_threads": []}
@@ -1060,46 +1035,39 @@ def _chat_threads_partial_data(
 def _render_ui_page(
     view_id: str,
     *,
+    page_name: str,
     initial_data: dict | None = None,
     active_nav_href: str | None = None,
-    active_search_section_id: str | None = None,
 ) -> HTMLResponse:
-    html = (_STATIC_DIR / "index.html").read_text(encoding="utf-8")
+    partial_name = _PAGE_PARTIAL_BY_NAME[page_name]
+    html = _LAYOUT_TEMPLATE.read_text(encoding="utf-8")
+    content = (_PARTIALS_DIR / partial_name).read_text(encoding="utf-8").rstrip()
     script_names = ["app.js", *_PAGE_SCRIPTS_BY_VIEW.get(view_id, [])]
     asset_version = str(
         max(
-            (_STATIC_DIR / "styles.css").stat().st_mtime_ns,
-            *[(_STATIC_DIR / script_name).stat().st_mtime_ns for script_name in script_names],
+            (_STATIC_CSS_DIR / "styles.css").stat().st_mtime_ns,
+            *[(_STATIC_JS_DIR / script_name).stat().st_mtime_ns for script_name in script_names],
         )
     )
-    html = html.replace('/static/styles.css"', f'/static/styles.css?v={asset_version}"')
-    html = html.replace('/static/app.js"', f'/static/app.js?v={asset_version}"')
+    asset_query = f"?v={asset_version}"
+    html = html.replace("{{asset_query}}", asset_query)
     page_script_tags = "\n".join(
-        f'    <script src="/static/{script_name}?v={asset_version}" defer></script>'
+        f'    <script src="/static/js/{script_name}{asset_query}" defer></script>'
         for script_name in script_names[1:]
     )
-    if page_script_tags:
-        app_script_tag = f'    <script src="/static/app.js?v={asset_version}" defer></script>'
-        html = html.replace(app_script_tag, f"{app_script_tag}\n{page_script_tags}", 1)
-
-    def keep_active_view(match: re.Match[str]) -> str:
-        if match.group("view_id") != view_id:
-            return ""
-        return match.group(0).replace(" view-hidden", "", 1)
-
-    html = _VIEW_ARTICLE_RE.sub(keep_active_view, html)
-    html = _render_active_search_subsection(html, active_search_section_id)
+    html = html.replace("{{page_scripts}}", page_script_tags)
+    html = html.replace("{{content}}", content)
     html = _render_active_nav(html, active_nav_href or _ACTIVE_NAV_BY_VIEW.get(view_id, "/ui/documents"))
+    initial_data_script = ""
     if initial_data is not None:
         html = _render_initial_page_data(html, initial_data)
         if initial_data.get("authenticated") is True:
             html = html.replace('<html lang="en">', '<html lang="en" class="has-session">', 1)
         payload = json.dumps(initial_data, ensure_ascii=True).replace("</", "<\\/")
-        html = html.replace(
-            "  </body>",
-            f'    <script id="paperwiseInitialData" type="application/json">{payload}</script>\n'
-            "  </body>",
+        initial_data_script = (
+            f'    <script id="paperwiseInitialData" type="application/json">{payload}</script>'
         )
+    html = html.replace("{{initial_data_script}}", initial_data_script)
 
     return HTMLResponse(
         html,
@@ -1128,6 +1096,7 @@ def documents_page(
 ) -> HTMLResponse:
     return _render_ui_page(
         "section-docs",
+        page_name="documents",
         initial_data=_documents_initial_data(
             repository,
             current_user,
@@ -1152,6 +1121,7 @@ def document_page(
 ) -> HTMLResponse:
     return _render_ui_page(
         "section-document",
+        page_name="document",
         initial_data=_document_detail_initial_data(repository, current_user, id),
     )
 
@@ -1161,7 +1131,11 @@ def tags_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
-    return _render_ui_page("section-tags", initial_data=_tag_stats_initial_data(repository, current_user))
+    return _render_ui_page(
+        "section-tags",
+        page_name="tags",
+        initial_data=_tag_stats_initial_data(repository, current_user),
+    )
 
 
 @router.get("/ui/document-types", include_in_schema=False)
@@ -1171,6 +1145,7 @@ def document_types_page(
 ) -> HTMLResponse:
     return _render_ui_page(
         "section-document-types",
+        page_name="document-types",
         initial_data=_document_type_stats_initial_data(repository, current_user),
     )
 
@@ -1182,8 +1157,8 @@ def search_page(
 ) -> HTMLResponse:
     return _render_ui_page(
         "section-search",
+        page_name="search",
         initial_data=_page_initial_data(current_user, repository),
-        active_search_section_id="search-section-keyword",
     )
 
 
@@ -1194,9 +1169,9 @@ def grounded_qa_page(
 ) -> HTMLResponse:
     return _render_ui_page(
         "section-search",
+        page_name="grounded-qa",
         initial_data=_chat_thread_initial_data(repository, current_user),
         active_nav_href="/ui/grounded-qa",
-        active_search_section_id="search-section-ask",
     )
 
 
@@ -1205,7 +1180,11 @@ def pending_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
-    return _render_ui_page("section-pending", initial_data=_pending_initial_data(repository, current_user))
+    return _render_ui_page(
+        "section-pending",
+        page_name="pending",
+        initial_data=_pending_initial_data(repository, current_user),
+    )
 
 
 @router.get("/ui/upload", include_in_schema=False)
@@ -1213,7 +1192,11 @@ def upload_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
-    return _render_ui_page("section-upload", initial_data=_page_initial_data(current_user, repository))
+    return _render_ui_page(
+        "section-upload",
+        page_name="upload",
+        initial_data=_page_initial_data(current_user, repository),
+    )
 
 
 @router.get("/ui/activity", include_in_schema=False)
@@ -1221,7 +1204,11 @@ def activity_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
-    return _render_ui_page("section-activity", initial_data=_activity_initial_data(repository, current_user))
+    return _render_ui_page(
+        "section-activity",
+        page_name="activity",
+        initial_data=_activity_initial_data(repository, current_user),
+    )
 
 
 @router.get("/ui/settings", include_in_schema=False)
@@ -1229,7 +1216,11 @@ def settings_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
-    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user, repository))
+    return _render_ui_page(
+        "section-settings",
+        page_name="settings-display",
+        initial_data=_page_initial_data(current_user, repository),
+    )
 
 
 @router.get("/ui/settings/account", include_in_schema=False)
@@ -1237,7 +1228,11 @@ def settings_account_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
-    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user, repository))
+    return _render_ui_page(
+        "section-settings",
+        page_name="settings-account",
+        initial_data=_page_initial_data(current_user, repository),
+    )
 
 
 @router.get("/ui/settings/display", include_in_schema=False)
@@ -1245,7 +1240,11 @@ def settings_display_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
-    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user, repository))
+    return _render_ui_page(
+        "section-settings",
+        page_name="settings-display",
+        initial_data=_page_initial_data(current_user, repository),
+    )
 
 
 @router.get("/ui/settings/models", include_in_schema=False)
@@ -1253,7 +1252,11 @@ def settings_models_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
-    return _render_ui_page("section-settings", initial_data=_page_initial_data(current_user, repository))
+    return _render_ui_page(
+        "section-settings",
+        page_name="settings-models",
+        initial_data=_page_initial_data(current_user, repository),
+    )
 
 
 @router.get("/ui/partials/documents", include_in_schema=False)

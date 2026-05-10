@@ -11,8 +11,6 @@ const pageIndicator = document.getElementById("pageIndicator");
 const docsTotalLabel = document.getElementById("docsTotalLabel");
 const docsProcessingLabel = document.getElementById("docsProcessingLabel");
 const settingsForm = document.getElementById("settingsForm");
-const settingsSubsections = [...document.querySelectorAll(".settings-subsection")];
-const settingsSubnavLinks = [...document.querySelectorAll(".settings-subnav-link")];
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
 const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
 const settingsGroundedQaTopKInput = document.getElementById("settingsGroundedQaTopKInput");
@@ -159,18 +157,6 @@ let docsListRequestSeq = 0;
 let initialDataCache;
 const initialPageDataConsumed = new Set();
 let initialUserPreferencesConsumed = false;
-let settingsActiveSectionId = "settings-section-display";
-const PATH_TO_SETTINGS_SECTION_ID = {
-  "/ui/settings": "settings-section-display",
-  "/ui/settings/account": "settings-section-account",
-  "/ui/settings/display": "settings-section-display",
-  "/ui/settings/models": "settings-section-models",
-};
-const SETTINGS_SECTION_ID_TO_PATH = {
-  "settings-section-account": "/ui/settings/account",
-  "settings-section-display": "/ui/settings/display",
-  "settings-section-models": "/ui/settings/models",
-};
 
 function normalizePageSize(value) {
   const size = Number(value);
@@ -714,7 +700,6 @@ async function hydrateUserPreferencesForSession() {
 // Avoid auth-gate flash on page load when the server rendered an authenticated shell.
 if (document.documentElement.classList.contains("has-session") && authGate && appShell) {
   readFiltersFromUrl();
-  setActiveSettingsSection(settingsActiveSectionId);
   renderSortHeaders();
   authGate.classList.add("view-hidden");
   appShell.classList.remove("view-hidden");
@@ -874,20 +859,6 @@ function restoreSession() {
     return;
   }
   clearSession();
-}
-
-function setActiveSettingsSection(sectionId) {
-  const defaultSectionId = "settings-section-display";
-  const nextSectionId = settingsSubsections.some((section) => section.id === sectionId)
-    ? sectionId
-    : defaultSectionId;
-  settingsActiveSectionId = nextSectionId;
-  for (const section of settingsSubsections) {
-    section.classList.toggle("view-hidden", section.id !== nextSectionId);
-  }
-  for (const link of settingsSubnavLinks) {
-    link.classList.toggle("active", link.dataset.settingsSection === nextSectionId);
-  }
 }
 
 function getCurrentPathViewId() {
@@ -1311,11 +1282,7 @@ function readFiltersFromUrl() {
     DOCS_SORT_FIELDS
   );
   const pathViewId = getCurrentPathViewId();
-  const pathSettingsSectionId = PATH_TO_SETTINGS_SECTION_ID[path];
   currentViewId = pathViewId || "section-docs";
-  if (pathSettingsSectionId) {
-    settingsActiveSectionId = pathSettingsSectionId;
-  }
 }
 
 function navigateToDocumentsPageFromState() {

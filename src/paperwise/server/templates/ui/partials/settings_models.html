@@ -1,0 +1,152 @@
+<article id="section-settings" class="panel panel-section view">
+          <h2>Settings</h2>
+          <nav class="settings-subnav" aria-label="Settings sections">
+            <a class="settings-subnav-link" data-settings-section="settings-section-display" href="/ui/settings/display">Preferences</a>
+            <a class="settings-subnav-link active" data-settings-section="settings-section-models" href="/ui/settings/models">Model Config</a>
+            <a class="settings-subnav-link" data-settings-section="settings-section-account" href="/ui/settings/account">User Account</a>
+          </nav>
+          <form id="settingsForm" class="stack settings-form">
+<section id="settings-section-models" class="settings-subsection">
+              <section class="settings-group settings-group-wide">
+                <h3 class="settings-group-title">Model Config Summary</h3>
+                <div class="docs-table-wrap">
+                  <table class="docs-table settings-model-summary-table">
+                    <thead>
+                      <tr>
+                        <th>Task</th>
+                        <th>Connection</th>
+                        <th>Configuration</th>
+                        <th>Test</th>
+                      </tr>
+                    </thead>
+                    <tbody id="settingsModelSummary">
+                      <tr data-summary-task="metadata">
+                        <td>Metadata Extraction</td>
+                        <td data-summary-connection>-</td>
+                        <td data-summary-configuration>Not configured</td>
+                        <td>
+                          <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="metadata">Test</button>
+                          <span class="settings-inline-status" data-summary-status aria-live="polite"></span>
+                        </td>
+                      </tr>
+                      <tr data-summary-task="grounded_qa">
+                        <td>Search and Ask Your Docs</td>
+                        <td data-summary-connection>-</td>
+                        <td data-summary-configuration>Not configured</td>
+                        <td>
+                          <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="grounded_qa">Test</button>
+                          <span class="settings-inline-status" data-summary-status aria-live="polite"></span>
+                        </td>
+                      </tr>
+                      <tr data-summary-task="ocr">
+                        <td>OCR</td>
+                        <td data-summary-connection>-</td>
+                        <td data-summary-configuration>Not configured</td>
+                        <td>
+                          <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="ocr">Test</button>
+                          <span class="settings-inline-status" data-summary-status aria-live="polite"></span>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <div class="settings-column">
+                <section class="settings-group">
+                  <h3 class="settings-group-title">Model Connections</h3>
+                  <p class="settings-group-note">Create reusable provider connections once, then assign different models to metadata, grounded Q&amp;A, and OCR.</p>
+                  <div id="settingsConnectionsList" class="settings-connections-list"></div>
+                  <div class="actions">
+                    <button id="settingsAddConnectionBtn" type="button" class="btn btn-muted">Add Connection</button>
+                  </div>
+                </section>
+              </div>
+
+              <div class="settings-column">
+                <section class="settings-group">
+                  <h3 class="settings-group-title">Task Models</h3>
+                  <p class="settings-group-note">Assign an explicit connection and model for each LLM-backed task.</p>
+                  <div class="settings-group-fields">
+                    <section class="settings-task-card">
+                      <h4 class="settings-task-title">Metadata Extraction</h4>
+                      <div id="settingsMetadataRouteFields" class="settings-route-grid">
+                        <label class="label" for="settingsMetadataConnectionSelect">Connection</label>
+                        <select id="settingsMetadataConnectionSelect" name="settingsMetadataConnectionSelect"></select>
+                        <label class="label" for="settingsMetadataModelInput">Model</label>
+                        <input
+                          id="settingsMetadataModelInput"
+                          name="settingsMetadataModelInput"
+                          type="text"
+                          placeholder="Optional override; defaults to the connection model"
+                        />
+                      </div>
+                    </section>
+
+                    <section class="settings-task-card">
+                      <h4 class="settings-task-title">Grounded Q&amp;A</h4>
+                      <div id="settingsGroundedQaRouteFields" class="settings-route-grid">
+                        <label class="label" for="settingsGroundedQaConnectionSelect">Connection</label>
+                        <select id="settingsGroundedQaConnectionSelect" name="settingsGroundedQaConnectionSelect"></select>
+                        <label class="label" for="settingsGroundedQaModelInput">Model</label>
+                        <input
+                          id="settingsGroundedQaModelInput"
+                          name="settingsGroundedQaModelInput"
+                          type="text"
+                          placeholder="Optional override; defaults to the connection model"
+                        />
+                      </div>
+                    </section>
+
+                    <section class="settings-task-card">
+                      <h4 class="settings-task-title">OCR</h4>
+                      <p class="settings-group-note">
+                        <code>LLM</code> sends rendered document images to the selected model.
+                        <code>Local Tesseract</code> runs OCR locally using <code>tesseract</code> and <code>pdftoppm</code>.
+                      </p>
+                      <div class="settings-route-grid">
+                        <label class="label" for="settingsOcrProviderSelect">OCR Engine</label>
+                        <select id="settingsOcrProviderSelect" name="settingsOcrProviderSelect">
+                          <option value="llm">LLM</option>
+                          <option value="tesseract">Local Tesseract</option>
+                        </select>
+                        <span id="settingsOcrStatus" class="settings-inline-status" aria-live="polite"></span>
+                      </div>
+                      <div id="settingsOcrRouteFields" class="settings-route-grid">
+                        <label class="label" for="settingsOcrConnectionSelect">Connection</label>
+                        <select id="settingsOcrConnectionSelect" name="settingsOcrConnectionSelect"></select>
+                        <label class="label" for="settingsOcrModelInput">Model</label>
+                        <input
+                          id="settingsOcrModelInput"
+                          name="settingsOcrModelInput"
+                          type="text"
+                          placeholder="Optional override; defaults to the connection model"
+                        />
+                      </div>
+                      <div class="settings-route-grid">
+                        <label class="settings-checkbox-row" for="settingsOcrAutoSwitchCheckbox">
+                          <input
+                            id="settingsOcrAutoSwitchCheckbox"
+                            name="settingsOcrAutoSwitchCheckbox"
+                            type="checkbox"
+                          />
+                          <span>Auto switch: use OCR only when local extraction looks weak</span>
+                        </label>
+                        <label class="label" for="settingsOcrImageDetailSelect">OCR Image Detail</label>
+                        <select id="settingsOcrImageDetailSelect" name="settingsOcrImageDetailSelect">
+                          <option value="auto">Auto</option>
+                          <option value="low">Low</option>
+                          <option value="high">High</option>
+                        </select>
+                      </div>
+                    </section>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <div class="actions settings-form-actions">
+              <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>
+            </div>
+          </form>
+        </article>

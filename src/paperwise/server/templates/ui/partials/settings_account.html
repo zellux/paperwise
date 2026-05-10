@@ -1,0 +1,56 @@
+<article id="section-settings" class="panel panel-section view">
+          <h2>Settings</h2>
+          <nav class="settings-subnav" aria-label="Settings sections">
+            <a class="settings-subnav-link" data-settings-section="settings-section-display" href="/ui/settings/display">Preferences</a>
+            <a class="settings-subnav-link" data-settings-section="settings-section-models" href="/ui/settings/models">Model Config</a>
+            <a class="settings-subnav-link active" data-settings-section="settings-section-account" href="/ui/settings/account">User Account</a>
+          </nav>
+          <form id="settingsForm" class="stack settings-form">
+<section id="settings-section-account" class="settings-subsection">
+              <div class="settings-column">
+                <section class="settings-group">
+                  <h3 class="settings-group-title">Security</h3>
+                  <p class="settings-group-note">Update your account password.</p>
+                  <div class="settings-group-fields">
+                    <label class="label" for="settingsCurrentPasswordInput">Current Password</label>
+                    <input
+                      id="settingsCurrentPasswordInput"
+                      name="settingsCurrentPasswordInput"
+                      type="password"
+                      autocomplete="current-password"
+                      placeholder="Current password"
+                    />
+
+                    <label class="label" for="settingsNewPasswordInput">New Password</label>
+                    <input
+                      id="settingsNewPasswordInput"
+                      name="settingsNewPasswordInput"
+                      type="password"
+                      autocomplete="new-password"
+                      placeholder="New password (min 8 chars)"
+                    />
+
+                    <label class="label" for="settingsConfirmPasswordInput">Confirm New Password</label>
+                    <input
+                      id="settingsConfirmPasswordInput"
+                      name="settingsConfirmPasswordInput"
+                      type="password"
+                      autocomplete="new-password"
+                      placeholder="Confirm new password"
+                    />
+                  </div>
+                  <div class="actions">
+                    <button id="settingsChangePasswordBtn" type="button" class="btn btn-muted">
+                      Change Password
+                    </button>
+                    <span id="settingsPasswordStatus" class="settings-inline-status" aria-live="polite"></span>
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <div class="actions settings-form-actions">
+              <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>
+            </div>
+          </form>
+        </article>

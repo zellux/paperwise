@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>paperwise | AI-Native Documents</title>
+    <link rel="icon" type="image/png" href="/static/icons/paperwise-icon.png" />
+    <link rel="apple-touch-icon" href="/static/icons/paperwise-icon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Lora:ital,wght@0,400;0,600;0,700;1,400&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      (() => {
+        try {
+          const key = "paperwise.ui.theme";
+          const supported = new Set(["atlas", "ledger", "moss", "ember", "folio", "forge"]);
+          const stored = String(window.localStorage.getItem(key) || "").trim().toLowerCase();
+          const theme = supported.has(stored) ? stored : "forge";
+          document.documentElement.classList.add(`theme-${theme}`);
+          document.documentElement.dataset.uiTheme = theme;
+        } catch (_error) {
+          document.documentElement.classList.add("theme-forge");
+          document.documentElement.dataset.uiTheme = "forge";
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/static/css/styles.css{{asset_query}}" />
+  </head>
+  <body>
+    <div class="bg-orb bg-orb-a"></div>
+    <div class="bg-orb bg-orb-b"></div>
+    <div class="bg-grid"></div>
+
+    <section id="authGate" class="auth-gate">
+      <div class="auth-card">
+        <div class="auth-brand">
+          <img src="/static/icons/paperwise-icon.png" alt="" class="auth-brand-icon" width="36" height="36" aria-hidden="true" />
+          <span class="auth-brand-title">paperwise</span>
+        </div>
+        <p class="eyebrow">Access Required</p>
+        <h1>Sign In</h1>
+        <p class="subhead">Create an account or sign in to continue.</p>
+        <div class="auth-tabs" role="tablist" aria-label="Authentication options">
+          <button
+            id="authTabSignIn"
+            type="button"
+            class="auth-tab is-active"
+            role="tab"
+            aria-selected="true"
+            aria-controls="authPanelSignIn"
+          >
+            Sign In
+          </button>
+          <button
+            id="authTabSignUp"
+            type="button"
+            class="auth-tab"
+            role="tab"
+            aria-selected="false"
+            aria-controls="authPanelSignUp"
+          >
+            Sign Up
+          </button>
+        </div>
+        <div class="auth-layout">
+          <section id="authPanelSignIn" class="auth-panel" role="tabpanel">
+            <h2 class="auth-panel-title">Sign In</h2>
+            <p class="auth-panel-note">Use your existing account.</p>
+            <form id="signInForm" class="stack">
+              <label class="label" for="signInEmail">Email</label>
+              <input id="signInEmail" name="signInEmail" type="text" required />
+              <label class="label" for="signInPassword">Password</label>
+              <input id="signInPassword" name="signInPassword" type="password" required />
+              <button type="submit" class="btn btn-primary">Sign In</button>
+            </form>
+          </section>
+          <section id="authPanelSignUp" class="auth-panel view-hidden" role="tabpanel">
+            <h2 class="auth-panel-title">Sign Up</h2>
+            <p class="auth-panel-note">Create a new account.</p>
+            <form id="registerForm" class="stack">
+              <label class="label" for="registerName">Full Name</label>
+              <input id="registerName" name="registerName" type="text" required />
+              <label class="label" for="registerEmail">Email</label>
+              <input id="registerEmail" name="registerEmail" type="text" required />
+              <label class="label" for="registerPassword">Password</label>
+              <input id="registerPassword" name="registerPassword" type="password" minlength="8" required />
+              <button type="submit" class="btn btn-primary">Create Account</button>
+            </form>
+          </section>
+        </div>
+        <p id="authMessage" class="auth-message">Enter credentials to continue.</p>
+      </div>
+    </section>
+
+    <main class="app-shell view-hidden">
+      <header class="topbar">
+        <div class="brand-block">
+          <button
+            id="brandHomeBtn"
+            type="button"
+            class="brand-home-btn"
+            aria-label="Go to documents home"
+            title="Go to documents home"
+          >
+            <img
+              src="/static/icons/paperwise-icon.png"
+              alt="paperwise logo"
+              class="brand-icon"
+              width="40"
+              height="40"
+            />
+            <div class="brand-copy">
+              <span class="brand-title">paperwise</span>
+              <span class="brand-subtitle">AI-Native Documents</span>
+            </div>
+          </button>
+        </div>
+        <div class="topbar-actions">
+          <span id="sessionUserLabel" class="profile-label">Not signed in</span>
+          <button id="signOutBtn" type="button" class="btn btn-muted">Log Out</button>
+        </div>
+      </header>
+
+      <aside class="sidebar">
+        <nav class="nav">
+          <a class="nav-link active" data-target="section-docs" href="/ui/documents">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+            <span>Documents</span>
+          </a>
+          <a class="nav-link" data-target="section-tags" href="/ui/tags">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+            <span>Tags</span>
+          </a>
+          <a class="nav-link" data-target="section-document-types" href="/ui/document-types">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <span>Document Types</span>
+          </a>
+          <a class="nav-link" data-target="section-pending" href="/ui/pending">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            <span>Processing Queue</span>
+          </a>
+          <a class="nav-link" data-target="section-upload" href="/ui/upload">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+            <span>Upload</span>
+          </a>
+          <a class="nav-link" data-target="section-activity" href="/ui/activity">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <span>Activity</span>
+          </a>
+          <div class="nav-divider" aria-hidden="true"></div>
+          <a
+            class="nav-link"
+            data-target="section-search"
+            href="/ui/search"
+          >
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <span>Search</span>
+          </a>
+          <a
+            class="nav-link"
+            data-target="section-search"
+            href="/ui/grounded-qa"
+          >
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span>Ask Your Docs</span>
+          </a>
+          <div class="nav-divider" aria-hidden="true"></div>
+          <a class="nav-link nav-link-settings" data-target="section-settings" href="/ui/settings">
+            <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Settings</span>
+          </a>
+        </nav>
+      </aside>
+
+      <section class="content-pane">
+{{content}}
+      </section>
+    </main>
+
+    <script src="/static/js/app.js{{asset_query}}" defer></script>
+{{page_scripts}}
+{{initial_data_script}}
+  </body>
+</html>

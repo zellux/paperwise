@@ -1,0 +1,53 @@
+<article id="section-search" class="panel panel-section view">
+          <h2 id="searchSectionHeading">Search</h2>
+          <p id="searchResultsMeta" class="search-hint">Ready.</p>
+<section id="search-section-ask" class="search-subsection">
+            <section class="search-card grounded-qa-card">
+              <div class="grounded-qa-layout">
+                <aside class="qa-sidebar" aria-label="Ask Your Docs chat controls">
+                  <div class="qa-panel-head">
+                    <span class="qa-eyebrow">Conversations</span>
+                    <h3>Recent chats</h3>
+                  </div>
+                  <button id="searchAskNewChatBtn" type="button" class="btn btn-primary qa-new-chat-btn">New Chat</button>
+                  <div class="threads-search">
+                    <span aria-hidden="true">⌕</span>
+                    <input id="searchAskThreadSearch" type="search" placeholder="Search chats..." autocomplete="off" />
+                  </div>
+                  <div id="searchAskThreadList" class="thread-list-wrap" aria-label="Recent chats"></div>
+                </aside>
+
+                <div class="qa-conversation">
+                  <div class="chat-header-row">
+                    <div>
+                      <p class="qa-eyebrow">Grounded Q&amp;A</p>
+                      <h3>Search and Ask Your Docs</h3>
+                    </div>
+                    <div class="chat-header-actions">
+                      <span id="searchAskTokenUsage" class="chat-token-usage">Tokens: 0</span>
+                    </div>
+                  </div>
+                  <div id="searchAskMessages" class="chat-messages" aria-live="polite">
+                    <div class="chat-message chat-message-assistant">
+                      <div class="chat-message-role">Paperwise</div>
+                      <div class="chat-message-body markdown-output">Ask a question to begin.</div>
+                    </div>
+                  </div>
+                  <form id="searchAskForm" class="chat-composer">
+                    <textarea
+                      id="searchAskQuestion"
+                      name="searchAskQuestion"
+                      rows="2"
+                      placeholder="Ask a follow-up, filter by tag, or ask about document metadata."
+                      required
+                    ></textarea>
+                    <div class="chat-composer-footer">
+                      <span class="chat-composer-hint">Enter to send · Shift+Enter for newline</span>
+                      <button id="searchAskSubmitBtn" type="submit" class="btn btn-primary">Ask</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+            </section>
+          </section>
+        </article>

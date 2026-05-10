@@ -1,0 +1,50 @@
+<article id="section-search" class="panel panel-section view">
+          <h2 id="searchSectionHeading">Search</h2>
+          <p id="searchResultsMeta" class="search-hint">Ready.</p>
+<section id="search-section-keyword" class="search-subsection">
+            <section class="search-card">
+              <h3>Keyword Search</h3>
+              <p class="search-hint">Search across all your documents.</p>
+              <form id="searchKeywordForm" class="stack">
+                <label class="label" for="searchKeywordInput">Query</label>
+                <input
+                  id="searchKeywordInput"
+                  name="searchKeywordInput"
+                  type="text"
+                  placeholder="Ask with keywords, e.g. consulting agreement termination"
+                  required
+                />
+                <label class="label" for="searchKeywordLimitSelect">Results Limit</label>
+                <select id="searchKeywordLimitSelect" name="searchKeywordLimitSelect">
+                  <option value="10">10</option>
+                  <option value="20" selected>20</option>
+                  <option value="50">50</option>
+                </select>
+                <div class="actions">
+                  <button id="searchKeywordSubmitBtn" type="submit" class="btn btn-primary">
+                    Run Search
+                  </button>
+                </div>
+              </form>
+              <div class="docs-table-wrap">
+                <table class="docs-table">
+                  <thead>
+                    <tr>
+                      <th>Title</th>
+                      <th>Type</th>
+                      <th>Correspondent</th>
+                      <th>Tags</th>
+                      <th>Score</th>
+                      <th>Snippet</th>
+                    </tr>
+                  </thead>
+                  <tbody id="searchResultsTableBody">
+                    <tr>
+                      <td colspan="6">No search results.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </section>
+        </article>
