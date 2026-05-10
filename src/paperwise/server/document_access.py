@@ -1,6 +1,6 @@
 from fastapi import HTTPException, status
 
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import DocumentStore
 from paperwise.application.services.documents import get_document
 from paperwise.domain.models import Document, User
 
@@ -8,7 +8,7 @@ from paperwise.domain.models import Document, User
 def get_owned_document_or_404(
     *,
     document_id: str,
-    repository: DocumentRepository,
+    repository: DocumentStore,
     current_user: User,
 ) -> Document:
     document = get_document(document_id=document_id, repository=repository)
