@@ -1457,7 +1457,7 @@ async function waitForDocumentReady(
   return false;
 }
 
-document.getElementById("signInForm")?.addEventListener("submit", async (event) => {
+async function handleSignInSubmit(event) {
   event.preventDefault();
   const email = document.getElementById("signInEmail").value.trim();
   const password = document.getElementById("signInPassword").value;
@@ -1483,9 +1483,9 @@ document.getElementById("signInForm")?.addEventListener("submit", async (event) 
   } catch (error) {
     setAuthMessage(error.message || "Failed to sign in.", true);
   }
-});
+}
 
-document.getElementById("registerForm")?.addEventListener("submit", async (event) => {
+async function handleRegisterSubmit(event) {
   event.preventDefault();
   const fullName = document.getElementById("registerName").value.trim();
   const email = document.getElementById("registerEmail").value.trim();
@@ -1526,25 +1526,28 @@ document.getElementById("registerForm")?.addEventListener("submit", async (event
   } catch (error) {
     setAuthMessage(error.message || "Failed to create account.", true);
   }
-});
+}
 
-document.getElementById("authTabSignIn")?.addEventListener("click", () => {
-  setActiveAuthTab("signin");
-});
-
-document.getElementById("authTabSignUp")?.addEventListener("click", () => {
-  setActiveAuthTab("signup");
-});
-
-document.getElementById("signOutBtn")?.addEventListener("click", async () => {
+async function handleSignOutClick() {
   await apiFetch("/users/logout", { method: "POST", allowUnauthorized: true }).catch(() => {});
   clearSession();
   setAuthMessage("Signed out.");
-});
+}
 
-document.getElementById("brandHomeBtn")?.addEventListener("click", () => {
-  window.location.href = "/ui/documents";
-});
+function bindAppShellEvents() {
+  document.getElementById("signInForm")?.addEventListener("submit", handleSignInSubmit);
+  document.getElementById("registerForm")?.addEventListener("submit", handleRegisterSubmit);
+  document.getElementById("authTabSignIn")?.addEventListener("click", () => {
+    setActiveAuthTab("signin");
+  });
+  document.getElementById("authTabSignUp")?.addEventListener("click", () => {
+    setActiveAuthTab("signup");
+  });
+  document.getElementById("signOutBtn")?.addEventListener("click", handleSignOutClick);
+  document.getElementById("brandHomeBtn")?.addEventListener("click", () => {
+    window.location.href = "/ui/documents";
+  });
+}
 
 async function initializeApp() {
   restoreSession();
@@ -1566,6 +1569,7 @@ async function initializeApp() {
 applyTheme(currentTheme);
 
 document.addEventListener("DOMContentLoaded", () => {
+  bindAppShellEvents();
   initializeApp().catch((error) => {
     setAuthMessage(error.message || "Failed to initialize app.", true);
   });
