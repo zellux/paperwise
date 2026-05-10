@@ -15,15 +15,17 @@
     <script>
       (() => {
         try {
-          const key = "paperwise.ui.theme";
-          const supported = new Set(["atlas", "ledger", "moss", "ember", "folio", "forge"]);
+          const key = "{{ui_theme_storage_key}}";
+          const supported = new Set({{supported_ui_themes_json}});
           const stored = String(window.localStorage.getItem(key) || "").trim().toLowerCase();
-          const theme = supported.has(stored) ? stored : "forge";
+          const theme = supported.has(stored) ? stored : "{{default_ui_theme}}";
           document.documentElement.classList.add(`theme-${theme}`);
           document.documentElement.dataset.uiTheme = theme;
+          document.documentElement.dataset.uiThemeStorageKey = key;
         } catch (_error) {
-          document.documentElement.classList.add("theme-forge");
-          document.documentElement.dataset.uiTheme = "forge";
+          document.documentElement.classList.add("theme-{{default_ui_theme}}");
+          document.documentElement.dataset.uiTheme = "{{default_ui_theme}}";
+          document.documentElement.dataset.uiThemeStorageKey = "{{ui_theme_storage_key}}";
         }
       })();
     </script>

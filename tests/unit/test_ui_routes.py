@@ -238,6 +238,7 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "currentPageKey" not in app_js.text
     assert "PATH_TO_PAGE_KEY" not in app_js.text
     assert "loadDataForCurrentPage" not in app_js.text
+    assert "const SUPPORTED_THEMES" not in app_js.text
     assert "initializeCurrentPageData" in app_js.text
     assert "initializePaperwisePage" in app_js.text
 
@@ -392,6 +393,8 @@ def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> No
         assert '<html lang="en" class="has-session">' in response.text
         payload = _initial_data_from_response(response.text)
         assert payload["authenticated"] is True
+        assert payload["ui_themes"] == ["atlas", "ledger", "moss", "ember", "folio", "forge"]
+        assert payload["default_ui_theme"] == "forge"
         assert payload["current_user"]["email"] == "chat-ui@example.com"
         assert payload["chat_threads"][0]["id"] == "thread-ui"
         assert payload["chat_threads"][0]["title"] == "Server rendered chat"

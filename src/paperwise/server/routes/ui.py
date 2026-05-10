@@ -88,13 +88,20 @@ _PAGE_SCRIPTS_BY_VIEW = {
     "section-activity": ["activity.js"],
     "section-settings": ["settings.js"],
 }
+SUPPORTED_UI_THEMES = ("atlas", "ledger", "moss", "ember", "folio", "forge")
+DEFAULT_UI_THEME = "forge"
+UI_THEME_STORAGE_KEY = "paperwise.ui.theme"
 
 
 def _page_initial_data(
     current_user: User | None,
     repository: DocumentRepository | None = None,
 ) -> dict:
-    initial_data: dict = {"authenticated": current_user is not None}
+    initial_data: dict = {
+        "authenticated": current_user is not None,
+        "ui_themes": list(SUPPORTED_UI_THEMES),
+        "default_ui_theme": DEFAULT_UI_THEME,
+    }
     if current_user is None:
         return initial_data
     initial_data["current_user"] = {
@@ -1073,6 +1080,9 @@ def _render_ui_page(
     )
     asset_query = f"?v={asset_version}"
     html = html.replace("{{asset_query}}", asset_query)
+    html = html.replace("{{ui_theme_storage_key}}", UI_THEME_STORAGE_KEY)
+    html = html.replace("{{supported_ui_themes_json}}", json.dumps(list(SUPPORTED_UI_THEMES)))
+    html = html.replace("{{default_ui_theme}}", DEFAULT_UI_THEME)
     page_script_tags = "\n".join(
         f'    <script src="/static/js/{script_name}{asset_query}" defer></script>'
         for script_name in script_names[1:]

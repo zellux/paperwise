@@ -75,8 +75,8 @@ const filterDropdownState = new Map();
 let activeFilterDropdown = null;
 let currentDocumentId = "";
 let currentUser = null;
-const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember", "folio", "forge"];
-const THEME_STORAGE_KEY = "paperwise.ui.theme";
+const THEME_STORAGE_KEY =
+  document.documentElement?.dataset?.uiThemeStorageKey || "paperwise.ui.theme";
 let currentTheme = "forge";
 const SUPPORTED_LLM_PROVIDERS = ["openai", "gemini", "custom"];
 const LLM_TASK_LABELS = {
@@ -136,6 +136,7 @@ let docsTotalCount = 0;
 let docsListRequestSeq = 0;
 let initialDataCache;
 let initialUserPreferencesConsumed = false;
+let supportedThemesCache;
 
 function normalizePageSize(value) {
   const size = Number(value);
@@ -220,21 +221,42 @@ function sanitizeDocsFilters(filters) {
 
 function normalizeThemeName(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  if (SUPPORTED_THEMES.includes(normalized)) {
+  if (getSupportedThemes().includes(normalized)) {
     return normalized;
   }
-  return "forge";
+  return getDefaultTheme();
+}
+
+function getSupportedThemes() {
+  if (supportedThemesCache !== undefined) {
+    return supportedThemesCache;
+  }
+  const initialThemes = readInitialData().ui_themes;
+  supportedThemesCache = Array.isArray(initialThemes)
+    ? initialThemes
+        .map((name) => String(name || "").trim().toLowerCase())
+        .filter((name) => name.length > 0)
+    : [];
+  if (!supportedThemesCache.length) {
+    supportedThemesCache = ["forge"];
+  }
+  return supportedThemesCache;
+}
+
+function getDefaultTheme() {
+  const defaultTheme = String(readInitialData().default_ui_theme || "forge").trim().toLowerCase();
+  return getSupportedThemes().includes(defaultTheme) ? defaultTheme : "forge";
 }
 
 function readBootTheme() {
   const bootTheme = normalizeThemeName(document.documentElement?.dataset?.uiTheme || "");
-  if (bootTheme !== "forge") {
+  if (bootTheme !== getDefaultTheme()) {
     return bootTheme;
   }
   try {
     return normalizeThemeName(window.localStorage.getItem(THEME_STORAGE_KEY));
   } catch {
-    return "forge";
+    return getDefaultTheme();
   }
 }
 
@@ -347,7 +369,7 @@ function normalizeOcrAutoSwitch(value) {
 
 function applyTheme(themeName) {
   currentTheme = normalizeThemeName(themeName);
-  const classNames = SUPPORTED_THEMES.map((name) => `theme-${name}`);
+  const classNames = getSupportedThemes().map((name) => `theme-${name}`);
   if (document.documentElement) {
     document.documentElement.classList.remove(...classNames);
     document.documentElement.classList.add(`theme-${currentTheme}`);
