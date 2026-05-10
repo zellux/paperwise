@@ -96,6 +96,13 @@ PENDING_DOCUMENT_STATUSES = {
 }
 
 
+def _theme_options_html() -> str:
+    return "\n".join(
+        f'                      <option value="{theme}">{theme.replace("-", " ").title()}</option>'
+        for theme in SUPPORTED_UI_THEMES
+    )
+
+
 def _page_initial_data(
     current_user: User | None,
     repository: DocumentRepository | None = None,
@@ -540,6 +547,7 @@ def _render_ui_page(
     partial_name = _PAGE_PARTIAL_BY_NAME[page_name]
     html = _LAYOUT_TEMPLATE.read_text(encoding="utf-8")
     content = (_PARTIALS_DIR / partial_name).read_text(encoding="utf-8").rstrip()
+    content = content.replace("{{theme_options}}", _theme_options_html())
     script_names = ["shared.js", "app.js", *_PAGE_SCRIPTS_BY_VIEW.get(view_id, [])]
     asset_version = str(
         max(

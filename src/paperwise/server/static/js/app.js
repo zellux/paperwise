@@ -754,7 +754,7 @@ function renderSessionState() {
 
 function clearSession() {
   persistSession(null);
-  applyTheme("forge");
+  applyTheme(getDefaultTheme());
   llmConnections = [];
   llmRouting = createDefaultLlmRouting();
   ocrProvider = "llm";

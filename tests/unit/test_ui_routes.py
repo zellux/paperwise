@@ -217,6 +217,8 @@ def test_settings_subroutes_are_server_selected_partials() -> None:
     assert 'id="settings-section-display"' in display
     assert 'id="settings-section-account"' not in display
     assert 'id="settings-section-models"' not in display
+    assert "{{theme_options}}" not in display
+    assert '<option value="forge">Forge</option>' in display
 
     models = client.get("/ui/settings/models").text
     assert 'id="settings-section-models"' in models

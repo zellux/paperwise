@@ -2,19 +2,11 @@ let initialDocumentsHydrated = false;
 let documentsEventsBound = false;
 
 function getDocumentsPageElements() {
-  const filterTag = document.getElementById("filterTag");
-  const filterCorrespondent = document.getElementById("filterCorrespondent");
-  const filterType = document.getElementById("filterType");
-  const filterStatus = document.getElementById("filterStatus");
+  const filterControls = getDocumentFilterControls();
   return {
     docsFilterForm: document.getElementById("docsFilterForm"),
     clearFiltersBtn: document.getElementById("clearFiltersBtn"),
-    filterTag,
-    filterCorrespondent,
-    filterType,
-    filterStatus,
-    filterQuery: document.getElementById("filterQuery"),
-    filterSelects: [filterTag, filterCorrespondent, filterType, filterStatus],
+    ...filterControls,
   };
 }
 
