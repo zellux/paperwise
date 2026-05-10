@@ -147,13 +147,6 @@ def _document_list_item(document: Document, llm_result: LLMParseResult | None) -
     }
 
 
-def _document_list_item_by_id(repository: DocumentRepository, document_id: str) -> dict | None:
-    document = repository.get(document_id)
-    if document is None:
-        return None
-    return _document_list_item(document, repository.get_llm_parse_result(document.id))
-
-
 def _tag_stats_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     initial_data = _page_initial_data(current_user, repository)
     if current_user is None:
@@ -185,9 +178,12 @@ def _activity_initial_data(repository: DocumentRepository, current_user: User | 
     if current_user is None:
         return {**initial_data, "activity_documents": [], "activity_total_tokens": 0}
     ready_documents = [
-        document
-        for document in repository.list_documents(limit=20)
-        if document.owner_id == current_user.id and document.status == DocumentStatus.READY
+        (document, llm_result)
+        for document, llm_result in repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=20,
+        )
+        if document.status == DocumentStatus.READY
     ]
     preference = repository.get_user_preference(current_user.id)
     total_tokens = 0
@@ -196,9 +192,8 @@ def _activity_initial_data(repository: DocumentRepository, current_user: User | 
     return {
         **initial_data,
         "activity_documents": [
-            item
-            for item in (_document_list_item_by_id(repository, document.id) for document in ready_documents)
-            if item is not None
+            _document_list_item(document, llm_result)
+            for document, llm_result in ready_documents
         ],
         "activity_total_tokens": total_tokens,
     }
@@ -213,9 +208,12 @@ def _activity_partial_data(
     initial_data = _page_initial_data(current_user, repository)
     normalized_limit = min(100, max(1, int(limit or 20)))
     ready_documents = [
-        document
-        for document in repository.list_documents(limit=10_000)
-        if document.owner_id == current_user.id and document.status == DocumentStatus.READY
+        (document, llm_result)
+        for document, llm_result in repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=10_000,
+        )
+        if document.status == DocumentStatus.READY
     ][:normalized_limit]
     preference = repository.get_user_preference(current_user.id)
     total_tokens = 0
@@ -224,9 +222,8 @@ def _activity_partial_data(
     return {
         **initial_data,
         "activity_documents": [
-            item
-            for item in (_document_list_item_by_id(repository, document.id) for document in ready_documents)
-            if item is not None
+            _document_list_item(document, llm_result)
+            for document, llm_result in ready_documents
         ],
         "activity_total_tokens": total_tokens,
     }
@@ -286,8 +283,11 @@ def _documents_initial_data(
     offset = (normalized_page - 1) * normalized_page_size
     processing_count = sum(
         1
-        for document in repository.list_documents(limit=10_000)
-        if document.owner_id == current_user.id and document.status != DocumentStatus.READY
+        for document, _llm_result in repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=10_000,
+        )
+        if document.status != DocumentStatus.READY
     )
     return {
         **initial_data,
@@ -307,16 +307,18 @@ def _pending_initial_data(repository: DocumentRepository, current_user: User | N
     if current_user is None:
         return {**initial_data, "pending_documents": []}
     pending_documents = [
-        document
-        for document in repository.list_documents(limit=200)
-        if document.owner_id == current_user.id and document.status != DocumentStatus.READY
+        (document, llm_result)
+        for document, llm_result in repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=200,
+        )
+        if document.status != DocumentStatus.READY
     ]
     return {
         **initial_data,
         "pending_documents": [
-            item
-            for item in (_document_list_item_by_id(repository, document.id) for document in pending_documents)
-            if item is not None
+            _document_list_item(document, llm_result)
+            for document, llm_result in pending_documents
         ],
     }
 
