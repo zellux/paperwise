@@ -1,8 +1,4 @@
-from datetime import datetime
-from typing import Any
-
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from pydantic import BaseModel, Field
 
 from paperwise.server.dependencies import (
     SESSION_COOKIE_NAME,
@@ -27,58 +23,18 @@ from paperwise.application.services.users import (
 from paperwise.domain.models import User
 from paperwise.domain.models import UserPreference
 from paperwise.infrastructure.config import Settings
+from paperwise.server.user_schemas import (
+    ChangePasswordRequest,
+    ChangePasswordResponse,
+    CreateUserRequest,
+    LoginRequest,
+    LoginResponse,
+    UserPreferenceRequest,
+    UserPreferenceResponse,
+    UserResponse,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
-
-
-class CreateUserRequest(BaseModel):
-    email: str = Field(min_length=3, max_length=320)
-    full_name: str = Field(min_length=1, max_length=256)
-    password: str = Field(min_length=8, max_length=256)
-
-
-class UserResponse(BaseModel):
-    id: str
-    email: str
-    full_name: str
-    is_active: bool
-    created_at: datetime
-
-    @classmethod
-    def from_domain(cls, user: User) -> "UserResponse":
-        return cls(
-            id=user.id,
-            email=user.email,
-            full_name=user.full_name,
-            is_active=user.is_active,
-            created_at=user.created_at,
-        )
-
-
-class LoginRequest(BaseModel):
-    email: str = Field(min_length=3, max_length=320)
-    password: str = Field(min_length=1, max_length=256)
-
-
-class LoginResponse(BaseModel):
-    user: UserResponse
-
-
-class UserPreferenceRequest(BaseModel):
-    preferences: dict[str, Any]
-
-
-class UserPreferenceResponse(BaseModel):
-    preferences: dict[str, Any]
-
-
-class ChangePasswordRequest(BaseModel):
-    current_password: str = Field(min_length=1, max_length=256)
-    new_password: str = Field(min_length=8, max_length=256)
-
-
-class ChangePasswordResponse(BaseModel):
-    message: str
 
 
 def _session_cookie_secure(settings: Settings) -> bool:
