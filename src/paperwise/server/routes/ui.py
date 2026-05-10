@@ -23,6 +23,7 @@ from paperwise.application.services.llm_preferences import (
     llm_provider_defaults_payload,
     ocr_llm_provider_defaults_payload,
 )
+from paperwise.application.services.chat_threads import migrate_legacy_chat_threads
 from paperwise.domain.models import Document, DocumentHistoryEvent, DocumentStatus, LLMParseResult, User
 from paperwise.server.dependencies import (
     current_user_dependency,
@@ -30,7 +31,6 @@ from paperwise.server.dependencies import (
     optional_current_user_dependency,
 )
 from paperwise.server.routes.document_access import get_owned_document_or_404
-from paperwise.server.routes.query import _migrate_legacy_chat_threads
 
 router = APIRouter(tags=["ui"])
 
@@ -911,7 +911,7 @@ def _apply_layout_replacements(
 def _chat_thread_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     if current_user is None:
         return {**_page_initial_data(current_user, repository), "chat_threads": []}
-    _migrate_legacy_chat_threads(repository, current_user)
+    migrate_legacy_chat_threads(repository, current_user)
     return {
         **_page_initial_data(current_user, repository),
         "chat_threads": [
