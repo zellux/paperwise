@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from paperwise.server.dependencies import (
     current_user_dependency,
@@ -90,6 +90,8 @@ class CreateDocumentResponse(BaseModel):
 
 
 class DocumentResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     filename: str
     owner_id: str
@@ -100,20 +102,43 @@ class DocumentResponse(BaseModel):
     status: str
     created_at: datetime
 
+    @classmethod
+    def from_domain(cls, document: Document) -> "DocumentResponse":
+        return cls.model_validate(document)
+
 
 class DocumentListMetadata(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     suggested_title: str
     document_date: str | None
     correspondent: str
     document_type: str
     tags: list[str]
 
+    @classmethod
+    def from_llm_result(cls, result: LLMParseResult | None) -> "DocumentListMetadata | None":
+        if result is None:
+            return None
+        return cls.model_validate(result)
+
 
 class DocumentListItemResponse(DocumentResponse):
     llm_metadata: DocumentListMetadata | None = None
 
+    @classmethod
+    def from_domain(
+        cls,
+        document: Document,
+        llm_result: LLMParseResult | None = None,
+    ) -> "DocumentListItemResponse":
+        base = DocumentResponse.from_domain(document).model_dump()
+        return cls(**base, llm_metadata=DocumentListMetadata.from_llm_result(llm_result))
+
 
 class ParseResultResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     document_id: str
     parser: str
     status: str
@@ -122,8 +147,14 @@ class ParseResultResponse(BaseModel):
     text_preview: str
     created_at: datetime
 
+    @classmethod
+    def from_domain(cls, result: ParseResult) -> "ParseResultResponse":
+        return cls.model_validate(result)
+
 
 class LLMParseResultResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     document_id: str
     suggested_title: str
     document_date: str | None
@@ -135,8 +166,14 @@ class LLMParseResultResponse(BaseModel):
     created_tags: list[str]
     created_at: datetime
 
+    @classmethod
+    def from_domain(cls, result: LLMParseResult) -> "LLMParseResultResponse":
+        return cls.model_validate(result)
+
 
 class DocumentHistoryEventResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     document_id: str
     event_type: str
@@ -145,6 +182,10 @@ class DocumentHistoryEventResponse(BaseModel):
     source: str
     changes: dict[str, Any]
     created_at: datetime
+
+    @classmethod
+    def from_domain(cls, event: DocumentHistoryEvent) -> "DocumentHistoryEventResponse":
+        return cls.model_validate(event)
 
 
 class TaxonomyResponse(BaseModel):
@@ -177,6 +218,21 @@ class DocumentDetailResponse(BaseModel):
     llm_metadata: DocumentListMetadata | None = None
     ocr_text_preview: str | None = None
     ocr_parsed_at: datetime | None = None
+
+    @classmethod
+    def from_domain(
+        cls,
+        *,
+        document: Document,
+        llm_result: LLMParseResult | None,
+        parse_result: ParseResult | None,
+    ) -> "DocumentDetailResponse":
+        return cls(
+            document=DocumentResponse.from_domain(document),
+            llm_metadata=DocumentListMetadata.from_llm_result(llm_result),
+            ocr_text_preview=parse_result.text_preview if parse_result is not None else None,
+            ocr_parsed_at=parse_result.created_at if parse_result is not None else None,
+        )
 
 
 class MetadataUpdateRequest(BaseModel):
@@ -376,44 +432,14 @@ def _cleanup_empty_storage_dirs(start: Path) -> None:
 
 
 def _to_response(document: Document) -> DocumentResponse:
-    return DocumentResponse(
-        id=document.id,
-        filename=document.filename,
-        owner_id=document.owner_id,
-        blob_uri=document.blob_uri,
-        checksum_sha256=document.checksum_sha256,
-        content_type=document.content_type,
-        size_bytes=document.size_bytes,
-        status=document.status.value,
-        created_at=document.created_at,
-    )
+    return DocumentResponse.from_domain(document)
 
 
 def _to_list_item_response(
     document: Document,
     llm_result: LLMParseResult | None,
 ) -> DocumentListItemResponse:
-    metadata = None
-    if llm_result is not None:
-        metadata = DocumentListMetadata(
-            suggested_title=llm_result.suggested_title,
-            document_date=llm_result.document_date,
-            correspondent=llm_result.correspondent,
-            document_type=llm_result.document_type,
-            tags=llm_result.tags,
-        )
-    return DocumentListItemResponse(
-        id=document.id,
-        filename=document.filename,
-        owner_id=document.owner_id,
-        blob_uri=document.blob_uri,
-        checksum_sha256=document.checksum_sha256,
-        content_type=document.content_type,
-        size_bytes=document.size_bytes,
-        status=document.status.value,
-        created_at=document.created_at,
-        llm_metadata=metadata,
-    )
+    return DocumentListItemResponse.from_domain(document, llm_result)
 
 
 def _to_detail_response(
@@ -421,62 +447,23 @@ def _to_detail_response(
     llm_result: LLMParseResult | None,
     parse_result: ParseResult | None,
 ) -> DocumentDetailResponse:
-    return DocumentDetailResponse(
-        document=_to_response(document),
-        llm_metadata=(
-            DocumentListMetadata(
-                suggested_title=llm_result.suggested_title,
-                document_date=llm_result.document_date,
-                correspondent=llm_result.correspondent,
-                document_type=llm_result.document_type,
-                tags=llm_result.tags,
-            )
-            if llm_result is not None
-            else None
-        ),
-        ocr_text_preview=parse_result.text_preview if parse_result is not None else None,
-        ocr_parsed_at=parse_result.created_at if parse_result is not None else None,
+    return DocumentDetailResponse.from_domain(
+        document=document,
+        llm_result=llm_result,
+        parse_result=parse_result,
     )
 
 
 def _to_parse_response(result: ParseResult) -> ParseResultResponse:
-    return ParseResultResponse(
-        document_id=result.document_id,
-        parser=result.parser,
-        status=result.status,
-        size_bytes=result.size_bytes,
-        page_count=result.page_count,
-        text_preview=result.text_preview,
-        created_at=result.created_at,
-    )
+    return ParseResultResponse.from_domain(result)
 
 
 def _to_llm_parse_response(result: LLMParseResult) -> LLMParseResultResponse:
-    return LLMParseResultResponse(
-        document_id=result.document_id,
-        suggested_title=result.suggested_title,
-        document_date=result.document_date,
-        correspondent=result.correspondent,
-        document_type=result.document_type,
-        tags=result.tags,
-        created_correspondent=result.created_correspondent,
-        created_document_type=result.created_document_type,
-        created_tags=result.created_tags,
-        created_at=result.created_at,
-    )
+    return LLMParseResultResponse.from_domain(result)
 
 
 def _to_history_event_response(event: DocumentHistoryEvent) -> DocumentHistoryEventResponse:
-    return DocumentHistoryEventResponse(
-        id=event.id,
-        document_id=event.document_id,
-        event_type=event.event_type.value,
-        actor_type=event.actor_type.value,
-        actor_id=event.actor_id,
-        source=event.source,
-        changes=event.changes,
-        created_at=event.created_at,
-    )
+    return DocumentHistoryEventResponse.from_domain(event)
 
 
 def _run_parse_document_blob_or_400(
