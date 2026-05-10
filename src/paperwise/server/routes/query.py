@@ -9,18 +9,18 @@ from fastapi.responses import Response, StreamingResponse
 from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
+from paperwise.application.services.grounded_qa import (
+    build_qa_contexts as _build_qa_contexts,
+    is_timeout_error as _is_timeout_error,
+    resolve_metadata_scoped_document_ids as _resolve_metadata_scoped_document_ids,
+    search_document_chunks_multi_query as _search_document_chunks_multi_query,
+)
 from paperwise.application.services.llm_preferences import LLM_TASK_GROUNDED_QA
 from paperwise.domain.models import ChatThread, User, UserPreference
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
     llm_provider_dependency,
-)
-from paperwise.server.routes.collections import (
-    _build_qa_contexts,
-    _is_timeout_error,
-    _resolve_metadata_scoped_document_ids,
-    _search_document_chunks_multi_query,
 )
 from paperwise.server.llm_provider import (
     resolve_http_llm_provider_from_preferences as _resolve_llm_provider_from_preferences,

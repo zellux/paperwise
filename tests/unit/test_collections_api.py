@@ -20,7 +20,7 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
 )
 from paperwise.server.main import app
-from paperwise.server.routes.collections import _build_qa_contexts
+from paperwise.application.services.grounded_qa import build_qa_contexts
 from paperwise.server.routes.query import _compact_chat_context_content
 
 
@@ -906,7 +906,7 @@ def test_build_qa_contexts_limits_unique_documents() -> None:
         ),
     ]
 
-    contexts = _build_qa_contexts(
+    contexts = build_qa_contexts(
         repository=repository,
         chunk_hits=chunk_hits,
         top_k_chunks=10,
