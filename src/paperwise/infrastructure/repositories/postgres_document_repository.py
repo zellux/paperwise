@@ -19,7 +19,6 @@ from paperwise.domain.models import (
     HistoryActorType,
     HistoryEventType,
     LLMParseResult,
-    ParseResult,
 )
 from paperwise.infrastructure.db import Base, build_engine, build_session_factory
 from paperwise.infrastructure.repositories.postgres_chat_thread_repository import (
@@ -27,6 +26,10 @@ from paperwise.infrastructure.repositories.postgres_chat_thread_repository impor
 )
 from paperwise.infrastructure.repositories.postgres_collection_repository import (
     PostgresCollectionRepositoryMixin,
+)
+from paperwise.infrastructure.repositories.postgres_parse_result_repository import (
+    PostgresParseResultRepositoryMixin,
+    llm_parse_result_from_row,
 )
 from paperwise.infrastructure.repositories.postgres_models import (
     CollectionDocumentRow,
@@ -74,42 +77,10 @@ def _ordered_count_rows(rows: list[tuple[str, int]]) -> list[tuple[str, int]]:
     return sorted(rows, key=lambda item: (-item[1], item[0].casefold()))
 
 
-def _llm_parse_result_from_row(row: LLMParseResultRow) -> LLMParseResult:
-    normalized_tags: list[str] = []
-    seen_tags: set[str] = set()
-    for tag in list(row.tags or []):
-        normalized = normalize_name(str(tag))
-        if not normalized or normalized in seen_tags:
-            continue
-        seen_tags.add(normalized)
-        normalized_tags.append(to_title_case(str(tag)))
-
-    normalized_created_tags: list[str] = []
-    seen_created: set[str] = set()
-    for tag in list(row.created_tags or []):
-        normalized = normalize_name(str(tag))
-        if not normalized or normalized in seen_created:
-            continue
-        seen_created.add(normalized)
-        normalized_created_tags.append(to_title_case(str(tag)))
-    return LLMParseResult(
-        document_id=row.document_id,
-        suggested_title=row.suggested_title,
-        document_date=row.document_date,
-        correspondent=row.correspondent,
-        document_type=row.document_type,
-        tags=normalized_tags,
-        created_correspondent=row.created_correspondent,
-        created_document_type=row.created_document_type,
-        created_tags=normalized_created_tags,
-        created_at=row.created_at,
-        llm_details=None,
-    )
-
-
 class PostgresDocumentRepository(
     PostgresChatThreadRepositoryMixin,
     PostgresCollectionRepositoryMixin,
+    PostgresParseResultRepositoryMixin,
     PostgresUserRepositoryMixin,
     DocumentRepository,
 ):
@@ -192,7 +163,7 @@ class PostgresDocumentRepository(
             return [
                 (
                     _document_from_row(document_row),
-                    _llm_parse_result_from_row(llm_row) if llm_row is not None else None,
+                    llm_parse_result_from_row(llm_row) if llm_row is not None else None,
                 )
                 for document_row, llm_row in rows
             ]
@@ -257,78 +228,6 @@ class PostgresDocumentRepository(
             if document_row is not None:
                 session.delete(document_row)
             session.commit()
-
-    def save_parse_result(self, result: ParseResult) -> None:
-        with self._session_factory() as session:
-            row = session.get(ParseResultRow, result.document_id)
-            if row is None:
-                row = ParseResultRow(document_id=result.document_id)
-                session.add(row)
-            row.parser = result.parser
-            row.status = result.status
-            row.size_bytes = result.size_bytes
-            row.page_count = result.page_count
-            row.text_preview = result.text_preview
-            row.created_at = result.created_at
-            session.commit()
-
-    def get_parse_result(self, document_id: str) -> ParseResult | None:
-        with self._session_factory() as session:
-            row = session.get(ParseResultRow, document_id)
-            if row is None:
-                return None
-            return ParseResult(
-                document_id=row.document_id,
-                parser=row.parser,
-                status=row.status,
-                size_bytes=row.size_bytes,
-                page_count=row.page_count,
-                text_preview=row.text_preview,
-                created_at=row.created_at,
-                ocr_details=None,
-            )
-
-    def save_llm_parse_result(self, result: LLMParseResult) -> None:
-        normalized_tags: list[str] = []
-        seen_tags: set[str] = set()
-        for tag in result.tags:
-            normalized = normalize_name(tag)
-            if not normalized or normalized in seen_tags:
-                continue
-            seen_tags.add(normalized)
-            normalized_tags.append(to_title_case(tag))
-
-        normalized_created_tags: list[str] = []
-        seen_created: set[str] = set()
-        for tag in result.created_tags:
-            normalized = normalize_name(tag)
-            if not normalized or normalized in seen_created:
-                continue
-            seen_created.add(normalized)
-            normalized_created_tags.append(to_title_case(tag))
-
-        with self._session_factory() as session:
-            row = session.get(LLMParseResultRow, result.document_id)
-            if row is None:
-                row = LLMParseResultRow(document_id=result.document_id)
-                session.add(row)
-            row.suggested_title = result.suggested_title
-            row.document_date = result.document_date
-            row.correspondent = result.correspondent
-            row.document_type = result.document_type
-            row.tags = normalized_tags
-            row.created_correspondent = result.created_correspondent
-            row.created_document_type = result.created_document_type
-            row.created_tags = normalized_created_tags
-            row.created_at = result.created_at
-            session.commit()
-
-    def get_llm_parse_result(self, document_id: str) -> LLMParseResult | None:
-        with self._session_factory() as session:
-            row = session.get(LLMParseResultRow, document_id)
-            if row is None:
-                return None
-            return _llm_parse_result_from_row(row)
 
     def list_correspondents(self) -> list[str]:
         with self._session_factory() as session:
