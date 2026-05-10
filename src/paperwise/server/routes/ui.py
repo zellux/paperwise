@@ -23,8 +23,7 @@ from paperwise.application.services.llm_preferences import (
     llm_provider_defaults_payload,
     ocr_llm_provider_defaults_payload,
 )
-from paperwise.application.services.taxonomy import to_title_case
-from paperwise.domain.models import DocumentHistoryEvent, DocumentStatus, LLMParseResult, User
+from paperwise.domain.models import DocumentHistoryEvent, DocumentStatus, User
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
@@ -152,43 +151,15 @@ def _document_list_item(repository: DocumentRepository, document_id: str) -> dic
     }
 
 
-def _owner_llm_results(repository: DocumentRepository, current_user: User) -> list[LLMParseResult]:
-    results: list[LLMParseResult] = []
-    for document in repository.list_documents(limit=10_000):
-        if document.owner_id != current_user.id:
-            continue
-        llm_result = repository.get_llm_parse_result(document.id)
-        if llm_result is not None:
-            results.append(llm_result)
-    return results
-
-
 def _tag_stats_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     initial_data = _page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "tag_stats": []}
-    counts: dict[str, int] = {}
-    display_name_by_key: dict[str, str] = {}
-    for llm_result in _owner_llm_results(repository, current_user):
-        seen_tags: set[str] = set()
-        for tag in llm_result.tags:
-            cleaned = str(tag).strip()
-            if not cleaned:
-                continue
-            key = cleaned.casefold()
-            if key in seen_tags:
-                continue
-            seen_tags.add(key)
-            display_name_by_key.setdefault(key, to_title_case(cleaned))
-            counts[key] = counts.get(key, 0) + 1
     return {
         **initial_data,
         "tag_stats": [
-            {"tag": display_name_by_key[key], "document_count": count}
-            for key, count in sorted(
-                counts.items(),
-                key=lambda item: (-item[1], display_name_by_key[item[0]].casefold()),
-            )
+            {"tag": tag, "document_count": count}
+            for tag, count in repository.list_owner_tag_stats(current_user.id)
         ],
     }
 
@@ -197,23 +168,11 @@ def _document_type_stats_initial_data(repository: DocumentRepository, current_us
     initial_data = _page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "document_type_stats": []}
-    counts: dict[str, int] = {}
-    display_name_by_key: dict[str, str] = {}
-    for llm_result in _owner_llm_results(repository, current_user):
-        cleaned = str(llm_result.document_type).strip()
-        if not cleaned:
-            continue
-        key = cleaned.casefold()
-        display_name_by_key.setdefault(key, to_title_case(cleaned))
-        counts[key] = counts.get(key, 0) + 1
     return {
         **initial_data,
         "document_type_stats": [
-            {"document_type": display_name_by_key[key], "document_count": count}
-            for key, count in sorted(
-                counts.items(),
-                key=lambda item: (-item[1], display_name_by_key[item[0]].casefold()),
-            )
+            {"document_type": document_type, "document_count": count}
+            for document_type, count in repository.list_owner_document_type_stats(current_user.id)
         ],
     }
 

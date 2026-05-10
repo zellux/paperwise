@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 import re
 from threading import RLock
+from collections.abc import Iterable
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.domain.models import (
@@ -74,6 +75,43 @@ def _extract_snippet(text: str, terms: list[str], *, max_len: int = 240) -> str:
     start = max(0, pos - max_len // 3)
     end = min(len(source), start + max_len)
     return " ".join(source[start:end].split())
+
+
+def _tag_stats_from_llm_results(results: Iterable[LLMParseResult]) -> list[tuple[str, int]]:
+    counts: dict[str, int] = {}
+    display_name_by_key: dict[str, str] = {}
+    for result in results:
+        seen: set[str] = set()
+        for tag in result.tags:
+            cleaned = tag.strip()
+            if not cleaned:
+                continue
+            key = cleaned.casefold()
+            if key in seen:
+                continue
+            seen.add(key)
+            display_name_by_key.setdefault(key, _to_title_case(cleaned))
+            counts[key] = counts.get(key, 0) + 1
+    return sorted(
+        [(display_name_by_key[key], count) for key, count in counts.items()],
+        key=lambda item: (-item[1], item[0].casefold()),
+    )
+
+
+def _document_type_stats_from_llm_results(results: Iterable[LLMParseResult]) -> list[tuple[str, int]]:
+    counts: dict[str, int] = {}
+    display_name_by_key: dict[str, str] = {}
+    for result in results:
+        cleaned = str(result.document_type).strip()
+        if not cleaned:
+            continue
+        key = cleaned.casefold()
+        display_name_by_key.setdefault(key, _to_title_case(cleaned))
+        counts[key] = counts.get(key, 0) + 1
+    return sorted(
+        [(display_name_by_key[key], count) for key, count in counts.items()],
+        key=lambda item: (-item[1], item[0].casefold()),
+    )
 
 
 class InMemoryDocumentRepository(DocumentRepository):
@@ -191,26 +229,27 @@ class InMemoryDocumentRepository(DocumentRepository):
 
     def list_tag_stats(self) -> list[tuple[str, int]]:
         with self._lock:
-            counts: dict[str, int] = {}
-            display_name_by_key: dict[str, str] = {}
-            for result in self._llm_parse_results.values():
-                seen: set[str] = set()
-                for tag in result.tags:
-                    cleaned = tag.strip()
-                    if not cleaned:
-                        continue
-                    # Count each document at most once per tag.
-                    key = cleaned.casefold()
-                    if key in seen:
-                        continue
-                    seen.add(key)
-                    if key not in display_name_by_key:
-                        display_name_by_key[key] = _to_title_case(cleaned)
-                    counts[key] = counts.get(key, 0) + 1
-            return sorted(
-                [(display_name_by_key[key], count) for key, count in counts.items()],
-                key=lambda item: (-item[1], item[0].casefold()),
-            )
+            return _tag_stats_from_llm_results(self._llm_parse_results.values())
+
+    def list_owner_tag_stats(self, owner_id: str) -> list[tuple[str, int]]:
+        with self._lock:
+            results = [
+                result
+                for document_id, result in self._llm_parse_results.items()
+                if self._documents.get(document_id) is not None
+                and self._documents[document_id].owner_id == owner_id
+            ]
+            return _tag_stats_from_llm_results(results)
+
+    def list_owner_document_type_stats(self, owner_id: str) -> list[tuple[str, int]]:
+        with self._lock:
+            results = [
+                result
+                for document_id, result in self._llm_parse_results.items()
+                if self._documents.get(document_id) is not None
+                and self._documents[document_id].owner_id == owner_id
+            ]
+            return _document_type_stats_from_llm_results(results)
 
     def add_correspondent(self, name: str) -> None:
         with self._lock:
