@@ -3,7 +3,6 @@ import shutil
 from typing import Any
 from datetime import UTC, datetime
 from hashlib import sha256
-from pathlib import Path
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
@@ -62,6 +61,10 @@ from paperwise.application.services.llm_preferences import (
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.application.services.taxonomy import resolve_existing_name, resolve_tags
+from paperwise.application.services.upload_validation import (
+    is_supported_upload,
+    normalize_content_type,
+)
 from paperwise.domain.models import (
     Document,
     DocumentHistoryEvent,
@@ -265,35 +268,6 @@ PENDING_STATUSES = {
     DocumentStatus.PROCESSING,
     DocumentStatus.FAILED,
 }
-SUPPORTED_UPLOAD_EXTENSIONS = {
-    ".doc",
-    ".docx",
-    ".gif",
-    ".jpeg",
-    ".jpg",
-    ".markdown",
-    ".md",
-    ".pdf",
-    ".png",
-    ".txt",
-    ".webp",
-}
-SUPPORTED_UPLOAD_CONTENT_TYPES = {
-    "application/msword",
-    "application/octet-stream",
-    "application/pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    "image/gif",
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "text/markdown",
-    "text/plain",
-}
-
-
-def _normalize_content_type(value: str | None) -> str:
-    return str(value or "").split(";", 1)[0].strip().lower()
 
 
 def _validate_date(value: str | None) -> str | None:
@@ -303,14 +277,6 @@ def _validate_date(value: str | None) -> str | None:
         return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
     except ValueError:
         return None
-
-
-def _is_supported_upload(*, filename: str, content_type: str | None) -> bool:
-    suffix = Path(filename or "").suffix.lower()
-    normalized_content_type = _normalize_content_type(content_type)
-    if suffix in SUPPORTED_UPLOAD_EXTENSIONS:
-        return True
-    return normalized_content_type in SUPPORTED_UPLOAD_CONTENT_TYPES
 
 
 def _resolve_llm_provider_for_user(
@@ -417,8 +383,8 @@ def create_document_endpoint(
 ) -> CreateDocumentResponse:
     del owner_id
     filename = file.filename or "uploaded-document"
-    normalized_content_type = _normalize_content_type(file.content_type) or "application/octet-stream"
-    if not _is_supported_upload(filename=filename, content_type=normalized_content_type):
+    normalized_content_type = normalize_content_type(file.content_type) or "application/octet-stream"
+    if not is_supported_upload(filename=filename, content_type=normalized_content_type):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
             detail="Unsupported upload type. Use PDF, TXT, MD, DOC, DOCX, PNG, JPG, WEBP, or GIF.",
