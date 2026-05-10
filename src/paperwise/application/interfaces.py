@@ -86,7 +86,7 @@ class StorageProvider(Protocol):
         """Delete a previously stored artifact if it exists."""
 
 
-class DocumentRepository(Protocol):
+class DocumentStore(Protocol):
     def save(self, document: Document) -> None:
         """Persist a document aggregate."""
 
@@ -102,6 +102,8 @@ class DocumentRepository(Protocol):
     def delete_document(self, document_id: str) -> None:
         """Delete a document and all related records."""
 
+
+class ParseResultRepository(Protocol):
     def save_parse_result(self, result: ParseResult) -> None:
         """Persist parse output for a document."""
 
@@ -114,6 +116,8 @@ class DocumentRepository(Protocol):
     def get_llm_parse_result(self, document_id: str) -> LLMParseResult | None:
         """Load LLM metadata parse output for a document."""
 
+
+class TaxonomyRepository(Protocol):
     def list_correspondents(self) -> list[str]:
         """Return known correspondent names."""
 
@@ -135,6 +139,8 @@ class DocumentRepository(Protocol):
     def add_tags(self, names: list[str]) -> None:
         """Add tag names if missing."""
 
+
+class HistoryRepository(Protocol):
     def append_history_events(self, events: list[DocumentHistoryEvent]) -> None:
         """Append one or more immutable document history events."""
 
@@ -146,6 +152,8 @@ class DocumentRepository(Protocol):
     ) -> list[DocumentHistoryEvent]:
         """Return document history entries ordered newest-first."""
 
+
+class UserRepository(Protocol):
     def save_user(self, user: User) -> None:
         """Persist a user."""
 
@@ -158,12 +166,16 @@ class DocumentRepository(Protocol):
     def list_users(self, limit: int = 100) -> list[User]:
         """List users ordered newest-first."""
 
+
+class PreferenceRepository(Protocol):
     def save_user_preference(self, preference: UserPreference) -> None:
         """Persist user preferences payload."""
 
     def get_user_preference(self, user_id: str) -> UserPreference | None:
         """Load user preferences by user ID."""
 
+
+class ChatThreadRepository(Protocol):
     def save_chat_thread(self, thread: ChatThread) -> None:
         """Persist one user-owned chat thread."""
 
@@ -176,6 +188,8 @@ class DocumentRepository(Protocol):
     def delete_chat_thread(self, owner_id: str, thread_id: str) -> bool:
         """Delete one user-owned chat thread if present."""
 
+
+class CollectionRepository(Protocol):
     def create_collection(self, collection: Collection) -> None:
         """Persist a user-owned collection."""
 
@@ -203,6 +217,8 @@ class DocumentRepository(Protocol):
     def list_collection_document_ids(self, collection_id: str) -> list[str]:
         """Return document IDs contained in a collection."""
 
+
+class SearchRepository(Protocol):
     def search_documents(
         self,
         *,
@@ -213,6 +229,8 @@ class DocumentRepository(Protocol):
     ) -> list[DocumentSearchHit]:
         """Run keyword search over owner-visible documents (optionally scoped to IDs)."""
 
+
+class DocumentChunkRepository(Protocol):
     def replace_document_chunks(
         self,
         *,
@@ -234,6 +252,22 @@ class DocumentRepository(Protocol):
         document_ids: list[str] | None = None,
     ) -> list[DocumentChunkSearchHit]:
         """Run keyword chunk search over owner-visible chunks (optionally scoped)."""
+
+
+class DocumentRepository(
+    DocumentStore,
+    ParseResultRepository,
+    TaxonomyRepository,
+    HistoryRepository,
+    UserRepository,
+    PreferenceRepository,
+    ChatThreadRepository,
+    CollectionRepository,
+    SearchRepository,
+    DocumentChunkRepository,
+    Protocol,
+):
+    """Compatibility aggregate for call sites that still need the full repository surface."""
 
 
 class IngestionDispatcher(Protocol):
