@@ -8,6 +8,11 @@ from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.chat_contexts import compact_chat_search_contexts
+from paperwise.application.services.chat_tool_payloads import (
+    taxonomy_counts_payload,
+    taxonomy_stats_payload,
+    tool_document_item,
+)
 from paperwise.application.services.document_scope import all_owned_document_ids
 from paperwise.application.services.grounded_qa import (
     build_qa_contexts,
@@ -263,30 +268,6 @@ def _merge_tool_filters(scope: ChatScopeRequest, arguments: dict[str, Any]) -> d
     }
 
 
-def _to_tool_document_item(repository: DocumentRepository, document_id: str) -> dict[str, Any] | None:
-    document = repository.get(document_id)
-    if document is None:
-        return None
-    llm = repository.get_llm_parse_result(document_id)
-    return {
-        "document_id": document.id,
-        "filename": document.filename,
-        "title": llm.suggested_title if llm is not None and llm.suggested_title else document.filename,
-        "document_date": llm.document_date if llm is not None else None,
-        "document_type": llm.document_type if llm is not None else None,
-        "correspondent": llm.correspondent if llm is not None else None,
-        "tags": list(llm.tags or []) if llm is not None else [],
-        "created_at": document.created_at.isoformat(),
-    }
-
-
-def _taxonomy_stats_payload(items: list[tuple[str, int]]) -> list[dict[str, Any]]:
-    return [
-        {"name": item_name, "document_count": count}
-        for item_name, count in items[:30]
-    ]
-
-
 def _execute_chat_tool(
     *,
     repository: DocumentRepository,
@@ -338,7 +319,7 @@ def _execute_chat_tool(
         document_ids = scoped_ids if scoped_ids is not None else all_owned_document_ids(repository, current_user)
         items = []
         for document_id in document_ids[:limit]:
-            item = _to_tool_document_item(repository, document_id)
+            item = tool_document_item(repository, document_id)
             if item is not None:
                 items.append(item)
         return {"documents": items, "total_results": len(document_ids), "returned_results": len(items)}
@@ -347,11 +328,11 @@ def _execute_chat_tool(
             document_ids = all_owned_document_ids(repository, current_user)
             return {
                 "document_count": len(document_ids),
-                "tags": _taxonomy_stats_payload(repository.list_owner_tag_stats(current_user.id)),
-                "document_types": _taxonomy_stats_payload(
+                "tags": taxonomy_stats_payload(repository.list_owner_tag_stats(current_user.id)),
+                "document_types": taxonomy_stats_payload(
                     repository.list_owner_document_type_stats(current_user.id)
                 ),
-                "correspondents": _taxonomy_stats_payload(
+                "correspondents": taxonomy_stats_payload(
                     repository.list_owner_correspondent_stats(current_user.id)
                 ),
             }
@@ -368,17 +349,11 @@ def _execute_chat_tool(
             type_counts[llm.document_type] = type_counts.get(llm.document_type, 0) + 1
             correspondent_counts[llm.correspondent] = correspondent_counts.get(llm.correspondent, 0) + 1
 
-        def top_items(counts: dict[str, int]) -> list[dict[str, Any]]:
-            return [
-                {"name": item_name, "document_count": count}
-                for item_name, count in sorted(counts.items(), key=lambda item: (-item[1], item[0].casefold()))[:30]
-            ]
-
         return {
             "document_count": len(document_ids),
-            "tags": top_items(tag_counts),
-            "document_types": top_items(type_counts),
-            "correspondents": top_items(correspondent_counts),
+            "tags": taxonomy_counts_payload(tag_counts),
+            "document_types": taxonomy_counts_payload(type_counts),
+            "correspondents": taxonomy_counts_payload(correspondent_counts),
         }
     if name == "get_document_context":
         document_id = str(arguments.get("document_id") or "").strip()
@@ -386,7 +361,7 @@ def _execute_chat_tool(
         if document is None or document.owner_id != current_user.id:
             return {"error": "Document not found."}
         max_chunks = max(1, min(20, int(arguments.get("max_chunks") or 8)))
-        metadata = _to_tool_document_item(repository, document_id)
+        metadata = tool_document_item(repository, document_id)
         chunks = [
             {
                 "chunk_id": chunk.id,
