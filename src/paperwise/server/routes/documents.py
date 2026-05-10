@@ -16,8 +16,9 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
     storage_dependency,
 )
-from paperwise.server.llm_provider import load_user_preferences, resolve_http_llm_provider_for_user
+from paperwise.server.llm_provider import resolve_http_llm_provider_for_user
 from paperwise.server.routes.document_access import get_owned_document_or_404
+from paperwise.server.user_preferences import load_user_preferences
 from paperwise.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
@@ -531,11 +532,9 @@ def test_llm_connection_endpoint(
     current_user: User = Depends(current_user_dependency),
     provider_override: LLMProvider | None = Depends(llm_provider_dependency),
 ) -> LLMConnectionTestResponse:
-    preference = repository.get_user_preference(current_user.id)
-    base_preferences = dict(preference.preferences) if preference is not None else {}
     try:
         result = run_llm_connection_test(
-            preferences=base_preferences,
+            preferences=load_user_preferences(repository=repository, user_id=current_user.id),
             payload=LLMConnectionTestInput(
                 task=payload.task,
                 connection_name=payload.connection_name,

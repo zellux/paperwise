@@ -10,6 +10,7 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     settings_dependency,
 )
+from paperwise.server.user_preferences import load_user_preferences
 from paperwise.application.interfaces import PreferenceRepository, UserRepository
 from paperwise.application.services.session_tokens import create_session_token
 from paperwise.application.services.llm_preferences import get_normalized_llm_preferences, validate_api_key_for_provider
@@ -191,8 +192,9 @@ def get_me_preferences_endpoint(
     repository: PreferenceRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> UserPreferenceResponse:
-    preference = repository.get_user_preference(current_user.id)
-    return UserPreferenceResponse(preferences=dict(preference.preferences) if preference else {})
+    return UserPreferenceResponse(
+        preferences=load_user_preferences(repository=repository, user_id=current_user.id)
+    )
 
 
 @router.put("/me/preferences", response_model=UserPreferenceResponse)
@@ -201,8 +203,7 @@ def put_me_preferences_endpoint(
     repository: PreferenceRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> UserPreferenceResponse:
-    existing = repository.get_user_preference(current_user.id)
-    merged_preferences = dict(existing.preferences) if existing is not None else {}
+    merged_preferences = load_user_preferences(repository=repository, user_id=current_user.id)
     merged_preferences.update(dict(payload.preferences))
     _validate_llm_preferences(merged_preferences)
     preference = UserPreference(user_id=current_user.id, preferences=merged_preferences)

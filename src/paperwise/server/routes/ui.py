@@ -22,6 +22,7 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     optional_current_user_dependency,
 )
+from paperwise.server.user_preferences import load_user_preferences
 from paperwise.server.html_rewriter import (
     render_active_nav,
     replace_activity_token_total,
@@ -124,8 +125,10 @@ def _page_initial_data(
         "created_at": current_user.created_at.isoformat(),
     }
     if repository is not None:
-        preference = repository.get_user_preference(current_user.id)
-        initial_data["user_preferences"] = preference.preferences if preference is not None else {}
+        initial_data["user_preferences"] = load_user_preferences(
+            repository=repository,
+            user_id=current_user.id,
+        )
     return initial_data
 
 
@@ -201,10 +204,8 @@ def _activity_documents(
 
 
 def _activity_total_tokens(repository: DocumentRepository, current_user: User) -> int:
-    preference = repository.get_user_preference(current_user.id)
-    if preference is not None:
-        return int(preference.preferences.get("llm_total_tokens_processed") or 0)
-    return 0
+    preferences = load_user_preferences(repository=repository, user_id=current_user.id)
+    return int(preferences.get("llm_total_tokens_processed") or 0)
 
 
 def _activity_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:

@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from paperwise.application.interfaces import LLMProvider, PreferenceRepository
 from paperwise.application.services.llm_preferences import LLM_TASK_METADATA
 from paperwise.application.services.llm_provider_factory import resolve_llm_provider_from_preferences
+from paperwise.server.user_preferences import load_user_preferences
 
 
 def resolve_http_llm_provider_from_preferences(
@@ -29,15 +30,6 @@ def resolve_http_llm_provider_from_preferences(
             detail=detail,
         ),
     )
-
-
-def load_user_preferences(
-    *,
-    repository: PreferenceRepository,
-    user_id: str,
-) -> dict[str, Any]:
-    preference = repository.get_user_preference(user_id)
-    return dict(preference.preferences) if preference is not None else {}
 
 
 def resolve_http_llm_provider_for_user(
