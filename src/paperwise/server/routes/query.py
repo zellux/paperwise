@@ -22,7 +22,9 @@ from paperwise.server.routes.collections import (
     _resolve_metadata_scoped_document_ids,
     _search_document_chunks_multi_query,
 )
-from paperwise.server.routes.documents import _resolve_llm_provider_from_preferences
+from paperwise.server.llm_provider import (
+    resolve_http_llm_provider_from_preferences as _resolve_llm_provider_from_preferences,
+)
 
 router = APIRouter(prefix="/query", tags=["query"])
 

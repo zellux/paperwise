@@ -5,6 +5,7 @@ import re
 from sqlalchemy import select
 
 from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.services.taxonomy import normalize_name, to_title_case
 from paperwise.domain.models import (
     ChatThread,
     Collection,
@@ -37,41 +38,6 @@ from paperwise.infrastructure.repositories.postgres_models import (
     UserPreferenceRow,
     UserRow,
 )
-
-
-def _normalize_name(value: str) -> str:
-    cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
-    return " ".join(cleaned.split())
-
-
-def _to_title_case(value: str) -> str:
-    cleaned = " ".join(value.strip().split())
-    if not cleaned:
-        return cleaned
-
-    def looks_like_acronym_token(token: str) -> bool:
-        letters = "".join(ch for ch in token if ch.isalpha())
-        if not letters or not letters.isalpha():
-            return False
-        if len(letters) < 2 or len(letters) > 6:
-            return False
-        vowels = sum(ch in "aeiou" for ch in letters.lower())
-        return vowels == 0
-
-    words: list[str] = []
-    for word in cleaned.split(" "):
-        letters = "".join(ch for ch in word if ch.isalpha())
-        if len(letters) >= 2 and letters.isupper():
-            words.append(word)
-            continue
-        if looks_like_acronym_token(word):
-            words.append(word.upper())
-            continue
-        if word.islower():
-            words.append(word[:1].upper() + word[1:] if word else word)
-            continue
-        words.append(word)
-    return " ".join(words)
 
 
 def _coerce_document_status(value: str) -> DocumentStatus:
@@ -269,20 +235,20 @@ class PostgresDocumentRepository(DocumentRepository):
         normalized_tags: list[str] = []
         seen_tags: set[str] = set()
         for tag in result.tags:
-            normalized = _normalize_name(tag)
+            normalized = normalize_name(tag)
             if not normalized or normalized in seen_tags:
                 continue
             seen_tags.add(normalized)
-            normalized_tags.append(_to_title_case(tag))
+            normalized_tags.append(to_title_case(tag))
 
         normalized_created_tags: list[str] = []
         seen_created: set[str] = set()
         for tag in result.created_tags:
-            normalized = _normalize_name(tag)
+            normalized = normalize_name(tag)
             if not normalized or normalized in seen_created:
                 continue
             seen_created.add(normalized)
-            normalized_created_tags.append(_to_title_case(tag))
+            normalized_created_tags.append(to_title_case(tag))
 
         with self._session_factory() as session:
             row = session.get(LLMParseResultRow, result.document_id)
@@ -308,20 +274,20 @@ class PostgresDocumentRepository(DocumentRepository):
             normalized_tags: list[str] = []
             seen_tags: set[str] = set()
             for tag in list(row.tags or []):
-                normalized = _normalize_name(str(tag))
+                normalized = normalize_name(str(tag))
                 if not normalized or normalized in seen_tags:
                     continue
                 seen_tags.add(normalized)
-                normalized_tags.append(_to_title_case(str(tag)))
+                normalized_tags.append(to_title_case(str(tag)))
 
             normalized_created_tags: list[str] = []
             seen_created: set[str] = set()
             for tag in list(row.created_tags or []):
-                normalized = _normalize_name(str(tag))
+                normalized = normalize_name(str(tag))
                 if not normalized or normalized in seen_created:
                     continue
                 seen_created.add(normalized)
-                normalized_created_tags.append(_to_title_case(str(tag)))
+                normalized_created_tags.append(to_title_case(str(tag)))
             return LLMParseResult(
                 document_id=row.document_id,
                 suggested_title=row.suggested_title,
@@ -351,10 +317,10 @@ class PostgresDocumentRepository(DocumentRepository):
             rows = session.scalars(select(TagRow).order_by(TagRow.name)).all()
             by_norm: dict[str, str] = {}
             for row in rows:
-                normalized = _normalize_name(row.name)
+                normalized = normalize_name(row.name)
                 if not normalized:
                     continue
-                by_norm[normalized] = _to_title_case(row.name)
+                by_norm[normalized] = to_title_case(row.name)
             return sorted(by_norm.values())
 
     def list_tag_stats(self) -> list[tuple[str, int]]:
@@ -373,7 +339,7 @@ class PostgresDocumentRepository(DocumentRepository):
                         continue
                     seen.add(key)
                     if key not in display_name_by_key:
-                        display_name_by_key[key] = _to_title_case(cleaned)
+                        display_name_by_key[key] = to_title_case(cleaned)
                     counts[key] = counts.get(key, 0) + 1
             return sorted(
                 [(display_name_by_key[key], count) for key, count in counts.items()],
@@ -399,14 +365,14 @@ class PostgresDocumentRepository(DocumentRepository):
                 session.commit()
 
     def add_tags(self, names: list[str]) -> None:
-        cleaned_names = [_to_title_case(name) for name in names if name.strip()]
+        cleaned_names = [to_title_case(name) for name in names if name.strip()]
         if not cleaned_names:
             return
         with self._session_factory() as session:
             existing_rows = session.scalars(select(TagRow)).all()
-            existing_by_norm = {_normalize_name(row.name): row.name for row in existing_rows}
+            existing_by_norm = {normalize_name(row.name): row.name for row in existing_rows}
             for name in cleaned_names:
-                normalized = _normalize_name(name)
+                normalized = normalize_name(name)
                 if not normalized or normalized in existing_by_norm:
                     continue
                 session.add(TagRow(name=name))

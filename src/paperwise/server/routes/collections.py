@@ -8,14 +8,18 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
+from paperwise.application.services.document_listing import normalized_values as _normalized_values
 from paperwise.application.services.llm_preferences import LLM_TASK_GROUNDED_QA
+from paperwise.application.services.taxonomy import normalize_name as _normalize_name
 from paperwise.domain.models import Collection, DocumentChunkSearchHit, User
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
     llm_provider_dependency,
 )
-from paperwise.server.routes.documents import _resolve_llm_provider_from_preferences
+from paperwise.server.llm_provider import (
+    resolve_http_llm_provider_from_preferences as _resolve_llm_provider_from_preferences,
+)
 from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -173,21 +177,6 @@ def _build_search_response(
         if len(items) >= max(1, limit):
             break
     return SearchResponse(query=query, total_hits=len(items), hits=items)
-
-
-def _normalize_name(value: str) -> str:
-    cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
-    return " ".join(cleaned.split())
-
-
-def _normalized_values(values: list[str] | None) -> set[str]:
-    normalized: set[str] = set()
-    for value in values or []:
-        for part in value.split(","):
-            item = _normalize_name(part)
-            if item:
-                normalized.add(item)
-    return normalized
 
 
 def _resolve_metadata_scoped_document_ids(

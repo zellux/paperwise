@@ -12,20 +12,20 @@ from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 
 from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.services.document_listing import (
+    document_sort_key,
+    iter_filtered_documents,
+    normalized_sort_direction,
+    normalized_sort_field,
+    normalized_values,
+)
 from paperwise.domain.models import DocumentHistoryEvent, DocumentStatus, LLMParseResult, User
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
     optional_current_user_dependency,
 )
-from paperwise.server.routes.documents import (
-    _document_sort_key,
-    _get_owned_document_or_404,
-    _iter_filtered_documents,
-    _normalized_sort_direction,
-    _normalized_sort_field,
-    _normalized_values,
-)
+from paperwise.server.routes.document_access import get_owned_document_or_404
 from paperwise.server.routes.query import _migrate_legacy_chat_threads
 
 router = APIRouter(tags=["ui"])
@@ -299,26 +299,26 @@ def _documents_initial_data(
             "documents_page_size": normalized_page_size,
         }
 
-    normalized_statuses = _normalized_values(status)
+    normalized_statuses = normalized_values(status)
     if not normalized_statuses:
         normalized_statuses = {"ready"}
     matching_documents = list(
-        _iter_filtered_documents(
+        iter_filtered_documents(
             repository=repository,
             current_user=current_user,
             query=q,
-            normalized_tags=_normalized_values(tag),
-            normalized_correspondents=_normalized_values(correspondent),
-            normalized_document_types=_normalized_values(document_type),
+            normalized_tags=normalized_values(tag),
+            normalized_correspondents=normalized_values(correspondent),
+            normalized_document_types=normalized_values(document_type),
             normalized_statuses=normalized_statuses,
         )
     )
-    normalized_sort_field = _normalized_sort_field(sort_by)
-    normalized_sort_direction = _normalized_sort_direction(sort_dir)
-    if normalized_sort_field and normalized_sort_direction:
+    sort_field = normalized_sort_field(sort_by)
+    sort_direction = normalized_sort_direction(sort_dir)
+    if sort_field and sort_direction:
         matching_documents.sort(
-            key=lambda item: _document_sort_key(item[0], item[1], normalized_sort_field),
-            reverse=normalized_sort_direction == "desc",
+            key=lambda item: document_sort_key(item[0], item[1], sort_field),
+            reverse=sort_direction == "desc",
         )
     documents_total = len(matching_documents)
     total_pages = max(1, (documents_total + normalized_page_size - 1) // normalized_page_size)
@@ -373,7 +373,7 @@ def _document_detail_initial_data(
     initial_data = _page_initial_data(current_user, repository)
     if current_user is None or not document_id:
         return {**initial_data, "document_detail": None, "document_history": []}
-    document = _get_owned_document_or_404(
+    document = get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -677,7 +677,6 @@ def _activity_rows_html(documents: list[dict]) -> str:
     rows: list[str] = []
     for item in documents:
         raw_document_id = str(item.get("id") or "")
-        document_id = escape(raw_document_id)
         document_id_query = quote(raw_document_id, safe="")
         title = escape(_document_title(item))
         status_html = _status_badge_html(str(item.get("status") or ""))

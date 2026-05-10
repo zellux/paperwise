@@ -18,6 +18,10 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
     storage_dependency,
 )
+from paperwise.server.llm_provider import (
+    resolve_http_llm_provider_from_preferences as _resolve_llm_provider_from_preferences,
+)
+from paperwise.server.routes.document_access import get_owned_document_or_404 as _get_owned_document_or_404
 from paperwise.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
@@ -28,10 +32,16 @@ from paperwise.application.services.documents import (
     CreateDocumentCommand,
     create_document,
     delete_document,
-    get_document,
 )
 from paperwise.application.services.file_relocation import move_blob_to_processed
 from paperwise.application.services.filenames import sanitize_storage_filename
+from paperwise.application.services.document_listing import (
+    document_sort_key as _document_sort_key,
+    iter_filtered_documents as _iter_filtered_documents,
+    normalized_sort_direction as _normalized_sort_direction,
+    normalized_sort_field as _normalized_sort_field,
+    normalized_values as _normalized_values,
+)
 from paperwise.application.services.history import (
     build_file_moved_history_event,
     build_metadata_history_events,
@@ -43,16 +53,17 @@ from paperwise.application.services.llm_preferences import (
     LLM_TASK_GROUNDED_QA,
     LLM_TASK_METADATA,
     LLM_TASK_OCR,
-    ResolvedLLMTaskConfig,
-    default_base_url_for_provider,
-    default_model_for_task,
     get_normalized_llm_preferences,
-    resolve_task_config,
-    validate_api_key_for_provider,
 )
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.application.services.storage_paths import blob_ref_to_path
+from paperwise.application.services.taxonomy import (
+    normalize_name as _normalize_name,
+    resolve_existing_name as _resolve_existing_name,
+    resolve_tags as _resolve_tags,
+    to_title_case as _to_title_case,
+)
 from paperwise.domain.models import (
     Document,
     DocumentHistoryEvent,
@@ -63,10 +74,6 @@ from paperwise.domain.models import (
     User,
 )
 from paperwise.infrastructure.config import get_settings
-from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
-from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
-from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
-from paperwise.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 settings = get_settings()
@@ -242,53 +249,8 @@ SUPPORTED_UPLOAD_CONTENT_TYPES = {
 }
 
 
-def _normalize_name(value: str) -> str:
-    cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
-    return " ".join(cleaned.split())
-
-
 def _normalize_content_type(value: str | None) -> str:
     return str(value or "").split(";", 1)[0].strip().lower()
-
-
-def _to_title_case(value: str) -> str:
-    cleaned = " ".join(value.strip().split())
-    if not cleaned:
-        return cleaned
-
-    def looks_like_acronym_token(token: str) -> bool:
-        letters = "".join(ch for ch in token if ch.isalpha())
-        if not letters or not letters.isalpha():
-            return False
-        if len(letters) < 2 or len(letters) > 6:
-            return False
-        vowels = sum(ch in "aeiou" for ch in letters.lower())
-        return vowels == 0
-
-    words: list[str] = []
-    for word in cleaned.split(" "):
-        letters = "".join(ch for ch in word if ch.isalpha())
-        if len(letters) >= 2 and letters.isupper():
-            words.append(word)
-            continue
-        if looks_like_acronym_token(word):
-            words.append(word.upper())
-            continue
-        if word.islower():
-            words.append(word[:1].upper() + word[1:] if word else word)
-            continue
-        words.append(word)
-    return " ".join(words)
-
-
-def _resolve_existing_name(candidate: str, existing: list[str], fallback: str) -> tuple[str, bool]:
-    normalized_candidate = _normalize_name(candidate)
-    if not normalized_candidate:
-        return fallback, False
-    for name in existing:
-        if _normalize_name(name) == normalized_candidate:
-            return name, False
-    return _to_title_case(candidate), True
 
 
 def _validate_date(value: str | None) -> str | None:
@@ -298,158 +260,6 @@ def _validate_date(value: str | None) -> str | None:
         return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
     except ValueError:
         return None
-
-
-def _resolve_tags(candidate_tags: list[str], existing_tags: list[str]) -> tuple[list[str], list[str]]:
-    existing_by_norm = {_normalize_name(tag): _to_title_case(tag) for tag in existing_tags}
-    resolved: list[str] = []
-    created: list[str] = []
-    seen: set[str] = set()
-    for tag in candidate_tags:
-        normalized = _normalize_name(tag)
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        if normalized in existing_by_norm:
-            resolved.append(existing_by_norm[normalized])
-            continue
-        created_tag = _to_title_case(tag)
-        resolved.append(created_tag)
-        created.append(created_tag)
-    return resolved, created
-
-
-def _iter_filtered_documents(
-    *,
-    repository: DocumentRepository,
-    current_user: User,
-    query: str | None,
-    normalized_tags: set[str],
-    normalized_correspondents: set[str],
-    normalized_document_types: set[str],
-    normalized_statuses: set[str],
-):
-    batch_size = 1000
-    scan_offset = 0
-    while True:
-        documents = repository.list_documents(limit=batch_size, offset=scan_offset)
-        if not documents:
-            break
-        for document in documents:
-            if document.owner_id != current_user.id:
-                continue
-            llm_result = repository.get_llm_parse_result(document.id)
-            if not _matches_document_filters(
-                document=document,
-                llm_result=llm_result,
-                normalized_tags=normalized_tags,
-                normalized_correspondents=normalized_correspondents,
-                normalized_document_types=normalized_document_types,
-                normalized_statuses=normalized_statuses,
-                query=query,
-            ):
-                continue
-            yield document, llm_result
-        if len(documents) < batch_size:
-            break
-        scan_offset += batch_size
-
-
-def _normalized_sort_field(value: str | None) -> str | None:
-    normalized = str(value or "").strip()
-    if normalized in {"title", "document_type", "correspondent", "tags", "document_date", "status"}:
-        return normalized
-    return None
-
-
-def _normalized_sort_direction(value: str | None) -> str | None:
-    normalized = str(value or "").strip().lower()
-    if normalized in {"asc", "desc"}:
-        return normalized
-    return None
-
-
-def _document_sort_value(document: Document, llm_result: LLMParseResult | None, sort_field: str) -> str:
-    if sort_field == "title":
-        return llm_result.suggested_title if llm_result and llm_result.suggested_title else document.filename
-    if sort_field == "document_type":
-        return llm_result.document_type if llm_result else ""
-    if sort_field == "correspondent":
-        return llm_result.correspondent if llm_result else ""
-    if sort_field == "tags":
-        return " ".join(llm_result.tags) if llm_result else ""
-    if sort_field == "document_date":
-        return llm_result.document_date or "" if llm_result else ""
-    if sort_field == "status":
-        return document.status.value
-    return ""
-
-
-def _document_sort_key(document: Document, llm_result: LLMParseResult | None, sort_field: str) -> tuple[str, str]:
-    primary = _normalize_name(_document_sort_value(document, llm_result, sort_field))
-    return primary, document.id
-
-
-def _normalized_values(values: list[str] | None) -> set[str]:
-    normalized: set[str] = set()
-    for value in values or []:
-        for part in value.split(","):
-            item = _normalize_name(part)
-            if item:
-                normalized.add(item)
-    return normalized
-
-
-def _matches_text_query(
-    *,
-    query: str | None,
-    document: Document,
-    llm_result: LLMParseResult | None,
-) -> bool:
-    normalized_query = " ".join(str(query or "").strip().casefold().split())
-    if not normalized_query:
-        return True
-
-    candidates = [document.filename]
-    if llm_result is not None:
-        candidates.extend(
-            [
-                llm_result.suggested_title,
-                llm_result.correspondent,
-                llm_result.document_type,
-                llm_result.document_date or "",
-                " ".join(llm_result.tags),
-            ]
-        )
-
-    haystack = " ".join(" ".join(str(value).split()) for value in candidates).casefold()
-    return normalized_query in haystack
-
-
-def _matches_document_filters(
-    *,
-    document: Document,
-    llm_result: LLMParseResult | None,
-    normalized_tags: set[str],
-    normalized_correspondents: set[str],
-    normalized_document_types: set[str],
-    normalized_statuses: set[str],
-    query: str | None,
-) -> bool:
-    if normalized_statuses and _normalize_name(document.status.value) not in normalized_statuses:
-        return False
-    if normalized_tags:
-        if llm_result is None or not normalized_tags.intersection({_normalize_name(item) for item in llm_result.tags}):
-            return False
-    if normalized_correspondents:
-        if llm_result is None or _normalize_name(llm_result.correspondent) not in normalized_correspondents:
-            return False
-    if normalized_document_types:
-        if llm_result is None or _normalize_name(llm_result.document_type) not in normalized_document_types:
-            return False
-    if not _matches_text_query(query=query, document=document, llm_result=llm_result):
-        return False
-    return True
 
 
 def _is_supported_upload(*, filename: str, content_type: str | None) -> bool:
@@ -491,97 +301,6 @@ def _resolve_ocr_llm_provider_for_user(
         missing_api_key_detail="Selected OCR LLM connection requires an API key in Settings.",
         missing_base_url_detail="Custom OCR LLM connection requires a base URL in Settings.",
     )
-
-
-def _build_provider_from_task_config(
-    *,
-    config: ResolvedLLMTaskConfig | None,
-    default_llm_provider: LLMProvider,
-    task: str,
-    ocr_image_detail: str = "auto",
-    missing_provider_detail: str,
-    missing_api_key_detail: str,
-    missing_base_url_detail: str,
-) -> LLMProvider:
-    # Preserve testability when a fake provider is injected via dependency override.
-    if not isinstance(
-        default_llm_provider,
-        (MissingOpenAIProvider, OpenAILLMProvider, GeminiLLMProvider, SimpleLLMProvider),
-    ):
-        return default_llm_provider
-
-    if config is None or not config.provider:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=missing_provider_detail,
-        )
-    if not config.api_key:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=missing_api_key_detail,
-        )
-    api_key_error = validate_api_key_for_provider(config.provider, config.api_key)
-    if api_key_error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=api_key_error,
-        )
-
-    if config.provider == "openai":
-        return OpenAILLMProvider(
-            api_key=config.api_key,
-            model=config.model or default_model_for_task("openai", task),
-            base_url=config.base_url or default_base_url_for_provider("openai"),
-            vision_image_detail=ocr_image_detail,
-        )
-    if config.provider == "gemini":
-        return GeminiLLMProvider(
-            api_key=config.api_key,
-            model=config.model or default_model_for_task("gemini", task),
-            base_url=config.base_url or default_base_url_for_provider("gemini"),
-        )
-    if config.provider == "custom":
-        if not config.base_url:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=missing_base_url_detail,
-            )
-        return OpenAILLMProvider(
-            api_key=config.api_key,
-            model=config.model or default_model_for_task("custom", task),
-            base_url=config.base_url,
-            vision_image_detail=ocr_image_detail,
-            response_format_type="text",
-        )
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST,
-        detail=f"Unsupported LLM provider: {config.provider}",
-    )
-
-
-def _resolve_llm_provider_from_preferences(
-    *,
-    preferences: dict[str, Any],
-    default_llm_provider: LLMProvider,
-    task: str = LLM_TASK_METADATA,
-    missing_provider_detail: str = "Configure an LLM provider in Settings before running LLM parse.",
-    missing_api_key_detail: str = "Selected LLM provider requires your API key in Settings.",
-    missing_base_url_detail: str = "Custom LLM provider requires a base URL in Settings.",
-) -> LLMProvider:
-    config = resolve_task_config(preferences, task)
-    ocr_image_detail = str(preferences.get("ocr_image_detail", "auto")).strip().lower()
-    if ocr_image_detail not in {"auto", "low", "high"}:
-        ocr_image_detail = "auto"
-    provider = _build_provider_from_task_config(
-        config=config,
-        default_llm_provider=default_llm_provider,
-        task=task,
-        ocr_image_detail=ocr_image_detail,
-        missing_provider_detail=missing_provider_detail,
-        missing_api_key_detail=missing_api_key_detail,
-        missing_base_url_detail=missing_base_url_detail,
-    )
-    return provider
 
 
 def _merge_llm_preferences(
@@ -957,21 +676,6 @@ def _set_document_status(
         return document
     document.status = status_value
     repository.save(document)
-    return document
-
-
-def _get_owned_document_or_404(
-    *,
-    document_id: str,
-    repository: DocumentRepository,
-    current_user: User,
-) -> Document:
-    document = get_document(document_id=document_id, repository=repository)
-    if document is None or document.owner_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found",
-        )
     return document
 
 

@@ -10,20 +10,17 @@ from paperwise.application.services.history import (
 from paperwise.application.services.llm_preferences import (
     LLM_TASK_METADATA,
     LLM_TASK_OCR,
-    default_base_url_for_provider,
-    default_model_for_task,
     get_normalized_llm_preferences,
-    resolve_task_config,
+)
+from paperwise.application.services.llm_provider_factory import (
+    resolve_llm_provider_from_preferences as resolve_configured_llm_provider,
 )
 from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.domain.models import DocumentStatus, HistoryActorType
 from paperwise.infrastructure.config import get_settings
-from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
-from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
-from paperwise.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -77,47 +74,15 @@ def _resolve_llm_provider_from_preferences(
     default_llm_provider: LLMProvider,
     task: str = LLM_TASK_METADATA,
 ) -> LLMProvider:
-    config = resolve_task_config(preferences, task)
-
-    # Preserve worker testability when a fake provider is injected.
-    if not isinstance(
-        default_llm_provider,
-        (MissingOpenAIProvider, OpenAILLMProvider, GeminiLLMProvider, SimpleLLMProvider),
-    ):
-        return default_llm_provider
-
-    if config is None or not config.provider:
-        raise RuntimeError(f"missing provider setting for task: {task}")
-    if not config.api_key:
-        raise RuntimeError(f"missing API key setting for task: {task}")
-
-    ocr_image_detail = str(preferences.get("ocr_image_detail", "auto")).strip().lower()
-    if ocr_image_detail not in {"auto", "low", "high"}:
-        ocr_image_detail = "auto"
-
-    if config.provider == "openai":
-        return OpenAILLMProvider(
-            api_key=config.api_key,
-            model=config.model or default_model_for_task("openai", task),
-            base_url=config.base_url or default_base_url_for_provider("openai"),
-            vision_image_detail=ocr_image_detail,
-        )
-    if config.provider == "gemini":
-        return GeminiLLMProvider(
-            api_key=config.api_key,
-            model=config.model or default_model_for_task("gemini", task),
-            base_url=config.base_url or default_base_url_for_provider("gemini"),
-        )
-    if config.provider == "custom":
-        if not config.base_url:
-            raise RuntimeError(f"missing base URL setting for task: {task}")
-        return OpenAILLMProvider(
-            api_key=config.api_key,
-            model=config.model or default_model_for_task("custom", task),
-            base_url=config.base_url,
-            vision_image_detail=ocr_image_detail,
-        )
-    raise RuntimeError(f"unsupported provider: {config.provider}")
+    return resolve_configured_llm_provider(
+        preferences=preferences,
+        default_llm_provider=default_llm_provider,
+        task=task,
+        missing_provider_detail=f"missing provider setting for task: {task}",
+        missing_api_key_detail=f"missing API key setting for task: {task}",
+        missing_base_url_detail=f"missing base URL setting for task: {task}",
+        error_factory=RuntimeError,
+    )
 
 
 def _resolve_metadata_llm_provider_for_owner(
