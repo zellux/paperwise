@@ -253,6 +253,13 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "document.querySelector" not in app_initialization
     assert "initializeCurrentPageData" in app_js.text
     assert "initializePaperwisePage" in app_js.text
+    assert (
+        "if (docsTableBody) {\n"
+        "    await loadDocumentsList();\n"
+        "  } else {\n"
+        "    await initializeCurrentPageData();\n"
+        "  }"
+    ) in app_js.text
 
     for script_name in [
         "documents.js",
@@ -617,7 +624,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'data-doc-id="doc-tax"' in documents_html
         assert "Tax Notice" in documents_html
         assert '<span class="status-badge status-ready">READY</span>' in documents_html
-        assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in documents_html
+        assert '<a class="btn" href="/ui/document?id=doc-tax" title="View document details">Details</a>' in documents_html
         assert (
             '<a class="btn btn-muted" href="/documents/doc-tax/file" target="_blank" '
             'rel="noopener noreferrer" title="View file">View</a>'
@@ -718,7 +725,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert documents_partial_payload["documents_returned"] == 1
         assert "documents" not in documents_partial_payload
         assert 'data-doc-id="doc-tax"' in documents_partial_payload["table_body_html"]
-        assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in documents_partial_payload["table_body_html"]
+        assert '<a class="btn" href="/ui/document?id=doc-tax" title="View document details">Details</a>' in documents_partial_payload["table_body_html"]
         assert "Total documents: 2" in documents_partial_payload["pagination_toolbar_html"]
         assert "Processing: 1" in documents_partial_payload["pagination_toolbar_html"]
         assert "Page 1 / 2" in documents_partial_payload["pagination_toolbar_html"]

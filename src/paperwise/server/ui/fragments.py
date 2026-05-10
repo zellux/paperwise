@@ -294,8 +294,8 @@ def document_rows_html(documents: list[dict]) -> str:
             f'<td data-label="Date">{document_date}</td>'
             f'<td data-label="Status">{status_html}</td>'
             '<td data-label="Action"><div class="table-actions">'
-            f'<a class="btn" href="/ui/document?id={document_id_query}" title="Open document">'
-            "Open"
+            f'<a class="btn" href="/ui/document?id={document_id_query}" title="View document details">'
+            "Details"
             "</a>"
             f'<a class="btn btn-muted" href="/documents/{document_id_query}/file" '
             'target="_blank" rel="noopener noreferrer" title="View file">'

@@ -1286,7 +1286,11 @@ async function deleteDocumentById(documentId, options = {}) {
     return true;
   }
 
-  await initializeCurrentPageData();
+  if (docsTableBody) {
+    await loadDocumentsList();
+  } else {
+    await initializeCurrentPageData();
+  }
 
   logActivity(`Deleted document ${documentId}.`);
   return true;
