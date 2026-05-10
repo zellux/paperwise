@@ -12,6 +12,7 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     ingestion_dispatcher_dependency,
     llm_provider_dependency,
+    settings_dependency,
     storage_dependency,
 )
 from paperwise.server.llm_provider import (
@@ -92,10 +93,9 @@ from paperwise.domain.models import (
     ParseResult,
     User,
 )
-from paperwise.infrastructure.config import get_settings
+from paperwise.infrastructure.config import Settings
 
 router = APIRouter(prefix="/documents", tags=["documents"])
-settings = get_settings()
 
 
 def _run_parse_document_blob_or_400(
@@ -403,6 +403,7 @@ def get_document_detail_endpoint(
 def get_document_file_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
+    settings: Settings = Depends(settings_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> FileResponse:
     document = get_owned_document_or_404(
@@ -429,6 +430,7 @@ def delete_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
     storage: StorageProvider = Depends(storage_dependency),
+    settings: Settings = Depends(settings_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> None:
     document = get_owned_document_or_404(
@@ -573,6 +575,7 @@ def llm_parse_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
     provider_override: LLMProvider | None = Depends(llm_provider_dependency),
+    settings: Settings = Depends(settings_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> LLMParseResultResponse:
     document = get_owned_document_or_404(
