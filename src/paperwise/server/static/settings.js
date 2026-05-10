@@ -33,12 +33,28 @@ function renderSettingsForm() {
   refreshUploadAvailability();
 }
 
-function formatModelSummaryRow(label, settings, extra = "") {
+function formatModelSummaryTestCell(task, disabled = false) {
+  const status = taskTestStatuses.get(task) || { message: "", tone: "" };
+  const toneClass = status.tone === "success" ? "is-success" : status.tone === "error" ? "is-error" : "";
+  const isTesting = taskTestsInFlight.has(task);
+  return `
+    <td>
+      <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="${escapeHtml(task)}"${disabled || isTesting ? " disabled" : ""}>${isTesting ? "Testing..." : "Test"}</button>
+      <span class="settings-inline-status ${toneClass}">${escapeHtml(status.message || "")}</span>
+    </td>
+  `;
+}
+
+function formatModelSummaryRow(label, task, settings, extra = "") {
   if (!settings) {
-    return `<tr><td>${escapeHtml(label)}</td><td>-</td><td>Not configured</td></tr>`;
+    return `<tr><td>${escapeHtml(label)}</td><td>-</td><td>Not configured</td>${formatModelSummaryTestCell(task)}</tr>`;
   }
   const detail = `${settings.model}${extra ? `, ${extra}` : ""}`;
-  return `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(settings.connection_name)}</td><td>${escapeHtml(detail)}</td></tr>`;
+  return `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(settings.connection_name)}</td><td>${escapeHtml(detail)}</td>${formatModelSummaryTestCell(task)}</tr>`;
+}
+
+function formatLocalOcrSummaryRow() {
+  return `<tr><td>OCR</td><td>Local</td><td>local only</td>${formatModelSummaryTestCell("ocr")}</tr>`;
 }
 
 function renderModelConfigSummary() {
@@ -51,27 +67,39 @@ function renderModelConfigSummary() {
 
   if (ocrProvider === "tesseract") {
     settingsModelSummary.innerHTML = [
-      formatModelSummaryRow("Metadata Extraction", metadataSettings),
-      formatModelSummaryRow("Search and Ask Your Docs", groundedSettings),
-      "<tr><td>OCR</td><td>Local</td><td>local only</td></tr>",
+      formatModelSummaryRow(LLM_TASK_LABELS.metadata, "metadata", metadataSettings),
+      formatModelSummaryRow(LLM_TASK_LABELS.grounded_qa, "grounded_qa", groundedSettings),
+      formatLocalOcrSummaryRow(),
     ].join("");
-    return;
+  } else {
+    settingsModelSummary.innerHTML = [
+      formatModelSummaryRow(LLM_TASK_LABELS.metadata, "metadata", metadataSettings),
+      formatModelSummaryRow(LLM_TASK_LABELS.grounded_qa, "grounded_qa", groundedSettings),
+      formatModelSummaryRow(
+        LLM_TASK_LABELS.ocr,
+        "ocr",
+        ocrSettings,
+        `auto switch ${ocrAutoSwitch ? "on" : "off"}`
+      ),
+    ].join("");
   }
 
-  settingsModelSummary.innerHTML = [
-    formatModelSummaryRow("Metadata Extraction", metadataSettings),
-    formatModelSummaryRow("Search and Ask Your Docs", groundedSettings),
-    formatModelSummaryRow(
-      "OCR",
-      ocrSettings,
-      `auto switch ${ocrAutoSwitch ? "on" : "off"}`
-    ),
-  ].join("");
+  settingsModelSummary.querySelectorAll("[data-task-test]").forEach((buttonEl) => {
+    buttonEl.addEventListener("click", async () => {
+      const task = buttonEl.getAttribute("data-task-test") || "";
+      await testTaskConfig(task, buttonEl);
+    });
+  });
 }
 
 function setConnectionTestStatus(connectionId, message, tone = "") {
   connectionTestStatuses.set(connectionId, { message, tone });
   renderConnectionsList();
+}
+
+function setTaskTestStatus(task, message, tone = "") {
+  taskTestStatuses.set(task, { message, tone });
+  renderModelConfigSummary();
 }
 
 function renderConnectionSelect(selectEl, selectedValue) {
@@ -187,6 +215,109 @@ async function testConnection(connectionId, buttonEl) {
     setConnectionTestStatus(connectionId, error.message, "error");
     logActivity(`LLM API test failed: ${error.message}`);
   } finally {
+    if (buttonEl) {
+      buttonEl.disabled = false;
+      buttonEl.textContent = previousText || "Test";
+    }
+  }
+}
+
+async function testLocalOcrTask(buttonEl) {
+  const previousText = buttonEl?.textContent;
+  taskTestsInFlight.add("ocr");
+  if (buttonEl) {
+    buttonEl.disabled = true;
+    buttonEl.textContent = "Testing...";
+  }
+  setTaskTestStatus("ocr", "Testing local OCR tools...", "");
+  try {
+    const response = await apiFetch("/documents/ocr/local-status");
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload.available) {
+      const errorMessage = payload.detail || response.statusText || "Local OCR tools are not available.";
+      setTaskTestStatus("ocr", errorMessage, "error");
+      logActivity(`OCR config test failed: ${errorMessage}`);
+      return;
+    }
+    setTaskTestStatus("ocr", payload.detail || "Local OCR tools available.", "success");
+    logActivity("OCR config test passed for Local Tesseract.");
+  } catch (error) {
+    setTaskTestStatus("ocr", error.message || "Failed to test local OCR tools.", "error");
+    logActivity(`OCR config test failed: ${error.message}`);
+  } finally {
+    taskTestsInFlight.delete("ocr");
+    renderModelConfigSummary();
+    if (buttonEl) {
+      buttonEl.disabled = false;
+      buttonEl.textContent = previousText || "Test";
+    }
+  }
+}
+
+async function testTaskConfig(task, buttonEl) {
+  if (!["metadata", "grounded_qa", "ocr"].includes(task)) {
+    return;
+  }
+  if (task === "ocr" && normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider) === "tesseract") {
+    await testLocalOcrTask(buttonEl);
+    return;
+  }
+  const taskSettings = getResolvedTaskSettings(task);
+  const taskLabel = LLM_TASK_LABELS[task] || "Model config";
+  if (!taskSettings) {
+    const reason = `${taskLabel} is not configured.`;
+    setTaskTestStatus(task, reason, "error");
+    logActivity(`${taskLabel} config test blocked: ${reason}`);
+    return;
+  }
+  const reason = getConnectionValidationError(taskSettings);
+  if (reason) {
+    setTaskTestStatus(task, reason, "error");
+    logActivity(`${taskLabel} config test blocked: ${reason}`);
+    return;
+  }
+
+  const previousText = buttonEl?.textContent;
+  taskTestsInFlight.add(task);
+  if (buttonEl) {
+    buttonEl.disabled = true;
+    buttonEl.textContent = "Testing...";
+  }
+  setTaskTestStatus(task, "Testing...", "");
+  try {
+    const response = await apiFetch("/documents/llm/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        task,
+        connection_name: taskSettings.connection_name,
+        provider: taskSettings.provider,
+        model: taskSettings.model,
+        base_url: taskSettings.base_url,
+        api_key: taskSettings.api_key,
+      }),
+    });
+    const responseText = await response.text();
+    let payload = {};
+    try {
+      payload = responseText ? JSON.parse(responseText) : {};
+    } catch (_error) {
+      payload = {};
+    }
+    if (!response.ok) {
+      const errorMessage = formatApiErrorDetail(payload.detail) || responseText || response.statusText;
+      setTaskTestStatus(task, errorMessage, "error");
+      logActivity(`${taskLabel} config test failed: ${errorMessage}`);
+      return;
+    }
+    setTaskTestStatus(task, `Success (${payload.provider} / ${payload.model}).`, "success");
+    logActivity(`${taskLabel} config test passed (${payload.provider} / ${payload.model}).`);
+  } catch (error) {
+    setTaskTestStatus(task, error.message, "error");
+    logActivity(`${taskLabel} config test failed: ${error.message}`);
+  } finally {
+    taskTestsInFlight.delete(task);
+    renderModelConfigSummary();
     if (buttonEl) {
       buttonEl.disabled = false;
       buttonEl.textContent = previousText || "Test";

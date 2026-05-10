@@ -40,6 +40,7 @@ from paperwise.application.services.history import (
 )
 from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.llm_preferences import (
+    LLM_TASK_GROUNDED_QA,
     LLM_TASK_METADATA,
     LLM_TASK_OCR,
     ResolvedLLMTaskConfig,
@@ -69,6 +70,17 @@ from paperwise.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 settings = get_settings()
+OCR_CONNECTION_TEST_IMAGE_DATA_URL = (
+    "data:image/png;base64,"
+    "iVBORw0KGgoAAAANSUhEUgAAANwAAABGCAIAAAAoxW3zAAABFElEQVR42u3cyQ2EMBAAQeefNKQAwnOZ6u/"
+    "iBUbFAyF5XVKzlhEISglKQSlBKSglKAWlBKUEpaCUoBSUEpSCUoJSUEpHoFxvSlsbOKaW9xu3Nm50"
+    "jw6GEkoooYQSSiihhBLKFig3/hp33uJBB9xv1V99eYDz3r6hhBJKKKGEEkoooYQSSihbzApKKKGEE"
+    "koooYQSSiihTPxWthHlxrVpz0b2rKCEEkoooYQSSiihhPLXKI9/+x5xGVBCCSWUUEIJJZRQQgkllF"
+    "BCCSWUUEIJJZRQQgnlDJRVuz5MRFm1y8Wk3USghBJKKKGEEkoooYSyBqUUyNoIBKUEpaCUoBSUEpSC"
+    "UoJSglJQSlAKSglKQSlBqZ93AzSzyIKXc69aAAAAAElFTkSuQmCC"
+)
+OCR_CONNECTION_TEST_EXPECTED_WORDS = ("ocr", "test")
+OCR_CONNECTION_TEST_EXPECTED_DIGITS = "12"
 
 
 class CreateDocumentResponse(BaseModel):
@@ -176,6 +188,7 @@ class MetadataUpdateRequest(BaseModel):
 
 
 class LLMConnectionTestRequest(BaseModel):
+    task: str | None = None
     connection_name: str | None = None
     provider: str | None = None
     model: str | None = None
@@ -640,6 +653,90 @@ def _test_custom_llm_connection(*, base_url: str, api_key: str, model: str) -> N
         available = ", ".join(sorted(model_ids)[:10])
         suffix = f" Available models: {available}." if available else ""
         raise RuntimeError(f"Model '{model}' was not found in the provider's /models response.{suffix}")
+
+
+def _normalize_llm_connection_test_task(value: str | None) -> str:
+    task = str(value or "").strip().lower()
+    if task in {LLM_TASK_METADATA, LLM_TASK_GROUNDED_QA, LLM_TASK_OCR}:
+        return task
+    return LLM_TASK_METADATA
+
+
+def _llm_connection_test_missing_details(task: str) -> tuple[str, str, str]:
+    if task == LLM_TASK_GROUNDED_QA:
+        return (
+            "Configure a Grounded Q&A LLM connection in Settings before testing Ask Your Docs.",
+            "Selected Grounded Q&A LLM connection requires an API key in Settings.",
+            "Custom Grounded Q&A connection requires a base URL in Settings.",
+        )
+    if task == LLM_TASK_OCR:
+        return (
+            "Configure an OCR LLM connection in Settings before testing OCR.",
+            "Selected OCR LLM connection requires an API key in Settings.",
+            "Custom OCR LLM connection requires a base URL in Settings.",
+        )
+    return (
+        "Configure an LLM provider in Settings before running LLM parse.",
+        "Selected LLM provider requires your API key in Settings.",
+        "Custom LLM provider requires a base URL in Settings.",
+    )
+
+
+def _test_llm_vision_ocr_connection(llm_provider: LLMProvider) -> None:
+    image_ocr = getattr(llm_provider, "extract_ocr_text_from_images", None)
+    if not callable(image_ocr):
+        raise RuntimeError("Selected OCR provider does not support image OCR.")
+
+    result = image_ocr(
+        filename="ocr-connection-test.png",
+        image_data_urls=[OCR_CONNECTION_TEST_IMAGE_DATA_URL],
+    )
+    normalized_result = " ".join(str(result or "").lower().split())
+    if not normalized_result:
+        raise RuntimeError("OCR model returned empty text for the connection test image.")
+    compact_result = "".join(character for character in normalized_result if character.isalnum())
+    missing_words = [
+        word for word in OCR_CONNECTION_TEST_EXPECTED_WORDS if word not in normalized_result
+    ]
+    if missing_words or OCR_CONNECTION_TEST_EXPECTED_DIGITS not in compact_result:
+        raise RuntimeError(
+            "OCR model did not read the connection test image. "
+            "Expected OCR text to include OCR TEST and at least part of 123. "
+            f"Received: {str(result or '').strip()[:200]}"
+        )
+
+
+def _run_llm_connection_task_test(llm_provider: LLMProvider, task: str) -> None:
+    if task == LLM_TASK_GROUNDED_QA:
+        answer_with_tools = getattr(llm_provider, "answer_with_tools", None)
+        if not callable(answer_with_tools):
+            raise RuntimeError("Selected Grounded Q&A provider does not support conversational tool use.")
+        answer_with_tools(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are Paperwise's model configuration tester.",
+                },
+                {
+                    "role": "user",
+                    "content": "Reply with a brief confirmation that the Paperwise Ask Your Docs model config test is working.",
+                },
+            ],
+            tools=[],
+        )
+        return
+    if task == LLM_TASK_OCR:
+        _test_llm_vision_ocr_connection(llm_provider)
+        return
+    llm_provider.suggest_metadata(
+        filename="connection-test.txt",
+        text_preview="Connection test sample.",
+        current_correspondent=None,
+        current_document_type=None,
+        existing_correspondents=[],
+        existing_document_types=[],
+        existing_tags=["Test"],
+    )
 
 
 def _resolve_ocr_provider_for_user(
@@ -1115,35 +1212,35 @@ def test_llm_connection_endpoint(
     preference = repository.get_user_preference(current_user.id)
     base_preferences = dict(preference.preferences) if preference is not None else {}
     merged_preferences = _merge_llm_preferences(base_preferences, payload)
+    requested_task = str(payload.task or "").strip().lower()
+    task_specific_probe = requested_task in {LLM_TASK_METADATA, LLM_TASK_GROUNDED_QA, LLM_TASK_OCR}
+    task = _normalize_llm_connection_test_task(payload.task)
+    missing_provider_detail, missing_api_key_detail, missing_base_url_detail = _llm_connection_test_missing_details(task)
     llm_provider = _resolve_llm_provider_from_preferences(
         preferences=merged_preferences,
         default_llm_provider=default_llm_provider,
+        task=task,
+        missing_provider_detail=missing_provider_detail,
+        missing_api_key_detail=missing_api_key_detail,
+        missing_base_url_detail=missing_base_url_detail,
     )
     normalized_llm = get_normalized_llm_preferences(merged_preferences)
-    metadata_route = normalized_llm["llm_routing"]["metadata"]
+    task_route = normalized_llm["llm_routing"][task]
     connections_by_id = {
         str(connection["id"]): connection for connection in normalized_llm["llm_connections"]
     }
-    selected_connection = connections_by_id.get(str(metadata_route.get("connection_id", "")), {})
+    selected_connection = connections_by_id.get(str(task_route.get("connection_id", "")), {})
     provider_name = str(selected_connection.get("provider", "")).strip().lower() or "custom"
-    model_name = str(metadata_route.get("model", "")).strip() or "default"
+    model_name = str(task_route.get("model", "")).strip() or "default"
     try:
-        if provider_name == "custom":
+        if provider_name == "custom" and not task_specific_probe:
             _test_custom_llm_connection(
                 base_url=str(selected_connection.get("base_url", "")).strip(),
                 api_key=str(selected_connection.get("api_key", "")).strip(),
                 model=model_name,
             )
         else:
-            llm_provider.suggest_metadata(
-                filename="connection-test.txt",
-                text_preview="Connection test sample.",
-                current_correspondent=None,
-                current_document_type=None,
-                existing_correspondents=[],
-                existing_document_types=[],
-                existing_tags=["Test"],
-            )
+            _run_llm_connection_task_test(llm_provider, task)
     except HTTPException:
         raise
     except Exception as exc:

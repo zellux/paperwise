@@ -51,6 +51,9 @@ class FakeDispatcher:
 class FakeLLMProvider:
     def __init__(self) -> None:
         self.calls = 0
+        self.ocr_calls = 0
+        self.image_ocr_calls = 0
+        self.tool_calls = 0
         self._model = "metadata-test-model"
 
     def suggest_metadata(
@@ -89,7 +92,30 @@ class FakeLLMProvider:
     ) -> str:
         del filename
         del content_type
+        self.ocr_calls += 1
         return text_preview
+
+    def extract_ocr_text_from_images(
+        self,
+        *,
+        filename: str,
+        image_data_urls: list[str],
+    ) -> str:
+        del filename
+        del image_data_urls
+        self.image_ocr_calls += 1
+        return "OCR TEST 123"
+
+    def answer_with_tools(
+        self,
+        *,
+        messages: list[dict],
+        tools: list[dict],
+    ) -> dict:
+        del messages
+        del tools
+        self.tool_calls += 1
+        return {"role": "assistant", "content": "Paperwise model config test passed.", "tool_calls": []}
 
 
 class FakeFailingLLMProvider:
@@ -1642,6 +1668,142 @@ def test_llm_connection_test_accepts_payload_overrides_and_calls_provider() -> N
         assert payload["provider"] == "openai"
         assert payload["model"] == "gpt-4.1-mini"
         assert fake_provider.calls == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_connection_test_can_probe_grounded_qa_task() -> None:
+    repository = InMemoryDocumentRepository()
+    fake_provider = FakeLLMProvider()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: fake_provider
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents/llm/test",
+            json={
+                "task": "grounded_qa",
+                "provider": "openai",
+                "model": "gpt-4.1-mini",
+                "api_key": "sk-test",
+                "base_url": "https://api.openai.com/v1",
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["ok"] is True
+        assert payload["provider"] == "openai"
+        assert payload["model"] == "gpt-4.1-mini"
+        assert fake_provider.calls == 0
+        assert fake_provider.tool_calls == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_connection_test_can_probe_ocr_task() -> None:
+    repository = InMemoryDocumentRepository()
+    fake_provider = FakeLLMProvider()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: fake_provider
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents/llm/test",
+            json={
+                "task": "ocr",
+                "provider": "openai",
+                "model": "gpt-4.1-nano",
+                "api_key": "sk-test",
+                "base_url": "https://api.openai.com/v1",
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["ok"] is True
+        assert payload["provider"] == "openai"
+        assert payload["model"] == "gpt-4.1-nano"
+        assert fake_provider.calls == 0
+        assert fake_provider.ocr_calls == 0
+        assert fake_provider.image_ocr_calls == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_connection_test_custom_task_runs_task_probe(monkeypatch) -> None:
+    repository = InMemoryDocumentRepository()
+    fake_provider = FakeLLMProvider()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: fake_provider
+
+    def fail_if_models_endpoint_is_used(*_args, **_kwargs):
+        raise AssertionError("custom task tests should run the selected task probe")
+
+    monkeypatch.setattr(documents_routes.httpx, "Client", fail_if_models_endpoint_is_used)
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents/llm/test",
+            json={
+                "task": "ocr",
+                "provider": "custom",
+                "model": "qwen3-0.6b",
+                "api_key": "lm-studio",
+                "base_url": "http://hyperion.local.zellux.me:1234/v1",
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["ok"] is True
+        assert payload["provider"] == "custom"
+        assert payload["model"] == "qwen3-0.6b"
+        assert fake_provider.ocr_calls == 0
+        assert fake_provider.image_ocr_calls == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_llm_connection_test_ocr_requires_reading_test_image() -> None:
+    repository = InMemoryDocumentRepository()
+
+    class FakeTextOnlyOCRProvider(FakeLLMProvider):
+        def extract_ocr_text_from_images(
+            self,
+            *,
+            filename: str,
+            image_data_urls: list[str],
+        ) -> str:
+            del filename
+            del image_data_urls
+            self.image_ocr_calls += 1
+            return "I cannot read images, but the text path is available."
+
+    fake_provider = FakeTextOnlyOCRProvider()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: fake_provider
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents/llm/test",
+            json={
+                "task": "ocr",
+                "provider": "custom",
+                "model": "qwen3-0.6b",
+                "api_key": "lm-studio",
+                "base_url": "http://hyperion.local.zellux.me:1234/v1",
+            },
+        )
+        assert response.status_code == 502
+        detail = response.json()["detail"]
+        assert "OCR model did not read the connection test image" in detail
+        assert fake_provider.image_ocr_calls == 1
     finally:
         app.dependency_overrides.clear()
 

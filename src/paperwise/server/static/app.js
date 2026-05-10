@@ -101,6 +101,11 @@ const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember", "folio", "forge"];
 const THEME_STORAGE_KEY = "paperwise.ui.theme";
 let currentTheme = "forge";
 const SUPPORTED_LLM_PROVIDERS = ["openai", "gemini", "custom"];
+const LLM_TASK_LABELS = {
+  metadata: "Metadata Extraction",
+  grounded_qa: "Search and Ask Your Docs",
+  ocr: "OCR",
+};
 const LLM_PROVIDER_DEFAULTS = {
   openai: {
     model: "gpt-4.1-mini",
@@ -132,6 +137,8 @@ let llmRouting = {
   ocr: { engine: "llm", connection_id: "", model: "" },
 };
 const connectionTestStatuses = new Map();
+const taskTestStatuses = new Map();
+const taskTestsInFlight = new Set();
 let ocrStatusRequestSeq = 0;
 let docsFilters = {
   q: "",

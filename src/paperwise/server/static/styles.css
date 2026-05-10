@@ -1036,6 +1036,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   vertical-align: top;
 }
 
+.settings-model-summary-table .settings-summary-test-btn {
+  margin-right: 8px;
+}
+
 #settings-section-models .settings-group-wide .docs-table-wrap {
   margin-top: 10px;
 }
