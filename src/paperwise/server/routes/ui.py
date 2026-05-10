@@ -493,7 +493,7 @@ def _render_ui_page(
     script_names = ["shared.js", "app.js", *_PAGE_SCRIPTS_BY_VIEW.get(view_id, [])]
     asset_version = str(
         max(
-            (_STATIC_CSS_DIR / "styles.css").stat().st_mtime_ns,
+            *[path.stat().st_mtime_ns for path in _STATIC_CSS_DIR.glob("*.css")],
             *[(_STATIC_JS_DIR / script_name).stat().st_mtime_ns for script_name in script_names],
         )
     )

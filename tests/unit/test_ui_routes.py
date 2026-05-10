@@ -305,6 +305,24 @@ def test_static_assets_do_not_keep_legacy_tag_renderers() -> None:
     assert ".tag-pill-button" not in styles.text
 
 
+def test_static_assets_split_theme_css() -> None:
+    client = TestClient(app)
+
+    styles = client.get("/static/css/styles.css")
+    assert styles.status_code == 200
+    assert "body.theme-forge" not in styles.text
+
+    themes = client.get("/static/css/themes.css")
+    assert themes.status_code == 200
+    assert "body.theme-forge" in themes.text
+    assert "--bg-main" in themes.text
+
+    html = client.get("/ui/documents")
+    assert html.status_code == 200
+    assert "/static/css/themes.css?v=" in html.text
+    assert "/static/css/styles.css?v=" in html.text
+
+
 def test_static_assets_keep_search_logic_in_page_script() -> None:
     client = TestClient(app)
 
