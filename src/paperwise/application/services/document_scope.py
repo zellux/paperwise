@@ -1,8 +1,8 @@
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import DocumentStore
 from paperwise.domain.models import User
 
 
-def all_owned_document_ids(repository: DocumentRepository, current_user: User) -> list[str]:
+def all_owned_document_ids(repository: DocumentStore, current_user: User) -> list[str]:
     document_ids: list[str] = []
     batch_size = 1000
     offset = 0

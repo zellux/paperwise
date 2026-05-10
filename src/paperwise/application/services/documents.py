@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import uuid4
 
-from paperwise.application.interfaces import DocumentRepository, IngestionDispatcher
+from paperwise.application.interfaces import DocumentStore, IngestionDispatcher
 from paperwise.application.use_cases import CreateDocumentInput, initialize_document
 from paperwise.domain.models import Document, DocumentStatus
 
@@ -18,7 +18,7 @@ class CreateDocumentCommand:
 
 def create_document(
     command: CreateDocumentCommand,
-    repository: DocumentRepository,
+    repository: DocumentStore,
     dispatcher: IngestionDispatcher,
 ) -> tuple[Document, str]:
     """Create a document aggregate, then move it to processing once queued."""
@@ -46,11 +46,11 @@ def create_document(
     return document, job_id
 
 
-def get_document(document_id: str, repository: DocumentRepository) -> Document | None:
+def get_document(document_id: str, repository: DocumentStore) -> Document | None:
     """Fetch a document aggregate by ID."""
     return repository.get(document_id)
 
 
-def delete_document(document_id: str, repository: DocumentRepository) -> None:
+def delete_document(document_id: str, repository: DocumentStore) -> None:
     """Delete a document aggregate and its related records."""
     repository.delete_document(document_id)

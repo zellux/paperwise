@@ -10,7 +10,7 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     settings_dependency,
 )
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import PreferenceRepository, UserRepository
 from paperwise.application.services.session_tokens import create_session_token
 from paperwise.application.services.llm_preferences import get_normalized_llm_preferences, validate_api_key_for_provider
 from paperwise.application.services.users import (
@@ -96,7 +96,7 @@ def _validate_llm_preferences(preferences: dict[str, Any]) -> None:
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
 def create_user_endpoint(
     payload: CreateUserRequest,
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: UserRepository = Depends(document_repository_dependency),
 ) -> UserResponse:
     try:
         user = create_user(
@@ -118,7 +118,7 @@ def create_user_endpoint(
 @router.get("", response_model=list[UserResponse])
 def list_users_endpoint(
     limit: int = 100,
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: UserRepository = Depends(document_repository_dependency),
 ) -> list[UserResponse]:
     users = repository.list_users(limit=limit)
     return [_to_user_response(user) for user in users]
@@ -134,7 +134,7 @@ def get_me_endpoint(
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user_endpoint(
     user_id: str,
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: UserRepository = Depends(document_repository_dependency),
 ) -> UserResponse:
     user = repository.get_user(user_id)
     if user is None:
@@ -149,7 +149,7 @@ def get_user_endpoint(
 def login_user_endpoint(
     payload: LoginRequest,
     response: Response,
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: UserRepository = Depends(document_repository_dependency),
     settings: Settings = Depends(settings_dependency),
 ) -> LoginResponse:
     user = authenticate_user(
@@ -188,7 +188,7 @@ def logout_user_endpoint(response: Response) -> Response:
 
 @router.get("/me/preferences", response_model=UserPreferenceResponse)
 def get_me_preferences_endpoint(
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: PreferenceRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> UserPreferenceResponse:
     preference = repository.get_user_preference(current_user.id)
@@ -198,7 +198,7 @@ def get_me_preferences_endpoint(
 @router.put("/me/preferences", response_model=UserPreferenceResponse)
 def put_me_preferences_endpoint(
     payload: UserPreferenceRequest,
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: PreferenceRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> UserPreferenceResponse:
     existing = repository.get_user_preference(current_user.id)
@@ -213,7 +213,7 @@ def put_me_preferences_endpoint(
 @router.post("/me/password", response_model=ChangePasswordResponse)
 def change_password_endpoint(
     payload: ChangePasswordRequest,
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: UserRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> ChangePasswordResponse:
     try:

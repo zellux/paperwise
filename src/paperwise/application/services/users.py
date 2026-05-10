@@ -5,7 +5,7 @@ from hmac import compare_digest
 from os import urandom
 from uuid import uuid4
 
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import UserRepository
 from paperwise.domain.models import User
 
 _HASH_NAME = "sha256"
@@ -62,7 +62,7 @@ def verify_password(password: str, password_hash: str) -> bool:
     return compare_digest(candidate, expected)
 
 
-def create_user(command: CreateUserCommand, repository: DocumentRepository) -> User:
+def create_user(command: CreateUserCommand, repository: UserRepository) -> User:
     email = _normalize_email(command.email)
     full_name = " ".join(command.full_name.split()).strip()
     password = command.password
@@ -89,7 +89,7 @@ def create_user(command: CreateUserCommand, repository: DocumentRepository) -> U
     return user
 
 
-def authenticate_user(email: str, password: str, repository: DocumentRepository) -> User | None:
+def authenticate_user(email: str, password: str, repository: UserRepository) -> User | None:
     user = repository.get_user_by_email(_normalize_email(email))
     if user is None or not user.is_active:
         return None
@@ -103,7 +103,7 @@ def change_user_password(
     user: User,
     current_password: str,
     new_password: str,
-    repository: DocumentRepository,
+    repository: UserRepository,
 ) -> None:
     if not verify_password(current_password, user.password_hash):
         raise ValueError("Current password is incorrect")

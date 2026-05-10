@@ -8,6 +8,7 @@ from paperwise.application.interfaces import (
     IngestionDispatcher,
     LLMProvider,
     StorageProvider,
+    UserRepository,
 )
 from paperwise.domain.models import User
 from paperwise.infrastructure.config import Settings, get_settings
@@ -54,7 +55,7 @@ def llm_provider_dependency() -> LLMProvider | None:
 
 def current_user_dependency(
     session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: UserRepository = Depends(document_repository_dependency),
     settings: Settings = Depends(settings_dependency),
 ) -> User:
     token = ""
@@ -82,7 +83,7 @@ def current_user_dependency(
 
 def optional_current_user_dependency(
     session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: UserRepository = Depends(document_repository_dependency),
     settings: Settings = Depends(settings_dependency),
 ) -> User | None:
     try:

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 import re
 
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import DocumentChunkRepository
 from paperwise.domain.models import Document, DocumentChunk, ParseResult
 
 
@@ -51,7 +51,7 @@ def build_document_chunks(*, document: Document, parse_result: ParseResult) -> l
 
 def index_document_chunks(
     *,
-    repository: DocumentRepository,
+    repository: DocumentChunkRepository,
     document: Document,
     parse_result: ParseResult,
 ) -> int:

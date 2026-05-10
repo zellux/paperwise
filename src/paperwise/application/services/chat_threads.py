@@ -1,11 +1,16 @@
 from datetime import UTC, datetime
 from typing import Any
+from typing import Protocol
 
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import ChatThreadRepository, PreferenceRepository
 from paperwise.domain.models import ChatThread, User, UserPreference
 
 CHAT_THREADS_PREFERENCE_KEY = "chat_threads"
 MAX_STORED_CHAT_MESSAGES = 40
+
+
+class LegacyChatThreadRepository(PreferenceRepository, ChatThreadRepository, Protocol):
+    pass
 
 
 def thread_title_from_messages(messages: list[dict[str, Any]]) -> str:
@@ -18,7 +23,7 @@ def thread_title_from_messages(messages: list[dict[str, Any]]) -> str:
     return "New chat"
 
 
-def migrate_legacy_chat_threads(repository: DocumentRepository, current_user: User) -> None:
+def migrate_legacy_chat_threads(repository: LegacyChatThreadRepository, current_user: User) -> None:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
     legacy_threads = _chat_threads_from_preferences(preferences)
