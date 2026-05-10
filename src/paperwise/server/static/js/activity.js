@@ -48,7 +48,7 @@ async function loadProcessedDocumentsActivity() {
     return;
   }
   applyActivityPartial(payload);
-  logActivity(`Loaded ${payload.activity_documents.length} latest processed document(s).`);
+  logActivity(`Loaded ${Number(payload.activity_document_count || 0)} latest processed document(s).`);
 }
 
 function hydrateInitialActivityData(initialData) {

@@ -51,7 +51,7 @@ async function loadTagStats() {
     return;
   }
   applyTagsPartial(payload);
-  logActivity(`Loaded ${payload.tag_stats.length} tag(s)`);
+  logActivity(`Loaded ${Number(payload.tag_count || 0)} tag(s)`);
 }
 
 async function loadDocumentTypeStats() {
@@ -76,7 +76,7 @@ async function loadDocumentTypeStats() {
     return;
   }
   applyDocumentTypesPartial(payload);
-  logActivity(`Loaded ${payload.document_type_stats.length} document type(s)`);
+  logActivity(`Loaded ${Number(payload.document_type_count || 0)} document type(s)`);
 }
 
 function hydrateInitialTagStats(initialData) {

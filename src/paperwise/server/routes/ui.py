@@ -855,7 +855,7 @@ def tags_partial(
     return JSONResponse(
         {
             "table_body_html": tag_rows_html(tag_stats),
-            "tag_stats": tag_stats,
+            "tag_count": len(tag_stats),
         },
         headers={"Cache-Control": "no-store"},
     )
@@ -873,7 +873,7 @@ def document_types_partial(
     return JSONResponse(
         {
             "table_body_html": document_type_rows_html(document_type_stats),
-            "document_type_stats": document_type_stats,
+            "document_type_count": len(document_type_stats),
         },
         headers={"Cache-Control": "no-store"},
     )
@@ -885,10 +885,15 @@ def pending_partial(
     current_user: User = Depends(current_user_dependency),
 ) -> JSONResponse:
     data = _pending_initial_data(repository, current_user)
+    pending_documents = data["pending_documents"]
     return JSONResponse(
         {
-            "table_body_html": pending_rows_html(data["pending_documents"]),
-            "pending_documents": data["pending_documents"],
+            "table_body_html": pending_rows_html(pending_documents),
+            "pending_count": len(pending_documents),
+            "has_restartable_pending_documents": any(
+                str(document.get("status") or "").strip().lower() not in {"", "ready"}
+                for document in pending_documents
+            ),
         },
         headers={"Cache-Control": "no-store"},
     )
@@ -901,10 +906,11 @@ def activity_partial(
     current_user: User = Depends(current_user_dependency),
 ) -> JSONResponse:
     data = _activity_partial_data(repository, current_user, limit=limit)
+    activity_documents = data["activity_documents"]
     return JSONResponse(
         {
-            "table_body_html": activity_rows_html(data["activity_documents"]),
-            "activity_documents": data["activity_documents"],
+            "table_body_html": activity_rows_html(activity_documents),
+            "activity_document_count": len(activity_documents),
             "activity_total_tokens": data["activity_total_tokens"],
         },
         headers={"Cache-Control": "no-store"},

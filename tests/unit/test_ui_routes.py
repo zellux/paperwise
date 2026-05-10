@@ -628,29 +628,34 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         tags_partial = client.get("/ui/partials/tags?sort_by=tag&sort_dir=desc")
         assert tags_partial.status_code == 200
         tags_partial_payload = tags_partial.json()
-        assert [item["tag"] for item in tags_partial_payload["tag_stats"]] == ["Tax", "Finance"]
+        assert tags_partial_payload["tag_count"] == 2
+        assert "tag_stats" not in tags_partial_payload
+        assert tags_partial_payload["table_body_html"].index("Tax") < tags_partial_payload[
+            "table_body_html"
+        ].index("Finance")
         assert '<a class="btn" href="/ui/documents?tag=Tax" ' in tags_partial_payload["table_body_html"]
 
         types_partial = client.get("/ui/partials/document-types?sort_by=document_type&sort_dir=asc")
         assert types_partial.status_code == 200
         types_partial_payload = types_partial.json()
-        assert [item["document_type"] for item in types_partial_payload["document_type_stats"]] == [
-            "Invoice",
-            "Notice",
-        ]
+        assert types_partial_payload["document_type_count"] == 2
+        assert "document_type_stats" not in types_partial_payload
         assert '<td data-label="Document Type">Invoice</td>' in types_partial_payload["table_body_html"]
 
         activity_partial = client.get("/ui/partials/activity?limit=1")
         assert activity_partial.status_code == 200
         activity_partial_payload = activity_partial.json()
         assert activity_partial_payload["activity_total_tokens"] == 42
-        assert len(activity_partial_payload["activity_documents"]) == 1
+        assert activity_partial_payload["activity_document_count"] == 1
+        assert "activity_documents" not in activity_partial_payload
         assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in activity_partial_payload["table_body_html"]
 
         pending_partial = client.get("/ui/partials/pending")
         assert pending_partial.status_code == 200
         pending_partial_payload = pending_partial.json()
-        assert pending_partial_payload["pending_documents"][0]["id"] == "doc-pending"
+        assert pending_partial_payload["pending_count"] == 1
+        assert pending_partial_payload["has_restartable_pending_documents"] is True
+        assert "pending_documents" not in pending_partial_payload
         assert 'data-pending-doc-id="doc-pending"' in pending_partial_payload["table_body_html"]
 
         document_partial = client.get("/ui/partials/document?id=doc-tax")

@@ -32,9 +32,8 @@ function getVisiblePendingRowCount() {
 
 function applyPendingPartial(payload) {
   const { pendingTableBody } = getPendingElements();
-  const documents = Array.isArray(payload.pending_documents) ? payload.pending_documents : [];
   replaceElementHtml(pendingTableBody, payload.table_body_html);
-  setRestartPendingButtonEnabled(documents.some((doc) => isRestartablePendingDocument(doc)));
+  setRestartPendingButtonEnabled(Boolean(payload.has_restartable_pending_documents));
 }
 
 async function loadPendingDocuments() {
@@ -54,7 +53,7 @@ async function loadPendingDocuments() {
     return;
   }
   applyPendingPartial(payload);
-  logActivity(`Loaded ${payload.pending_documents.length} pending document(s)`);
+  logActivity(`Loaded ${Number(payload.pending_count || 0)} pending document(s)`);
 }
 
 function hydrateInitialPendingData(initialData) {
