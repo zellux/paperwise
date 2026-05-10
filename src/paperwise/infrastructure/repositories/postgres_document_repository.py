@@ -112,6 +112,53 @@ def _document_type_stats_from_rows(rows: list[LLMParseResultRow]) -> list[tuple[
     )
 
 
+def _document_from_row(row: DocumentRow) -> Document:
+    return Document(
+        id=row.id,
+        filename=row.filename,
+        owner_id=row.owner_id,
+        blob_uri=row.blob_uri,
+        checksum_sha256=row.checksum_sha256,
+        content_type=row.content_type,
+        size_bytes=row.size_bytes,
+        status=_coerce_document_status(row.status),
+        created_at=row.created_at,
+    )
+
+
+def _llm_parse_result_from_row(row: LLMParseResultRow) -> LLMParseResult:
+    normalized_tags: list[str] = []
+    seen_tags: set[str] = set()
+    for tag in list(row.tags or []):
+        normalized = normalize_name(str(tag))
+        if not normalized or normalized in seen_tags:
+            continue
+        seen_tags.add(normalized)
+        normalized_tags.append(to_title_case(str(tag)))
+
+    normalized_created_tags: list[str] = []
+    seen_created: set[str] = set()
+    for tag in list(row.created_tags or []):
+        normalized = normalize_name(str(tag))
+        if not normalized or normalized in seen_created:
+            continue
+        seen_created.add(normalized)
+        normalized_created_tags.append(to_title_case(str(tag)))
+    return LLMParseResult(
+        document_id=row.document_id,
+        suggested_title=row.suggested_title,
+        document_date=row.document_date,
+        correspondent=row.correspondent,
+        document_type=row.document_type,
+        tags=normalized_tags,
+        created_correspondent=row.created_correspondent,
+        created_document_type=row.created_document_type,
+        created_tags=normalized_created_tags,
+        created_at=row.created_at,
+        llm_details=None,
+    )
+
+
 class PostgresDocumentRepository(DocumentRepository):
     def __init__(self, database_url: str) -> None:
         self._engine = build_engine(database_url)
@@ -139,17 +186,7 @@ class PostgresDocumentRepository(DocumentRepository):
             row = session.get(DocumentRow, document_id)
             if row is None:
                 return None
-            return Document(
-                id=row.id,
-                filename=row.filename,
-                owner_id=row.owner_id,
-                blob_uri=row.blob_uri,
-                checksum_sha256=row.checksum_sha256,
-                content_type=row.content_type,
-                size_bytes=row.size_bytes,
-                status=_coerce_document_status(row.status),
-                created_at=row.created_at,
-            )
+            return _document_from_row(row)
 
     def get_by_owner_checksum(self, owner_id: str, checksum_sha256: str) -> Document | None:
         with self._session_factory() as session:
@@ -162,17 +199,7 @@ class PostgresDocumentRepository(DocumentRepository):
             )
             if row is None:
                 return None
-            return Document(
-                id=row.id,
-                filename=row.filename,
-                owner_id=row.owner_id,
-                blob_uri=row.blob_uri,
-                checksum_sha256=row.checksum_sha256,
-                content_type=row.content_type,
-                size_bytes=row.size_bytes,
-                status=_coerce_document_status(row.status),
-                created_at=row.created_at,
-            )
+            return _document_from_row(row)
 
     def list_documents(self, limit: int = 100, *, offset: int = 0) -> list[Document]:
         with self._session_factory() as session:
@@ -182,19 +209,30 @@ class PostgresDocumentRepository(DocumentRepository):
                 .offset(max(0, offset))
                 .limit(limit)
             ).all()
+            return [_document_from_row(row) for row in rows]
+
+    def list_owner_documents_with_llm_results(
+        self,
+        *,
+        owner_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[tuple[Document, LLMParseResult | None]]:
+        with self._session_factory() as session:
+            rows = session.execute(
+                select(DocumentRow, LLMParseResultRow)
+                .outerjoin(LLMParseResultRow, LLMParseResultRow.document_id == DocumentRow.id)
+                .where(DocumentRow.owner_id == owner_id)
+                .order_by(DocumentRow.created_at.desc())
+                .offset(max(0, offset))
+                .limit(max(0, limit))
+            ).all()
             return [
-                Document(
-                    id=row.id,
-                    filename=row.filename,
-                    owner_id=row.owner_id,
-                    blob_uri=row.blob_uri,
-                    checksum_sha256=row.checksum_sha256,
-                    content_type=row.content_type,
-                    size_bytes=row.size_bytes,
-                    status=_coerce_document_status(row.status),
-                    created_at=row.created_at,
+                (
+                    _document_from_row(document_row),
+                    _llm_parse_result_from_row(llm_row) if llm_row is not None else None,
                 )
-                for row in rows
+                for document_row, llm_row in rows
             ]
 
     def delete_document(self, document_id: str) -> None:
@@ -308,36 +346,7 @@ class PostgresDocumentRepository(DocumentRepository):
             row = session.get(LLMParseResultRow, document_id)
             if row is None:
                 return None
-            normalized_tags: list[str] = []
-            seen_tags: set[str] = set()
-            for tag in list(row.tags or []):
-                normalized = normalize_name(str(tag))
-                if not normalized or normalized in seen_tags:
-                    continue
-                seen_tags.add(normalized)
-                normalized_tags.append(to_title_case(str(tag)))
-
-            normalized_created_tags: list[str] = []
-            seen_created: set[str] = set()
-            for tag in list(row.created_tags or []):
-                normalized = normalize_name(str(tag))
-                if not normalized or normalized in seen_created:
-                    continue
-                seen_created.add(normalized)
-                normalized_created_tags.append(to_title_case(str(tag)))
-            return LLMParseResult(
-                document_id=row.document_id,
-                suggested_title=row.suggested_title,
-                document_date=row.document_date,
-                correspondent=row.correspondent,
-                document_type=row.document_type,
-                tags=normalized_tags,
-                created_correspondent=row.created_correspondent,
-                created_document_type=row.created_document_type,
-                created_tags=normalized_created_tags,
-                created_at=row.created_at,
-                llm_details=None,
-            )
+            return _llm_parse_result_from_row(row)
 
     def list_correspondents(self) -> list[str]:
         with self._session_factory() as session:

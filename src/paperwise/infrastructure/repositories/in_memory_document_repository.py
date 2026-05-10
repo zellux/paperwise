@@ -158,6 +158,26 @@ class InMemoryDocumentRepository(DocumentRepository):
             end = start + max(0, limit)
             return docs[start:end]
 
+    def list_owner_documents_with_llm_results(
+        self,
+        *,
+        owner_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[tuple[Document, LLMParseResult | None]]:
+        with self._lock:
+            docs = sorted(
+                (document for document in self._documents.values() if document.owner_id == owner_id),
+                key=lambda d: d.created_at,
+                reverse=True,
+            )
+            start = max(0, offset)
+            end = start + max(0, limit)
+            return [
+                (document, self._llm_parse_results.get(document.id))
+                for document in docs[start:end]
+            ]
+
     def delete_document(self, document_id: str) -> None:
         with self._lock:
             self._documents.pop(document_id, None)

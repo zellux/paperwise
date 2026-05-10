@@ -23,7 +23,7 @@ from paperwise.application.services.llm_preferences import (
     llm_provider_defaults_payload,
     ocr_llm_provider_defaults_payload,
 )
-from paperwise.domain.models import DocumentHistoryEvent, DocumentStatus, User
+from paperwise.domain.models import Document, DocumentHistoryEvent, DocumentStatus, LLMParseResult, User
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
@@ -123,11 +123,7 @@ def _page_initial_data(
     return initial_data
 
 
-def _document_list_item(repository: DocumentRepository, document_id: str) -> dict | None:
-    document = repository.get(document_id)
-    if document is None:
-        return None
-    llm_result = repository.get_llm_parse_result(document.id)
+def _document_list_item(document: Document, llm_result: LLMParseResult | None) -> dict:
     metadata = None
     if llm_result is not None:
         metadata = {
@@ -149,6 +145,13 @@ def _document_list_item(repository: DocumentRepository, document_id: str) -> dic
         "created_at": document.created_at.isoformat(),
         "llm_metadata": metadata,
     }
+
+
+def _document_list_item_by_id(repository: DocumentRepository, document_id: str) -> dict | None:
+    document = repository.get(document_id)
+    if document is None:
+        return None
+    return _document_list_item(document, repository.get_llm_parse_result(document.id))
 
 
 def _tag_stats_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
@@ -194,7 +197,7 @@ def _activity_initial_data(repository: DocumentRepository, current_user: User | 
         **initial_data,
         "activity_documents": [
             item
-            for item in (_document_list_item(repository, document.id) for document in ready_documents)
+            for item in (_document_list_item_by_id(repository, document.id) for document in ready_documents)
             if item is not None
         ],
         "activity_total_tokens": total_tokens,
@@ -222,7 +225,7 @@ def _activity_partial_data(
         **initial_data,
         "activity_documents": [
             item
-            for item in (_document_list_item(repository, document.id) for document in ready_documents)
+            for item in (_document_list_item_by_id(repository, document.id) for document in ready_documents)
             if item is not None
         ],
         "activity_total_tokens": total_tokens,
@@ -289,12 +292,8 @@ def _documents_initial_data(
     return {
         **initial_data,
         "documents": [
-            item
-            for item in (
-                _document_list_item(repository, document.id)
-                for document, _llm_result in matching_documents[offset : offset + normalized_page_size]
-            )
-            if item is not None
+            _document_list_item(document, llm_result)
+            for document, llm_result in matching_documents[offset : offset + normalized_page_size]
         ],
         "documents_total": documents_total,
         "documents_processing_count": processing_count,
@@ -316,7 +315,7 @@ def _pending_initial_data(repository: DocumentRepository, current_user: User | N
         **initial_data,
         "pending_documents": [
             item
-            for item in (_document_list_item(repository, document.id) for document in pending_documents)
+            for item in (_document_list_item_by_id(repository, document.id) for document in pending_documents)
             if item is not None
         ],
     }
@@ -336,9 +335,7 @@ def _document_detail_initial_data(
         current_user=current_user,
     )
     parse_result = repository.get_parse_result(document.id)
-    item = _document_list_item(repository, document.id)
-    if item is None:
-        return {**initial_data, "document_detail": None, "document_history": []}
+    item = _document_list_item(document, repository.get_llm_parse_result(document.id))
     return {
         **initial_data,
         "document_detail": {

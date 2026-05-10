@@ -49,3 +49,17 @@ def test_owner_taxonomy_stats_are_scoped_to_document_owner() -> None:
         ("Invoice", 1),
         ("Statement", 1),
     ]
+
+
+def test_list_owner_documents_with_llm_results_returns_owner_rows() -> None:
+    repository = InMemoryDocumentRepository()
+    repository.save(_document("owner-a-1", "owner-a"))
+    repository.save(_document("owner-b-1", "owner-b"))
+    repository.save_llm_parse_result(_llm_result("owner-a-1", "invoice", ["tax"]))
+    repository.save_llm_parse_result(_llm_result("owner-b-1", "statement", ["finance"]))
+
+    rows = repository.list_owner_documents_with_llm_results(owner_id="owner-a")
+
+    assert [(document.id, llm_result.document_type if llm_result else None) for document, llm_result in rows] == [
+        ("owner-a-1", "invoice")
+    ]

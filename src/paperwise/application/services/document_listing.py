@@ -53,13 +53,14 @@ def iter_filtered_documents(
     batch_size = 1000
     scan_offset = 0
     while True:
-        documents = repository.list_documents(limit=batch_size, offset=scan_offset)
-        if not documents:
+        documents_with_metadata = repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=batch_size,
+            offset=scan_offset,
+        )
+        if not documents_with_metadata:
             break
-        for document in documents:
-            if document.owner_id != current_user.id:
-                continue
-            llm_result = repository.get_llm_parse_result(document.id)
+        for document, llm_result in documents_with_metadata:
             if not _matches_document_filters(
                 document=document,
                 llm_result=llm_result,
@@ -71,7 +72,7 @@ def iter_filtered_documents(
             ):
                 continue
             yield document, llm_result
-        if len(documents) < batch_size:
+        if len(documents_with_metadata) < batch_size:
             break
         scan_offset += batch_size
 

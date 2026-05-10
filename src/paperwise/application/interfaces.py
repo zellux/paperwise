@@ -99,6 +99,15 @@ class DocumentStore(Protocol):
     def list_documents(self, limit: int = 100, *, offset: int = 0) -> list[Document]:
         """List recent documents."""
 
+    def list_owner_documents_with_llm_results(
+        self,
+        *,
+        owner_id: str,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[tuple[Document, LLMParseResult | None]]:
+        """List owner documents with optional LLM metadata in one repository call."""
+
     def delete_document(self, document_id: str) -> None:
         """Delete a document and all related records."""
 
