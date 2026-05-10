@@ -41,8 +41,6 @@ def get_llm_provider_name(llm_provider: LLMProvider | None) -> str | None:
         return "openai"
     if class_name == "SimpleLLMProvider":
         return "simple"
-    if class_name == "MissingOpenAIProvider":
-        return "missing_openai"
     if class_name.endswith("LLMProvider"):
         normalized = class_name[: -len("LLMProvider")].strip()
         if normalized:
