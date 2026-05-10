@@ -1,3 +1,5 @@
+from functools import lru_cache
+
 from fastapi import Cookie, Depends, HTTPException, status
 
 from paperwise.application.services.session_tokens import decode_session_token
@@ -21,41 +23,41 @@ from paperwise.infrastructure.repositories.postgres_document_repository import (
 )
 from paperwise.infrastructure.storage.local_storage import LocalStorageAdapter
 
-_ingestion_dispatcher: IngestionDispatcher = CeleryIngestionDispatcher()
-_settings = get_settings()
-_document_repository: DocumentRepository
-if _settings.repository_backend.lower() == "postgres":
-    _document_repository = PostgresDocumentRepository(_settings.postgres_url)
-else:
-    _document_repository = InMemoryDocumentRepository()
-_storage: StorageProvider = LocalStorageAdapter(_settings.object_store_root)
-_llm_provider: LLMProvider = MissingOpenAIProvider()
 SESSION_COOKIE_NAME = "paperwise_session"
 
 
+@lru_cache
 def settings_dependency() -> Settings:
-    return _settings
+    return get_settings()
 
 
+@lru_cache
 def document_repository_dependency() -> DocumentRepository:
-    return _document_repository
+    settings = settings_dependency()
+    if settings.repository_backend.lower() == "postgres":
+        return PostgresDocumentRepository(settings.postgres_url)
+    return InMemoryDocumentRepository()
 
 
+@lru_cache
 def ingestion_dispatcher_dependency() -> IngestionDispatcher:
-    return _ingestion_dispatcher
+    return CeleryIngestionDispatcher()
 
 
+@lru_cache
 def storage_dependency() -> StorageProvider:
-    return _storage
+    return LocalStorageAdapter(settings_dependency().object_store_root)
 
 
+@lru_cache
 def llm_provider_dependency() -> LLMProvider:
-    return _llm_provider
+    return MissingOpenAIProvider()
 
 
 def current_user_dependency(
     session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
     repository: DocumentRepository = Depends(document_repository_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> User:
     token = ""
     if session_token:
@@ -65,7 +67,7 @@ def current_user_dependency(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Authentication required",
         )
-    payload = decode_session_token(token=token, secret=_settings.auth_secret)
+    payload = decode_session_token(token=token, secret=settings.auth_secret)
     if payload is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -83,11 +85,13 @@ def current_user_dependency(
 def optional_current_user_dependency(
     session_token: str | None = Cookie(default=None, alias=SESSION_COOKIE_NAME),
     repository: DocumentRepository = Depends(document_repository_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> User | None:
     try:
         return current_user_dependency(
             session_token=session_token,
             repository=repository,
+            settings=settings,
         )
     except HTTPException:
         return None
