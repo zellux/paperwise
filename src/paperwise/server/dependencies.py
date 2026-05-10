@@ -15,12 +15,7 @@ from paperwise.infrastructure.config import Settings, get_settings
 from paperwise.infrastructure.dispatchers.celery_ingestion_dispatcher import (
     CeleryIngestionDispatcher,
 )
-from paperwise.infrastructure.repositories.in_memory_document_repository import (
-    InMemoryDocumentRepository,
-)
-from paperwise.infrastructure.repositories.postgres_document_repository import (
-    PostgresDocumentRepository,
-)
+from paperwise.infrastructure.factories import build_document_repository, build_llm_provider
 from paperwise.infrastructure.storage.local_storage import LocalStorageAdapter
 
 SESSION_COOKIE_NAME = "paperwise_session"
@@ -33,10 +28,7 @@ def settings_dependency() -> Settings:
 
 @lru_cache
 def document_repository_dependency() -> DocumentRepository:
-    settings = settings_dependency()
-    if settings.repository_backend.lower() == "postgres":
-        return PostgresDocumentRepository(settings.postgres_url)
-    return InMemoryDocumentRepository()
+    return build_document_repository(settings_dependency())
 
 
 @lru_cache
@@ -50,7 +42,7 @@ def storage_dependency() -> StorageProvider:
 
 
 def llm_provider_dependency() -> LLMProvider | None:
-    return None
+    return build_llm_provider(settings_dependency())
 
 
 def current_user_dependency(

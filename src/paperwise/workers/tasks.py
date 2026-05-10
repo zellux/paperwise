@@ -24,12 +24,7 @@ from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.domain.models import DocumentStatus, HistoryActorType
 from paperwise.infrastructure.config import get_settings
-from paperwise.infrastructure.repositories.in_memory_document_repository import (
-    InMemoryDocumentRepository,
-)
-from paperwise.infrastructure.repositories.postgres_document_repository import (
-    PostgresDocumentRepository,
-)
+from paperwise.infrastructure.factories import build_document_repository, build_llm_provider
 from paperwise.workers.celery_app import celery_app
 
 logger = get_task_logger(__name__)
@@ -37,13 +32,11 @@ settings = get_settings()
 
 
 def _build_repository() -> DocumentRepository:
-    if settings.repository_backend.lower() == "postgres":
-        return PostgresDocumentRepository(settings.postgres_url)
-    return InMemoryDocumentRepository()
+    return build_document_repository(settings)
 
 
 def _build_llm_provider() -> LLMProvider | None:
-    return None
+    return build_llm_provider(settings)
 
 
 def _resolve_llm_provider_from_preferences(
@@ -83,15 +76,8 @@ def _resolve_ocr_llm_provider_for_owner(
 ) -> LLMProvider | None:
     if ocr_provider == "tesseract":
         return None
-    preferences = load_user_preferences(repository=repository, user_id=owner_id)
-    if ocr_provider == "llm_separate":
-        return _resolve_llm_provider_from_preferences(
-            preferences=preferences,
-            provider_override=provider_override,
-            task=LLM_TASK_OCR,
-        )
     return _resolve_llm_provider_from_preferences(
-        preferences=preferences,
+        preferences=load_user_preferences(repository=repository, user_id=owner_id),
         provider_override=provider_override,
         task=LLM_TASK_OCR,
     )
