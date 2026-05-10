@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+import re
 
 from fastapi.responses import HTMLResponse
 
@@ -104,12 +105,15 @@ def render_ui_page(
     if initial_data is not None:
         html = _render_initial_page_data(html, initial_data)
         if initial_data.get("authenticated") is True:
-            html = html.replace('<html lang="en">', '<html lang="en" class="has-session">', 1)
+            html = _render_authenticated_html_class(html)
         payload = json.dumps(initial_data, ensure_ascii=True).replace("</", "<\\/")
         initial_data_script = (
             f'    <script id="paperwiseInitialData" type="application/json">{payload}</script>'
         )
-    html = html.replace("{{initial_data_script}}", initial_data_script)
+    html = render_template_placeholders(
+        html,
+        {"initial_data_script": initial_data_script},
+    )
 
     return HTMLResponse(
         html,
@@ -207,6 +211,19 @@ def _apply_layout_replacements(
         "content": content,
         "initial_data_script": initial_data_script,
     }
-    for key, value in replacements.items():
-        html = html.replace(f"{{{{{key}}}}}", value)
-    return html
+    return render_template_placeholders(html, replacements)
+
+
+def render_template_placeholders(template: str, values: dict[str, object]) -> str:
+    rendered = template
+    for key, value in values.items():
+        rendered = rendered.replace(f"{{{{{key}}}}}", str(value))
+    return rendered
+
+
+def _render_authenticated_html_class(html: str) -> str:
+    return html.replace('<html lang="en">', '<html lang="en" class="has-session">', 1)
+
+
+def find_template_placeholders(html: str) -> list[str]:
+    return sorted(set(re.findall(r"{{([a-zA-Z0-9_]+)}}", html)))

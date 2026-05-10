@@ -19,6 +19,7 @@ from paperwise.domain.models import (
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from paperwise.server.dependencies import document_repository_dependency
 from paperwise.server.main import app
+from paperwise.server.ui_page import find_template_placeholders
 
 
 def _initial_data_from_response(html: str) -> dict:
@@ -128,6 +129,7 @@ def test_ui_routes_serve_page_html() -> None:
         assert response.status_code == 200
         assert "text/html" in response.headers.get("content-type", "")
         assert "<!doctype html>" in response.text.lower()
+        assert find_template_placeholders(response.text) == []
 
 
 def test_ui_html_is_split_into_layout_and_partials() -> None:
