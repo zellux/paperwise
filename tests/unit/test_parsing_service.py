@@ -206,6 +206,32 @@ def test_parse_document_blob_llm_timeout_falls_back_to_extracted_text(tmp_path) 
     assert "Readable sample OCR text" in result.text_preview
 
 
+def test_parse_document_blob_pdf_render_failure_uses_text_ocr_fallback(tmp_path, monkeypatch) -> None:
+    blob = tmp_path / "sample.pdf"
+    blob.write_bytes(b"%PDF-1.7\nReadable sample OCR text\n/Type /Page")
+    llm = RecordingOCRLLM("Text OCR fallback")
+
+    def fail_render(**kwargs):
+        del kwargs
+        raise RuntimeError("pdftoppm failed")
+
+    monkeypatch.setattr(parsing_module, "_render_pdf_pages_to_data_urls", fail_render)
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.image_calls == 0
+    assert llm.calls == 1
+    assert result.text_preview == "Text OCR fallback"
+    assert result.ocr_details is not None
+    assert result.ocr_details["attempts"]["llm_vision"]["succeeded"] is False
+    assert result.ocr_details["attempts"]["llm_text"]["succeeded"] is True
+
+
 def test_parse_document_blob_auto_switch_uses_llm_for_low_quality_text(tmp_path, monkeypatch) -> None:
     blob = tmp_path / "low-quality.pdf"
     blob.write_bytes(b"%PDF-1.7\nshort\n/Type /Page")
