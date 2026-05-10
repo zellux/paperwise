@@ -11,6 +11,30 @@ async function refreshDocumentRelatedLists(options = {}) {
   }
 }
 
+function hydrateInitialDocumentData(initialData) {
+  const detail = initialData.document_detail;
+  const documentId = String(detail?.document?.id || "").trim();
+  if (initialData.authenticated !== true || !documentId) {
+    return false;
+  }
+  currentDocumentId = documentId;
+  logActivity(`Opened document ${currentDocumentId}`);
+  return true;
+}
+
+window.initializePaperwisePage = async ({ authenticated, initialData }) => {
+  if (authenticated !== true) {
+    return;
+  }
+  if (hydrateInitialDocumentData(initialData || {})) {
+    return;
+  }
+  currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";
+  if (currentDocumentId) {
+    await openDocumentView(currentDocumentId);
+  }
+};
+
 documentMetaForm?.addEventListener("submit", async (event) => {
   event.preventDefault();
   if (!currentDocumentId) {

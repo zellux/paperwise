@@ -79,7 +79,7 @@ _PAGE_PARTIAL_BY_NAME = {
 }
 _PAGE_SCRIPTS_BY_VIEW = {
     "section-docs": ["documents.js"],
-    "section-document": ["document.js"],
+    "section-document": ["single-document.js"],
     "section-search": ["search.js"],
     "section-tags": ["catalog.js"],
     "section-document-types": ["catalog.js"],

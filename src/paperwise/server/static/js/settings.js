@@ -619,3 +619,12 @@ settingsChangePasswordBtn?.addEventListener("click", async () => {
     setSettingsPasswordStatus(error.message || "Failed to update password.", "error");
   }
 });
+
+window.initializePaperwisePage = async ({ authenticated }) => {
+  if (authenticated !== true) {
+    return;
+  }
+  if (!hydrateSettingsFormFromInitialPreferences()) {
+    refreshSettingsForm();
+  }
+};

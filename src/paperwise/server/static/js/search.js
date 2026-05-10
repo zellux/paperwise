@@ -1077,10 +1077,13 @@ async function runAsk() {
   }
 }
 
-async function initializeSearchView() {
+window.initializePaperwisePage = async ({ authenticated }) => {
+  if (authenticated !== true) {
+    return;
+  }
   await loadSearchAskThreads();
   renderSearchResultsMeta("Ready.");
-}
+};
 
 searchKeywordForm?.addEventListener("submit", async (event) => {
   event.preventDefault();

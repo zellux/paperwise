@@ -2,6 +2,7 @@ const restartPendingBtn = document.getElementById("restartPendingBtn");
 const pendingTableBody = document.getElementById("pendingTableBody");
 
 let pendingDocsRequestSeq = 0;
+let initialPendingHydrated = false;
 
 function setRestartPendingButtonEnabled(enabled) {
   if (!restartPendingBtn) {
@@ -47,9 +48,33 @@ async function loadPendingDocuments() {
   logActivity(`Loaded ${payload.pending_documents.length} pending document(s)`);
 }
 
-async function initializePendingView() {
-  await loadPendingDocuments();
+function hydrateInitialPendingData(initialData) {
+  if (initialPendingHydrated) {
+    return true;
+  }
+  if (
+    initialData.authenticated !== true ||
+    !Array.isArray(initialData.pending_documents)
+  ) {
+    return false;
+  }
+  setRestartPendingButtonEnabled(
+    initialData.pending_documents.some((doc) => isRestartablePendingDocument(doc))
+  );
+  logActivity(`Loaded ${initialData.pending_documents.length} pending document(s)`);
+  initialPendingHydrated = true;
+  return true;
 }
+
+window.initializePaperwisePage = async ({ authenticated, initialData }) => {
+  if (authenticated !== true) {
+    return;
+  }
+  if (hydrateInitialPendingData(initialData || {})) {
+    return;
+  }
+  await loadPendingDocuments();
+};
 
 restartPendingBtn?.addEventListener("click", async () => {
   if (restartPendingBtn.disabled) {

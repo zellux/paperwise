@@ -189,7 +189,7 @@ def test_ui_routes_load_page_specific_scripts() -> None:
     client = TestClient(app)
 
     assert "/static/js/documents.js" in client.get("/ui/documents").text
-    assert "/static/js/document.js" in client.get("/ui/document").text
+    assert "/static/js/single-document.js" in client.get("/ui/document").text
     assert "/static/js/search.js" in client.get("/ui/search").text
     assert "/static/js/search.js" in client.get("/ui/grounded-qa").text
     assert "/static/js/catalog.js" in client.get("/ui/tags").text
@@ -235,8 +235,24 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "PATH_TO_VIEW_ID" not in app_js.text
     assert "getCurrentPathViewId" not in app_js.text
     assert "loadDataForCurrentView" not in app_js.text
-    assert "currentPageKey" in app_js.text
-    assert "PATH_TO_PAGE_KEY" in app_js.text
+    assert "currentPageKey" not in app_js.text
+    assert "PATH_TO_PAGE_KEY" not in app_js.text
+    assert "loadDataForCurrentPage" not in app_js.text
+    assert "initializeCurrentPageData" in app_js.text
+    assert "initializePaperwisePage" in app_js.text
+
+    for script_name in [
+        "documents.js",
+        "single-document.js",
+        "catalog.js",
+        "search.js",
+        "pending.js",
+        "activity.js",
+        "settings.js",
+    ]:
+        script = client.get(f"/static/js/{script_name}")
+        assert script.status_code == 200
+        assert "initializePaperwisePage" in script.text
 
 
 def test_static_assets_do_not_render_document_pagination_controls() -> None:

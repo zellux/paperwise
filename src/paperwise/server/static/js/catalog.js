@@ -5,6 +5,8 @@ let tagStatsSort = { field: "", direction: "" };
 let documentTypesSort = { field: "", direction: "" };
 let tagStatsRequestSeq = 0;
 let documentTypeStatsRequestSeq = 0;
+let initialTagStatsHydrated = false;
+let initialDocumentTypesHydrated = false;
 
 function clearCatalogStateForSession() {
   tagStatsSort = { field: "", direction: "" };
@@ -69,13 +71,52 @@ async function loadDocumentTypeStats() {
   logActivity(`Loaded ${payload.document_type_stats.length} document type(s)`);
 }
 
-async function initializeTagsView() {
-  await loadTagStats();
+function hydrateInitialTagStats(initialData) {
+  if (initialTagStatsHydrated) {
+    return true;
+  }
+  if (
+    initialData.authenticated !== true ||
+    !Array.isArray(initialData.tag_stats)
+  ) {
+    return false;
+  }
+  renderSortHeaders();
+  logActivity(`Loaded ${initialData.tag_stats.length} tag(s)`);
+  initialTagStatsHydrated = true;
+  return true;
 }
 
-async function initializeDocumentTypesView() {
-  await loadDocumentTypeStats();
+function hydrateInitialDocumentTypes(initialData) {
+  if (initialDocumentTypesHydrated) {
+    return true;
+  }
+  if (
+    initialData.authenticated !== true ||
+    !Array.isArray(initialData.document_type_stats)
+  ) {
+    return false;
+  }
+  renderSortHeaders();
+  logActivity(`Loaded ${initialData.document_type_stats.length} document type(s)`);
+  initialDocumentTypesHydrated = true;
+  return true;
 }
+
+window.initializePaperwisePage = async ({ authenticated, initialData }) => {
+  if (authenticated !== true) {
+    return;
+  }
+  if (tagsTableBody) {
+    if (!hydrateInitialTagStats(initialData || {})) {
+      await loadTagStats();
+    }
+    return;
+  }
+  if (documentTypesTableBody && !hydrateInitialDocumentTypes(initialData || {})) {
+    await loadDocumentTypeStats();
+  }
+};
 
 for (const header of sortableHeaders) {
   const button = header.querySelector(".table-sort-button");

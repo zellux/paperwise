@@ -1,3 +1,34 @@
+let initialDocumentsHydrated = false;
+
+function hydrateInitialDocumentsData(initialData) {
+  if (initialDocumentsHydrated) {
+    return true;
+  }
+  if (
+    initialData.authenticated !== true ||
+    !Array.isArray(initialData.documents)
+  ) {
+    return false;
+  }
+  docsTotalCount = Number(initialData.documents_total || initialData.documents.length || 0);
+  docsPage = Math.max(1, Number(initialData.documents_page || docsPage || 1));
+  docsPageSize = normalizePageSize(initialData.documents_page_size || docsPageSize);
+  refreshFilterOptionsFromDocuments(initialData.documents);
+  logActivity(`Loaded ${initialData.documents.length} document(s) of ${docsTotalCount} total`);
+  initialDocumentsHydrated = true;
+  return true;
+}
+
+window.initializePaperwisePage = async ({ authenticated, initialData }) => {
+  if (authenticated !== true) {
+    return;
+  }
+  if (hydrateInitialDocumentsData(initialData || {})) {
+    return;
+  }
+  await loadDocumentsList();
+};
+
 docsFilterForm?.addEventListener("submit", (event) => {
   event.preventDefault();
 });

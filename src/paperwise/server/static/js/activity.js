@@ -2,6 +2,7 @@ const processedDocsTableBody = document.getElementById("processedDocsTableBody")
 const activityTokenTotal = document.getElementById("activityTokenTotal");
 
 let processedActivityRequestSeq = 0;
+let initialActivityHydrated = false;
 
 function renderActivityTokenTotal(totalTokens) {
   if (!activityTokenTotal) {
@@ -42,6 +43,28 @@ async function loadProcessedDocumentsActivity() {
   logActivity(`Loaded ${payload.activity_documents.length} latest processed document(s).`);
 }
 
-async function initializeActivityView() {
-  await loadProcessedDocumentsActivity();
+function hydrateInitialActivityData(initialData) {
+  if (initialActivityHydrated) {
+    return true;
+  }
+  if (
+    initialData.authenticated !== true ||
+    !Array.isArray(initialData.activity_documents)
+  ) {
+    return false;
+  }
+  renderActivityTokenTotal(Number(initialData.activity_total_tokens || 0));
+  logActivity(`Loaded ${initialData.activity_documents.length} latest processed document(s).`);
+  initialActivityHydrated = true;
+  return true;
 }
+
+window.initializePaperwisePage = async ({ authenticated, initialData }) => {
+  if (authenticated !== true) {
+    return;
+  }
+  if (hydrateInitialActivityData(initialData || {})) {
+    return;
+  }
+  await loadProcessedDocumentsActivity();
+};

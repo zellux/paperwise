@@ -73,22 +73,6 @@ const docsTableBody = document.getElementById("docsTableBody");
 const sortableHeaders = [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
 const filterDropdownState = new Map();
 let activeFilterDropdown = null;
-let currentPageKey = "documents";
-const PATH_TO_PAGE_KEY = {
-  "/ui/documents": "documents",
-  "/ui/document": "document",
-  "/ui/search": "search",
-  "/ui/grounded-qa": "search",
-  "/ui/tags": "tags",
-  "/ui/document-types": "document-types",
-  "/ui/pending": "pending",
-  "/ui/upload": "upload",
-  "/ui/activity": "activity",
-  "/ui/settings": "settings",
-  "/ui/settings/account": "settings",
-  "/ui/settings/display": "settings",
-  "/ui/settings/models": "settings",
-};
 let currentDocumentId = "";
 let currentUser = null;
 const SUPPORTED_THEMES = ["atlas", "ledger", "moss", "ember", "folio", "forge"];
@@ -151,7 +135,6 @@ let groundedQaMaxDocuments = 12;
 let docsTotalCount = 0;
 let docsListRequestSeq = 0;
 let initialDataCache;
-const initialPageDataHydrated = new Set();
 let initialUserPreferencesConsumed = false;
 
 function normalizePageSize(value) {
@@ -806,7 +789,6 @@ function clearSession() {
     document_type: [],
     status: ["ready"],
   });
-  currentPageKey = "documents";
   if (typeof clearSearchStateForSession === "function") {
     clearSearchStateForSession();
   }
@@ -855,11 +837,6 @@ function restoreSession() {
     return;
   }
   clearSession();
-}
-
-function getCurrentPageKey() {
-  const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  return PATH_TO_PAGE_KEY[path] || "documents";
 }
 
 function splitTags(value) {
@@ -1259,7 +1236,6 @@ function buildDocumentsUrl() {
 
 function readFiltersFromUrl() {
   const params = new URLSearchParams(window.location.search);
-  const path = window.location.pathname.replace(/\/+$/, "") || "/";
   docsFilters.q = String(params.get("q") || "").trim();
   docsFilters.tag = unique(params.getAll("tag"));
   docsFilters.correspondent = unique(params.getAll("correspondent"));
@@ -1277,7 +1253,6 @@ function readFiltersFromUrl() {
     },
     DOCS_SORT_FIELDS
   );
-  currentPageKey = getCurrentPageKey();
 }
 
 function navigateToDocumentsPageFromState() {
@@ -1317,7 +1292,7 @@ async function deleteDocumentById(documentId, options = {}) {
 
   const visibleDocRows = docsTableBody?.querySelectorAll("tr[data-doc-id]").length || 0;
   const shouldStepBackPage =
-    currentPageKey === "documents" && docsPage > 1 && visibleDocRows <= 1;
+    Boolean(docsTableBody) && docsPage > 1 && visibleDocRows <= 1;
 
   const response = await apiFetch(`/documents/${documentId}`, {
     method: "DELETE",
@@ -1337,7 +1312,7 @@ async function deleteDocumentById(documentId, options = {}) {
     return true;
   }
 
-  await loadDataForCurrentPage();
+  await initializeCurrentPageData();
 
   logActivity(`Deleted document ${documentId}.`);
   return true;
@@ -1459,118 +1434,14 @@ function renderTableLoading(tbody, colspan, message) {
   tbody.innerHTML = `<tr><td colspan="${colspan}">${message}</td></tr>`;
 }
 
-function hydrateInitialPageDataForCurrentPage() {
-  if (initialPageDataHydrated.has(currentPageKey)) {
-    return true;
-  }
-  const initialData = readInitialData();
-  if (initialData.authenticated !== true) {
-    return false;
-  }
-
-  if (currentPageKey === "documents" && Array.isArray(initialData.documents)) {
-    docsTotalCount = Number(initialData.documents_total || initialData.documents.length || 0);
-    docsPage = Math.max(1, Number(initialData.documents_page || docsPage || 1));
-    docsPageSize = normalizePageSize(initialData.documents_page_size || docsPageSize);
-    refreshFilterOptionsFromDocuments(initialData.documents);
-    logActivity(`Loaded ${initialData.documents.length} document(s) of ${docsTotalCount} total`);
-    initialPageDataHydrated.add(currentPageKey);
-    return true;
-  }
-
-  if (currentPageKey === "tags" && Array.isArray(initialData.tag_stats)) {
-    renderSortHeaders();
-    logActivity(`Loaded ${initialData.tag_stats.length} tag(s)`);
-    initialPageDataHydrated.add(currentPageKey);
-    return true;
-  }
-
-  if (currentPageKey === "document-types" && Array.isArray(initialData.document_type_stats)) {
-    renderSortHeaders();
-    logActivity(`Loaded ${initialData.document_type_stats.length} document type(s)`);
-    initialPageDataHydrated.add(currentPageKey);
-    return true;
-  }
-
-  if (currentPageKey === "activity" && Array.isArray(initialData.activity_documents)) {
-    if (typeof renderActivityTokenTotal === "function") {
-      renderActivityTokenTotal(Number(initialData.activity_total_tokens || 0));
-    }
-    logActivity(`Loaded ${initialData.activity_documents.length} latest processed document(s).`);
-    initialPageDataHydrated.add(currentPageKey);
-    return true;
-  }
-
-  if (currentPageKey === "pending" && Array.isArray(initialData.pending_documents)) {
-    const hasRestartable =
-      typeof isRestartablePendingDocument === "function" &&
-      initialData.pending_documents.some((doc) => isRestartablePendingDocument(doc));
-    if (typeof setRestartPendingButtonEnabled === "function") {
-      setRestartPendingButtonEnabled(hasRestartable);
-    }
-    logActivity(`Loaded ${initialData.pending_documents.length} pending document(s)`);
-    initialPageDataHydrated.add(currentPageKey);
-    return true;
-  }
-
-  if (currentPageKey === "document" && initialData.document_detail?.document?.id) {
-    currentDocumentId = String(initialData.document_detail.document.id || "");
-    logActivity(`Opened document ${currentDocumentId}`);
-    initialPageDataHydrated.add(currentPageKey);
-    return true;
-  }
-
-  return false;
-}
-
-async function loadDataForCurrentPage() {
-  if (hydrateInitialPageDataForCurrentPage()) {
+async function initializeCurrentPageData() {
+  if (typeof window.initializePaperwisePage !== "function") {
     return;
   }
-  if (currentPageKey === "tags") {
-    if (typeof initializeTagsView === "function") {
-      await initializeTagsView();
-    }
-    return;
-  }
-  if (currentPageKey === "document-types") {
-    if (typeof initializeDocumentTypesView === "function") {
-      await initializeDocumentTypesView();
-    }
-    return;
-  }
-  if (currentPageKey === "activity") {
-    if (typeof initializeActivityView === "function") {
-      await initializeActivityView();
-    }
-    return;
-  }
-  if (currentPageKey === "pending") {
-    if (typeof initializePendingView === "function") {
-      await initializePendingView();
-    }
-    return;
-  }
-  if (currentPageKey === "search") {
-    if (typeof initializeSearchView === "function") {
-      await initializeSearchView();
-    }
-    return;
-  }
-  if (currentPageKey === "document" && currentDocumentId) {
-    await openDocumentView(currentDocumentId);
-    return;
-  }
-  if (currentPageKey === "settings") {
-    if (!hydrateSettingsFormFromInitialPreferences()) {
-      refreshSettingsForm();
-    }
-    return;
-  }
-  if (currentPageKey === "upload") {
-    return;
-  }
-  await loadDocumentsList();
+  await window.initializePaperwisePage({
+    authenticated: Boolean(currentUser),
+    initialData: readInitialData(),
+  });
 }
 
 async function openDocumentView(documentId) {
@@ -1638,7 +1509,7 @@ signInForm?.addEventListener("submit", async (event) => {
     setAuthMessage(`Signed in as ${payload.user.email}.`);
     await hydrateUserPreferencesForSession();
     applyFiltersToControls();
-    await loadDataForCurrentPage();
+    await initializeCurrentPageData();
   } catch (error) {
     setAuthMessage(error.message || "Failed to sign in.", true);
   }
@@ -1681,7 +1552,7 @@ registerForm?.addEventListener("submit", async (event) => {
     setAuthMessage(`Registered ${registerPayload.email}.`);
     await hydrateUserPreferencesForSession();
     applyFiltersToControls();
-    await loadDataForCurrentPage();
+    await initializeCurrentPageData();
   } catch (error) {
     setAuthMessage(error.message || "Failed to create account.", true);
   }
@@ -1717,11 +1588,8 @@ async function initializeApp() {
   refreshSettingsForm();
   renderSortHeaders();
   refreshUploadAvailability();
-  if (currentPageKey === "document") {
-    currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";
-  }
-  loadDataForCurrentPage().catch((error) => {
-    logActivity(`Initial ${currentPageKey} load failed: ${error.message}`);
+  initializeCurrentPageData().catch((error) => {
+    logActivity(`Initial page load failed: ${error.message}`);
   });
 }
 
