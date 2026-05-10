@@ -23,6 +23,7 @@ from paperwise.application.services.pending_documents import (
     list_pending_documents,
 )
 from paperwise.application.services.chat_threads import migrate_legacy_chat_threads
+from paperwise.application.services.taxonomy_stats import sort_stat_rows
 from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult, User
 from paperwise.server.dependencies import (
@@ -375,22 +376,6 @@ def _document_detail_initial_data(
             for event in repository.list_history(document_id=document.id, limit=100)
         ],
     }
-
-
-def _sort_stat_rows(items: list[dict], *, sort_by: str | None, sort_dir: str | None) -> list[dict]:
-    field = str(sort_by or "").strip()
-    direction = str(sort_dir or "").strip().lower()
-    if direction not in {"asc", "desc"}:
-        return items
-    if field not in {"tag", "document_type", "document_count"}:
-        return items
-    return sorted(
-        items,
-        key=lambda item: (
-            item.get(field, "") if field == "document_count" else str(item.get(field, "")).casefold()
-        ),
-        reverse=direction == "desc",
-    )
 
 
 def _history_event_item(event: DocumentHistoryEvent) -> dict:
@@ -816,7 +801,7 @@ def tags_partial(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> JSONResponse:
-    tag_stats = _sort_stat_rows(
+    tag_stats = sort_stat_rows(
         _tag_stats(repository, current_user),
         sort_by=sort_by,
         sort_dir=sort_dir,
@@ -837,7 +822,7 @@ def document_types_partial(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> JSONResponse:
-    document_type_stats = _sort_stat_rows(
+    document_type_stats = sort_stat_rows(
         _document_type_stats(repository, current_user),
         sort_by=sort_by,
         sort_dir=sort_dir,

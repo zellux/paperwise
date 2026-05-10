@@ -30,6 +30,27 @@ def correspondent_stats_from_metadata(items: Iterable[Any]) -> list[tuple[str, i
     return _single_value_stats(items, "correspondent", title_case=False)
 
 
+def sort_stat_rows(
+    items: list[dict[str, Any]],
+    *,
+    sort_by: str | None,
+    sort_dir: str | None,
+) -> list[dict[str, Any]]:
+    field = str(sort_by or "").strip()
+    direction = str(sort_dir or "").strip().lower()
+    if direction not in {"asc", "desc"}:
+        return items
+    if field not in {"tag", "document_type", "document_count"}:
+        return items
+    return sorted(
+        items,
+        key=lambda item: (
+            item.get(field, "") if field == "document_count" else str(item.get(field, "")).casefold()
+        ),
+        reverse=direction == "desc",
+    )
+
+
 def _single_value_stats(
     items: Iterable[Any],
     attr_name: str,
