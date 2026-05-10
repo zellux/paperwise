@@ -20,6 +20,7 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     llm_provider_dependency,
 )
+from paperwise.server.collection_access import get_collection_or_404
 from paperwise.server.llm_provider import resolve_http_llm_provider_for_user
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -54,6 +55,18 @@ class CollectionResponse(BaseModel):
             document_count=document_count,
             created_at=collection.created_at,
             updated_at=collection.updated_at,
+        )
+
+    @classmethod
+    def from_repository(
+        cls,
+        *,
+        repository: DocumentRepository,
+        collection: Collection,
+    ) -> "CollectionResponse":
+        return cls.from_domain(
+            collection=collection,
+            document_count=len(repository.list_collection_document_ids(collection.id)),
         )
 
 
@@ -173,30 +186,6 @@ class AskResponse(BaseModel):
     insufficient_evidence: bool
     citations: list[AskCitationResponse]
     debug: dict[str, Any] | None = None
-
-
-def _to_collection_response(
-    *,
-    repository: DocumentRepository,
-    collection: Collection,
-) -> CollectionResponse:
-    document_count = len(repository.list_collection_document_ids(collection.id))
-    return CollectionResponse.from_domain(
-        collection=collection,
-        document_count=document_count,
-    )
-
-
-def _get_collection_or_404(
-    *,
-    collection_id: str,
-    repository: DocumentRepository,
-    current_user: User,
-) -> Collection:
-    collection = repository.get_collection(collection_id)
-    if collection is None or collection.owner_id != current_user.id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
-    return collection
 
 
 def _ask_grounded(
@@ -379,7 +368,7 @@ def create_collection_endpoint(
         updated_at=now,
     )
     repository.create_collection(collection)
-    return _to_collection_response(repository=repository, collection=collection)
+    return CollectionResponse.from_repository(repository=repository, collection=collection)
 
 
 @router.get("", response_model=list[CollectionResponse])
@@ -388,7 +377,7 @@ def list_collections_endpoint(
     current_user: User = Depends(current_user_dependency),
 ) -> list[CollectionResponse]:
     collections = repository.list_collections(current_user.id)
-    return [_to_collection_response(repository=repository, collection=item) for item in collections]
+    return [CollectionResponse.from_repository(repository=repository, collection=item) for item in collections]
 
 
 @router.get("/{collection_id}", response_model=CollectionResponse)
@@ -397,12 +386,12 @@ def get_collection_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> CollectionResponse:
-    collection = _get_collection_or_404(
+    collection = get_collection_or_404(
         collection_id=collection_id,
         repository=repository,
         current_user=current_user,
     )
-    return _to_collection_response(repository=repository, collection=collection)
+    return CollectionResponse.from_repository(repository=repository, collection=collection)
 
 
 @router.delete("/{collection_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -411,7 +400,7 @@ def delete_collection_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> None:
-    _get_collection_or_404(
+    get_collection_or_404(
         collection_id=collection_id,
         repository=repository,
         current_user=current_user,
@@ -425,7 +414,7 @@ def list_collection_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> CollectionDocumentIdsResponse:
-    _get_collection_or_404(
+    get_collection_or_404(
         collection_id=collection_id,
         repository=repository,
         current_user=current_user,
@@ -443,7 +432,7 @@ def add_collection_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> CollectionDocumentIdsResponse:
-    _get_collection_or_404(
+    get_collection_or_404(
         collection_id=collection_id,
         repository=repository,
         current_user=current_user,
@@ -474,7 +463,7 @@ def remove_collection_document_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> CollectionDocumentIdsResponse:
-    _get_collection_or_404(
+    get_collection_or_404(
         collection_id=collection_id,
         repository=repository,
         current_user=current_user,
@@ -521,7 +510,7 @@ def search_collection_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> SearchResponse:
-    _get_collection_or_404(
+    get_collection_or_404(
         collection_id=collection_id,
         repository=repository,
         current_user=current_user,
@@ -598,7 +587,7 @@ def ask_collection_documents_endpoint(
     provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> AskResponse:
-    _get_collection_or_404(
+    get_collection_or_404(
         collection_id=collection_id,
         repository=repository,
         current_user=current_user,
