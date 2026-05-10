@@ -768,7 +768,35 @@
                         <th>Test</th>
                       </tr>
                     </thead>
-                    <tbody id="settingsModelSummary"></tbody>
+                    <tbody id="settingsModelSummary">
+                      <tr data-summary-task="metadata">
+                        <td>Metadata Extraction</td>
+                        <td data-summary-connection>-</td>
+                        <td data-summary-configuration>Not configured</td>
+                        <td>
+                          <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="metadata">Test</button>
+                          <span class="settings-inline-status" data-summary-status aria-live="polite"></span>
+                        </td>
+                      </tr>
+                      <tr data-summary-task="grounded_qa">
+                        <td>Search and Ask Your Docs</td>
+                        <td data-summary-connection>-</td>
+                        <td data-summary-configuration>Not configured</td>
+                        <td>
+                          <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="grounded_qa">Test</button>
+                          <span class="settings-inline-status" data-summary-status aria-live="polite"></span>
+                        </td>
+                      </tr>
+                      <tr data-summary-task="ocr">
+                        <td>OCR</td>
+                        <td data-summary-connection>-</td>
+                        <td data-summary-configuration>Not configured</td>
+                        <td>
+                          <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="ocr">Test</button>
+                          <span class="settings-inline-status" data-summary-status aria-live="polite"></span>
+                        </td>
+                      </tr>
+                    </tbody>
                   </table>
                 </div>
               </section>

@@ -27,63 +27,70 @@ function renderSettingsForm() {
   renderTaskRoutingControls();
   renderModelConfigSummary();
   syncTaskRoutingVisibility();
+  bindModelConfigSummaryActions();
   setActiveSettingsSection(settingsActiveSectionId);
   refreshLocalOcrStatus().catch(() => {});
   setSettingsPasswordStatus("");
   refreshUploadAvailability();
 }
 
-function formatModelSummaryTestCell(task, disabled = false) {
+function updateModelSummaryTestCell(rowEl, task) {
   const status = taskTestStatuses.get(task) || { message: "", tone: "" };
-  const toneClass = status.tone === "success" ? "is-success" : status.tone === "error" ? "is-error" : "";
   const isTesting = taskTestsInFlight.has(task);
-  return `
-    <td>
-      <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="${escapeHtml(task)}"${disabled || isTesting ? " disabled" : ""}>${isTesting ? "Testing..." : "Test"}</button>
-      <span class="settings-inline-status ${toneClass}">${escapeHtml(status.message || "")}</span>
-    </td>
-  `;
-}
-
-function formatModelSummaryRow(label, task, settings, extra = "") {
-  if (!settings) {
-    return `<tr><td>${escapeHtml(label)}</td><td>-</td><td>Not configured</td>${formatModelSummaryTestCell(task)}</tr>`;
+  const buttonEl = rowEl.querySelector("[data-task-test]");
+  if (buttonEl) {
+    buttonEl.disabled = isTesting;
+    buttonEl.textContent = isTesting ? "Testing..." : "Test";
   }
-  const detail = `${settings.model}${extra ? `, ${extra}` : ""}`;
-  return `<tr><td>${escapeHtml(label)}</td><td>${escapeHtml(settings.connection_name)}</td><td>${escapeHtml(detail)}</td>${formatModelSummaryTestCell(task)}</tr>`;
-}
-
-function formatLocalOcrSummaryRow() {
-  return `<tr><td>OCR</td><td>Local</td><td>local only</td>${formatModelSummaryTestCell("ocr")}</tr>`;
+  const statusEl = rowEl.querySelector("[data-summary-status]");
+  if (statusEl) {
+    statusEl.textContent = status.message || "";
+    statusEl.classList.remove("is-success", "is-error");
+    if (status.tone === "success") {
+      statusEl.classList.add("is-success");
+    } else if (status.tone === "error") {
+      statusEl.classList.add("is-error");
+    }
+  }
 }
 
 function renderModelConfigSummary() {
   if (!settingsModelSummary) {
     return;
   }
-  const metadataSettings = getResolvedTaskSettings("metadata");
-  const groundedSettings = getResolvedTaskSettings("grounded_qa");
-  const ocrSettings = getResolvedTaskSettings("ocr");
+  settingsModelSummary.querySelectorAll("[data-summary-task]").forEach((rowEl) => {
+    const task = rowEl.getAttribute("data-summary-task") || "";
+    let settings = getResolvedTaskSettings(task);
+    let connectionText = "-";
+    let configurationText = "Not configured";
+    if (task === "ocr" && ocrProvider === "tesseract") {
+      settings = null;
+      connectionText = "Local";
+      configurationText = "local only";
+    } else if (settings) {
+      connectionText = settings.connection_name;
+      configurationText = settings.model;
+      if (task === "ocr") {
+        configurationText += `, auto switch ${ocrAutoSwitch ? "on" : "off"}`;
+      }
+    }
+    const connectionEl = rowEl.querySelector("[data-summary-connection]");
+    if (connectionEl) {
+      connectionEl.textContent = connectionText;
+    }
+    const configurationEl = rowEl.querySelector("[data-summary-configuration]");
+    if (configurationEl) {
+      configurationEl.textContent = configurationText;
+    }
+    updateModelSummaryTestCell(rowEl, task);
+  });
+}
 
-  if (ocrProvider === "tesseract") {
-    settingsModelSummary.innerHTML = [
-      formatModelSummaryRow(LLM_TASK_LABELS.metadata, "metadata", metadataSettings),
-      formatModelSummaryRow(LLM_TASK_LABELS.grounded_qa, "grounded_qa", groundedSettings),
-      formatLocalOcrSummaryRow(),
-    ].join("");
-  } else {
-    settingsModelSummary.innerHTML = [
-      formatModelSummaryRow(LLM_TASK_LABELS.metadata, "metadata", metadataSettings),
-      formatModelSummaryRow(LLM_TASK_LABELS.grounded_qa, "grounded_qa", groundedSettings),
-      formatModelSummaryRow(
-        LLM_TASK_LABELS.ocr,
-        "ocr",
-        ocrSettings,
-        `auto switch ${ocrAutoSwitch ? "on" : "off"}`
-      ),
-    ].join("");
+function bindModelConfigSummaryActions() {
+  if (!settingsModelSummary || settingsModelSummary.dataset.actionsBound === "true") {
+    return;
   }
-
+  settingsModelSummary.dataset.actionsBound = "true";
   settingsModelSummary.querySelectorAll("[data-task-test]").forEach((buttonEl) => {
     buttonEl.addEventListener("click", async () => {
       const task = buttonEl.getAttribute("data-task-test") || "";
