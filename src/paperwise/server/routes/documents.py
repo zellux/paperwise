@@ -34,13 +34,7 @@ from paperwise.application.services.documents import (
 )
 from paperwise.application.services.file_relocation import move_blob_to_processed
 from paperwise.application.services.filenames import sanitize_storage_filename
-from paperwise.application.services.document_listing import (
-    document_sort_key as _document_sort_key,
-    iter_filtered_documents as _iter_filtered_documents,
-    normalized_sort_direction as _normalized_sort_direction,
-    normalized_sort_field as _normalized_sort_field,
-    normalized_values as _normalized_values,
-)
+from paperwise.application.services.document_listing import count_filtered_documents, list_filtered_documents
 from paperwise.application.services.history import (
     build_file_moved_history_event,
     build_metadata_history_events,
@@ -64,7 +58,6 @@ from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.application.services.storage_paths import blob_ref_to_path
 from paperwise.application.services.taxonomy import (
-    normalize_name as _normalize_name,
     resolve_existing_name as _resolve_existing_name,
     resolve_tags as _resolve_tags,
 )
@@ -544,41 +537,23 @@ def list_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentListItemResponse]:
-    normalized_tags = _normalized_values(tag)
-    normalized_correspondents = _normalized_values(correspondent)
-    normalized_document_types = _normalized_values(document_type)
-    normalized_statuses = _normalized_values(status)
-    normalized_sort_field = _normalized_sort_field(sort_by)
-    normalized_sort_direction = _normalized_sort_direction(sort_dir)
-    if not normalized_statuses:
-        normalized_statuses = {_normalize_name(DocumentStatus.READY.value)}
-
-    matching_documents = list(
-        _iter_filtered_documents(
-            repository=repository,
-            current_user=current_user,
-            query=q,
-            normalized_tags=normalized_tags,
-            normalized_correspondents=normalized_correspondents,
-            normalized_document_types=normalized_document_types,
-            normalized_statuses=normalized_statuses,
-        )
+    listing = list_filtered_documents(
+        repository=repository,
+        current_user=current_user,
+        query=q,
+        tag=tag,
+        correspondent=correspondent,
+        document_type=document_type,
+        status=status,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        limit=limit,
+        offset=offset,
     )
-    if normalized_sort_field and normalized_sort_direction:
-        matching_documents.sort(
-            key=lambda item: _document_sort_key(item[0], item[1], normalized_sort_field),
-            reverse=normalized_sort_direction == "desc",
-        )
-
-    results: list[DocumentListItemResponse] = []
-    for document, llm_result in matching_documents[offset : offset + limit]:
-        results.append(
-            DocumentListItemResponse.from_domain(
-                document=document,
-                llm_result=llm_result,
-            )
-        )
-    return results
+    return [
+        DocumentListItemResponse.from_domain(document=document, llm_result=llm_result)
+        for document, llm_result in listing.rows
+    ]
 
 
 @router.get("/count", response_model=CountResponse)
@@ -591,26 +566,17 @@ def count_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> CountResponse:
-    normalized_tags = _normalized_values(tag)
-    normalized_correspondents = _normalized_values(correspondent)
-    normalized_document_types = _normalized_values(document_type)
-    normalized_statuses = _normalized_values(status)
-    if not normalized_statuses:
-        normalized_statuses = {_normalize_name(DocumentStatus.READY.value)}
-
-    total = sum(
-        1
-        for _document, _llm_result in _iter_filtered_documents(
+    return CountResponse(
+        total=count_filtered_documents(
             repository=repository,
             current_user=current_user,
             query=q,
-            normalized_tags=normalized_tags,
-            normalized_correspondents=normalized_correspondents,
-            normalized_document_types=normalized_document_types,
-            normalized_statuses=normalized_statuses,
+            tag=tag,
+            correspondent=correspondent,
+            document_type=document_type,
+            status=status,
         )
     )
-    return CountResponse(total=total)
 
 
 @router.get("/pending", response_model=list[DocumentListItemResponse])

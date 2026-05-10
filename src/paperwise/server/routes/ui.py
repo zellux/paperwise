@@ -9,11 +9,7 @@ from fastapi.responses import RedirectResponse
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.application.services.document_listing import (
-    document_sort_key,
-    iter_filtered_documents,
-    normalized_sort_direction,
-    normalized_sort_field,
-    normalized_values,
+    list_filtered_documents,
 )
 from paperwise.application.services.llm_preferences import (
     llm_provider_defaults_payload,
@@ -279,31 +275,38 @@ def _documents_initial_data(
             }
         return data
 
-    normalized_statuses = normalized_values(status)
-    if not normalized_statuses:
-        normalized_statuses = {"ready"}
-    matching_documents = list(
-        iter_filtered_documents(
+    requested_offset = (normalized_page - 1) * normalized_page_size
+    listing = list_filtered_documents(
+        repository=repository,
+        current_user=current_user,
+        query=q,
+        tag=tag,
+        correspondent=correspondent,
+        document_type=document_type,
+        status=status,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        limit=normalized_page_size,
+        offset=requested_offset,
+    )
+    documents_total = listing.total
+    total_pages = max(1, (documents_total + normalized_page_size - 1) // normalized_page_size)
+    clamped_page = min(normalized_page, total_pages)
+    if clamped_page != normalized_page:
+        normalized_page = clamped_page
+        listing = list_filtered_documents(
             repository=repository,
             current_user=current_user,
             query=q,
-            normalized_tags=normalized_values(tag),
-            normalized_correspondents=normalized_values(correspondent),
-            normalized_document_types=normalized_values(document_type),
-            normalized_statuses=normalized_statuses,
+            tag=tag,
+            correspondent=correspondent,
+            document_type=document_type,
+            status=status,
+            sort_by=sort_by,
+            sort_dir=sort_dir,
+            limit=normalized_page_size,
+            offset=(normalized_page - 1) * normalized_page_size,
         )
-    )
-    sort_field = normalized_sort_field(sort_by)
-    sort_direction = normalized_sort_direction(sort_dir)
-    if sort_field and sort_direction:
-        matching_documents.sort(
-            key=lambda item: document_sort_key(item[0], item[1], sort_field),
-            reverse=sort_direction == "desc",
-        )
-    documents_total = len(matching_documents)
-    total_pages = max(1, (documents_total + normalized_page_size - 1) // normalized_page_size)
-    normalized_page = min(normalized_page, total_pages)
-    offset = (normalized_page - 1) * normalized_page_size
     processing_count = repository.count_owner_documents_by_statuses(
         owner_id=current_user.id,
         statuses=PENDING_DOCUMENT_STATUSES,
@@ -312,7 +315,7 @@ def _documents_initial_data(
         **initial_data,
         "documents": [
             _document_list_item(document, llm_result)
-            for document, llm_result in matching_documents[offset : offset + normalized_page_size]
+            for document, llm_result in listing.rows
         ],
         "documents_total": documents_total,
         "documents_processing_count": processing_count,

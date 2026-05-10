@@ -1,10 +1,17 @@
 from collections.abc import Iterator
+from dataclasses import dataclass
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.application.services.taxonomy import normalize_name
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, User
 
 DOCUMENT_SORT_FIELDS = {"title", "document_type", "correspondent", "tags", "document_date", "status"}
+
+
+@dataclass(frozen=True)
+class FilteredDocumentListing:
+    rows: list[tuple[Document, LLMParseResult | None]]
+    total: int
 
 
 def normalized_sort_field(value: str | None) -> str | None:
@@ -38,6 +45,71 @@ def document_sort_key(
 ) -> tuple[str, str]:
     primary = normalize_name(_document_sort_value(document, llm_result, sort_field))
     return primary, document.id
+
+
+def list_filtered_documents(
+    *,
+    repository: DocumentRepository,
+    current_user: User,
+    query: str | None,
+    tag: list[str] | None,
+    correspondent: list[str] | None,
+    document_type: list[str] | None,
+    status: list[str] | None,
+    sort_by: str | None = None,
+    sort_dir: str | None = None,
+    limit: int,
+    offset: int = 0,
+) -> FilteredDocumentListing:
+    normalized_statuses = normalized_values(status)
+    if not normalized_statuses:
+        normalized_statuses = {normalize_name(DocumentStatus.READY.value)}
+    matching_documents = list(
+        iter_filtered_documents(
+            repository=repository,
+            current_user=current_user,
+            query=query,
+            normalized_tags=normalized_values(tag),
+            normalized_correspondents=normalized_values(correspondent),
+            normalized_document_types=normalized_values(document_type),
+            normalized_statuses=normalized_statuses,
+        )
+    )
+    sort_field = normalized_sort_field(sort_by)
+    sort_direction = normalized_sort_direction(sort_dir)
+    if sort_field and sort_direction:
+        matching_documents.sort(
+            key=lambda item: document_sort_key(item[0], item[1], sort_field),
+            reverse=sort_direction == "desc",
+        )
+    normalized_offset = max(0, int(offset or 0))
+    normalized_limit = max(0, int(limit or 0))
+    return FilteredDocumentListing(
+        rows=matching_documents[normalized_offset : normalized_offset + normalized_limit],
+        total=len(matching_documents),
+    )
+
+
+def count_filtered_documents(
+    *,
+    repository: DocumentRepository,
+    current_user: User,
+    query: str | None,
+    tag: list[str] | None,
+    correspondent: list[str] | None,
+    document_type: list[str] | None,
+    status: list[str] | None,
+) -> int:
+    return list_filtered_documents(
+        repository=repository,
+        current_user=current_user,
+        query=query,
+        tag=tag,
+        correspondent=correspondent,
+        document_type=document_type,
+        status=status,
+        limit=0,
+    ).total
 
 
 def iter_filtered_documents(
