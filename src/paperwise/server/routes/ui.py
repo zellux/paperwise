@@ -160,17 +160,25 @@ def _document_list_item(document: Document, llm_result: LLMParseResult | None) -
     }
 
 
+def _tag_stats(repository: DocumentRepository, current_user: User) -> list[dict]:
+    return [
+        {"tag": tag, "document_count": count}
+        for tag, count in repository.list_owner_tag_stats(current_user.id)
+    ]
+
+
 def _tag_stats_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     initial_data = _page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "tag_stats": []}
-    return {
-        **initial_data,
-        "tag_stats": [
-            {"tag": tag, "document_count": count}
-            for tag, count in repository.list_owner_tag_stats(current_user.id)
-        ],
-    }
+    return {**initial_data, "tag_stats": _tag_stats(repository, current_user)}
+
+
+def _document_type_stats(repository: DocumentRepository, current_user: User) -> list[dict]:
+    return [
+        {"document_type": document_type, "document_count": count}
+        for document_type, count in repository.list_owner_document_type_stats(current_user.id)
+    ]
 
 
 def _document_type_stats_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
@@ -179,36 +187,41 @@ def _document_type_stats_initial_data(repository: DocumentRepository, current_us
         return {**initial_data, "document_type_stats": []}
     return {
         **initial_data,
-        "document_type_stats": [
-            {"document_type": document_type, "document_count": count}
-            for document_type, count in repository.list_owner_document_type_stats(current_user.id)
-        ],
+        "document_type_stats": _document_type_stats(repository, current_user),
     }
+
+
+def _activity_documents(
+    repository: DocumentRepository,
+    current_user: User,
+    *,
+    limit: int,
+) -> list[dict]:
+    return [
+        _document_list_item(document, llm_result)
+        for document, llm_result in repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=limit,
+            statuses={DocumentStatus.READY},
+        )
+    ]
+
+
+def _activity_total_tokens(repository: DocumentRepository, current_user: User) -> int:
+    preference = repository.get_user_preference(current_user.id)
+    if preference is not None:
+        return int(preference.preferences.get("llm_total_tokens_processed") or 0)
+    return 0
 
 
 def _activity_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
     initial_data = _page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "activity_documents": [], "activity_total_tokens": 0}
-    ready_documents = [
-        (document, llm_result)
-        for document, llm_result in repository.list_owner_documents_with_llm_results(
-            owner_id=current_user.id,
-            limit=20,
-            statuses={DocumentStatus.READY},
-        )
-    ]
-    preference = repository.get_user_preference(current_user.id)
-    total_tokens = 0
-    if preference is not None:
-        total_tokens = int(preference.preferences.get("llm_total_tokens_processed") or 0)
     return {
         **initial_data,
-        "activity_documents": [
-            _document_list_item(document, llm_result)
-            for document, llm_result in ready_documents
-        ],
-        "activity_total_tokens": total_tokens,
+        "activity_documents": _activity_documents(repository, current_user, limit=20),
+        "activity_total_tokens": _activity_total_tokens(repository, current_user),
     }
 
 
@@ -218,27 +231,10 @@ def _activity_partial_data(
     *,
     limit: int = 20,
 ) -> dict:
-    initial_data = _page_initial_data(current_user, repository)
     normalized_limit = min(100, max(1, int(limit or 20)))
-    ready_documents = [
-        (document, llm_result)
-        for document, llm_result in repository.list_owner_documents_with_llm_results(
-            owner_id=current_user.id,
-            limit=normalized_limit,
-            statuses={DocumentStatus.READY},
-        )
-    ]
-    preference = repository.get_user_preference(current_user.id)
-    total_tokens = 0
-    if preference is not None:
-        total_tokens = int(preference.preferences.get("llm_total_tokens_processed") or 0)
     return {
-        **initial_data,
-        "activity_documents": [
-            _document_list_item(document, llm_result)
-            for document, llm_result in ready_documents
-        ],
-        "activity_total_tokens": total_tokens,
+        "activity_documents": _activity_documents(repository, current_user, limit=normalized_limit),
+        "activity_total_tokens": _activity_total_tokens(repository, current_user),
     }
 
 
@@ -311,24 +307,24 @@ def _documents_initial_data(
     }
 
 
-def _pending_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
-    initial_data = _page_initial_data(current_user, repository)
-    if current_user is None:
-        return {**initial_data, "pending_documents": []}
-    pending_documents = [
-        (document, llm_result)
+def _pending_documents(repository: DocumentRepository, current_user: User) -> list[dict]:
+    return [
+        _document_list_item(document, llm_result)
         for document, llm_result in repository.list_owner_documents_with_llm_results(
             owner_id=current_user.id,
             limit=200,
             statuses=PENDING_DOCUMENT_STATUSES,
         )
     ]
+
+
+def _pending_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
+    initial_data = _page_initial_data(current_user, repository)
+    if current_user is None:
+        return {**initial_data, "pending_documents": []}
     return {
         **initial_data,
-        "pending_documents": [
-            _document_list_item(document, llm_result)
-            for document, llm_result in pending_documents
-        ],
+        "pending_documents": _pending_documents(repository, current_user),
     }
 
 
@@ -850,8 +846,11 @@ def tags_partial(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> JSONResponse:
-    data = _tag_stats_initial_data(repository, current_user)
-    tag_stats = _sort_stat_rows(data["tag_stats"], sort_by=sort_by, sort_dir=sort_dir)
+    tag_stats = _sort_stat_rows(
+        _tag_stats(repository, current_user),
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+    )
     return JSONResponse(
         {
             "table_body_html": tag_rows_html(tag_stats),
@@ -868,8 +867,11 @@ def document_types_partial(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> JSONResponse:
-    data = _document_type_stats_initial_data(repository, current_user)
-    document_type_stats = _sort_stat_rows(data["document_type_stats"], sort_by=sort_by, sort_dir=sort_dir)
+    document_type_stats = _sort_stat_rows(
+        _document_type_stats(repository, current_user),
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+    )
     return JSONResponse(
         {
             "table_body_html": document_type_rows_html(document_type_stats),
@@ -884,8 +886,7 @@ def pending_partial(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> JSONResponse:
-    data = _pending_initial_data(repository, current_user)
-    pending_documents = data["pending_documents"]
+    pending_documents = _pending_documents(repository, current_user)
     return JSONResponse(
         {
             "table_body_html": pending_rows_html(pending_documents),
