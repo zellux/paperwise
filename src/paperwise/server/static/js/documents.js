@@ -1,3 +1,12 @@
+const docsFilterForm = document.getElementById("docsFilterForm");
+const clearFiltersBtn = document.getElementById("clearFiltersBtn");
+const filterTag = document.getElementById("filterTag");
+const filterCorrespondent = document.getElementById("filterCorrespondent");
+const filterType = document.getElementById("filterType");
+const filterStatus = document.getElementById("filterStatus");
+const filterQuery = document.getElementById("filterQuery");
+const filterSelects = [filterTag, filterCorrespondent, filterType, filterStatus];
+
 let initialDocumentsHydrated = false;
 
 function hydrateInitialDocumentsData(initialData) {

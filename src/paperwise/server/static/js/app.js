@@ -1,6 +1,3 @@
-const docsFilterForm = document.getElementById("docsFilterForm");
-const clearFiltersBtn = document.getElementById("clearFiltersBtn");
-const documentsPaginationToolbar = document.getElementById("documentsPaginationToolbar");
 const settingsForm = document.getElementById("settingsForm");
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
 const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
@@ -39,15 +36,7 @@ const authMessage = document.getElementById("authMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const sessionUserLabel = document.getElementById("sessionUserLabel");
 const brandHomeBtn = document.getElementById("brandHomeBtn");
-const filterTag = document.getElementById("filterTag");
-const filterCorrespondent = document.getElementById("filterCorrespondent");
-const filterType = document.getElementById("filterType");
-const filterStatus = document.getElementById("filterStatus");
-const filterQuery = document.getElementById("filterQuery");
-const filterSelects = [filterTag, filterCorrespondent, filterType, filterStatus];
-
 const activityOutput = document.getElementById("activityOutput");
-const docsTableBody = document.getElementById("docsTableBody");
 const sortableHeaders = [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
 const filterDropdownState = new Map();
 let activeFilterDropdown = null;
@@ -883,6 +872,21 @@ function getSortStateForTable(tableName) {
   return { field: "", direction: "" };
 }
 
+function getDocumentFilterControls() {
+  const filterTag = document.getElementById("filterTag");
+  const filterCorrespondent = document.getElementById("filterCorrespondent");
+  const filterType = document.getElementById("filterType");
+  const filterStatus = document.getElementById("filterStatus");
+  return {
+    filterTag,
+    filterCorrespondent,
+    filterType,
+    filterStatus,
+    filterQuery: document.getElementById("filterQuery"),
+    filterSelects: [filterTag, filterCorrespondent, filterType, filterStatus],
+  };
+}
+
 function renderSortHeaders() {
   for (const header of sortableHeaders) {
     const tableName = header.dataset.sortTable || "";
@@ -907,6 +911,7 @@ function renderSortHeaders() {
 }
 
 function getFilterKey(selectEl) {
+  const { filterTag, filterCorrespondent, filterType } = getDocumentFilterControls();
   if (selectEl === filterTag) {
     return "tag";
   }
@@ -941,7 +946,7 @@ function summarizeSelectedValues(selectedValues, selectEl) {
     return "Any";
   }
   const displayValues = selectedValues.map((value) =>
-    selectEl === filterStatus ? formatStatus(value) : value
+    selectEl === getDocumentFilterControls().filterStatus ? formatStatus(value) : value
   );
   if (selectedValues.length === 1) {
     return displayValues[0];
@@ -1132,6 +1137,8 @@ function setupFilterDropdown(selectEl) {
 }
 
 function applyFiltersToControls() {
+  const { filterTag, filterCorrespondent, filterType, filterStatus, filterQuery, filterSelects } =
+    getDocumentFilterControls();
   if (filterQuery) {
     filterQuery.value = docsFilters.q || "";
   }
@@ -1164,6 +1171,8 @@ function setSelectOptions(selectEl, values) {
 }
 
 function readFiltersFromControls() {
+  const { filterTag, filterCorrespondent, filterType, filterStatus, filterQuery } =
+    getDocumentFilterControls();
   docsFilters.q = String(filterQuery?.value || "").trim();
   docsFilters.tag = getSelectedValues(filterTag);
   docsFilters.correspondent = getSelectedValues(filterCorrespondent);
@@ -1172,6 +1181,7 @@ function readFiltersFromControls() {
 }
 
 function refreshFilterOptionsFromDocuments(documents) {
+  const { filterTag, filterCorrespondent, filterType, filterStatus } = getDocumentFilterControls();
   const tags = new Set();
   const correspondents = new Set();
   const documentTypes = new Set();
@@ -1306,6 +1316,7 @@ async function deleteDocumentById(documentId, options = {}) {
     return false;
   }
 
+  const docsTableBody = document.getElementById("docsTableBody");
   const visibleDocRows = docsTableBody?.querySelectorAll("tr[data-doc-id]").length || 0;
   const shouldStepBackPage =
     Boolean(docsTableBody) && docsPage > 1 && visibleDocRows <= 1;
@@ -1370,6 +1381,8 @@ function hydrateSettingsFormFromInitialPreferences() {
 }
 
 function applyDocumentsPartial(payload) {
+  const docsTableBody = document.getElementById("docsTableBody");
+  const documentsPaginationToolbar = document.getElementById("documentsPaginationToolbar");
   replaceElementHtml(docsTableBody, payload.table_body_html);
   replaceElementHtml(documentsPaginationToolbar, payload.pagination_toolbar_html);
   docsTotalCount = Number(payload.documents_total || 0);
@@ -1404,6 +1417,7 @@ function applyDocumentDetailPartial(payload) {
 
 async function loadDocumentsList() {
   const requestSeq = ++docsListRequestSeq;
+  const docsTableBody = document.getElementById("docsTableBody");
   renderTableLoading(docsTableBody, 7, "Loading documents...");
   renderSortHeaders();
   const query = new URLSearchParams({
