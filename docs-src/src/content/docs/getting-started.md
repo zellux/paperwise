@@ -184,6 +184,8 @@ After the app is running, there is one more required step: configure model conne
 4. Assign task models for metadata extraction, grounded Q&A, and OCR.
 5. Save settings and test with a sample document.
 
+Using LM Studio or another local model server with Docker? See [Host-local providers with Docker](/docs/model-config/#host-local-providers-with-docker).
+
 ### Minimum setup by feature
 
 | Feature | Minimum setup |
@@ -211,6 +213,7 @@ If upload works but extraction or Ask My Docs fails:
 - open **Settings > Model Config**
 - confirm the required task models are assigned
 - check the API logs for provider timeout or auth errors
+- for Docker plus host-local model servers, use `host.docker.internal` instead of `localhost`
 
 ## Want to run from source?
 

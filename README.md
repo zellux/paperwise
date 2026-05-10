@@ -192,6 +192,8 @@ After the app is running:
    - **OCR**
 5. Upload a few documents and test extraction or Ask My Docs.
 
+If Paperwise runs in Docker and your local model server runs on the Docker host, do not use `localhost` in **Model Config**. Use `host.docker.internal`, for example `http://host.docker.internal:1234/v1`. Both the `api` and `worker` containers need access because settings tests run in the API and document processing runs in the worker.
+
 ## Suggested starting setup
 
 - **Metadata extraction**: a fast general-purpose model
@@ -244,6 +246,7 @@ If upload works but extraction or Ask My Docs fails:
 - open **Settings > Model Config**
 - confirm the required task models are assigned
 - check the API logs for provider timeout or auth errors
+- for Docker plus host-local model servers such as LM Studio, Ollama-compatible gateways, or llama.cpp, use `host.docker.internal` instead of `localhost`
 
 ## License
 

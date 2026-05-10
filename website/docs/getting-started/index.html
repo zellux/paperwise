@@ -161,6 +161,7 @@
 <li>Assign task models for metadata extraction, grounded Q&#x26;A, and OCR.</li>
 <li>Save settings and test with a sample document.</li>
 </ol>
+<p>Using LM Studio or another local model server with Docker? See <a href="/docs/model-config/#host-local-providers-with-docker">Host-local providers with Docker</a>.</p>
 <div class="sl-heading-wrapper level-h3"><h3 id="minimum-setup-by-feature">Minimum setup by feature</h3><a class="sl-anchor-link" href="#minimum-setup-by-feature"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Minimum setup by feature”</span></a></div>
 
 
@@ -202,6 +203,7 @@
 <li>open <strong>Settings > Model Config</strong></li>
 <li>confirm the required task models are assigned</li>
 <li>check the API logs for provider timeout or auth errors</li>
+<li>for Docker plus host-local model servers, use <code dir="auto">host.docker.internal</code> instead of <code dir="auto">localhost</code></li>
 </ul>
 <div class="sl-heading-wrapper level-h2"><h2 id="want-to-run-from-source">Want to run from source?</h2><a class="sl-anchor-link" href="#want-to-run-from-source"><span aria-hidden="true" class="sl-anchor-icon"><svg width="16" height="16" viewBox="0 0 24 24"><path fill="currentcolor" d="m12.11 15.39-3.88 3.88a2.52 2.52 0 0 1-3.5 0 2.47 2.47 0 0 1 0-3.5l3.88-3.88a1 1 0 0 0-1.42-1.42l-3.88 3.89a4.48 4.48 0 0 0 6.33 6.33l3.89-3.88a1 1 0 1 0-1.42-1.42Zm8.58-12.08a4.49 4.49 0 0 0-6.33 0l-3.89 3.88a1 1 0 0 0 1.42 1.42l3.88-3.88a2.52 2.52 0 0 1 3.5 0 2.47 2.47 0 0 1 0 3.5l-3.88 3.88a1 1 0 1 0 1.42 1.42l3.88-3.89a4.49 4.49 0 0 0 0-6.33ZM8.83 15.17a1 1 0 0 0 1.1.22 1 1 0 0 0 .32-.22l4.92-4.92a1 1 0 0 0-1.42-1.42l-4.92 4.92a1 1 0 0 0 0 1.42Z"></path></svg></span><span class="sr-only" data-pagefind-ignore="">Section titled “Want to run from source?”</span></a></div>
 <p>If you plan to modify the code, debug the internals, or run Paperwise without Docker for the app processes, follow <a href="/docs/reference/local-development/">Dev Environment Setup</a>.</p>
