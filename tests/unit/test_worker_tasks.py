@@ -82,8 +82,8 @@ def test_parse_document_task_uses_current_document_blob_uri(monkeypatch) -> None
             created_at=datetime.now(UTC),
         )
 
-    monkeypatch.setattr(worker_tasks, "_build_repository", lambda: repository)
-    monkeypatch.setattr(worker_tasks, "_build_llm_provider", lambda: object())
+    monkeypatch.setattr(worker_tasks, "build_document_repository", lambda settings: repository)
+    monkeypatch.setattr(worker_tasks, "build_llm_provider", lambda settings: object())
     monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_provider", lambda *args, **kwargs: "llm")
     monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_auto_switch", lambda *args, **kwargs: False)
     monkeypatch.setattr(worker_tasks, "_resolve_metadata_llm_provider_for_owner", lambda *args, **kwargs: object())
@@ -130,8 +130,8 @@ def test_parse_document_task_marks_document_failed_and_records_history(monkeypat
         del kwargs
         raise RuntimeError("LLM OCR failed: HTTP 404 from OpenRouter")
 
-    monkeypatch.setattr(worker_tasks, "_build_repository", lambda: repository)
-    monkeypatch.setattr(worker_tasks, "_build_llm_provider", lambda: object())
+    monkeypatch.setattr(worker_tasks, "build_document_repository", lambda settings: repository)
+    monkeypatch.setattr(worker_tasks, "build_llm_provider", lambda settings: object())
     monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_provider", lambda *args, **kwargs: "llm")
     monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_auto_switch", lambda *args, **kwargs: False)
     monkeypatch.setattr(worker_tasks, "_resolve_metadata_llm_provider_for_owner", lambda *args, **kwargs: object())
@@ -195,7 +195,7 @@ def test_parse_document_task_skips_duplicate_ready_document(monkeypatch) -> None
         parse_calls["count"] += 1
         raise AssertionError("parse_document_blob should not be called for already-ready documents")
 
-    monkeypatch.setattr(worker_tasks, "_build_repository", lambda: repository)
+    monkeypatch.setattr(worker_tasks, "build_document_repository", lambda settings: repository)
     monkeypatch.setattr(worker_tasks, "parse_document_blob", fake_parse_document_blob)
 
     result = worker_tasks.parse_document_task(

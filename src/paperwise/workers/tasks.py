@@ -31,14 +31,6 @@ logger = get_task_logger(__name__)
 settings = get_settings()
 
 
-def _build_repository() -> DocumentRepository:
-    return build_document_repository(settings)
-
-
-def _build_llm_provider() -> LLMProvider | None:
-    return build_llm_provider(settings)
-
-
 def _resolve_llm_provider_from_preferences(
     *,
     preferences: dict[str, str],
@@ -167,8 +159,8 @@ def parse_document_task(
     filename: str,
     content_type: str,
 ) -> dict[str, str | int]:
-    repository = _build_repository()
-    provider_override = _build_llm_provider()
+    repository = build_document_repository(settings)
+    provider_override = build_llm_provider(settings)
     document = repository.get(document_id)
     if document is None:
         logger.error("parse task failed; document_id=%s not found", document_id)
