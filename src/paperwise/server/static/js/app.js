@@ -1,29 +1,3 @@
-const settingsForm = document.getElementById("settingsForm");
-const settingsThemeSelect = document.getElementById("settingsThemeSelect");
-const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
-const settingsGroundedQaTopKInput = document.getElementById("settingsGroundedQaTopKInput");
-const settingsGroundedQaMaxDocsInput = document.getElementById("settingsGroundedQaMaxDocsInput");
-const settingsConnectionsList = document.getElementById("settingsConnectionsList");
-const settingsAddConnectionBtn = document.getElementById("settingsAddConnectionBtn");
-const settingsModelSummary = document.getElementById("settingsModelSummary");
-const settingsMetadataRouteFields = document.getElementById("settingsMetadataRouteFields");
-const settingsMetadataConnectionSelect = document.getElementById("settingsMetadataConnectionSelect");
-const settingsMetadataModelInput = document.getElementById("settingsMetadataModelInput");
-const settingsGroundedQaRouteFields = document.getElementById("settingsGroundedQaRouteFields");
-const settingsGroundedQaConnectionSelect = document.getElementById("settingsGroundedQaConnectionSelect");
-const settingsGroundedQaModelInput = document.getElementById("settingsGroundedQaModelInput");
-const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
-const settingsOcrStatus = document.getElementById("settingsOcrStatus");
-const settingsOcrRouteFields = document.getElementById("settingsOcrRouteFields");
-const settingsOcrConnectionSelect = document.getElementById("settingsOcrConnectionSelect");
-const settingsOcrModelInput = document.getElementById("settingsOcrModelInput");
-const settingsOcrAutoSwitchCheckbox = document.getElementById("settingsOcrAutoSwitchCheckbox");
-const settingsOcrImageDetailSelect = document.getElementById("settingsOcrImageDetailSelect");
-const settingsCurrentPasswordInput = document.getElementById("settingsCurrentPasswordInput");
-const settingsNewPasswordInput = document.getElementById("settingsNewPasswordInput");
-const settingsConfirmPasswordInput = document.getElementById("settingsConfirmPasswordInput");
-const settingsChangePasswordBtn = document.getElementById("settingsChangePasswordBtn");
-const settingsPasswordStatus = document.getElementById("settingsPasswordStatus");
 const authGate = document.getElementById("authGate");
 const appShell = document.querySelector(".app-shell");
 const authTabSignIn = document.getElementById("authTabSignIn");
@@ -367,8 +341,9 @@ function applyTheme(themeName) {
   } catch {
     // Ignore storage write errors (private mode, blocked storage, etc.).
   }
-  if (settingsThemeSelect && settingsThemeSelect.value !== currentTheme) {
-    settingsThemeSelect.value = currentTheme;
+  const themeSelect = document.getElementById("settingsThemeSelect");
+  if (themeSelect && themeSelect.value !== currentTheme) {
+    themeSelect.value = currentTheme;
   }
 }
 
