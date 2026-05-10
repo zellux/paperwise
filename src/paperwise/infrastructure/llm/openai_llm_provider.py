@@ -66,8 +66,13 @@ class OpenAILLMProvider(LLMProvider):
         base_url: str = "https://api.openai.com/v1",
         timeout_seconds: float = 30.0,
         vision_image_detail: str = "auto",
+        response_format_type: str = "json_object",
     ) -> None:
         self._model = model
+        normalized_response_format = str(response_format_type).strip().lower()
+        self._response_format_type = (
+            normalized_response_format if normalized_response_format in {"json_object", "text"} else "json_object"
+        )
         normalized_detail = str(vision_image_detail).strip().lower()
         self._vision_image_detail = normalized_detail if normalized_detail in {"auto", "low", "high"} else "auto"
         self._client = httpx.Client(
@@ -78,6 +83,9 @@ class OpenAILLMProvider(LLMProvider):
                 "Content-Type": "application/json",
             },
         )
+
+    def _json_response_format(self) -> dict[str, str]:
+        return {"type": self._response_format_type}
 
     def _chat_completions(
         self,
@@ -165,7 +173,7 @@ class OpenAILLMProvider(LLMProvider):
         request_payload = {
             "model": self._model,
             "temperature": 0,
-            "response_format": {"type": "json_object"},
+            "response_format": self._json_response_format(),
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": json.dumps(user_prompt)},
@@ -217,7 +225,7 @@ class OpenAILLMProvider(LLMProvider):
                 "model": self._model,
                 "temperature": 0,
                 "max_tokens": 3000,
-                "response_format": {"type": "json_object"},
+                "response_format": self._json_response_format(),
                 "messages": [
                     {"role": "system", "content": OCR_SYSTEM_PROMPT},
                     {"role": "user", "content": json.dumps(user_prompt)},
@@ -290,7 +298,7 @@ class OpenAILLMProvider(LLMProvider):
                 "model": self._model,
                 "temperature": 0,
                 "max_tokens": 3000,
-                "response_format": {"type": "json_object"},
+                "response_format": self._json_response_format(),
                 "messages": [
                     {"role": "system", "content": OCR_SYSTEM_PROMPT},
                     {
@@ -428,7 +436,7 @@ class OpenAILLMProvider(LLMProvider):
         request_payload = {
             "model": self._model,
             "temperature": 0,
-            "response_format": {"type": "json_object"},
+            "response_format": self._json_response_format(),
             "messages": [
                 {"role": "system", "content": GROUNDED_QA_SYSTEM_PROMPT},
                 {"role": "user", "content": json.dumps(user_prompt)},
@@ -463,7 +471,7 @@ class OpenAILLMProvider(LLMProvider):
         request_payload = {
             "model": self._model,
             "temperature": 0,
-            "response_format": {"type": "json_object"},
+            "response_format": self._json_response_format(),
             "messages": [
                 {"role": "system", "content": RETRIEVAL_QUERY_SYSTEM_PROMPT},
                 {"role": "user", "content": json.dumps(user_prompt)},

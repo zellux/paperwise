@@ -1646,6 +1646,60 @@ def test_llm_connection_test_accepts_payload_overrides_and_calls_provider() -> N
         app.dependency_overrides.clear()
 
 
+def test_llm_connection_test_uses_models_endpoint_for_custom_provider(monkeypatch) -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    captured: dict[str, object] = {"paths": []}
+
+    class FakeModelsClient:
+        def __init__(self, *, base_url: str, timeout: float, headers: dict[str, str]) -> None:
+            captured["base_url"] = base_url
+            captured["timeout"] = timeout
+            captured["headers"] = headers
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, _exc_type, _exc, _traceback) -> None:
+            return None
+
+        def get(self, path: str):
+            captured["paths"].append(path)
+
+            class Response:
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict:
+                    return {"data": [{"id": "qwen3-0.6b"}]}
+
+            return Response()
+
+    monkeypatch.setattr(documents_routes.httpx, "Client", FakeModelsClient)
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents/llm/test",
+            json={
+                "provider": "custom",
+                "model": "qwen3-0.6b",
+                "api_key": "lm-studio",
+                "base_url": "http://hyperion.local.zellux.me:1234/v1",
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["ok"] is True
+        assert payload["provider"] == "custom"
+        assert payload["model"] == "qwen3-0.6b"
+        assert captured["base_url"] == "http://hyperion.local.zellux.me:1234/v1"
+        assert captured["paths"] == ["/models"]
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_llm_connection_test_includes_provider_response_body_on_failure() -> None:
     repository = InMemoryDocumentRepository()
     fake_provider = FakeFailingLLMProvider()

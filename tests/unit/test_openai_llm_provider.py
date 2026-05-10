@@ -152,6 +152,56 @@ def test_openai_provider_omits_missing_keys(monkeypatch) -> None:
     assert result == {"suggested_title": "Only Title"}
 
 
+def test_openai_provider_can_use_text_response_format_for_custom_providers(monkeypatch) -> None:
+    captured_request: dict[str, dict] = {}
+
+    class FakeClient:
+        def post(self, _path: str, json: dict):
+            captured_request["payload"] = json
+
+            class Response:
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": json_module.dumps(
+                                        {
+                                            "suggested_title": "Credit Report March 2026",
+                                            "document_date": "2026-03-01",
+                                            "correspondent": "Experian",
+                                            "document_type": "Credit Report",
+                                            "tags": ["credit"],
+                                        }
+                                    )
+                                }
+                            }
+                        ]
+                    }
+
+            return Response()
+
+    json_module = json
+    provider = OpenAILLMProvider(api_key="k", model="m", response_format_type="text")
+    monkeypatch.setattr(provider, "_client", FakeClient())
+
+    result = provider.suggest_metadata(
+        filename="credit.pdf",
+        text_preview="sample",
+        current_correspondent=None,
+        current_document_type=None,
+        existing_correspondents=[],
+        existing_document_types=[],
+        existing_tags=[],
+    )
+
+    assert captured_request["payload"]["response_format"] == {"type": "text"}
+    assert result["suggested_title"] == "Credit Report March 2026"
+
+
 def test_openai_provider_uses_ocr_specific_prompt(monkeypatch) -> None:
     captured_request: dict[str, dict] = {}
 

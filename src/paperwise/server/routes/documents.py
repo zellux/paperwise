@@ -6,6 +6,7 @@ from hashlib import sha256
 from pathlib import Path
 from uuid import uuid4
 
+import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
@@ -537,6 +538,7 @@ def _build_provider_from_task_config(
             model=config.model or default_model_for_task("custom", task),
             base_url=config.base_url,
             vision_image_detail=ocr_image_detail,
+            response_format_type="text",
         )
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
@@ -615,6 +617,29 @@ def _format_llm_connection_test_error(exc: Exception) -> str:
     if response_text in message:
         return message
     return f"{message}; {prefix}: {response_text}"
+
+
+def _test_custom_llm_connection(*, base_url: str, api_key: str, model: str) -> None:
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json",
+    }
+    with httpx.Client(base_url=base_url.rstrip("/"), timeout=10.0, headers=headers) as client:
+        response = client.get("/models")
+        response.raise_for_status()
+        payload = response.json()
+
+    if not model or model == "default":
+        return
+    model_ids = {
+        str(item.get("id", "")).strip()
+        for item in payload.get("data", [])
+        if isinstance(item, dict) and str(item.get("id", "")).strip()
+    }
+    if model_ids and model not in model_ids:
+        available = ", ".join(sorted(model_ids)[:10])
+        suffix = f" Available models: {available}." if available else ""
+        raise RuntimeError(f"Model '{model}' was not found in the provider's /models response.{suffix}")
 
 
 def _resolve_ocr_provider_for_user(
@@ -1103,15 +1128,22 @@ def test_llm_connection_endpoint(
     provider_name = str(selected_connection.get("provider", "")).strip().lower() or "custom"
     model_name = str(metadata_route.get("model", "")).strip() or "default"
     try:
-        llm_provider.suggest_metadata(
-            filename="connection-test.txt",
-            text_preview="Connection test sample.",
-            current_correspondent=None,
-            current_document_type=None,
-            existing_correspondents=[],
-            existing_document_types=[],
-            existing_tags=["Test"],
-        )
+        if provider_name == "custom":
+            _test_custom_llm_connection(
+                base_url=str(selected_connection.get("base_url", "")).strip(),
+                api_key=str(selected_connection.get("api_key", "")).strip(),
+                model=model_name,
+            )
+        else:
+            llm_provider.suggest_metadata(
+                filename="connection-test.txt",
+                text_preview="Connection test sample.",
+                current_correspondent=None,
+                current_document_type=None,
+                existing_correspondents=[],
+                existing_document_types=[],
+                existing_tags=["Test"],
+            )
     except HTTPException:
         raise
     except Exception as exc:
