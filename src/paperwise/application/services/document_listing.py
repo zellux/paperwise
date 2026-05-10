@@ -2,7 +2,7 @@ from collections.abc import Iterator
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.application.services.taxonomy import normalize_name
-from paperwise.domain.models import Document, LLMParseResult, User
+from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, User
 
 DOCUMENT_SORT_FIELDS = {"title", "document_type", "correspondent", "tags", "document_date", "status"}
 
@@ -52,11 +52,13 @@ def iter_filtered_documents(
 ) -> Iterator[tuple[Document, LLMParseResult | None]]:
     batch_size = 1000
     scan_offset = 0
+    status_filter = _document_statuses_for_filter(normalized_statuses)
     while True:
         documents_with_metadata = repository.list_owner_documents_with_llm_results(
             owner_id=current_user.id,
             limit=batch_size,
             offset=scan_offset,
+            statuses=status_filter,
         )
         if not documents_with_metadata:
             break
@@ -75,6 +77,18 @@ def iter_filtered_documents(
         if len(documents_with_metadata) < batch_size:
             break
         scan_offset += batch_size
+
+
+def _document_statuses_for_filter(normalized_statuses: set[str]) -> set[DocumentStatus] | None:
+    if not normalized_statuses:
+        return None
+    statuses: set[DocumentStatus] = set()
+    for status in normalized_statuses:
+        try:
+            statuses.add(DocumentStatus(status))
+        except ValueError:
+            continue
+    return statuses
 
 
 def _document_sort_value(document: Document, llm_result: LLMParseResult | None, sort_field: str) -> str:

@@ -106,6 +106,7 @@ class DocumentStore(Protocol):
         owner_id: str,
         limit: int = 100,
         offset: int = 0,
+        statuses: set[DocumentStatus] | None = None,
     ) -> list[tuple[Document, LLMParseResult | None]]:
         """List owner documents with optional LLM metadata in one repository call."""
 

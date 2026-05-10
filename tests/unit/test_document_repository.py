@@ -71,6 +71,20 @@ def test_list_owner_documents_with_llm_results_returns_owner_rows() -> None:
     ]
 
 
+def test_list_owner_documents_with_llm_results_filters_by_status() -> None:
+    repository = InMemoryDocumentRepository()
+    repository.save(_document("owner-a-ready", "owner-a"))
+    repository.save(_processing_document("owner-a-processing", "owner-a"))
+    repository.save(_processing_document("owner-b-processing", "owner-b"))
+
+    rows = repository.list_owner_documents_with_llm_results(
+        owner_id="owner-a",
+        statuses={DocumentStatus.PROCESSING},
+    )
+
+    assert [document.id for document, _llm_result in rows] == ["owner-a-processing"]
+
+
 def test_count_owner_documents_by_statuses_is_owner_scoped() -> None:
     repository = InMemoryDocumentRepository()
     repository.save(_processing_document("owner-a-processing", "owner-a"))

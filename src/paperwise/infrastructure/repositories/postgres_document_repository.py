@@ -217,12 +217,21 @@ class PostgresDocumentRepository(DocumentRepository):
         owner_id: str,
         limit: int = 100,
         offset: int = 0,
+        statuses: set[DocumentStatus] | None = None,
     ) -> list[tuple[Document, LLMParseResult | None]]:
+        if statuses is not None and not statuses:
+            return []
+        status_values = [status.value for status in statuses] if statuses is not None else None
         with self._session_factory() as session:
-            rows = session.execute(
+            statement = (
                 select(DocumentRow, LLMParseResultRow)
                 .outerjoin(LLMParseResultRow, LLMParseResultRow.document_id == DocumentRow.id)
                 .where(DocumentRow.owner_id == owner_id)
+            )
+            if status_values is not None:
+                statement = statement.where(DocumentRow.status.in_(status_values))
+            rows = session.execute(
+                statement
                 .order_by(DocumentRow.created_at.desc())
                 .offset(max(0, offset))
                 .limit(max(0, limit))

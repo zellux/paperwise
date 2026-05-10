@@ -131,10 +131,18 @@ class InMemoryDocumentRepository(DocumentRepository):
         owner_id: str,
         limit: int = 100,
         offset: int = 0,
+        statuses: set[DocumentStatus] | None = None,
     ) -> list[tuple[Document, LLMParseResult | None]]:
+        if statuses is not None and not statuses:
+            return []
         with self._lock:
             docs = sorted(
-                (document for document in self._documents.values() if document.owner_id == owner_id),
+                (
+                    document
+                    for document in self._documents.values()
+                    if document.owner_id == owner_id
+                    and (statuses is None or document.status in statuses)
+                ),
                 key=lambda d: d.created_at,
                 reverse=True,
             )

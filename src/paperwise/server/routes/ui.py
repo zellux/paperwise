@@ -187,8 +187,8 @@ def _activity_initial_data(repository: DocumentRepository, current_user: User | 
         for document, llm_result in repository.list_owner_documents_with_llm_results(
             owner_id=current_user.id,
             limit=20,
+            statuses={DocumentStatus.READY},
         )
-        if document.status == DocumentStatus.READY
     ]
     preference = repository.get_user_preference(current_user.id)
     total_tokens = 0
@@ -216,10 +216,10 @@ def _activity_partial_data(
         (document, llm_result)
         for document, llm_result in repository.list_owner_documents_with_llm_results(
             owner_id=current_user.id,
-            limit=10_000,
+            limit=normalized_limit,
+            statuses={DocumentStatus.READY},
         )
-        if document.status == DocumentStatus.READY
-    ][:normalized_limit]
+    ]
     preference = repository.get_user_preference(current_user.id)
     total_tokens = 0
     if preference is not None:
@@ -312,8 +312,8 @@ def _pending_initial_data(repository: DocumentRepository, current_user: User | N
         for document, llm_result in repository.list_owner_documents_with_llm_results(
             owner_id=current_user.id,
             limit=200,
+            statuses=PENDING_DOCUMENT_STATUSES,
         )
-        if document.status != DocumentStatus.READY
     ]
     return {
         **initial_data,
