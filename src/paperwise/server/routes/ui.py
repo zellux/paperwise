@@ -39,7 +39,7 @@ from paperwise.server.html_rewriter import (
     replace_input_value,
     replace_table_body,
 )
-from paperwise.server.routes.document_access import get_owned_document_or_404
+from paperwise.server.document_access import get_owned_document_or_404
 from paperwise.server.ui_payloads import document_list_item, history_event_item
 from paperwise.server.ui_fragments import (
     activity_rows_html,

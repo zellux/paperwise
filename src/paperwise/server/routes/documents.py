@@ -20,7 +20,7 @@ from paperwise.server.llm_provider import (
     resolve_http_metadata_llm_provider_for_user,
     resolve_http_ocr_llm_provider_for_user,
 )
-from paperwise.server.routes.document_access import get_owned_document_or_404
+from paperwise.server.document_access import get_owned_document_or_404
 from paperwise.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
