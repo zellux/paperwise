@@ -92,10 +92,32 @@ class ChatThreadSummaryResponse(BaseModel):
     created_at: str
     updated_at: str
 
+    @classmethod
+    def from_domain(cls, thread: ChatThread) -> "ChatThreadSummaryResponse":
+        return cls(
+            id=thread.id,
+            title=thread.title or "Untitled chat",
+            message_count=len(thread.messages),
+            created_at=thread.created_at.isoformat(),
+            updated_at=thread.updated_at.isoformat(),
+        )
+
 
 class ChatThreadResponse(ChatThreadSummaryResponse):
     messages: list[dict[str, Any]]
     token_usage: ChatTokenUsageResponse = Field(default_factory=ChatTokenUsageResponse)
+
+    @classmethod
+    def from_domain(cls, thread: ChatThread) -> "ChatThreadResponse":
+        usage = dict(thread.token_usage or {})
+        return cls(
+            **ChatThreadSummaryResponse.from_domain(thread).model_dump(mode="json"),
+            messages=[dict(message) for message in thread.messages],
+            token_usage=ChatTokenUsageResponse(
+                total_tokens=int(usage.get("total_tokens") or 0),
+                llm_requests=int(usage.get("llm_requests") or 0),
+            ),
+        )
 
 
 CHAT_SYSTEM_PROMPT = (
@@ -199,36 +221,16 @@ def _save_chat_thread(
     return response
 
 
-def _to_chat_thread_summary(thread: ChatThread) -> ChatThreadSummaryResponse:
-    return ChatThreadSummaryResponse(
-        id=thread.id,
-        title=thread.title or "Untitled chat",
-        message_count=len(thread.messages),
-        created_at=thread.created_at.isoformat(),
-        updated_at=thread.updated_at.isoformat(),
-    )
-
-
-def _to_chat_thread_response(thread: ChatThread) -> ChatThreadResponse:
-    summary = _to_chat_thread_summary(thread)
-    usage = dict(thread.token_usage or {})
-    return ChatThreadResponse(
-        **summary.model_dump(mode="json"),
-        messages=[dict(message) for message in thread.messages],
-        token_usage=ChatTokenUsageResponse(
-            total_tokens=int(usage.get("total_tokens") or 0),
-            llm_requests=int(usage.get("llm_requests") or 0),
-        ),
-    )
-
-
 @router.get("/chat/threads", response_model=list[ChatThreadSummaryResponse])
 def list_chat_threads_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[ChatThreadSummaryResponse]:
     migrate_legacy_chat_threads(repository, current_user)
-    return [_to_chat_thread_summary(thread) for thread in repository.list_chat_threads(current_user.id, MAX_CHAT_THREADS)]
+    return [
+        ChatThreadSummaryResponse.from_domain(thread)
+        for thread in repository.list_chat_threads(current_user.id, MAX_CHAT_THREADS)
+    ]
 
 
 @router.get("/chat/threads/{thread_id}", response_model=ChatThreadResponse)
@@ -240,7 +242,7 @@ def get_chat_thread_endpoint(
     migrate_legacy_chat_threads(repository, current_user)
     thread = repository.get_chat_thread(current_user.id, thread_id)
     if thread is not None:
-        return _to_chat_thread_response(thread)
+        return ChatThreadResponse.from_domain(thread)
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat thread not found.")
 
 
