@@ -14,7 +14,9 @@
                   <div class="settings-group-fields">
                     <label class="label" for="settingsThemeSelect">Theme</label>
                     <select id="settingsThemeSelect" name="settingsThemeSelect">
-                      {{theme_options}}
+{% for theme in supported_ui_themes %}
+                      <option value="{{ theme }}">{{ theme|replace("-", " ")|title }}</option>
+{% endfor %}
                     </select>
 
                     <label class="label" for="settingsPageSizeSelect">Documents per page</label>

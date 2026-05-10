@@ -1,6 +1,6 @@
 <article id="section-activity" class="panel panel-section view">
           <h2>Activity</h2>
-          <p id="activityTokenTotal" class="activity-token-total">LLM tokens processed: 0</p>
+          <p id="activityTokenTotal" class="activity-token-total">LLM tokens processed: {{ activity_total_tokens|default(0)|int|format_number }}</p>
           <h3>Recently Processed Documents</h3>
           <div class="docs-table-wrap">
             <table class="docs-table pending-table">
@@ -13,9 +13,7 @@
                 </tr>
               </thead>
               <tbody id="processedDocsTableBody">
-                <tr>
-                  <td colspan="4">No processed documents loaded.</td>
-                </tr>
+{{ activity_table_body_html|safe }}
               </tbody>
             </table>
           </div>

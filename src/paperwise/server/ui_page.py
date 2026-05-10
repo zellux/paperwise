@@ -3,15 +3,8 @@ import json
 import re
 
 from fastapi.responses import HTMLResponse
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from paperwise.server.html_rewriter import (
-    render_active_nav,
-    replace_activity_token_total,
-    replace_element_html,
-    replace_element_text,
-    replace_input_value,
-    replace_table_body,
-)
 from paperwise.server.ui_fragments import (
     activity_rows_html,
     chat_thread_list_html,
@@ -27,8 +20,11 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 _STATIC_CSS_DIR = STATIC_DIR / "css"
 _STATIC_JS_DIR = STATIC_DIR / "js"
 _TEMPLATE_DIR = Path(__file__).resolve().parent / "templates" / "ui"
-_LAYOUT_TEMPLATE = _TEMPLATE_DIR / "layout.html"
-_PARTIALS_DIR = _TEMPLATE_DIR / "partials"
+_TEMPLATE_ENV = Environment(
+    loader=FileSystemLoader(_TEMPLATE_DIR),
+    autoescape=select_autoescape(("html", "xml")),
+)
+_TEMPLATE_ENV.filters["format_number"] = lambda value: f"{int(value or 0):,}"
 _ACTIVE_NAV_BY_VIEW = {
     "section-docs": "/ui/documents",
     "section-document": "/ui/documents",
@@ -41,18 +37,18 @@ _ACTIVE_NAV_BY_VIEW = {
     "section-settings": "/ui/settings",
 }
 _PAGE_PARTIAL_BY_NAME = {
-    "documents": "documents.html",
-    "document": "document.html",
-    "search": "search.html",
-    "grounded-qa": "grounded_qa.html",
-    "tags": "tags.html",
-    "document-types": "document_types.html",
-    "pending": "pending.html",
-    "upload": "upload.html",
-    "activity": "activity.html",
-    "settings-display": "settings_display.html",
-    "settings-account": "settings_account.html",
-    "settings-models": "settings_models.html",
+    "documents": "partials/documents.html",
+    "document": "partials/document.html",
+    "search": "partials/search.html",
+    "grounded-qa": "partials/grounded_qa.html",
+    "tags": "partials/tags.html",
+    "document-types": "partials/document_types.html",
+    "pending": "partials/pending.html",
+    "upload": "partials/upload.html",
+    "activity": "partials/activity.html",
+    "settings-display": "partials/settings_display.html",
+    "settings-account": "partials/settings_account.html",
+    "settings-models": "partials/settings_models.html",
 }
 _PAGE_SCRIPTS_BY_VIEW = {
     "section-docs": ["documents.js"],
@@ -77,10 +73,6 @@ def render_ui_page(
     initial_data: dict | None = None,
     active_nav_href: str | None = None,
 ) -> HTMLResponse:
-    partial_name = _PAGE_PARTIAL_BY_NAME[page_name]
-    html = _LAYOUT_TEMPLATE.read_text(encoding="utf-8")
-    content = (_PARTIALS_DIR / partial_name).read_text(encoding="utf-8").rstrip()
-    content = content.replace("{{theme_options}}", _theme_options_html())
     script_names = ["shared.js", "app.js", *_PAGE_SCRIPTS_BY_VIEW.get(view_id, [])]
     asset_version = str(
         max(
@@ -89,31 +81,22 @@ def render_ui_page(
         )
     )
     asset_query = f"?v={asset_version}"
-    page_script_tags = "\n".join(
-        f'    <script src="/static/js/{script_name}{asset_query}" defer></script>'
-        for script_name in script_names[2:]
-    )
-    html = _apply_layout_replacements(
-        html,
-        asset_query=asset_query,
-        content=content,
-        page_script_tags=page_script_tags,
-        initial_data_script="{{initial_data_script}}",
-    )
-    html = render_active_nav(html, active_nav_href or _ACTIVE_NAV_BY_VIEW.get(view_id, "/ui/documents"))
-    initial_data_script = ""
+    initial_data_json = ""
     if initial_data is not None:
-        html = _render_initial_page_data(html, initial_data)
-        if initial_data.get("authenticated") is True:
-            html = _render_authenticated_html_class(html)
-        payload = json.dumps(initial_data, ensure_ascii=True).replace("</", "<\\/")
-        initial_data_script = (
-            f'    <script id="paperwiseInitialData" type="application/json">{payload}</script>'
-        )
-    html = render_template_placeholders(
-        html,
-        {"initial_data_script": initial_data_script},
-    )
+        initial_data_json = json.dumps(initial_data, ensure_ascii=True).replace("</", "<\\/")
+    context = {
+        **_initial_render_context(initial_data or {}),
+        "active_nav_href": active_nav_href or _ACTIVE_NAV_BY_VIEW.get(view_id, "/ui/documents"),
+        "asset_query": asset_query,
+        "authenticated": bool(initial_data and initial_data.get("authenticated") is True),
+        "default_ui_theme": DEFAULT_UI_THEME,
+        "initial_data_json": initial_data_json,
+        "page_script_names": script_names[2:],
+        "page_template": _PAGE_PARTIAL_BY_NAME[page_name],
+        "supported_ui_themes": list(SUPPORTED_UI_THEMES),
+        "ui_theme_storage_key": UI_THEME_STORAGE_KEY,
+    }
+    html = _TEMPLATE_ENV.get_template("layout.html").render(context)
 
     return HTMLResponse(
         html,
@@ -121,108 +104,48 @@ def render_ui_page(
     )
 
 
-def _theme_options_html() -> str:
-    return "\n".join(
-        f'                      <option value="{theme}">{theme.replace("-", " ").title()}</option>'
-        for theme in SUPPORTED_UI_THEMES
-    )
-
-
-def _render_document_detail_data(html: str, initial_data: dict) -> str:
-    if not isinstance(initial_data.get("document_detail"), dict):
-        return html
+def _initial_render_context(initial_data: dict) -> dict:
+    documents = initial_data.get("documents")
+    tags = initial_data.get("tag_stats")
+    document_types = initial_data.get("document_type_stats")
+    activity_documents = initial_data.get("activity_documents")
+    pending_documents = initial_data.get("pending_documents")
+    chat_threads = initial_data.get("chat_threads")
     fragments = document_detail_fragments(initial_data)
-    if not fragments["document_id"]:
-        return html
-    for element_id, value in fragments["text"].items():
-        html = replace_element_text(html, element_id, value)
-    for element_id, value in fragments["html"].items():
-        html = replace_element_html(html, element_id, value)
-    for element_id, value in fragments["inputs"].items():
-        html = replace_input_value(html, element_id, value)
-
-    html = replace_element_html(html, "documentHistoryList", fragments["history_html"])
-    return html
-
-
-def _render_initial_page_data(html: str, initial_data: dict) -> str:
-    html = _render_document_detail_data(html, initial_data)
-    if isinstance(initial_data.get("documents"), list):
-        html = replace_table_body(html, "docsTableBody", document_rows_html(initial_data["documents"]))
-        total = int(initial_data.get("documents_total") or 0)
-        processing_count = int(initial_data.get("documents_processing_count") or 0)
-        page = max(1, int(initial_data.get("documents_page") or 1))
-        page_size = max(1, int(initial_data.get("documents_page_size") or 20))
-        html = replace_element_html(
-            html,
-            "documentsPaginationToolbar",
-            documents_pagination_toolbar_html(
-                total=total,
-                processing_count=processing_count,
-                page=page,
-                page_size=page_size,
-            ),
-        )
-    if isinstance(initial_data.get("tag_stats"), list):
-        html = replace_table_body(html, "tagsTableBody", tag_rows_html(initial_data["tag_stats"]))
-    if isinstance(initial_data.get("document_type_stats"), list):
-        html = replace_table_body(
-            html,
-            "documentTypesTableBody",
-            document_type_rows_html(initial_data["document_type_stats"]),
-        )
-    if isinstance(initial_data.get("activity_documents"), list):
-        html = replace_table_body(
-            html,
-            "processedDocsTableBody",
-            activity_rows_html(initial_data["activity_documents"]),
-        )
-        total_tokens = int(initial_data.get("activity_total_tokens") or 0)
-        html = replace_activity_token_total(html, total_tokens)
-    if isinstance(initial_data.get("pending_documents"), list):
-        html = replace_table_body(
-            html,
-            "pendingTableBody",
-            pending_rows_html(initial_data["pending_documents"]),
-        )
-    if isinstance(initial_data.get("chat_threads"), list):
-        html = replace_element_html(
-            html,
-            "searchAskThreadList",
-            chat_thread_list_html(initial_data["chat_threads"]),
-        )
-    return html
-
-
-def _apply_layout_replacements(
-    html: str,
-    *,
-    asset_query: str,
-    content: str,
-    page_script_tags: str,
-    initial_data_script: str,
-) -> str:
-    replacements = {
-        "asset_query": asset_query,
-        "ui_theme_storage_key": UI_THEME_STORAGE_KEY,
-        "supported_ui_themes_json": json.dumps(list(SUPPORTED_UI_THEMES)),
-        "default_ui_theme": DEFAULT_UI_THEME,
-        "page_scripts": page_script_tags,
-        "content": content,
-        "initial_data_script": initial_data_script,
+    total = int(initial_data.get("documents_total") or 0)
+    processing_count = int(initial_data.get("documents_processing_count") or 0)
+    page = max(1, int(initial_data.get("documents_page") or 1))
+    page_size = max(1, int(initial_data.get("documents_page_size") or 20))
+    return {
+        "activity_table_body_html": activity_rows_html(
+            activity_documents if isinstance(activity_documents, list) else []
+        ),
+        "activity_total_tokens": int(initial_data.get("activity_total_tokens") or 0),
+        "chat_thread_list_html": chat_thread_list_html(
+            chat_threads if isinstance(chat_threads, list) else []
+        ),
+        "document_detail_blob_uri": fragments["blob_uri"],
+        "document_detail_inputs": fragments["inputs"],
+        "document_detail_status_html": fragments["html"].get("detailStatus", "-"),
+        "document_detail_text": fragments["text"],
+        "document_history_html": fragments["history_html"],
+        "document_types_table_body_html": document_type_rows_html(
+            document_types if isinstance(document_types, list) else []
+        ),
+        "documents_pagination_toolbar_html": documents_pagination_toolbar_html(
+            total=total,
+            processing_count=processing_count,
+            page=page,
+            page_size=page_size,
+        ),
+        "documents_table_body_html": document_rows_html(
+            documents if isinstance(documents, list) else []
+        ),
+        "pending_table_body_html": pending_rows_html(
+            pending_documents if isinstance(pending_documents, list) else []
+        ),
+        "tags_table_body_html": tag_rows_html(tags if isinstance(tags, list) else []),
     }
-    return render_template_placeholders(html, replacements)
-
-
-def render_template_placeholders(template: str, values: dict[str, object]) -> str:
-    rendered = template
-    for key, value in values.items():
-        rendered = rendered.replace(f"{{{{{key}}}}}", str(value))
-    return rendered
-
-
-def _render_authenticated_html_class(html: str) -> str:
-    return html.replace('<html lang="en">', '<html lang="en" class="has-session">', 1)
 
 
 def find_template_placeholders(html: str) -> list[str]:

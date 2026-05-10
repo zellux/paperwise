@@ -59,17 +59,7 @@
             </div>
             <button id="clearFiltersBtn" type="button" class="btn btn-muted">Reset Filters</button>
           </form>
-          <div id="documentsPaginationToolbar" class="pagination-toolbar">
-            <div class="docs-summary">
-              <span id="docsTotalLabel" class="docs-total-label">Total documents: 0</span>
-              <span id="docsProcessingLabel" class="docs-total-label">Processing: 0</span>
-            </div>
-            <div class="pagination-controls">
-              <button id="pagePrevBtn" type="button" class="btn btn-muted">Prev</button>
-              <span id="pageIndicator" class="page-indicator">Page 1</span>
-              <button id="pageNextBtn" type="button" class="btn btn-muted">Next</button>
-            </div>
-          </div>
+          <div id="documentsPaginationToolbar" class="pagination-toolbar">{{ documents_pagination_toolbar_html|safe }}</div>
           <div class="docs-table-wrap">
             <table class="docs-table">
               <thead>
@@ -114,9 +104,7 @@
                 </tr>
               </thead>
               <tbody id="docsTableBody">
-                <tr>
-                  <td colspan="7">No documents loaded.</td>
-                </tr>
+{{ documents_table_body_html|safe }}
               </tbody>
             </table>
           </div>

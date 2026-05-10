@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en"{% if authenticated %} class="has-session"{% endif %}>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -15,30 +15,30 @@
     <script>
       (() => {
         try {
-          const key = "{{ui_theme_storage_key}}";
-          const supported = new Set({{supported_ui_themes_json}});
+          const key = {{ ui_theme_storage_key|tojson }};
+          const supported = new Set({{ supported_ui_themes|tojson }});
           const stored = String(window.localStorage.getItem(key) || "").trim().toLowerCase();
-          const theme = supported.has(stored) ? stored : "{{default_ui_theme}}";
+          const theme = supported.has(stored) ? stored : {{ default_ui_theme|tojson }};
           document.documentElement.classList.add(`theme-${theme}`);
           document.documentElement.dataset.uiTheme = theme;
           document.documentElement.dataset.uiThemeStorageKey = key;
         } catch (_error) {
-          document.documentElement.classList.add("theme-{{default_ui_theme}}");
-          document.documentElement.dataset.uiTheme = "{{default_ui_theme}}";
-          document.documentElement.dataset.uiThemeStorageKey = "{{ui_theme_storage_key}}";
+          document.documentElement.classList.add("theme-{{ default_ui_theme }}");
+          document.documentElement.dataset.uiTheme = "{{ default_ui_theme }}";
+          document.documentElement.dataset.uiThemeStorageKey = "{{ ui_theme_storage_key }}";
         }
       })();
     </script>
-    <link rel="stylesheet" href="/static/css/themes.css{{asset_query}}" />
-    <link rel="stylesheet" href="/static/css/styles.css{{asset_query}}" />
-    <link rel="stylesheet" href="/static/css/auth.css{{asset_query}}" />
-    <link rel="stylesheet" href="/static/css/documents.css{{asset_query}}" />
-    <link rel="stylesheet" href="/static/css/tables.css{{asset_query}}" />
-    <link rel="stylesheet" href="/static/css/upload.css{{asset_query}}" />
-    <link rel="stylesheet" href="/static/css/search.css{{asset_query}}" />
-    <link rel="stylesheet" href="/static/css/chat.css{{asset_query}}" />
-    <link rel="stylesheet" href="/static/css/activity.css{{asset_query}}" />
-    <link rel="stylesheet" href="/static/css/settings.css{{asset_query}}" />
+    <link rel="stylesheet" href="/static/css/themes.css{{ asset_query }}" />
+    <link rel="stylesheet" href="/static/css/styles.css{{ asset_query }}" />
+    <link rel="stylesheet" href="/static/css/auth.css{{ asset_query }}" />
+    <link rel="stylesheet" href="/static/css/documents.css{{ asset_query }}" />
+    <link rel="stylesheet" href="/static/css/tables.css{{ asset_query }}" />
+    <link rel="stylesheet" href="/static/css/upload.css{{ asset_query }}" />
+    <link rel="stylesheet" href="/static/css/search.css{{ asset_query }}" />
+    <link rel="stylesheet" href="/static/css/chat.css{{ asset_query }}" />
+    <link rel="stylesheet" href="/static/css/activity.css{{ asset_query }}" />
+    <link rel="stylesheet" href="/static/css/settings.css{{ asset_query }}" />
   </head>
   <body>
     <div class="bg-orb bg-orb-a"></div>
@@ -137,33 +137,33 @@
 
       <aside class="sidebar">
         <nav class="nav">
-          <a class="nav-link active" data-target="section-docs" href="/ui/documents">
+          <a class="nav-link{% if active_nav_href == '/ui/documents' %} active{% endif %}" data-target="section-docs" href="/ui/documents">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
             <span>Documents</span>
           </a>
-          <a class="nav-link" data-target="section-tags" href="/ui/tags">
+          <a class="nav-link{% if active_nav_href == '/ui/tags' %} active{% endif %}" data-target="section-tags" href="/ui/tags">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
             <span>Tags</span>
           </a>
-          <a class="nav-link" data-target="section-document-types" href="/ui/document-types">
+          <a class="nav-link{% if active_nav_href == '/ui/document-types' %} active{% endif %}" data-target="section-document-types" href="/ui/document-types">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
             <span>Document Types</span>
           </a>
-          <a class="nav-link" data-target="section-pending" href="/ui/pending">
+          <a class="nav-link{% if active_nav_href == '/ui/pending' %} active{% endif %}" data-target="section-pending" href="/ui/pending">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
             <span>Processing Queue</span>
           </a>
-          <a class="nav-link" data-target="section-upload" href="/ui/upload">
+          <a class="nav-link{% if active_nav_href == '/ui/upload' %} active{% endif %}" data-target="section-upload" href="/ui/upload">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
             <span>Upload</span>
           </a>
-          <a class="nav-link" data-target="section-activity" href="/ui/activity">
+          <a class="nav-link{% if active_nav_href == '/ui/activity' %} active{% endif %}" data-target="section-activity" href="/ui/activity">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             <span>Activity</span>
           </a>
           <div class="nav-divider" aria-hidden="true"></div>
           <a
-            class="nav-link"
+            class="nav-link{% if active_nav_href == '/ui/search' %} active{% endif %}"
             data-target="section-search"
             href="/ui/search"
           >
@@ -171,7 +171,7 @@
             <span>Search</span>
           </a>
           <a
-            class="nav-link"
+            class="nav-link{% if active_nav_href == '/ui/grounded-qa' %} active{% endif %}"
             data-target="section-search"
             href="/ui/grounded-qa"
           >
@@ -179,7 +179,7 @@
             <span>Ask Your Docs</span>
           </a>
           <div class="nav-divider" aria-hidden="true"></div>
-          <a class="nav-link nav-link-settings" data-target="section-settings" href="/ui/settings">
+          <a class="nav-link nav-link-settings{% if active_nav_href == '/ui/settings' %} active{% endif %}" data-target="section-settings" href="/ui/settings">
             <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             <span>Settings</span>
           </a>
@@ -187,13 +187,17 @@
       </aside>
 
       <section class="content-pane">
-{{content}}
+{% include page_template %}
       </section>
     </main>
 
-    <script src="/static/js/shared.js{{asset_query}}" defer></script>
-    <script src="/static/js/app.js{{asset_query}}" defer></script>
-{{page_scripts}}
-{{initial_data_script}}
+    <script src="/static/js/shared.js{{ asset_query }}" defer></script>
+    <script src="/static/js/app.js{{ asset_query }}" defer></script>
+{% for script_name in page_script_names %}
+    <script src="/static/js/{{ script_name }}{{ asset_query }}" defer></script>
+{% endfor %}
+{% if initial_data_json %}
+    <script id="paperwiseInitialData" type="application/json">{{ initial_data_json|safe }}</script>
+{% endif %}
   </body>
 </html>
