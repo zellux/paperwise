@@ -1,10 +1,10 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
-import re
 
 from sqlalchemy import func, select
 
 from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.services.search_text import extract_search_snippet, tokenize_search_query
 from paperwise.application.services.taxonomy import normalize_name, to_title_case
 from paperwise.application.services.taxonomy_stats import (
     tag_stats_from_metadata,
@@ -54,28 +54,6 @@ def _coerce_document_status(value: str) -> DocumentStatus:
     if normalized in legacy_map:
         return legacy_map[normalized]
     return DocumentStatus(normalized)
-
-
-def _tokenize_query(query: str) -> list[str]:
-    return [token.lower() for token in re.findall(r"[A-Za-z0-9]{2,}", query)]
-
-
-def _extract_snippet(text: str, terms: list[str], *, max_len: int = 240) -> str:
-    source = str(text or "")
-    if not source.strip():
-        return ""
-    lowered = source.lower()
-    pos = -1
-    for term in terms:
-        idx = lowered.find(term)
-        if idx >= 0:
-            pos = idx
-            break
-    if pos < 0:
-        return " ".join(source.split())[:max_len]
-    start = max(0, pos - max_len // 3)
-    end = min(len(source), start + max_len)
-    return " ".join(source[start:end].split())
 
 
 def _document_from_row(row: DocumentRow) -> Document:
@@ -739,7 +717,7 @@ class PostgresDocumentRepository(DocumentRepository):
         limit: int = 20,
         document_ids: list[str] | None = None,
     ) -> list[DocumentSearchHit]:
-        terms = _tokenize_query(query)
+        terms = tokenize_search_query(query)
         if not terms:
             return []
         scoped_ids = sorted(set(document_ids or []))
@@ -777,7 +755,7 @@ class PostgresDocumentRepository(DocumentRepository):
                 if not matched:
                     continue
                 score = float(sum(lowered.count(term) for term in matched))
-                snippet = _extract_snippet(
+                snippet = extract_search_snippet(
                     parse_row.text_preview if parse_row is not None else searchable_text,
                     matched,
                 )
@@ -858,7 +836,7 @@ class PostgresDocumentRepository(DocumentRepository):
         limit: int = 40,
         document_ids: list[str] | None = None,
     ) -> list[DocumentChunkSearchHit]:
-        terms = _tokenize_query(query)
+        terms = tokenize_search_query(query)
         if not terms:
             return []
         scoped_ids = sorted(set(document_ids or []))
