@@ -12,7 +12,7 @@ from paperwise.server.dependencies import (
 )
 from paperwise.application.interfaces import PreferenceRepository, UserRepository
 from paperwise.application.services.session_tokens import create_session_token
-from paperwise.application.services.llm_preferences import get_normalized_llm_preferences, validate_api_key_for_provider
+from paperwise.application.services.llm_preferences import validate_llm_preference_api_keys
 from paperwise.application.services.user_preferences import (
     load_normalized_user_preferences,
     load_user_preferences,
@@ -85,17 +85,6 @@ def _session_cookie_secure(settings: Settings) -> bool:
     if settings.session_cookie_secure is not None:
         return settings.session_cookie_secure
     return settings.env.lower() not in {"local", "dev", "development", "test", "docker"}
-
-
-def _validate_llm_preferences(preferences: dict[str, Any]) -> None:
-    normalized = get_normalized_llm_preferences(preferences)
-    for connection in normalized["llm_connections"]:
-        error = validate_api_key_for_provider(connection.get("provider", ""), connection.get("api_key", ""))
-        if error:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=error,
-            )
 
 
 @router.post("", status_code=status.HTTP_201_CREATED, response_model=UserResponse)
@@ -209,7 +198,11 @@ def put_me_preferences_endpoint(
 ) -> UserPreferenceResponse:
     merged_preferences = load_user_preferences(repository=repository, user_id=current_user.id)
     merged_preferences.update(dict(payload.preferences))
-    _validate_llm_preferences(merged_preferences)
+    if error := validate_llm_preference_api_keys(merged_preferences):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error,
+        )
     preference = UserPreference(user_id=current_user.id, preferences=merged_preferences)
     repository.save_user_preference(preference)
     return UserPreferenceResponse(preferences=normalized_user_preferences(preference.preferences))

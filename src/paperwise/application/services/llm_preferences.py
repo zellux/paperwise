@@ -51,6 +51,15 @@ def validate_api_key_for_provider(provider: str, api_key: Any) -> str:
     return ""
 
 
+def validate_llm_preference_api_keys(preferences: dict[str, Any]) -> str:
+    normalized = get_normalized_llm_preferences(preferences)
+    for connection in normalized["llm_connections"]:
+        error = validate_api_key_for_provider(connection.get("provider", ""), connection.get("api_key", ""))
+        if error:
+            return error
+    return ""
+
+
 def default_base_url_for_provider(provider: str) -> str:
     if provider == "openai":
         return DEFAULT_OPENAI_BASE_URL
