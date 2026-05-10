@@ -1,9 +1,14 @@
 from typing import Any
+from typing import Protocol
 
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import DocumentStore, ParseResultRepository
 
 
-def tool_document_item(repository: DocumentRepository, document_id: str) -> dict[str, Any] | None:
+class ToolDocumentRepository(DocumentStore, ParseResultRepository, Protocol):
+    """Repository surface needed to build chat tool document payloads."""
+
+
+def tool_document_item(repository: ToolDocumentRepository, document_id: str) -> dict[str, Any] | None:
     document = repository.get(document_id)
     if document is None:
         return None

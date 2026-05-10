@@ -1,7 +1,7 @@
 from collections.abc import Iterator
 from dataclasses import dataclass
 
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import DocumentStore
 from paperwise.application.services.taxonomy import normalize_name
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, User
 
@@ -49,7 +49,7 @@ def document_sort_key(
 
 def list_filtered_documents(
     *,
-    repository: DocumentRepository,
+    repository: DocumentStore,
     current_user: User,
     query: str | None,
     tag: list[str] | None,
@@ -118,7 +118,7 @@ def list_filtered_documents(
 
 def count_filtered_documents(
     *,
-    repository: DocumentRepository,
+    repository: DocumentStore,
     current_user: User,
     query: str | None,
     tag: list[str] | None,
@@ -140,7 +140,7 @@ def count_filtered_documents(
 
 def iter_filtered_documents(
     *,
-    repository: DocumentRepository,
+    repository: DocumentStore,
     current_user: User,
     query: str | None,
     normalized_tags: set[str],

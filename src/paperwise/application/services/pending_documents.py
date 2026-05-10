@@ -1,6 +1,7 @@
 from dataclasses import dataclass
+from typing import Protocol
 
-from paperwise.application.interfaces import DocumentRepository, IngestionDispatcher
+from paperwise.application.interfaces import DocumentStore, HistoryRepository, IngestionDispatcher
 from paperwise.application.services.history import build_processing_restarted_history_event
 from paperwise.domain.models import Document, DocumentHistoryEvent, DocumentStatus, HistoryActorType, LLMParseResult
 
@@ -11,6 +12,10 @@ PENDING_DOCUMENT_STATUSES = {
 }
 
 
+class PendingDocumentRepository(DocumentStore, HistoryRepository, Protocol):
+    """Repository surface needed to restart pending documents."""
+
+
 @dataclass(frozen=True)
 class RestartPendingDocumentsResult:
     restarted_count: int
@@ -19,7 +24,7 @@ class RestartPendingDocumentsResult:
 
 def list_pending_documents(
     *,
-    repository: DocumentRepository,
+    repository: DocumentStore,
     owner_id: str,
     limit: int,
 ) -> list[tuple[Document, LLMParseResult | None]]:
@@ -32,7 +37,7 @@ def list_pending_documents(
 
 def restart_pending_documents(
     *,
-    repository: DocumentRepository,
+    repository: PendingDocumentRepository,
     dispatcher: IngestionDispatcher,
     owner_id: str,
     actor_id: str | None,

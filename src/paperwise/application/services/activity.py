@@ -1,8 +1,13 @@
 from dataclasses import dataclass
+from typing import Protocol
 
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import DocumentStore, PreferenceRepository
 from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult
+
+
+class ActivityRepository(DocumentStore, PreferenceRepository, Protocol):
+    """Repository surface needed for activity summaries."""
 
 
 @dataclass(frozen=True)
@@ -13,7 +18,7 @@ class ActivitySummary:
 
 def owner_activity_summary(
     *,
-    repository: DocumentRepository,
+    repository: ActivityRepository,
     owner_id: str,
     limit: int,
 ) -> ActivitySummary:
