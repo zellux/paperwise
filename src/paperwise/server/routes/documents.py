@@ -59,6 +59,10 @@ from paperwise.application.services.llm_preferences import (
 )
 from paperwise.application.services.metadata_updates import update_document_metadata
 from paperwise.application.services.parsing import parse_document_blob
+from paperwise.application.services.pending_documents import (
+    list_pending_documents,
+    restart_pending_documents,
+)
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.application.services.upload_validation import (
     is_supported_upload,
@@ -260,13 +264,6 @@ class LocalOCRStatusResponse(BaseModel):
     tesseract_available: bool
     pdftoppm_available: bool
     detail: str
-
-
-PENDING_STATUSES = {
-    DocumentStatus.RECEIVED,
-    DocumentStatus.PROCESSING,
-    DocumentStatus.FAILED,
-}
 
 
 def _resolve_llm_provider_for_user(
@@ -499,10 +496,10 @@ def list_pending_documents_endpoint(
             document=document,
             llm_result=llm_result,
         )
-        for document, llm_result in repository.list_owner_documents_with_llm_results(
+        for document, llm_result in list_pending_documents(
+            repository=repository,
             owner_id=current_user.id,
             limit=limit,
-            statuses=PENDING_STATUSES,
         )
     ]
 
@@ -514,49 +511,16 @@ def restart_pending_documents_endpoint(
     dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> RestartPendingResponse:
-    documents = [
-        document
-        for document, _llm_result in repository.list_owner_documents_with_llm_results(
-            owner_id=current_user.id,
-            limit=limit,
-        )
-    ]
-    restarted_count = 0
-    skipped_ready_count = 0
-    history_events: list[DocumentHistoryEvent] = []
-
-    for document in documents:
-        if document.status == DocumentStatus.READY:
-            skipped_ready_count += 1
-            continue
-        previous_status = document.status.value
-        _set_document_status(
-            document=document,
-            repository=repository,
-            status_value=DocumentStatus.PROCESSING,
-        )
-        dispatcher.enqueue(
-            document_id=document.id,
-            blob_uri=document.blob_uri,
-            filename=document.filename,
-            content_type=document.content_type,
-        )
-        history_events.append(
-            build_processing_restarted_history_event(
-                document_id=document.id,
-                actor_type=HistoryActorType.USER,
-                actor_id=current_user.id,
-                source="api.pending_restart",
-                previous_status=previous_status,
-                current_status=document.status.value,
-            )
-        )
-        restarted_count += 1
-
-    repository.append_history_events(history_events)
+    result = restart_pending_documents(
+        repository=repository,
+        dispatcher=dispatcher,
+        owner_id=current_user.id,
+        actor_id=current_user.id,
+        limit=limit,
+    )
     return RestartPendingResponse(
-        restarted_count=restarted_count,
-        skipped_ready_count=skipped_ready_count,
+        restarted_count=result.restarted_count,
+        skipped_ready_count=result.skipped_ready_count,
     )
 
 
