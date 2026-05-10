@@ -17,7 +17,7 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
     storage_dependency,
 )
-from paperwise.server.llm_provider import resolve_http_llm_provider_from_preferences
+from paperwise.server.llm_provider import load_user_preferences, resolve_http_llm_provider_for_user
 from paperwise.server.routes.document_access import get_owned_document_or_404
 from paperwise.application.interfaces import (
     DocumentRepository,
@@ -313,10 +313,9 @@ def _resolve_llm_provider_for_user(
     current_user: User,
     provider_override: LLMProvider | None,
 ) -> LLMProvider:
-    preference = repository.get_user_preference(current_user.id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    return resolve_http_llm_provider_from_preferences(
-        preferences=preferences,
+    return resolve_http_llm_provider_for_user(
+        repository=repository,
+        user_id=current_user.id,
         provider_override=provider_override,
         task=LLM_TASK_METADATA,
     )
@@ -328,10 +327,9 @@ def _resolve_ocr_llm_provider_for_user(
     current_user: User,
     provider_override: LLMProvider | None,
 ) -> LLMProvider:
-    preference = repository.get_user_preference(current_user.id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    return resolve_http_llm_provider_from_preferences(
-        preferences=preferences,
+    return resolve_http_llm_provider_for_user(
+        repository=repository,
+        user_id=current_user.id,
         provider_override=provider_override,
         task=LLM_TASK_OCR,
         missing_provider_detail="Configure an OCR LLM connection in Settings before OCR parsing.",
@@ -345,9 +343,9 @@ def _resolve_ocr_provider_for_user(
     repository: DocumentRepository,
     current_user: User,
 ) -> str:
-    preference = repository.get_user_preference(current_user.id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    return resolve_ocr_provider(preferences)
+    return resolve_ocr_provider(
+        load_user_preferences(repository=repository, user_id=current_user.id)
+    )
 
 
 def _resolve_ocr_auto_switch_for_user(
@@ -355,9 +353,9 @@ def _resolve_ocr_auto_switch_for_user(
     repository: DocumentRepository,
     current_user: User,
 ) -> bool:
-    preference = repository.get_user_preference(current_user.id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    return resolve_ocr_auto_switch(preferences)
+    return resolve_ocr_auto_switch(
+        load_user_preferences(repository=repository, user_id=current_user.id)
+    )
 
 
 def _resolve_file_path_from_uri(blob_uri: str) -> Path | None:

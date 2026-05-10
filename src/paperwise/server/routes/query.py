@@ -28,7 +28,7 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     llm_provider_dependency,
 )
-from paperwise.server.llm_provider import resolve_http_llm_provider_from_preferences
+from paperwise.server.llm_provider import resolve_http_llm_provider_for_user
 
 router = APIRouter(prefix="/query", tags=["query"])
 
@@ -787,10 +787,9 @@ def chat_all_documents_endpoint(
     provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> ChatResponse:
-    preference = repository.get_user_preference(current_user.id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    llm_provider = resolve_http_llm_provider_from_preferences(
-        preferences=preferences,
+    llm_provider = resolve_http_llm_provider_for_user(
+        repository=repository,
+        user_id=current_user.id,
         provider_override=provider_override,
         task=LLM_TASK_GROUNDED_QA,
         missing_provider_detail="Configure a Grounded Q&A LLM connection in Settings before chatting with your documents.",
@@ -812,10 +811,9 @@ def stream_chat_all_documents_endpoint(
     provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> StreamingResponse:
-    preference = repository.get_user_preference(current_user.id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    llm_provider = resolve_http_llm_provider_from_preferences(
-        preferences=preferences,
+    llm_provider = resolve_http_llm_provider_for_user(
+        repository=repository,
+        user_id=current_user.id,
         provider_override=provider_override,
         task=LLM_TASK_GROUNDED_QA,
         missing_provider_detail="Configure a Grounded Q&A LLM connection in Settings before chatting with your documents.",
