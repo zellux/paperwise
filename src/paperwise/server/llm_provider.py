@@ -3,7 +3,7 @@ from typing import Any
 from fastapi import HTTPException, status
 
 from paperwise.application.interfaces import LLMProvider, PreferenceRepository
-from paperwise.application.services.llm_preferences import LLM_TASK_METADATA
+from paperwise.application.services.llm_preferences import LLM_TASK_METADATA, LLM_TASK_OCR
 from paperwise.application.services.llm_provider_factory import resolve_llm_provider_from_preferences
 from paperwise.application.services.user_preferences import load_user_preferences
 
@@ -49,4 +49,35 @@ def resolve_http_llm_provider_for_user(
         missing_provider_detail=missing_provider_detail,
         missing_api_key_detail=missing_api_key_detail,
         missing_base_url_detail=missing_base_url_detail,
+    )
+
+
+def resolve_http_metadata_llm_provider_for_user(
+    *,
+    repository: PreferenceRepository,
+    user_id: str,
+    provider_override: LLMProvider | None = None,
+) -> LLMProvider:
+    return resolve_http_llm_provider_for_user(
+        repository=repository,
+        user_id=user_id,
+        provider_override=provider_override,
+        task=LLM_TASK_METADATA,
+    )
+
+
+def resolve_http_ocr_llm_provider_for_user(
+    *,
+    repository: PreferenceRepository,
+    user_id: str,
+    provider_override: LLMProvider | None = None,
+) -> LLMProvider:
+    return resolve_http_llm_provider_for_user(
+        repository=repository,
+        user_id=user_id,
+        provider_override=provider_override,
+        task=LLM_TASK_OCR,
+        missing_provider_detail="Configure an OCR LLM connection in Settings before OCR parsing.",
+        missing_api_key_detail="Selected OCR LLM connection requires an API key in Settings.",
+        missing_base_url_detail="Custom OCR LLM connection requires a base URL in Settings.",
     )

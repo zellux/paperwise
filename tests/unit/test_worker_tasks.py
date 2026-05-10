@@ -4,13 +4,16 @@ from paperwise.domain.models import Document, DocumentStatus, ParseResult, UserP
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
+from paperwise.application.services.ocr_preferences import (
+    resolve_owner_ocr_auto_switch,
+    resolve_owner_ocr_provider,
+)
 from paperwise.workers import tasks as worker_tasks
-from paperwise.workers.tasks import _resolve_ocr_auto_switch_for_owner, _resolve_ocr_provider_for_owner
 
 
 def test_resolve_ocr_provider_defaults_to_llm_without_preferences() -> None:
     repository = InMemoryDocumentRepository()
-    assert _resolve_ocr_provider_for_owner(repository, "user-1") == "llm"
+    assert resolve_owner_ocr_provider(repository, "user-1") == "llm"
 
 
 def test_resolve_ocr_provider_reads_saved_preference() -> None:
@@ -18,7 +21,7 @@ def test_resolve_ocr_provider_reads_saved_preference() -> None:
     repository.save_user_preference(
         UserPreference(user_id="user-1", preferences={"ocr_provider": "tesseract"})
     )
-    assert _resolve_ocr_provider_for_owner(repository, "user-1") == "tesseract"
+    assert resolve_owner_ocr_provider(repository, "user-1") == "tesseract"
 
 
 def test_resolve_ocr_provider_supports_separate_llm_mode() -> None:
@@ -26,7 +29,7 @@ def test_resolve_ocr_provider_supports_separate_llm_mode() -> None:
     repository.save_user_preference(
         UserPreference(user_id="user-1", preferences={"ocr_provider": "llm_separate"})
     )
-    assert _resolve_ocr_provider_for_owner(repository, "user-1") == "llm_separate"
+    assert resolve_owner_ocr_provider(repository, "user-1") == "llm_separate"
 
 
 def test_resolve_ocr_provider_falls_back_to_llm_for_invalid_value() -> None:
@@ -34,12 +37,12 @@ def test_resolve_ocr_provider_falls_back_to_llm_for_invalid_value() -> None:
     repository.save_user_preference(
         UserPreference(user_id="user-1", preferences={"ocr_provider": "unknown-provider"})
     )
-    assert _resolve_ocr_provider_for_owner(repository, "user-1") == "llm"
+    assert resolve_owner_ocr_provider(repository, "user-1") == "llm"
 
 
 def test_resolve_ocr_auto_switch_defaults_to_false() -> None:
     repository = InMemoryDocumentRepository()
-    assert _resolve_ocr_auto_switch_for_owner(repository, "user-1") is False
+    assert resolve_owner_ocr_auto_switch(repository, "user-1") is False
 
 
 def test_resolve_ocr_auto_switch_reads_saved_preference() -> None:
@@ -47,7 +50,7 @@ def test_resolve_ocr_auto_switch_reads_saved_preference() -> None:
     repository.save_user_preference(
         UserPreference(user_id="user-1", preferences={"ocr_auto_switch": True})
     )
-    assert _resolve_ocr_auto_switch_for_owner(repository, "user-1") is True
+    assert resolve_owner_ocr_auto_switch(repository, "user-1") is True
 
 
 def test_parse_document_task_uses_current_document_blob_uri(monkeypatch) -> None:
@@ -81,8 +84,8 @@ def test_parse_document_task_uses_current_document_blob_uri(monkeypatch) -> None
 
     monkeypatch.setattr(worker_tasks, "_build_repository", lambda: repository)
     monkeypatch.setattr(worker_tasks, "_build_llm_provider", lambda: object())
-    monkeypatch.setattr(worker_tasks, "_resolve_ocr_provider_for_owner", lambda *args, **kwargs: "llm")
-    monkeypatch.setattr(worker_tasks, "_resolve_ocr_auto_switch_for_owner", lambda *args, **kwargs: False)
+    monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_provider", lambda *args, **kwargs: "llm")
+    monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_auto_switch", lambda *args, **kwargs: False)
     monkeypatch.setattr(worker_tasks, "_resolve_metadata_llm_provider_for_owner", lambda *args, **kwargs: object())
     monkeypatch.setattr(worker_tasks, "_resolve_ocr_llm_provider_for_owner", lambda *args, **kwargs: object())
     monkeypatch.setattr(worker_tasks, "parse_document_blob", fake_parse_document_blob)
@@ -129,8 +132,8 @@ def test_parse_document_task_marks_document_failed_and_records_history(monkeypat
 
     monkeypatch.setattr(worker_tasks, "_build_repository", lambda: repository)
     monkeypatch.setattr(worker_tasks, "_build_llm_provider", lambda: object())
-    monkeypatch.setattr(worker_tasks, "_resolve_ocr_provider_for_owner", lambda *args, **kwargs: "llm")
-    monkeypatch.setattr(worker_tasks, "_resolve_ocr_auto_switch_for_owner", lambda *args, **kwargs: False)
+    monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_provider", lambda *args, **kwargs: "llm")
+    monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_auto_switch", lambda *args, **kwargs: False)
     monkeypatch.setattr(worker_tasks, "_resolve_metadata_llm_provider_for_owner", lambda *args, **kwargs: object())
     monkeypatch.setattr(worker_tasks, "_resolve_ocr_llm_provider_for_owner", lambda *args, **kwargs: object())
     monkeypatch.setattr(worker_tasks, "parse_document_blob", fail_parse_document_blob)

@@ -16,7 +16,10 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
     storage_dependency,
 )
-from paperwise.server.llm_provider import resolve_http_llm_provider_for_user
+from paperwise.server.llm_provider import (
+    resolve_http_metadata_llm_provider_for_user,
+    resolve_http_ocr_llm_provider_for_user,
+)
 from paperwise.server.routes.document_access import get_owned_document_or_404
 from paperwise.application.interfaces import (
     DocumentRepository,
@@ -51,13 +54,11 @@ from paperwise.application.services.llm_connection_test import (
     format_llm_connection_test_error,
     run_llm_connection_test,
 )
-from paperwise.application.services.llm_preferences import (
-    LLM_TASK_METADATA,
-    LLM_TASK_OCR,
-    resolve_ocr_auto_switch,
-    resolve_ocr_provider,
-)
 from paperwise.application.services.metadata_updates import update_document_metadata
+from paperwise.application.services.ocr_preferences import (
+    resolve_owner_ocr_auto_switch,
+    resolve_owner_ocr_provider,
+)
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.pending_documents import (
     list_pending_documents,
@@ -265,57 +266,6 @@ class LocalOCRStatusResponse(BaseModel):
     tesseract_available: bool
     pdftoppm_available: bool
     detail: str
-
-
-def _resolve_llm_provider_for_user(
-    *,
-    repository: DocumentRepository,
-    current_user: User,
-    provider_override: LLMProvider | None,
-) -> LLMProvider:
-    return resolve_http_llm_provider_for_user(
-        repository=repository,
-        user_id=current_user.id,
-        provider_override=provider_override,
-        task=LLM_TASK_METADATA,
-    )
-
-
-def _resolve_ocr_llm_provider_for_user(
-    *,
-    repository: DocumentRepository,
-    current_user: User,
-    provider_override: LLMProvider | None,
-) -> LLMProvider:
-    return resolve_http_llm_provider_for_user(
-        repository=repository,
-        user_id=current_user.id,
-        provider_override=provider_override,
-        task=LLM_TASK_OCR,
-        missing_provider_detail="Configure an OCR LLM connection in Settings before OCR parsing.",
-        missing_api_key_detail="Selected OCR LLM connection requires an API key in Settings.",
-        missing_base_url_detail="Custom OCR LLM connection requires a base URL in Settings.",
-    )
-
-
-def _resolve_ocr_provider_for_user(
-    *,
-    repository: DocumentRepository,
-    current_user: User,
-) -> str:
-    return resolve_ocr_provider(
-        load_user_preferences(repository=repository, user_id=current_user.id)
-    )
-
-
-def _resolve_ocr_auto_switch_for_user(
-    *,
-    repository: DocumentRepository,
-    current_user: User,
-) -> bool:
-    return resolve_ocr_auto_switch(
-        load_user_preferences(repository=repository, user_id=current_user.id)
-    )
 
 
 def _run_parse_document_blob_or_400(
@@ -730,29 +680,23 @@ def parse_document_endpoint(
         repository=repository,
         status_value=DocumentStatus.PROCESSING,
     )
-    ocr_provider = _resolve_ocr_provider_for_user(
-        repository=repository,
-        current_user=current_user,
-    )
-    ocr_auto_switch = _resolve_ocr_auto_switch_for_user(
-        repository=repository,
-        current_user=current_user,
-    )
+    ocr_provider = resolve_owner_ocr_provider(repository, current_user.id)
+    ocr_auto_switch = resolve_owner_ocr_auto_switch(repository, current_user.id)
     ocr_llm_provider: LLMProvider | None = None
     if ocr_provider == "llm":
         try:
-            ocr_llm_provider = _resolve_llm_provider_for_user(
+            ocr_llm_provider = resolve_http_metadata_llm_provider_for_user(
                 repository=repository,
-                current_user=current_user,
+                user_id=current_user.id,
                 provider_override=provider_override,
             )
         except HTTPException:
             ocr_llm_provider = None
     elif ocr_provider == "llm_separate":
         try:
-            ocr_llm_provider = _resolve_ocr_llm_provider_for_user(
+            ocr_llm_provider = resolve_http_ocr_llm_provider_for_user(
                 repository=repository,
-                current_user=current_user,
+                user_id=current_user.id,
                 provider_override=provider_override,
             )
         except HTTPException:
@@ -806,27 +750,21 @@ def llm_parse_document_endpoint(
         repository=repository,
         current_user=current_user,
     )
-    llm_provider = _resolve_llm_provider_for_user(
+    llm_provider = resolve_http_metadata_llm_provider_for_user(
         repository=repository,
-        current_user=current_user,
+        user_id=current_user.id,
         provider_override=provider_override,
     )
-    ocr_provider = _resolve_ocr_provider_for_user(
-        repository=repository,
-        current_user=current_user,
-    )
-    ocr_auto_switch = _resolve_ocr_auto_switch_for_user(
-        repository=repository,
-        current_user=current_user,
-    )
+    ocr_provider = resolve_owner_ocr_provider(repository, current_user.id)
+    ocr_auto_switch = resolve_owner_ocr_auto_switch(repository, current_user.id)
     ocr_llm_provider: LLMProvider | None = None
     if ocr_provider == "llm":
         ocr_llm_provider = llm_provider
     elif ocr_provider == "llm_separate":
         try:
-            ocr_llm_provider = _resolve_ocr_llm_provider_for_user(
+            ocr_llm_provider = resolve_http_ocr_llm_provider_for_user(
                 repository=repository,
-                current_user=current_user,
+                user_id=current_user.id,
                 provider_override=provider_override,
             )
         except HTTPException:

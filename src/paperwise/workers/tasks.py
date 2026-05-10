@@ -10,13 +10,15 @@ from paperwise.application.services.history import (
 from paperwise.application.services.llm_preferences import (
     LLM_TASK_METADATA,
     LLM_TASK_OCR,
-    resolve_ocr_auto_switch,
-    resolve_ocr_provider,
 )
 from paperwise.application.services.llm_provider_factory import (
     resolve_llm_provider_from_preferences as resolve_configured_llm_provider,
 )
 from paperwise.application.services.llm_parsing import parse_with_llm
+from paperwise.application.services.ocr_preferences import (
+    resolve_owner_ocr_auto_switch,
+    resolve_owner_ocr_provider,
+)
 from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
@@ -42,14 +44,6 @@ def _build_repository() -> DocumentRepository:
 
 def _build_llm_provider() -> LLMProvider | None:
     return None
-
-
-def _resolve_ocr_provider_for_owner(repository: DocumentRepository, owner_id: str) -> str:
-    return resolve_ocr_provider(load_user_preferences(repository=repository, user_id=owner_id))
-
-
-def _resolve_ocr_auto_switch_for_owner(repository: DocumentRepository, owner_id: str) -> bool:
-    return resolve_ocr_auto_switch(load_user_preferences(repository=repository, user_id=owner_id))
 
 
 def _resolve_llm_provider_from_preferences(
@@ -213,8 +207,8 @@ def parse_document_task(
         document.status = DocumentStatus.PROCESSING
         repository.save(document)
 
-        ocr_provider = _resolve_ocr_provider_for_owner(repository, document.owner_id)
-        ocr_auto_switch = _resolve_ocr_auto_switch_for_owner(repository, document.owner_id)
+        ocr_provider = resolve_owner_ocr_provider(repository, document.owner_id)
+        ocr_auto_switch = resolve_owner_ocr_auto_switch(repository, document.owner_id)
         metadata_llm_provider = _resolve_metadata_llm_provider_for_owner(
             repository=repository,
             owner_id=document.owner_id,
