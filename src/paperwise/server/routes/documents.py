@@ -41,7 +41,6 @@ from paperwise.application.services.filenames import sanitize_storage_filename
 from paperwise.application.services.document_listing import count_filtered_documents, list_filtered_documents
 from paperwise.application.services.history import (
     build_file_moved_history_event,
-    build_metadata_history_events,
     build_processing_completed_history_event,
     build_processing_restarted_history_event,
 )
@@ -58,9 +57,9 @@ from paperwise.application.services.llm_preferences import (
     resolve_ocr_auto_switch,
     resolve_ocr_provider,
 )
+from paperwise.application.services.metadata_updates import update_document_metadata
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
-from paperwise.application.services.taxonomy import resolve_existing_name, resolve_tags
 from paperwise.application.services.upload_validation import (
     is_supported_upload,
     normalize_content_type,
@@ -268,15 +267,6 @@ PENDING_STATUSES = {
     DocumentStatus.PROCESSING,
     DocumentStatus.FAILED,
 }
-
-
-def _validate_date(value: str | None) -> str | None:
-    if not value:
-        return None
-    try:
-        return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
-    except ValueError:
-        return None
 
 
 def _resolve_llm_provider_for_user(
@@ -994,56 +984,17 @@ def update_document_metadata_endpoint(
         current_user=current_user,
     )
 
-    correspondents = repository.list_correspondents()
-    document_types = repository.list_document_types()
-    existing_tags = repository.list_tags()
-
-    correspondent, created_correspondent = resolve_existing_name(
-        payload.correspondent,
-        correspondents,
-        fallback="Unknown Sender",
-    )
-    document_type, created_document_type = resolve_existing_name(
-        payload.document_type,
-        document_types,
-        fallback="General Document",
-    )
-    tags, created_tags = resolve_tags(payload.tags, existing_tags)
-
-    if created_correspondent:
-        repository.add_correspondent(correspondent)
-    if created_document_type:
-        repository.add_document_type(document_type)
-    if created_tags:
-        repository.add_tags(created_tags)
-
-    previous = repository.get_llm_parse_result(document_id)
-    result = LLMParseResult(
-        document_id=document_id,
-        suggested_title=payload.suggested_title.strip() or document.filename,
-        document_date=_validate_date(payload.document_date),
-        correspondent=correspondent,
-        document_type=document_type,
-        tags=tags,
-        created_correspondent=created_correspondent,
-        created_document_type=created_document_type,
-        created_tags=created_tags,
-        created_at=datetime.now(UTC),
-    )
-    repository.save_llm_parse_result(result)
-    repository.append_history_events(
-        build_metadata_history_events(
-            previous=previous,
-            current=result,
-            actor_type=HistoryActorType.USER,
-            actor_id=current_user.id,
-            source="api.patch_metadata",
-        )
-    )
-    _set_document_status(
+    result = update_document_metadata(
         document=document,
         repository=repository,
-        status_value=DocumentStatus.READY,
+        suggested_title=payload.suggested_title,
+        document_date=payload.document_date,
+        correspondent=payload.correspondent,
+        document_type=payload.document_type,
+        tags=payload.tags,
+        actor_type=HistoryActorType.USER,
+        actor_id=current_user.id,
+        history_source="api.patch_metadata",
     )
     return LLMParseResultResponse.from_domain(result)
 

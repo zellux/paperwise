@@ -4,6 +4,7 @@ from difflib import SequenceMatcher
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.history import build_metadata_history_events
 from paperwise.application.services.llm_runtime import summarize_llm_provider
+from paperwise.application.services.metadata_updates import validate_document_date
 from paperwise.domain.models import (
     Document,
     HistoryActorType,
@@ -85,16 +86,6 @@ def _resolve_tags(candidates: list[str], existing: list[str]) -> tuple[list[str]
         if is_new:
             created.append(resolved_tag)
     return resolved, created
-
-
-def _validate_date(value: str | None) -> str | None:
-    if not value:
-        return None
-    try:
-        # Keep only YYYY-MM-DD in storage for predictable filtering.
-        return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
-    except ValueError:
-        return None
 
 
 def _build_metadata_llm_details(
@@ -187,7 +178,7 @@ def parse_with_llm(
     if "document_date" in raw:
         raw_date = raw.get("document_date")
         if isinstance(raw_date, str):
-            validated_date = _validate_date(raw_date)
+            validated_date = validate_document_date(raw_date)
             if validated_date is not None:
                 document_date = validated_date
             elif previous is not None:
