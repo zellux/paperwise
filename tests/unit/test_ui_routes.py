@@ -241,6 +241,9 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "const SUPPORTED_THEMES" not in app_js.text
     assert "const LLM_PROVIDER_DEFAULTS" not in app_js.text
     assert "const OCR_LLM_PROVIDER_DEFAULTS" not in app_js.text
+    app_initialization = app_js.text.split("\nfunction ", 1)[0]
+    assert "document.getElementById" not in app_initialization
+    assert "document.querySelector" not in app_initialization
     assert "initializeCurrentPageData" in app_js.text
     assert "initializePaperwisePage" in app_js.text
 
