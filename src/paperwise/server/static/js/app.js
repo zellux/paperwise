@@ -1,15 +1,3 @@
-const authGate = document.getElementById("authGate");
-const appShell = document.querySelector(".app-shell");
-const authTabSignIn = document.getElementById("authTabSignIn");
-const authTabSignUp = document.getElementById("authTabSignUp");
-const authPanelSignIn = document.getElementById("authPanelSignIn");
-const authPanelSignUp = document.getElementById("authPanelSignUp");
-const signInForm = document.getElementById("signInForm");
-const registerForm = document.getElementById("registerForm");
-const authMessage = document.getElementById("authMessage");
-const signOutBtn = document.getElementById("signOutBtn");
-const sessionUserLabel = document.getElementById("sessionUserLabel");
-const brandHomeBtn = document.getElementById("brandHomeBtn");
 const activityOutput = document.getElementById("activityOutput");
 const sortableHeaders = [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
 const filterDropdownState = new Map();
@@ -656,12 +644,26 @@ async function hydrateUserPreferencesForSession() {
   readFiltersFromUrl();
 }
 
+function getAuthElements() {
+  return {
+    authGate: document.getElementById("authGate"),
+    appShell: document.querySelector(".app-shell"),
+    authTabSignIn: document.getElementById("authTabSignIn"),
+    authTabSignUp: document.getElementById("authTabSignUp"),
+    authPanelSignIn: document.getElementById("authPanelSignIn"),
+    authPanelSignUp: document.getElementById("authPanelSignUp"),
+    authMessage: document.getElementById("authMessage"),
+    sessionUserLabel: document.getElementById("sessionUserLabel"),
+  };
+}
+
 // Avoid auth-gate flash on page load when the server rendered an authenticated shell.
-if (document.documentElement.classList.contains("has-session") && authGate && appShell) {
+if (document.documentElement.classList.contains("has-session")) {
+  const { authGate, appShell } = getAuthElements();
   readFiltersFromUrl();
   renderSortHeaders();
-  authGate.classList.add("view-hidden");
-  appShell.classList.remove("view-hidden");
+  authGate?.classList.add("view-hidden");
+  appShell?.classList.remove("view-hidden");
 }
 
 function formatStatus(value) {
@@ -698,6 +700,7 @@ function escapeHtml(value) {
 }
 
 function setAuthMessage(message, isError = false) {
+  const { authMessage } = getAuthElements();
   if (!authMessage) {
     return;
   }
@@ -707,6 +710,7 @@ function setAuthMessage(message, isError = false) {
 
 function setActiveAuthTab(tab) {
   const isSignUp = tab === "signup";
+  const { authTabSignIn, authTabSignUp, authPanelSignIn, authPanelSignUp } = getAuthElements();
   authTabSignIn?.classList.toggle("is-active", !isSignUp);
   authTabSignIn?.setAttribute("aria-selected", String(!isSignUp));
   authTabSignUp?.classList.toggle("is-active", isSignUp);
@@ -738,9 +742,10 @@ function persistSession(user) {
 
 function renderSessionState() {
   const signedIn = Boolean(currentUser);
+  const { authGate, appShell, sessionUserLabel } = getAuthElements();
   document.documentElement.classList.toggle("has-session", signedIn);
-  authGate.classList.toggle("view-hidden", signedIn);
-  appShell.classList.toggle("view-hidden", !signedIn);
+  authGate?.classList.toggle("view-hidden", signedIn);
+  appShell?.classList.toggle("view-hidden", !signedIn);
   if (sessionUserLabel) {
     sessionUserLabel.textContent = signedIn
       ? `${currentUser.full_name} (${currentUser.email})`
@@ -1493,7 +1498,7 @@ async function waitForDocumentReady(
   return false;
 }
 
-signInForm?.addEventListener("submit", async (event) => {
+document.getElementById("signInForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const email = document.getElementById("signInEmail").value.trim();
   const password = document.getElementById("signInPassword").value;
@@ -1521,7 +1526,7 @@ signInForm?.addEventListener("submit", async (event) => {
   }
 });
 
-registerForm?.addEventListener("submit", async (event) => {
+document.getElementById("registerForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
   const fullName = document.getElementById("registerName").value.trim();
   const email = document.getElementById("registerEmail").value.trim();
@@ -1564,21 +1569,21 @@ registerForm?.addEventListener("submit", async (event) => {
   }
 });
 
-authTabSignIn?.addEventListener("click", () => {
+document.getElementById("authTabSignIn")?.addEventListener("click", () => {
   setActiveAuthTab("signin");
 });
 
-authTabSignUp?.addEventListener("click", () => {
+document.getElementById("authTabSignUp")?.addEventListener("click", () => {
   setActiveAuthTab("signup");
 });
 
-signOutBtn?.addEventListener("click", async () => {
+document.getElementById("signOutBtn")?.addEventListener("click", async () => {
   await apiFetch("/users/logout", { method: "POST", allowUnauthorized: true }).catch(() => {});
   clearSession();
   setAuthMessage("Signed out.");
 });
 
-brandHomeBtn?.addEventListener("click", () => {
+document.getElementById("brandHomeBtn")?.addEventListener("click", () => {
   window.location.href = "/ui/documents";
 });
 
