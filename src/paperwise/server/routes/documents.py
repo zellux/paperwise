@@ -418,41 +418,6 @@ def _cleanup_empty_storage_dirs(start: Path) -> None:
         current = current.parent
 
 
-def _to_response(document: Document) -> DocumentResponse:
-    return DocumentResponse.from_domain(document)
-
-
-def _to_list_item_response(
-    document: Document,
-    llm_result: LLMParseResult | None,
-) -> DocumentListItemResponse:
-    return DocumentListItemResponse.from_domain(document, llm_result)
-
-
-def _to_detail_response(
-    document: Document,
-    llm_result: LLMParseResult | None,
-    parse_result: ParseResult | None,
-) -> DocumentDetailResponse:
-    return DocumentDetailResponse.from_domain(
-        document=document,
-        llm_result=llm_result,
-        parse_result=parse_result,
-    )
-
-
-def _to_parse_response(result: ParseResult) -> ParseResultResponse:
-    return ParseResultResponse.from_domain(result)
-
-
-def _to_llm_parse_response(result: LLMParseResult) -> LLMParseResultResponse:
-    return LLMParseResultResponse.from_domain(result)
-
-
-def _to_history_event_response(event: DocumentHistoryEvent) -> DocumentHistoryEventResponse:
-    return DocumentHistoryEventResponse.from_domain(event)
-
-
 def _run_parse_document_blob_or_400(
     *,
     document_id: str,
@@ -608,7 +573,7 @@ def list_documents_endpoint(
     results: list[DocumentListItemResponse] = []
     for document, llm_result in matching_documents[offset : offset + limit]:
         results.append(
-            _to_list_item_response(
+            DocumentListItemResponse.from_domain(
                 document=document,
                 llm_result=llm_result,
             )
@@ -655,7 +620,7 @@ def list_pending_documents_endpoint(
     current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentListItemResponse]:
     return [
-        _to_list_item_response(
+        DocumentListItemResponse.from_domain(
             document=document,
             llm_result=llm_result,
         )
@@ -793,7 +758,7 @@ def get_document_endpoint(
         repository=repository,
         current_user=current_user,
     )
-    return _to_response(document)
+    return DocumentResponse.from_domain(document)
 
 
 @router.get("/{document_id}/detail", response_model=DocumentDetailResponse)
@@ -809,7 +774,11 @@ def get_document_detail_endpoint(
     )
     llm_result = repository.get_llm_parse_result(document_id)
     parse_result = repository.get_parse_result(document_id)
-    return _to_detail_response(document=document, llm_result=llm_result, parse_result=parse_result)
+    return DocumentDetailResponse.from_domain(
+        document=document,
+        llm_result=llm_result,
+        parse_result=parse_result,
+    )
 
 
 @router.get("/{document_id}/file")
@@ -964,7 +933,7 @@ def parse_document_endpoint(
         document=document,
         parse_result=result,
     )
-    return _to_parse_response(result)
+    return ParseResultResponse.from_domain(result)
 
 
 @router.get("/{document_id}/parse", response_model=ParseResultResponse)
@@ -984,7 +953,7 @@ def get_parse_document_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Parse result not found",
         )
-    return _to_parse_response(result)
+    return ParseResultResponse.from_domain(result)
 
 
 @router.post("/{document_id}/llm-parse", response_model=LLMParseResultResponse)
@@ -1104,7 +1073,7 @@ def llm_parse_document_endpoint(
     )
     if file_move_event is not None:
         repository.append_history_events([file_move_event])
-    return _to_llm_parse_response(result)
+    return LLMParseResultResponse.from_domain(result)
 
 
 @router.get("/{document_id}/llm-parse", response_model=LLMParseResultResponse)
@@ -1124,7 +1093,7 @@ def get_llm_parse_document_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="LLM parse result not found",
         )
-    return _to_llm_parse_response(result)
+    return LLMParseResultResponse.from_domain(result)
 
 
 @router.patch("/{document_id}/metadata", response_model=LLMParseResultResponse)
@@ -1191,7 +1160,7 @@ def update_document_metadata_endpoint(
         repository=repository,
         status_value=DocumentStatus.READY,
     )
-    return _to_llm_parse_response(result)
+    return LLMParseResultResponse.from_domain(result)
 
 
 @router.get("/{document_id}/history", response_model=list[DocumentHistoryEventResponse])
@@ -1207,7 +1176,7 @@ def list_document_history_endpoint(
         current_user=current_user,
     )
     return [
-        _to_history_event_response(event)
+        DocumentHistoryEventResponse.from_domain(event)
         for event in repository.list_history(document_id=document_id, limit=limit)
     ]
 
