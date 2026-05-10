@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from fastapi.testclient import TestClient
 
 from paperwise.application.services.chunk_indexing import index_document_chunks
+from paperwise.application.services.chat_contexts import compact_chat_context_content
+from paperwise.application.services.grounded_qa import build_qa_contexts
 from paperwise.domain.models import (
     Document,
     DocumentChunk,
@@ -20,8 +22,7 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
 )
 from paperwise.server.main import app
-from paperwise.application.services.grounded_qa import build_qa_contexts
-from paperwise.server.routes.query import _all_owned_document_ids, _compact_chat_context_content
+from paperwise.server.routes.query import _all_owned_document_ids
 
 
 TEST_USER = User(
@@ -68,7 +69,7 @@ class FakeGroundedLLM:
 def test_compact_chat_context_keeps_query_centered_excerpt() -> None:
     content = "intro " * 500 + "Height 2 ft 10 in recorded at the visit. " + "footer " * 500
 
-    excerpt, truncated = _compact_chat_context_content(content, "Quincy height")
+    excerpt, truncated = compact_chat_context_content(content, "Quincy height")
 
     assert truncated is True
     assert len(excerpt) < len(content)
