@@ -1,13 +1,12 @@
 from datetime import UTC, datetime
-from typing import Any
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.grounded_qa import (
-    build_qa_contexts,
-    is_timeout_error,
+    GroundedQATimeoutError,
+    answer_grounded_question,
     resolve_metadata_scoped_document_ids,
     search_document_chunks_multi_query,
 )
@@ -27,7 +26,6 @@ from paperwise.server.collection_requests import (
     SearchRequest,
 )
 from paperwise.server.collection_responses import (
-    AskCitationResponse,
     AskResponse,
     CollectionDocumentIdsResponse,
     CollectionResponse,
@@ -38,168 +36,22 @@ from paperwise.server.llm_provider import resolve_http_llm_provider_for_user
 router = APIRouter(prefix="/collections", tags=["collections"])
 
 
-def _ask_grounded(
-    *,
-    repository: DocumentRepository,
-    llm_provider: LLMProvider,
-    owner_id: str,
-    question: str,
-    top_k_chunks: int,
-    max_documents: int,
-    document_ids: list[str] | None,
-    debug_scope: dict[str, object] | None = None,
-    debug_enabled: bool = False,
-) -> AskResponse:
-    retrieval_debug: dict[str, object] = {}
-    chunk_hits = search_document_chunks_multi_query(
-        repository=repository,
-        owner_id=owner_id,
-        query=question,
-        limit=max(top_k_chunks * 3, top_k_chunks),
-        document_ids=document_ids,
-        llm_provider=llm_provider,
-        debug=retrieval_debug,
-    )
-    contexts = build_qa_contexts(
-        repository=repository,
-        chunk_hits=chunk_hits,
-        top_k_chunks=top_k_chunks,
-        max_documents=max_documents,
-    )
-    context_debug = [
-        {
-            "chunk_id": ctx.get("chunk_id"),
-            "document_id": ctx.get("document_id"),
-            "title": ctx.get("title"),
-            "content_len": len(str(ctx.get("content", ""))),
-            "content_preview": str(ctx.get("content", ""))[:800],
-        }
-        for ctx in contexts
-    ]
-
-    request_debug = {
-        "owner_id": owner_id,
-        "question": question,
-        "top_k_chunks": top_k_chunks,
-        "max_documents": max_documents,
-        "scope": debug_scope or {},
-        "retrieval": retrieval_debug,
-        "selected_contexts": context_debug,
-    }
-    response_debug: dict[str, Any] = {}
-    if not contexts:
-        response_debug = {
-            "answer": "Not enough evidence in the selected documents.",
-            "insufficient_evidence": True,
-            "citations": [],
-        }
-        log_llm_exchange(
-            provider="grounded_qa",
-            endpoint="/collections/ask",
-            request_payload=request_debug,
-            response_status=200,
-            response_payload=response_debug,
-        )
-        return AskResponse(
-            question=question,
-            answer="Not enough evidence in the selected documents.",
-            insufficient_evidence=True,
-            citations=[],
-            debug=(
-                {
-                    "scope": request_debug.get("scope"),
-                    "retrieval": request_debug.get("retrieval"),
-                    "sources_sent_to_llm": request_debug.get("selected_contexts"),
-                    "result": response_debug,
-                }
-                if debug_enabled
-                else None
-            ),
-        )
-
-    try:
-        llm_payload = llm_provider.answer_grounded(
-            question=question,
-            contexts=contexts,
-        )
-    except Exception as exc:
-        if is_timeout_error(exc):
-            message = (
-                "The LLM request timed out before completion. "
-                "Results may be incomplete. Please retry, reduce scope, or lower context limits in Settings."
-            )
-            log_llm_exchange(
-                provider="grounded_qa",
-                endpoint="/collections/ask",
-                request_payload=request_debug,
-                response_status=504,
-                response_payload={"detail": message},
-                error=str(exc),
-            )
-            raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=message) from exc
-        raise
-    citations: list[AskCitationResponse] = []
-    by_chunk = {ctx["chunk_id"]: ctx for ctx in contexts}
-    for citation in llm_payload.get("citations", []) if isinstance(llm_payload, dict) else []:
-        chunk_id = str(citation.get("chunk_id", "")).strip()
-        if not chunk_id or chunk_id not in by_chunk:
-            continue
-        context = by_chunk[chunk_id]
-        citations.append(
-            AskCitationResponse(
-                chunk_id=chunk_id,
-                document_id=context["document_id"],
-                title=context["title"],
-                quote=str(citation.get("quote", "")).strip() or context["content"][:200],
-            )
-        )
-
-    answer = str(llm_payload.get("answer", "")).strip() if isinstance(llm_payload, dict) else ""
-    insufficient = bool(llm_payload.get("insufficient_evidence", False)) if isinstance(llm_payload, dict) else True
-    if not answer:
-        answer = "Not enough evidence in the selected documents."
-        insufficient = True
-    if not citations and not insufficient:
-        insufficient = True
-        answer = "Not enough evidence in the selected documents."
-    response_payload = AskResponse(
-        question=question,
-        answer=answer,
-        insufficient_evidence=insufficient,
-        citations=citations,
-    )
-    response_debug = {
-        "answer": response_payload.answer,
-        "insufficient_evidence": response_payload.insufficient_evidence,
-        "citation_count": len(response_payload.citations),
-        "citations": [
-            {
-                "chunk_id": item.chunk_id,
-                "document_id": item.document_id,
-                "title": item.title,
-                "quote_len": len(item.quote),
-            }
-            for item in response_payload.citations
-        ],
-    }
+def _log_grounded_qa_exchange(
+    provider: str,
+    endpoint: str,
+    request_payload: dict,
+    response_status: int | None,
+    response_payload: object,
+    error: str | None,
+) -> None:
     log_llm_exchange(
-        provider="grounded_qa",
-        endpoint="/collections/ask",
-        request_payload=request_debug,
-        response_status=200,
-        response_payload=response_debug,
+        provider=provider,
+        endpoint=endpoint,
+        request_payload=request_payload,
+        response_status=response_status,
+        response_payload=response_payload,
+        error=error,
     )
-    response_payload.debug = (
-        {
-            "scope": request_debug.get("scope"),
-            "retrieval": request_debug.get("retrieval"),
-            "sources_sent_to_llm": request_debug.get("selected_contexts"),
-            "result": response_debug,
-        }
-        if debug_enabled
-        else None
-    )
-    return response_payload
 
 
 @router.post("", response_model=CollectionResponse, status_code=status.HTTP_201_CREATED)
@@ -411,22 +263,27 @@ def ask_all_documents_endpoint(
         tag_filters=payload.tag,
         document_type_filters=payload.document_type,
     )
-    return _ask_grounded(
-        repository=repository,
-        llm_provider=llm_provider,
-        owner_id=current_user.id,
-        question=payload.question,
-        top_k_chunks=payload.top_k_chunks,
-        max_documents=payload.max_documents,
-        document_ids=scoped_ids,
-        debug_scope={
-            "collection_id": None,
-            "tag": payload.tag,
-            "document_type": payload.document_type,
-            "scoped_document_count": len(scoped_ids) if scoped_ids is not None else None,
-        },
-        debug_enabled=payload.debug,
-    )
+    try:
+        result = answer_grounded_question(
+            repository=repository,
+            llm_provider=llm_provider,
+            owner_id=current_user.id,
+            question=payload.question,
+            top_k_chunks=payload.top_k_chunks,
+            max_documents=payload.max_documents,
+            document_ids=scoped_ids,
+            debug_scope={
+                "collection_id": None,
+                "tag": payload.tag,
+                "document_type": payload.document_type,
+                "scoped_document_count": len(scoped_ids) if scoped_ids is not None else None,
+            },
+            debug_enabled=payload.debug,
+            log_exchange=_log_grounded_qa_exchange,
+        )
+    except GroundedQATimeoutError as exc:
+        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(exc)) from exc
+    return AskResponse.from_grounded_qa_result(result)
 
 
 @router.post("/{collection_id}/ask", response_model=AskResponse)
@@ -459,19 +316,24 @@ def ask_collection_documents_endpoint(
         tag_filters=payload.tag,
         document_type_filters=payload.document_type,
     )
-    return _ask_grounded(
-        repository=repository,
-        llm_provider=llm_provider,
-        owner_id=current_user.id,
-        question=payload.question,
-        top_k_chunks=payload.top_k_chunks,
-        max_documents=payload.max_documents,
-        document_ids=scoped_ids,
-        debug_scope={
-            "collection_id": collection_id,
-            "tag": payload.tag,
-            "document_type": payload.document_type,
-            "scoped_document_count": len(scoped_ids) if scoped_ids is not None else None,
-        },
-        debug_enabled=payload.debug,
-    )
+    try:
+        result = answer_grounded_question(
+            repository=repository,
+            llm_provider=llm_provider,
+            owner_id=current_user.id,
+            question=payload.question,
+            top_k_chunks=payload.top_k_chunks,
+            max_documents=payload.max_documents,
+            document_ids=scoped_ids,
+            debug_scope={
+                "collection_id": collection_id,
+                "tag": payload.tag,
+                "document_type": payload.document_type,
+                "scoped_document_count": len(scoped_ids) if scoped_ids is not None else None,
+            },
+            debug_enabled=payload.debug,
+            log_exchange=_log_grounded_qa_exchange,
+        )
+    except GroundedQATimeoutError as exc:
+        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(exc)) from exc
+    return AskResponse.from_grounded_qa_result(result)

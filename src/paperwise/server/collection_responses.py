@@ -4,6 +4,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import CollectionRepository, DocumentStore, ParseResultRepository
+from paperwise.application.services.grounded_qa import GroundedQAResult
 from paperwise.domain.models import Collection
 
 
@@ -150,3 +151,21 @@ class AskResponse(BaseModel):
     insufficient_evidence: bool
     citations: list[AskCitationResponse]
     debug: dict[str, Any] | None = None
+
+    @classmethod
+    def from_grounded_qa_result(cls, result: GroundedQAResult) -> "AskResponse":
+        return cls(
+            question=result.question,
+            answer=result.answer,
+            insufficient_evidence=result.insufficient_evidence,
+            citations=[
+                AskCitationResponse(
+                    chunk_id=item.chunk_id,
+                    document_id=item.document_id,
+                    title=item.title,
+                    quote=item.quote,
+                )
+                for item in result.citations
+            ],
+            debug=result.debug,
+        )
