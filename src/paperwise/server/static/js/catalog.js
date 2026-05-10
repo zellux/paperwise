@@ -1,6 +1,3 @@
-const tagsTableBody = document.getElementById("tagsTableBody");
-const documentTypesTableBody = document.getElementById("documentTypesTableBody");
-
 let tagStatsSort = { field: "", direction: "" };
 let documentTypesSort = { field: "", direction: "" };
 let tagStatsRequestSeq = 0;
@@ -8,22 +5,32 @@ let documentTypeStatsRequestSeq = 0;
 let initialTagStatsHydrated = false;
 let initialDocumentTypesHydrated = false;
 
+function getCatalogElements() {
+  return {
+    tagsTableBody: document.getElementById("tagsTableBody"),
+    documentTypesTableBody: document.getElementById("documentTypesTableBody"),
+  };
+}
+
 function clearCatalogStateForSession() {
   tagStatsSort = { field: "", direction: "" };
   documentTypesSort = { field: "", direction: "" };
 }
 
 function applyTagsPartial(payload) {
+  const { tagsTableBody } = getCatalogElements();
   replaceElementHtml(tagsTableBody, payload.table_body_html);
   renderSortHeaders();
 }
 
 function applyDocumentTypesPartial(payload) {
+  const { documentTypesTableBody } = getCatalogElements();
   replaceElementHtml(documentTypesTableBody, payload.table_body_html);
   renderSortHeaders();
 }
 
 async function loadTagStats() {
+  const { tagsTableBody } = getCatalogElements();
   const requestSeq = ++tagStatsRequestSeq;
   renderTableLoading(tagsTableBody, 3, "Loading tags...");
   renderSortHeaders();
@@ -48,6 +55,7 @@ async function loadTagStats() {
 }
 
 async function loadDocumentTypeStats() {
+  const { documentTypesTableBody } = getCatalogElements();
   const requestSeq = ++documentTypeStatsRequestSeq;
   renderTableLoading(documentTypesTableBody, 3, "Loading document types...");
   renderSortHeaders();
@@ -103,10 +111,39 @@ function hydrateInitialDocumentTypes(initialData) {
   return true;
 }
 
+function bindCatalogSortHeaders() {
+  for (const header of getSortableHeaders()) {
+    if (header.dataset.catalogSortBound === "true") {
+      continue;
+    }
+    const button = header.querySelector(".table-sort-button");
+    button?.addEventListener("click", () => {
+      const tableName = header.dataset.sortTable || "";
+      const field = header.dataset.sortField || "";
+      if (tableName === "tags") {
+        tagStatsSort = getNextSortState(tagStatsSort, field);
+        loadTagStats().catch((error) => {
+          logActivity(`Tag stats load failed: ${error.message}`);
+        });
+        return;
+      }
+      if (tableName === "document-types") {
+        documentTypesSort = getNextSortState(documentTypesSort, field);
+        loadDocumentTypeStats().catch((error) => {
+          logActivity(`Document type stats load failed: ${error.message}`);
+        });
+      }
+    });
+    header.dataset.catalogSortBound = "true";
+  }
+}
+
 window.initializePaperwisePage = async ({ authenticated, initialData }) => {
   if (authenticated !== true) {
     return;
   }
+  bindCatalogSortHeaders();
+  const { tagsTableBody, documentTypesTableBody } = getCatalogElements();
   if (tagsTableBody) {
     if (!hydrateInitialTagStats(initialData || {})) {
       await loadTagStats();
@@ -117,24 +154,3 @@ window.initializePaperwisePage = async ({ authenticated, initialData }) => {
     await loadDocumentTypeStats();
   }
 };
-
-for (const header of getSortableHeaders()) {
-  const button = header.querySelector(".table-sort-button");
-  button?.addEventListener("click", () => {
-    const tableName = header.dataset.sortTable || "";
-    const field = header.dataset.sortField || "";
-    if (tableName === "tags") {
-      tagStatsSort = getNextSortState(tagStatsSort, field);
-      loadTagStats().catch((error) => {
-        logActivity(`Tag stats load failed: ${error.message}`);
-      });
-      return;
-    }
-    if (tableName === "document-types") {
-      documentTypesSort = getNextSortState(documentTypesSort, field);
-      loadDocumentTypeStats().catch((error) => {
-        logActivity(`Document type stats load failed: ${error.message}`);
-      });
-    }
-  });
-}

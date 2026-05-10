@@ -1,10 +1,15 @@
-const processedDocsTableBody = document.getElementById("processedDocsTableBody");
-const activityTokenTotal = document.getElementById("activityTokenTotal");
-
 let processedActivityRequestSeq = 0;
 let initialActivityHydrated = false;
 
+function getActivityElements() {
+  return {
+    processedDocsTableBody: document.getElementById("processedDocsTableBody"),
+    activityTokenTotal: document.getElementById("activityTokenTotal"),
+  };
+}
+
 function renderActivityTokenTotal(totalTokens) {
+  const { activityTokenTotal } = getActivityElements();
   if (!activityTokenTotal) {
     return;
   }
@@ -13,6 +18,7 @@ function renderActivityTokenTotal(totalTokens) {
 }
 
 function renderActivityTokenLoading() {
+  const { activityTokenTotal } = getActivityElements();
   if (!activityTokenTotal) {
     return;
   }
@@ -20,11 +26,13 @@ function renderActivityTokenLoading() {
 }
 
 function applyActivityPartial(payload) {
+  const { processedDocsTableBody } = getActivityElements();
   replaceElementHtml(processedDocsTableBody, payload.table_body_html);
   renderActivityTokenTotal(Number(payload.activity_total_tokens || 0));
 }
 
 async function loadProcessedDocumentsActivity() {
+  const { processedDocsTableBody } = getActivityElements();
   const requestSeq = ++processedActivityRequestSeq;
   const limit = Math.max(1, normalizePageSize(docsPageSize));
   renderTableLoading(processedDocsTableBody, 4, "Loading processed documents...");

@@ -1,13 +1,22 @@
-const docsFilterForm = document.getElementById("docsFilterForm");
-const clearFiltersBtn = document.getElementById("clearFiltersBtn");
-const filterTag = document.getElementById("filterTag");
-const filterCorrespondent = document.getElementById("filterCorrespondent");
-const filterType = document.getElementById("filterType");
-const filterStatus = document.getElementById("filterStatus");
-const filterQuery = document.getElementById("filterQuery");
-const filterSelects = [filterTag, filterCorrespondent, filterType, filterStatus];
-
 let initialDocumentsHydrated = false;
+let documentsEventsBound = false;
+
+function getDocumentsPageElements() {
+  const filterTag = document.getElementById("filterTag");
+  const filterCorrespondent = document.getElementById("filterCorrespondent");
+  const filterType = document.getElementById("filterType");
+  const filterStatus = document.getElementById("filterStatus");
+  return {
+    docsFilterForm: document.getElementById("docsFilterForm"),
+    clearFiltersBtn: document.getElementById("clearFiltersBtn"),
+    filterTag,
+    filterCorrespondent,
+    filterType,
+    filterStatus,
+    filterQuery: document.getElementById("filterQuery"),
+    filterSelects: [filterTag, filterCorrespondent, filterType, filterStatus],
+  };
+}
 
 function hydrateInitialDocumentsData(initialData) {
   if (initialDocumentsHydrated) {
@@ -28,103 +37,113 @@ function hydrateInitialDocumentsData(initialData) {
   return true;
 }
 
+function bindDocumentsEvents() {
+  if (documentsEventsBound) {
+    return;
+  }
+  const { docsFilterForm, clearFiltersBtn, filterQuery, filterSelects } = getDocumentsPageElements();
+
+  docsFilterForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+  });
+
+  for (const selectEl of filterSelects) {
+    if (!selectEl) {
+      continue;
+    }
+    selectEl.addEventListener("change", () => {
+      applyFiltersFromControls();
+    });
+  }
+
+  for (const selectEl of filterSelects) {
+    if (!selectEl) {
+      continue;
+    }
+    setupFilterDropdown(selectEl);
+  }
+
+  for (const header of getSortableHeaders()) {
+    const button = header.querySelector(".table-sort-button");
+    button?.addEventListener("click", () => {
+      const tableName = header.dataset.sortTable || "";
+      const field = header.dataset.sortField || "";
+      if (tableName !== "docs") {
+        return;
+      }
+      docsSort = getNextSortState(docsSort, field);
+      docsPage = 1;
+      renderSortHeaders();
+      navigateToDocumentsPageFromState();
+    });
+  }
+
+  document.addEventListener("click", (event) => {
+    if (!activeFilterDropdown) {
+      return;
+    }
+    const state = filterDropdownState.get(activeFilterDropdown);
+    if (!state) {
+      return;
+    }
+    if (!state.chip.contains(event.target)) {
+      closeFilterDropdown(activeFilterDropdown);
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && activeFilterDropdown) {
+      closeFilterDropdown(activeFilterDropdown);
+    }
+  });
+
+  clearFiltersBtn?.addEventListener("click", () => {
+    docsFilters.q = "";
+    docsFilters.tag = [];
+    docsFilters.correspondent = [];
+    docsFilters.document_type = [];
+    docsFilters.status = ["ready"];
+    docsPage = 1;
+    applyFiltersToControls();
+    navigateToDocumentsPageFromState();
+  });
+
+  filterQuery?.addEventListener("input", () => {
+    if (docsFilterNavigateTimer) {
+      window.clearTimeout(docsFilterNavigateTimer);
+    }
+    docsFilterNavigateTimer = window.setTimeout(() => {
+      docsFilterNavigateTimer = 0;
+      applyFiltersFromControls();
+    }, 350);
+  });
+
+  document.addEventListener("click", (event) => {
+    const button =
+      event.target instanceof Element ? event.target.closest("[data-docs-page-action]") : null;
+    if (!(button instanceof HTMLButtonElement) || button.disabled) {
+      return;
+    }
+    if (button.dataset.docsPageAction === "prev") {
+      docsPage = Math.max(1, docsPage - 1);
+    } else if (button.dataset.docsPageAction === "next") {
+      docsPage += 1;
+    } else {
+      return;
+    }
+    navigateToDocumentsPageFromState();
+  });
+
+  documentsEventsBound = true;
+}
+
 window.initializePaperwisePage = async ({ authenticated, initialData }) => {
   if (authenticated !== true) {
     return;
   }
+  bindDocumentsEvents();
   if (hydrateInitialDocumentsData(initialData || {})) {
     return;
   }
   await loadDocumentsList();
 };
-
-docsFilterForm?.addEventListener("submit", (event) => {
-  event.preventDefault();
-});
-
-for (const selectEl of filterSelects) {
-  if (!selectEl) {
-    continue;
-  }
-  selectEl.addEventListener("change", () => {
-    applyFiltersFromControls();
-  });
-}
-
-for (const selectEl of filterSelects) {
-  if (!selectEl) {
-    continue;
-  }
-  setupFilterDropdown(selectEl);
-}
-
-for (const header of getSortableHeaders()) {
-  const button = header.querySelector(".table-sort-button");
-  button?.addEventListener("click", () => {
-    const tableName = header.dataset.sortTable || "";
-    const field = header.dataset.sortField || "";
-    if (tableName !== "docs") {
-      return;
-    }
-    docsSort = getNextSortState(docsSort, field);
-    docsPage = 1;
-    renderSortHeaders();
-    navigateToDocumentsPageFromState();
-  });
-}
-
-document.addEventListener("click", (event) => {
-  if (!activeFilterDropdown) {
-    return;
-  }
-  const state = filterDropdownState.get(activeFilterDropdown);
-  if (!state) {
-    return;
-  }
-  if (!state.chip.contains(event.target)) {
-    closeFilterDropdown(activeFilterDropdown);
-  }
-});
-
-document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape" && activeFilterDropdown) {
-    closeFilterDropdown(activeFilterDropdown);
-  }
-});
-
-clearFiltersBtn?.addEventListener("click", () => {
-  docsFilters.q = "";
-  docsFilters.tag = [];
-  docsFilters.correspondent = [];
-  docsFilters.document_type = [];
-  docsFilters.status = ["ready"];
-  docsPage = 1;
-  applyFiltersToControls();
-  navigateToDocumentsPageFromState();
-});
-
-filterQuery?.addEventListener("input", () => {
-  if (docsFilterNavigateTimer) {
-    window.clearTimeout(docsFilterNavigateTimer);
-  }
-  docsFilterNavigateTimer = window.setTimeout(() => {
-    docsFilterNavigateTimer = 0;
-    applyFiltersFromControls();
-  }, 350);
-});
-
-document.addEventListener("click", (event) => {
-  const button =
-    event.target instanceof Element ? event.target.closest("[data-docs-page-action]") : null;
-  if (!(button instanceof HTMLButtonElement) || button.disabled) {
-    return;
-  }
-  if (button.dataset.docsPageAction === "prev") {
-    docsPage = Math.max(1, docsPage - 1);
-  } else if (button.dataset.docsPageAction === "next") {
-    docsPage += 1;
-  } else {
-    return;
-  }
-  navigateToDocumentsPageFromState();
-});

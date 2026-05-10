@@ -1,10 +1,16 @@
-const restartPendingBtn = document.getElementById("restartPendingBtn");
-const pendingTableBody = document.getElementById("pendingTableBody");
-
 let pendingDocsRequestSeq = 0;
 let initialPendingHydrated = false;
+let pendingEventsBound = false;
+
+function getPendingElements() {
+  return {
+    restartPendingBtn: document.getElementById("restartPendingBtn"),
+    pendingTableBody: document.getElementById("pendingTableBody"),
+  };
+}
 
 function setRestartPendingButtonEnabled(enabled) {
+  const { restartPendingBtn } = getPendingElements();
   if (!restartPendingBtn) {
     return;
   }
@@ -17,6 +23,7 @@ function isRestartablePendingDocument(doc) {
 }
 
 function getVisiblePendingRowCount() {
+  const { pendingTableBody } = getPendingElements();
   if (!pendingTableBody) {
     return 0;
   }
@@ -24,12 +31,14 @@ function getVisiblePendingRowCount() {
 }
 
 function applyPendingPartial(payload) {
+  const { pendingTableBody } = getPendingElements();
   const documents = Array.isArray(payload.pending_documents) ? payload.pending_documents : [];
   replaceElementHtml(pendingTableBody, payload.table_body_html);
   setRestartPendingButtonEnabled(documents.some((doc) => isRestartablePendingDocument(doc)));
 }
 
 async function loadPendingDocuments() {
+  const { pendingTableBody } = getPendingElements();
   const requestSeq = ++pendingDocsRequestSeq;
   renderTableLoading(pendingTableBody, 4, "Loading pending documents...");
   let payload;
@@ -66,39 +75,50 @@ function hydrateInitialPendingData(initialData) {
   return true;
 }
 
+function bindPendingEvents() {
+  if (pendingEventsBound) {
+    return;
+  }
+  const { restartPendingBtn } = getPendingElements();
+  if (!restartPendingBtn) {
+    return;
+  }
+  restartPendingBtn.addEventListener("click", async () => {
+    if (restartPendingBtn.disabled) {
+      return;
+    }
+    const confirmed = window.confirm(
+      "Restart analysis for all documents that are not ready?"
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const response = await apiFetch("/documents/pending/restart?limit=200", {
+      method: "POST",
+    });
+    const payload = await response.json();
+    if (!response.ok) {
+      logActivity(`Restart failed: ${payload.detail || response.statusText}`);
+      return;
+    }
+
+    logActivity(
+      `Restarted ${payload.restarted_count} pending document(s). ` +
+        `${payload.skipped_ready_count} ready document(s) skipped.`
+    );
+    await loadPendingDocuments();
+  });
+  pendingEventsBound = true;
+}
+
 window.initializePaperwisePage = async ({ authenticated, initialData }) => {
   if (authenticated !== true) {
     return;
   }
+  bindPendingEvents();
   if (hydrateInitialPendingData(initialData || {})) {
     return;
   }
   await loadPendingDocuments();
 };
-
-restartPendingBtn?.addEventListener("click", async () => {
-  if (restartPendingBtn.disabled) {
-    return;
-  }
-  const confirmed = window.confirm(
-    "Restart analysis for all documents that are not ready?"
-  );
-  if (!confirmed) {
-    return;
-  }
-
-  const response = await apiFetch("/documents/pending/restart?limit=200", {
-    method: "POST",
-  });
-  const payload = await response.json();
-  if (!response.ok) {
-    logActivity(`Restart failed: ${payload.detail || response.statusText}`);
-    return;
-  }
-
-  logActivity(
-    `Restarted ${payload.restarted_count} pending document(s). ` +
-      `${payload.skipped_ready_count} ready document(s) skipped.`
-  );
-  await loadPendingDocuments();
-});
