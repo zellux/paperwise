@@ -17,7 +17,9 @@ function getSingleDocumentElements() {
 }
 
 async function refreshDocumentRelatedLists(options = {}) {
-  await loadDocumentsList();
+  if (typeof loadDocumentsList === "function") {
+    await loadDocumentsList();
+  }
   if (typeof loadPendingDocuments === "function") {
     await loadPendingDocuments();
   }

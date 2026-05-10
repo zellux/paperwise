@@ -1,5 +1,3 @@
-const filterDropdownState = new Map();
-let activeFilterDropdown = null;
 let currentDocumentId = "";
 let currentUser = null;
 const THEME_STORAGE_KEY =
@@ -23,22 +21,9 @@ const connectionTestStatuses = new Map();
 const taskTestStatuses = new Map();
 const taskTestsInFlight = new Set();
 let ocrStatusRequestSeq = 0;
-let docsFilters = {
-  q: "",
-  tag: [],
-  correspondent: [],
-  document_type: [],
-  status: ["ready"],
-};
-let docsPage = 1;
 let docsPageSize = 20;
-const DOCS_SORT_FIELDS = new Set(["title", "document_type", "correspondent", "tags", "document_date", "status"]);
-let docsSort = { field: "", direction: "" };
-let docsFilterNavigateTimer = 0;
 let groundedQaTopK = 18;
 let groundedQaMaxDocuments = 12;
-let docsTotalCount = 0;
-let docsListRequestSeq = 0;
 let initialDataCache;
 let initialUserPreferencesConsumed = false;
 let supportedThemesCache;
@@ -104,28 +89,6 @@ function normalizeGroundedQaMaxDocuments(value) {
     return 12;
   }
   return Math.max(1, Math.min(50, size));
-}
-
-function cloneDocsFilters(filters) {
-  return {
-    q: String(filters?.q || "").trim(),
-    tag: [...(filters?.tag || [])],
-    correspondent: [...(filters?.correspondent || [])],
-    document_type: [...(filters?.document_type || [])],
-    status: [...(filters?.status || ["ready"])],
-  };
-}
-
-function sanitizeDocsFilters(filters) {
-  const normalized = cloneDocsFilters(filters);
-  normalized.tag = unique(normalized.tag);
-  normalized.correspondent = unique(normalized.correspondent);
-  normalized.document_type = unique(normalized.document_type);
-  normalized.status = unique(normalized.status);
-  if (!normalized.status.length) {
-    normalized.status = ["ready"];
-  }
-  return normalized;
 }
 
 function normalizeThemeName(value) {
@@ -618,7 +581,9 @@ async function hydrateUserPreferencesForSession() {
   if (typeof searchAskThreadList !== "undefined" && searchAskThreadList) {
     await loadSearchAskThreads();
   }
-  readFiltersFromUrl();
+  if (typeof readDocumentListStateFromUrl === "function") {
+    readDocumentListStateFromUrl();
+  }
 }
 
 function getAuthElements() {
@@ -637,7 +602,6 @@ function getAuthElements() {
 // Avoid auth-gate flash on page load when the server rendered an authenticated shell.
 if (document.documentElement.classList.contains("has-session")) {
   const { authGate, appShell } = getAuthElements();
-  readFiltersFromUrl();
   renderSortHeaders();
   authGate?.classList.add("view-hidden");
   appShell?.classList.remove("view-hidden");
@@ -740,18 +704,13 @@ function clearSession() {
   ocrAutoSwitch = false;
   ocrImageDetail = "auto";
   connectionTestStatuses.clear();
-  docsPage = 1;
   docsPageSize = 20;
-  docsSort = { field: "", direction: "" };
+  if (typeof clearDocumentListStateForSession === "function") {
+    clearDocumentListStateForSession();
+  }
   if (typeof clearCatalogStateForSession === "function") {
     clearCatalogStateForSession();
   }
-  docsFilters = sanitizeDocsFilters({
-    tag: [],
-    correspondent: [],
-    document_type: [],
-    status: ["ready"],
-  });
   if (typeof clearSearchStateForSession === "function") {
     clearSearchStateForSession();
   }
@@ -791,34 +750,23 @@ function sortValues(values) {
 
 function getSortStateForTable(tableName) {
   if (tableName === "docs") {
-    return docsSort;
+    return typeof getDocumentListSortState === "function"
+      ? getDocumentListSortState()
+      : { field: "", direction: "" };
   }
   if (tableName === "tags") {
-    return tagStatsSort;
+    return typeof tagStatsSort !== "undefined" ? tagStatsSort : { field: "", direction: "" };
   }
   if (tableName === "document-types") {
-    return documentTypesSort;
+    return typeof documentTypesSort !== "undefined"
+      ? documentTypesSort
+      : { field: "", direction: "" };
   }
   return { field: "", direction: "" };
 }
 
 function getSortableHeaders() {
   return [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
-}
-
-function getDocumentFilterControls() {
-  const filterTag = document.getElementById("filterTag");
-  const filterCorrespondent = document.getElementById("filterCorrespondent");
-  const filterType = document.getElementById("filterType");
-  const filterStatus = document.getElementById("filterStatus");
-  return {
-    filterTag,
-    filterCorrespondent,
-    filterType,
-    filterStatus,
-    filterQuery: document.getElementById("filterQuery"),
-    filterSelects: [filterTag, filterCorrespondent, filterType, filterStatus],
-  };
 }
 
 function renderSortHeaders() {
@@ -842,400 +790,6 @@ function renderSortHeaders() {
       button.title = `Sort ${label} (${nextDirection})`;
     }
   }
-}
-
-function getFilterKey(selectEl) {
-  const { filterTag, filterCorrespondent, filterType } = getDocumentFilterControls();
-  if (selectEl === filterTag) {
-    return "tag";
-  }
-  if (selectEl === filterCorrespondent) {
-    return "correspondent";
-  }
-  if (selectEl === filterType) {
-    return "document_type";
-  }
-  return "status";
-}
-
-function getSelectedValues(selectEl) {
-  if (!selectEl) {
-    return [];
-  }
-  return [...selectEl.selectedOptions].map((option) => option.value).filter((value) => value);
-}
-
-function setSelectedValues(selectEl, values) {
-  if (!selectEl) {
-    return;
-  }
-  const selected = new Set(values || []);
-  for (const option of selectEl.options) {
-    option.selected = selected.has(option.value);
-  }
-}
-
-function summarizeSelectedValues(selectedValues, selectEl) {
-  if (!selectedValues.length) {
-    return "Any";
-  }
-  const displayValues = selectedValues.map((value) =>
-    selectEl === getDocumentFilterControls().filterStatus ? formatStatus(value) : value
-  );
-  if (selectedValues.length === 1) {
-    return displayValues[0];
-  }
-  return `${selectedValues.length} selected`;
-}
-
-function closeFilterDropdown(selectEl) {
-  const state = filterDropdownState.get(selectEl);
-  if (!state) {
-    return;
-  }
-  state.panel.hidden = true;
-  state.trigger.setAttribute("aria-expanded", "false");
-  state.chip.classList.remove("is-open");
-  if (activeFilterDropdown === selectEl) {
-    activeFilterDropdown = null;
-  }
-}
-
-function openFilterDropdown(selectEl) {
-  if (activeFilterDropdown && activeFilterDropdown !== selectEl) {
-    closeFilterDropdown(activeFilterDropdown);
-  }
-  const state = filterDropdownState.get(selectEl);
-  if (!state) {
-    return;
-  }
-  state.panel.hidden = false;
-  state.trigger.setAttribute("aria-expanded", "true");
-  state.chip.classList.add("is-open");
-  activeFilterDropdown = selectEl;
-  state.search.focus();
-}
-
-async function toggleFilterOption(selectEl, value) {
-  for (const option of selectEl.options) {
-    if (option.value === value) {
-      option.selected = !option.selected;
-      break;
-    }
-  }
-  await applyFiltersFromControls();
-}
-
-function renderFilterDropdownOptions(selectEl) {
-  const state = filterDropdownState.get(selectEl);
-  if (!state) {
-    return;
-  }
-
-  const query = state.search.value.trim().toLowerCase();
-  const options = [...selectEl.options].filter((option) => {
-    if (!query) {
-      return true;
-    }
-    return option.textContent.toLowerCase().includes(query);
-  });
-
-  state.options.innerHTML = "";
-
-  if (!options.length) {
-    const empty = document.createElement("div");
-    empty.className = "filter-dropdown-empty";
-    empty.textContent = "No matches.";
-    state.options.appendChild(empty);
-    return;
-  }
-
-  for (const option of options) {
-    const row = document.createElement("button");
-    row.type = "button";
-    row.className = "filter-dropdown-option";
-    row.dataset.value = option.value;
-    row.setAttribute("aria-pressed", option.selected ? "true" : "false");
-    if (option.selected) {
-      row.classList.add("is-selected");
-    }
-
-    const check = document.createElement("span");
-    check.className = "filter-dropdown-check";
-    check.textContent = option.selected ? "x" : "";
-
-    const label = document.createElement("span");
-    label.className = "filter-dropdown-option-label";
-    label.textContent = option.textContent;
-
-    row.appendChild(check);
-    row.appendChild(label);
-    state.options.appendChild(row);
-  }
-}
-
-function renderFilterDropdown(selectEl) {
-  const state = filterDropdownState.get(selectEl);
-  if (!state) {
-    return;
-  }
-  const selectedValues = getSelectedValues(selectEl);
-  state.value.textContent = summarizeSelectedValues(selectedValues, selectEl);
-  renderFilterDropdownOptions(selectEl);
-}
-
-function setupFilterDropdown(selectEl) {
-  if (!selectEl || filterDropdownState.has(selectEl)) {
-    return;
-  }
-
-  const chip = selectEl.closest(".filter-chip");
-  if (!chip) {
-    return;
-  }
-
-  const labelText = chip.querySelector(".chip-prefix")?.textContent?.trim() || "Filter";
-  selectEl.classList.add("filter-select-native");
-
-  const dropdown = document.createElement("div");
-  dropdown.className = "filter-dropdown";
-
-  const trigger = document.createElement("button");
-  trigger.type = "button";
-  trigger.className = "filter-dropdown-trigger";
-  trigger.setAttribute("aria-expanded", "false");
-
-  const triggerValue = document.createElement("span");
-  triggerValue.className = "filter-dropdown-value";
-  triggerValue.textContent = "Any";
-
-  const triggerCaret = document.createElement("span");
-  triggerCaret.className = "filter-dropdown-caret";
-  triggerCaret.textContent = "▾";
-
-  trigger.appendChild(triggerValue);
-  trigger.appendChild(triggerCaret);
-
-  const panel = document.createElement("div");
-  panel.className = "filter-dropdown-panel";
-  panel.hidden = true;
-
-  const search = document.createElement("input");
-  search.type = "search";
-  search.className = "filter-dropdown-search";
-  search.placeholder = `Filter ${labelText.toLowerCase()}`;
-
-  const options = document.createElement("div");
-  options.className = "filter-dropdown-options";
-
-  panel.appendChild(search);
-  panel.appendChild(options);
-  dropdown.appendChild(trigger);
-  dropdown.appendChild(panel);
-  chip.appendChild(dropdown);
-
-  filterDropdownState.set(selectEl, {
-    chip,
-    trigger,
-    panel,
-    search,
-    options,
-    value: triggerValue,
-  });
-
-  trigger.addEventListener("click", () => {
-    if (panel.hidden) {
-      openFilterDropdown(selectEl);
-      renderFilterDropdownOptions(selectEl);
-      return;
-    }
-    closeFilterDropdown(selectEl);
-  });
-
-  search.addEventListener("input", () => {
-    renderFilterDropdownOptions(selectEl);
-  });
-
-  options.addEventListener("click", async (event) => {
-    const button = event.target.closest(".filter-dropdown-option");
-    if (!button) {
-      return;
-    }
-    const value = button.dataset.value;
-    if (!value) {
-      return;
-    }
-    await toggleFilterOption(selectEl, value);
-    renderFilterDropdown(selectEl);
-  });
-}
-
-function applyFiltersToControls() {
-  const { filterTag, filterCorrespondent, filterType, filterStatus, filterQuery, filterSelects } =
-    getDocumentFilterControls();
-  if (filterQuery) {
-    filterQuery.value = docsFilters.q || "";
-  }
-  setSelectedValues(filterTag, docsFilters.tag);
-  setSelectedValues(filterCorrespondent, docsFilters.correspondent);
-  setSelectedValues(filterType, docsFilters.document_type);
-  setSelectedValues(filterStatus, docsFilters.status);
-  for (const selectEl of filterSelects) {
-    renderFilterDropdown(selectEl);
-  }
-}
-
-function setSelectOptions(selectEl, values) {
-  if (!selectEl) {
-    return;
-  }
-  const key = getFilterKey(selectEl);
-  const selectedValues = docsFilters[key] || [];
-  const mergedValues = sortValues(unique([...values, ...selectedValues]));
-  selectEl.innerHTML = "";
-
-  for (const value of mergedValues) {
-    const option = document.createElement("option");
-    option.value = value;
-    option.textContent = key === "status" ? formatStatus(value) : value;
-    selectEl.appendChild(option);
-  }
-  setSelectedValues(selectEl, selectedValues);
-  renderFilterDropdown(selectEl);
-}
-
-function readFiltersFromControls() {
-  const { filterTag, filterCorrespondent, filterType, filterStatus, filterQuery } =
-    getDocumentFilterControls();
-  docsFilters.q = String(filterQuery?.value || "").trim();
-  docsFilters.tag = getSelectedValues(filterTag);
-  docsFilters.correspondent = getSelectedValues(filterCorrespondent);
-  docsFilters.document_type = getSelectedValues(filterType);
-  docsFilters.status = getSelectedValues(filterStatus);
-}
-
-function refreshFilterOptions(options) {
-  const { filterTag, filterCorrespondent, filterType, filterStatus } = getDocumentFilterControls();
-  const source = options && typeof options === "object" ? options : {};
-  setSelectOptions(filterTag, Array.isArray(source.tags) ? source.tags : []);
-  setSelectOptions(filterCorrespondent, Array.isArray(source.correspondents) ? source.correspondents : []);
-  setSelectOptions(filterType, Array.isArray(source.document_types) ? source.document_types : []);
-  setSelectOptions(
-    filterStatus,
-    Array.isArray(source.statuses) ? source.statuses : ["received", "processing", "failed", "ready"]
-  );
-}
-
-function refreshFilterOptionsFromDocuments(documents) {
-  const tags = new Set();
-  const correspondents = new Set();
-  const documentTypes = new Set();
-  const statuses = new Set();
-
-  for (const doc of documents) {
-    if (doc.status) {
-      statuses.add(doc.status);
-    }
-    const metadata = doc.llm_metadata;
-    if (!metadata) {
-      continue;
-    }
-    if (metadata.correspondent) {
-      correspondents.add(metadata.correspondent);
-    }
-    if (metadata.document_type) {
-      documentTypes.add(metadata.document_type);
-    }
-    for (const tag of metadata.tags || []) {
-      if (tag) {
-        tags.add(tag);
-      }
-    }
-  }
-
-  refreshFilterOptions({
-    tags: [...tags],
-    correspondents: [...correspondents],
-    document_types: [...documentTypes],
-    statuses: ["received", "processing", "failed", "ready", ...statuses],
-  });
-}
-
-function applyDocsStateToUrl(url) {
-  url.searchParams.delete("q");
-  url.searchParams.delete("tag");
-  url.searchParams.delete("correspondent");
-  url.searchParams.delete("document_type");
-  url.searchParams.delete("status");
-  url.searchParams.delete("view");
-  url.searchParams.delete("page");
-  url.searchParams.delete("page_size");
-  url.searchParams.delete("sort_by");
-  url.searchParams.delete("sort_dir");
-
-  if (docsFilters.q) {
-    url.searchParams.set("q", docsFilters.q);
-  }
-  for (const value of docsFilters.tag) {
-    url.searchParams.append("tag", value);
-  }
-  for (const value of docsFilters.correspondent) {
-    url.searchParams.append("correspondent", value);
-  }
-  for (const value of docsFilters.document_type) {
-    url.searchParams.append("document_type", value);
-  }
-  for (const value of docsFilters.status) {
-    url.searchParams.append("status", value);
-  }
-  if (docsPage > 1) {
-    url.searchParams.set("page", String(docsPage));
-  }
-  if (docsPageSize !== 20) {
-    url.searchParams.set("page_size", String(docsPageSize));
-  }
-  if (docsSort.field && docsSort.direction) {
-    url.searchParams.set("sort_by", docsSort.field);
-    url.searchParams.set("sort_dir", docsSort.direction);
-  }
-}
-
-function buildDocumentsUrl() {
-  const url = new URL("/ui/documents", window.location.origin);
-  applyDocsStateToUrl(url);
-  const qs = url.searchParams.toString();
-  return qs ? `${url.pathname}?${qs}` : url.pathname;
-}
-
-function readFiltersFromUrl() {
-  const params = new URLSearchParams(window.location.search);
-  docsFilters.q = String(params.get("q") || "").trim();
-  docsFilters.tag = unique(params.getAll("tag"));
-  docsFilters.correspondent = unique(params.getAll("correspondent"));
-  docsFilters.document_type = unique(params.getAll("document_type"));
-  const statusValues = unique(params.getAll("status"));
-  docsFilters.status = statusValues.length ? statusValues : ["ready"];
-  const pageValue = Number(params.get("page") || "1");
-  docsPage = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
-  const pageSizeValue = params.get("page_size") || String(docsPageSize || 20);
-  docsPageSize = normalizePageSize(pageSizeValue);
-  docsSort = normalizeSortState(
-    {
-      field: params.get("sort_by") || "",
-      direction: params.get("sort_dir") || "",
-    },
-    DOCS_SORT_FIELDS
-  );
-}
-
-function navigateToDocumentsPageFromState() {
-  window.location.href = buildDocumentsUrl();
-}
-
-function applyFiltersFromControls() {
-  readFiltersFromControls();
-  docsPage = 1;
-  navigateToDocumentsPageFromState();
 }
 
 function navigateToDocument(documentId) {
@@ -1263,10 +817,9 @@ async function deleteDocumentById(documentId, options = {}) {
     return false;
   }
 
-  const docsTableBody = document.getElementById("docsTableBody");
-  const visibleDocRows = docsTableBody?.querySelectorAll("tr[data-doc-id]").length || 0;
-  const shouldStepBackPage =
-    Boolean(docsTableBody) && docsPage > 1 && visibleDocRows <= 1;
+  if (typeof prepareDocumentListDelete === "function") {
+    prepareDocumentListDelete();
+  }
 
   const response = await apiFetch(`/documents/${documentId}`, {
     method: "DELETE",
@@ -1277,17 +830,15 @@ async function deleteDocumentById(documentId, options = {}) {
     return false;
   }
 
-  if (shouldStepBackPage) {
-    docsPage -= 1;
-  }
   if (currentDocumentId === documentId) {
     currentDocumentId = "";
-    window.location.href = buildDocumentsUrl();
+    window.location.href =
+      typeof buildDocumentsUrl === "function" ? buildDocumentsUrl() : "/ui/documents";
     return true;
   }
 
-  if (docsTableBody) {
-    await loadDocumentsList();
+  if (typeof refreshDocumentListAfterDelete === "function") {
+    await refreshDocumentListAfterDelete();
   } else {
     await initializeCurrentPageData();
   }
@@ -1331,16 +882,6 @@ function hydrateSettingsFormFromInitialPreferences() {
   return true;
 }
 
-function applyDocumentsPartial(payload) {
-  const docsTableBody = document.getElementById("docsTableBody");
-  const documentsPaginationToolbar = document.getElementById("documentsPaginationToolbar");
-  applyTableBodyPartial(docsTableBody, payload);
-  replaceElementHtml(documentsPaginationToolbar, payload.pagination_toolbar_html);
-  docsTotalCount = Number(payload.documents_total || 0);
-  docsPage = Math.max(1, Number(payload.documents_page || docsPage || 1));
-  docsPageSize = normalizePageSize(payload.documents_page_size || docsPageSize);
-}
-
 function applyDocumentDetailPartial(payload) {
   currentDocumentId = String(payload.document_id || "");
   for (const [elementId, value] of Object.entries(payload.text || {})) {
@@ -1363,53 +904,6 @@ function applyDocumentDetailPartial(payload) {
   if (detailBlobUri && payload.blob_uri) {
     detailBlobUri.title = payload.blob_uri;
   }
-}
-
-async function loadDocumentsList() {
-  const requestSeq = ++docsListRequestSeq;
-  const docsTableBody = document.getElementById("docsTableBody");
-  renderSortHeaders();
-  const query = new URLSearchParams({
-    page: String(docsPage),
-    page_size: String(docsPageSize),
-  });
-  if (docsSort.field && docsSort.direction) {
-    query.set("sort_by", docsSort.field);
-    query.set("sort_dir", docsSort.direction);
-  }
-  if (docsFilters.q) {
-    query.set("q", docsFilters.q);
-  }
-  for (const value of docsFilters.tag) {
-    query.append("tag", value);
-  }
-  for (const value of docsFilters.correspondent) {
-    query.append("correspondent", value);
-  }
-  for (const value of docsFilters.document_type) {
-    query.append("document_type", value);
-  }
-  for (const value of docsFilters.status) {
-    query.append("status", value);
-  }
-
-  let payload;
-  try {
-    payload = await loadTablePartial({
-      url: `/ui/partials/documents?${query.toString()}`,
-      tbody: docsTableBody,
-      loadingColspan: 7,
-      loadingMessage: "Loading documents...",
-    });
-  } catch (error) {
-    logActivity(`Document list failed: ${error.message}`);
-    return;
-  }
-  if (requestSeq !== docsListRequestSeq) {
-    return;
-  }
-  applyDocumentsPartial(payload);
-  logActivity(`Loaded ${Number(payload.documents_returned || 0)} document(s) of ${docsTotalCount} total`);
 }
 
 async function initializeCurrentPageData() {
@@ -1486,7 +980,9 @@ async function handleSignInSubmit(event) {
     renderSessionState();
     setAuthMessage(`Signed in as ${payload.user.email}.`);
     await hydrateUserPreferencesForSession();
-    applyFiltersToControls();
+    if (typeof applyDocumentListFiltersToControls === "function") {
+      applyDocumentListFiltersToControls();
+    }
     await initializeCurrentPageData();
   } catch (error) {
     setAuthMessage(error.message || "Failed to sign in.", true);
@@ -1529,7 +1025,9 @@ async function handleRegisterSubmit(event) {
     renderSessionState();
     setAuthMessage(`Registered ${registerPayload.email}.`);
     await hydrateUserPreferencesForSession();
-    applyFiltersToControls();
+    if (typeof applyDocumentListFiltersToControls === "function") {
+      applyDocumentListFiltersToControls();
+    }
     await initializeCurrentPageData();
   } catch (error) {
     setAuthMessage(error.message || "Failed to create account.", true);
@@ -1565,7 +1063,9 @@ async function initializeApp() {
   }
 
   await hydrateUserPreferencesForSession();
-  applyFiltersToControls();
+  if (typeof applyDocumentListFiltersToControls === "function") {
+    applyDocumentListFiltersToControls();
+  }
   refreshSettingsForm();
   renderSortHeaders();
   refreshUploadAvailability();

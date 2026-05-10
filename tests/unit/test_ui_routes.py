@@ -253,13 +253,13 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "document.querySelector" not in app_initialization
     assert "initializeCurrentPageData" in app_js.text
     assert "initializePaperwisePage" in app_js.text
-    assert (
-        "if (docsTableBody) {\n"
-        "    await loadDocumentsList();\n"
-        "  } else {\n"
-        "    await initializeCurrentPageData();\n"
-        "  }"
-    ) in app_js.text
+    assert "refreshDocumentListAfterDelete" in app_js.text
+    assert "loadDocumentsList" not in app_js.text
+
+    documents_js = client.get("/static/js/documents.js")
+    assert documents_js.status_code == 200
+    assert "function refreshDocumentListAfterDelete" in documents_js.text
+    assert "await loadDocumentsList();" in documents_js.text
 
     for script_name in [
         "documents.js",

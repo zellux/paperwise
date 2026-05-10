@@ -590,7 +590,9 @@ function bindSettingsEvents() {
     refreshUploadAvailability();
     applyTheme(nextTheme);
     docsPageSize = nextPageSize;
-    docsPage = 1;
+    if (typeof resetDocumentListPage === "function") {
+      resetDocumentListPage();
+    }
     await saveUserPreferences();
     logActivity("Saved settings.");
     window.location.reload();
