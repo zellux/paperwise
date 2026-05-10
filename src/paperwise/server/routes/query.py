@@ -1,10 +1,10 @@
 import json
-from typing import Any
+from typing import Any, Protocol
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response, StreamingResponse
 
-from paperwise.application.interfaces import DocumentRepository, LLMProvider
+from paperwise.application.interfaces import ChatThreadRepository, LLMProvider
 from paperwise.application.services.chat_runtime import (
     ChatRuntimeEvent,
     ChatRuntimeResult,
@@ -12,7 +12,7 @@ from paperwise.application.services.chat_runtime import (
     iter_chat_runtime_events,
     run_chat_runtime,
 )
-from paperwise.application.services.chat_tools import ChatToolScope
+from paperwise.application.services.chat_tools import ChatToolRepository, ChatToolScope
 from paperwise.application.services.grounded_qa import is_timeout_error
 from paperwise.application.services.chat_threads import (
     migrate_legacy_chat_threads,
@@ -51,6 +51,10 @@ CHAT_SYSTEM_PROMPT = (
 )
 MAX_CHAT_TOOL_ROUNDS = 3
 MAX_CHAT_THREADS = 20
+
+
+class ChatQueryRepository(ChatThreadRepository, ChatToolRepository, Protocol):
+    pass
 
 
 CHAT_TOOLS: list[dict[str, Any]] = [
@@ -121,7 +125,7 @@ CHAT_TOOLS: list[dict[str, Any]] = [
 
 def _save_chat_thread(
     *,
-    repository: DocumentRepository,
+    repository: ChatThreadRepository,
     current_user: User,
     payload: ChatRequest,
     response: ChatResponse,
@@ -144,7 +148,7 @@ def _save_chat_thread(
 
 @router.get("/chat/threads", response_model=list[ChatThreadSummaryResponse])
 def list_chat_threads_endpoint(
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: ChatThreadRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[ChatThreadSummaryResponse]:
     migrate_legacy_chat_threads(repository, current_user)
@@ -157,7 +161,7 @@ def list_chat_threads_endpoint(
 @router.get("/chat/threads/{thread_id}", response_model=ChatThreadResponse)
 def get_chat_thread_endpoint(
     thread_id: str,
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: ChatThreadRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> ChatThreadResponse:
     migrate_legacy_chat_threads(repository, current_user)
@@ -170,7 +174,7 @@ def get_chat_thread_endpoint(
 @router.delete("/chat/threads/{thread_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_chat_thread_endpoint(
     thread_id: str,
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: ChatThreadRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> Response:
     migrate_legacy_chat_threads(repository, current_user)
@@ -259,7 +263,7 @@ def _raise_chat_runtime_http_exception(exc: Exception) -> None:
 
 def _chat_with_tools(
     *,
-    repository: DocumentRepository,
+    repository: ChatQueryRepository,
     llm_provider: LLMProvider,
     current_user: User,
     payload: ChatRequest,
@@ -302,7 +306,7 @@ def _chat_sse_event_from_runtime_event(event: ChatRuntimeEvent) -> str:
 
 def _iter_chat_events(
     *,
-    repository: DocumentRepository,
+    repository: ChatQueryRepository,
     llm_provider: LLMProvider,
     current_user: User,
     payload: ChatRequest,
@@ -349,7 +353,7 @@ def _iter_chat_events(
 @router.post("/chat", response_model=ChatResponse)
 def chat_all_documents_endpoint(
     payload: ChatRequest,
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: ChatQueryRepository = Depends(document_repository_dependency),
     provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> ChatResponse:
@@ -373,7 +377,7 @@ def chat_all_documents_endpoint(
 @router.post("/chat/stream")
 def stream_chat_all_documents_endpoint(
     payload: ChatRequest,
-    repository: DocumentRepository = Depends(document_repository_dependency),
+    repository: ChatQueryRepository = Depends(document_repository_dependency),
     provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> StreamingResponse:

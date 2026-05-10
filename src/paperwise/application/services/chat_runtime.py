@@ -4,8 +4,8 @@ import json
 from typing import Any
 from uuid import uuid4
 
-from paperwise.application.interfaces import DocumentRepository, LLMProvider
-from paperwise.application.services.chat_tools import ChatToolScope, execute_chat_tool
+from paperwise.application.interfaces import LLMProvider
+from paperwise.application.services.chat_tools import ChatToolRepository, ChatToolScope, execute_chat_tool
 from paperwise.domain.models import User
 
 
@@ -74,7 +74,7 @@ def _append_chat_tool_messages(
 
 def iter_chat_runtime_events(
     *,
-    repository: DocumentRepository,
+    repository: ChatToolRepository,
     llm_provider: LLMProvider,
     current_user: User,
     messages: list[dict[str, Any]],
