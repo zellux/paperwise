@@ -9,6 +9,7 @@ from paperwise.domain.models import (
     Document,
     DocumentSearchHit,
     DocumentHistoryEvent,
+    DocumentStatus,
     LLMParseResult,
     ParseResult,
     UserPreference,
@@ -107,6 +108,14 @@ class DocumentStore(Protocol):
         offset: int = 0,
     ) -> list[tuple[Document, LLMParseResult | None]]:
         """List owner documents with optional LLM metadata in one repository call."""
+
+    def count_owner_documents_by_statuses(
+        self,
+        *,
+        owner_id: str,
+        statuses: set[DocumentStatus],
+    ) -> int:
+        """Count owner documents whose status is in the provided set."""
 
     def delete_document(self, document_id: str) -> None:
         """Delete a document and all related records."""

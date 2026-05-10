@@ -95,6 +95,11 @@ _PAGE_SCRIPTS_BY_VIEW = {
 SUPPORTED_UI_THEMES = ("atlas", "ledger", "moss", "ember", "folio", "forge")
 DEFAULT_UI_THEME = "forge"
 UI_THEME_STORAGE_KEY = "paperwise.ui.theme"
+PENDING_DOCUMENT_STATUSES = {
+    DocumentStatus.RECEIVED,
+    DocumentStatus.PROCESSING,
+    DocumentStatus.FAILED,
+}
 
 
 def _page_initial_data(
@@ -281,13 +286,9 @@ def _documents_initial_data(
     total_pages = max(1, (documents_total + normalized_page_size - 1) // normalized_page_size)
     normalized_page = min(normalized_page, total_pages)
     offset = (normalized_page - 1) * normalized_page_size
-    processing_count = sum(
-        1
-        for document, _llm_result in repository.list_owner_documents_with_llm_results(
-            owner_id=current_user.id,
-            limit=10_000,
-        )
-        if document.status != DocumentStatus.READY
+    processing_count = repository.count_owner_documents_by_statuses(
+        owner_id=current_user.id,
+        statuses=PENDING_DOCUMENT_STATUSES,
     )
     return {
         **initial_data,

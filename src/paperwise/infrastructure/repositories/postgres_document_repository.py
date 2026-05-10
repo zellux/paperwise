@@ -2,7 +2,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime
 import re
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.application.services.taxonomy import normalize_name, to_title_case
@@ -234,6 +234,26 @@ class PostgresDocumentRepository(DocumentRepository):
                 )
                 for document_row, llm_row in rows
             ]
+
+    def count_owner_documents_by_statuses(
+        self,
+        *,
+        owner_id: str,
+        statuses: set[DocumentStatus],
+    ) -> int:
+        if not statuses:
+            return 0
+        status_values = [status.value for status in statuses]
+        with self._session_factory() as session:
+            return int(
+                session.scalar(
+                    select(func.count())
+                    .select_from(DocumentRow)
+                    .where(DocumentRow.owner_id == owner_id)
+                    .where(DocumentRow.status.in_(status_values))
+                )
+                or 0
+            )
 
     def delete_document(self, document_id: str) -> None:
         with self._session_factory() as session:

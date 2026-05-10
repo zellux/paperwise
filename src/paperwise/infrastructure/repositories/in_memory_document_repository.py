@@ -12,6 +12,7 @@ from paperwise.domain.models import (
     Document,
     DocumentSearchHit,
     DocumentHistoryEvent,
+    DocumentStatus,
     LLMParseResult,
     ParseResult,
     UserPreference,
@@ -177,6 +178,19 @@ class InMemoryDocumentRepository(DocumentRepository):
                 (document, self._llm_parse_results.get(document.id))
                 for document in docs[start:end]
             ]
+
+    def count_owner_documents_by_statuses(
+        self,
+        *,
+        owner_id: str,
+        statuses: set[DocumentStatus],
+    ) -> int:
+        with self._lock:
+            return sum(
+                1
+                for document in self._documents.values()
+                if document.owner_id == owner_id and document.status in statuses
+            )
 
     def delete_document(self, document_id: str) -> None:
         with self._lock:
