@@ -10,10 +10,10 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     settings_dependency,
 )
-from paperwise.server.user_preferences import load_user_preferences
 from paperwise.application.interfaces import PreferenceRepository, UserRepository
 from paperwise.application.services.session_tokens import create_session_token
 from paperwise.application.services.llm_preferences import get_normalized_llm_preferences, validate_api_key_for_provider
+from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.application.services.users import (
     CreateUserCommand,
     authenticate_user,

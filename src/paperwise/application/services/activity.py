@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
 from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult
 
 
@@ -21,8 +22,7 @@ def owner_activity_summary(
         limit=limit,
         statuses={DocumentStatus.READY},
     )
-    preference = repository.get_user_preference(owner_id)
-    preferences = dict(preference.preferences) if preference is not None else {}
+    preferences = load_user_preferences(repository=repository, user_id=owner_id)
     return ActivitySummary(
         documents=documents,
         total_tokens=int(preferences.get("llm_total_tokens_processed") or 0),

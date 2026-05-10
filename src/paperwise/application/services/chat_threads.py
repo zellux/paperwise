@@ -4,6 +4,7 @@ from typing import Protocol
 from uuid import uuid4
 
 from paperwise.application.interfaces import ChatThreadRepository, PreferenceRepository
+from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.domain.models import ChatThread, User, UserPreference
 
 CHAT_THREADS_PREFERENCE_KEY = "chat_threads"
@@ -87,8 +88,7 @@ def save_chat_thread_turn(
 
 
 def migrate_legacy_chat_threads(repository: LegacyChatThreadRepository, current_user: User) -> None:
-    preference = repository.get_user_preference(current_user.id)
-    preferences = dict(preference.preferences) if preference is not None else {}
+    preferences = load_user_preferences(repository=repository, user_id=current_user.id)
     legacy_threads = _chat_threads_from_preferences(preferences)
     if not legacy_threads:
         return

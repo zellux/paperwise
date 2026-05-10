@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from paperwise.application.interfaces import LLMProvider, PreferenceRepository
 from paperwise.application.services.llm_preferences import LLM_TASK_METADATA
 from paperwise.application.services.llm_provider_factory import resolve_llm_provider_from_preferences
-from paperwise.server.user_preferences import load_user_preferences
+from paperwise.application.services.user_preferences import load_user_preferences
 
 
 def resolve_http_llm_provider_from_preferences(

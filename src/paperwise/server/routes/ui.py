@@ -21,13 +21,13 @@ from paperwise.application.services.pending_documents import (
     list_pending_documents,
 )
 from paperwise.application.services.chat_threads import migrate_legacy_chat_threads
+from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult, User
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
     optional_current_user_dependency,
 )
-from paperwise.server.user_preferences import load_user_preferences
 from paperwise.server.html_rewriter import (
     render_active_nav,
     replace_activity_token_total,

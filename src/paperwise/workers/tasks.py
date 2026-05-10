@@ -17,6 +17,7 @@ from paperwise.application.services.llm_provider_factory import (
     resolve_llm_provider_from_preferences as resolve_configured_llm_provider,
 )
 from paperwise.application.services.llm_parsing import parse_with_llm
+from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.domain.models import DocumentStatus, HistoryActorType
@@ -44,15 +45,11 @@ def _build_llm_provider() -> LLMProvider | None:
 
 
 def _resolve_ocr_provider_for_owner(repository: DocumentRepository, owner_id: str) -> str:
-    preference = repository.get_user_preference(owner_id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    return resolve_ocr_provider(preferences)
+    return resolve_ocr_provider(load_user_preferences(repository=repository, user_id=owner_id))
 
 
 def _resolve_ocr_auto_switch_for_owner(repository: DocumentRepository, owner_id: str) -> bool:
-    preference = repository.get_user_preference(owner_id)
-    preferences = dict(preference.preferences) if preference is not None else {}
-    return resolve_ocr_auto_switch(preferences)
+    return resolve_ocr_auto_switch(load_user_preferences(repository=repository, user_id=owner_id))
 
 
 def _resolve_llm_provider_from_preferences(
@@ -77,10 +74,8 @@ def _resolve_metadata_llm_provider_for_owner(
     owner_id: str,
     provider_override: LLMProvider | None,
 ) -> LLMProvider:
-    preference = repository.get_user_preference(owner_id)
-    preferences = dict(preference.preferences) if preference is not None else {}
     return _resolve_llm_provider_from_preferences(
-        preferences=preferences,
+        preferences=load_user_preferences(repository=repository, user_id=owner_id),
         provider_override=provider_override,
         task=LLM_TASK_METADATA,
     )
@@ -94,8 +89,7 @@ def _resolve_ocr_llm_provider_for_owner(
 ) -> LLMProvider | None:
     if ocr_provider == "tesseract":
         return None
-    preference = repository.get_user_preference(owner_id)
-    preferences = dict(preference.preferences) if preference is not None else {}
+    preferences = load_user_preferences(repository=repository, user_id=owner_id)
     if ocr_provider == "llm_separate":
         return _resolve_llm_provider_from_preferences(
             preferences=preferences,

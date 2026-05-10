@@ -5,6 +5,7 @@ from paperwise.application.services.history import build_metadata_history_events
 from paperwise.application.services.llm_runtime import summarize_llm_provider
 from paperwise.application.services.metadata_updates import validate_document_date
 from paperwise.application.services.taxonomy import resolve_existing_name, resolve_tags
+from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.domain.models import (
     Document,
     HistoryActorType,
@@ -150,8 +151,7 @@ def parse_with_llm(
     )
     repository.save_llm_parse_result(result)
     if llm_total_tokens > 0:
-        preference = repository.get_user_preference(document.owner_id)
-        preference_data = dict(preference.preferences) if preference is not None else {}
+        preference_data = load_user_preferences(repository=repository, user_id=document.owner_id)
         existing_total = preference_data.get("llm_total_tokens_processed", 0)
         running_total = existing_total if isinstance(existing_total, int) and existing_total >= 0 else 0
         preference_data["llm_total_tokens_processed"] = running_total + llm_total_tokens

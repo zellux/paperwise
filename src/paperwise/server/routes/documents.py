@@ -18,7 +18,6 @@ from paperwise.server.dependencies import (
 )
 from paperwise.server.llm_provider import resolve_http_llm_provider_for_user
 from paperwise.server.routes.document_access import get_owned_document_or_404
-from paperwise.server.user_preferences import load_user_preferences
 from paperwise.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
@@ -69,6 +68,7 @@ from paperwise.application.services.upload_validation import (
     is_supported_upload,
     normalize_content_type,
 )
+from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.domain.models import (
     Document,
     DocumentHistoryEvent,
