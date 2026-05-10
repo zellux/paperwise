@@ -32,17 +32,21 @@ function getVisiblePendingRowCount() {
 
 function applyPendingPartial(payload) {
   const { pendingTableBody } = getPendingElements();
-  replaceElementHtml(pendingTableBody, payload.table_body_html);
+  applyTableBodyPartial(pendingTableBody, payload);
   setRestartPendingButtonEnabled(Boolean(payload.has_restartable_pending_documents));
 }
 
 async function loadPendingDocuments() {
   const { pendingTableBody } = getPendingElements();
   const requestSeq = ++pendingDocsRequestSeq;
-  renderTableLoading(pendingTableBody, 4, "Loading pending documents...");
   let payload;
   try {
-    payload = await fetchUiPartial("/ui/partials/pending");
+    payload = await loadTablePartial({
+      url: "/ui/partials/pending",
+      tbody: pendingTableBody,
+      loadingColspan: 4,
+      loadingMessage: "Loading pending documents...",
+    });
   } catch (error) {
     // Keep restart enabled if the UI still has visible pending rows.
     setRestartPendingButtonEnabled(getVisiblePendingRowCount() > 0);

@@ -32,3 +32,12 @@ function renderTableLoading(tbody, colspan, message) {
   }
   tbody.innerHTML = `<tr><td colspan="${colspan}">${message}</td></tr>`;
 }
+
+async function loadTablePartial({ url, tbody, loadingColspan, loadingMessage }) {
+  renderTableLoading(tbody, loadingColspan, loadingMessage);
+  return fetchUiPartial(url);
+}
+
+function applyTableBodyPartial(tbody, payload) {
+  replaceElementHtml(tbody, payload?.table_body_html);
+}

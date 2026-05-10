@@ -19,20 +19,19 @@ function clearCatalogStateForSession() {
 
 function applyTagsPartial(payload) {
   const { tagsTableBody } = getCatalogElements();
-  replaceElementHtml(tagsTableBody, payload.table_body_html);
+  applyTableBodyPartial(tagsTableBody, payload);
   renderSortHeaders();
 }
 
 function applyDocumentTypesPartial(payload) {
   const { documentTypesTableBody } = getCatalogElements();
-  replaceElementHtml(documentTypesTableBody, payload.table_body_html);
+  applyTableBodyPartial(documentTypesTableBody, payload);
   renderSortHeaders();
 }
 
 async function loadTagStats() {
   const { tagsTableBody } = getCatalogElements();
   const requestSeq = ++tagStatsRequestSeq;
-  renderTableLoading(tagsTableBody, 3, "Loading tags...");
   renderSortHeaders();
   const query = new URLSearchParams();
   if (tagStatsSort.field && tagStatsSort.direction) {
@@ -42,7 +41,12 @@ async function loadTagStats() {
   const suffix = query.toString() ? `?${query.toString()}` : "";
   let payload;
   try {
-    payload = await fetchUiPartial(`/ui/partials/tags${suffix}`);
+    payload = await loadTablePartial({
+      url: `/ui/partials/tags${suffix}`,
+      tbody: tagsTableBody,
+      loadingColspan: 3,
+      loadingMessage: "Loading tags...",
+    });
   } catch (error) {
     logActivity(`Tag stats load failed: ${error.message}`);
     return;
@@ -57,7 +61,6 @@ async function loadTagStats() {
 async function loadDocumentTypeStats() {
   const { documentTypesTableBody } = getCatalogElements();
   const requestSeq = ++documentTypeStatsRequestSeq;
-  renderTableLoading(documentTypesTableBody, 3, "Loading document types...");
   renderSortHeaders();
   const query = new URLSearchParams();
   if (documentTypesSort.field && documentTypesSort.direction) {
@@ -67,7 +70,12 @@ async function loadDocumentTypeStats() {
   const suffix = query.toString() ? `?${query.toString()}` : "";
   let payload;
   try {
-    payload = await fetchUiPartial(`/ui/partials/document-types${suffix}`);
+    payload = await loadTablePartial({
+      url: `/ui/partials/document-types${suffix}`,
+      tbody: documentTypesTableBody,
+      loadingColspan: 3,
+      loadingMessage: "Loading document types...",
+    });
   } catch (error) {
     logActivity(`Document type stats load failed: ${error.message}`);
     return;

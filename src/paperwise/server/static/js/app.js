@@ -1330,7 +1330,7 @@ function hydrateSettingsFormFromInitialPreferences() {
 function applyDocumentsPartial(payload) {
   const docsTableBody = document.getElementById("docsTableBody");
   const documentsPaginationToolbar = document.getElementById("documentsPaginationToolbar");
-  replaceElementHtml(docsTableBody, payload.table_body_html);
+  applyTableBodyPartial(docsTableBody, payload);
   replaceElementHtml(documentsPaginationToolbar, payload.pagination_toolbar_html);
   docsTotalCount = Number(payload.documents_total || 0);
   docsPage = Math.max(1, Number(payload.documents_page || docsPage || 1));
@@ -1364,7 +1364,6 @@ function applyDocumentDetailPartial(payload) {
 async function loadDocumentsList() {
   const requestSeq = ++docsListRequestSeq;
   const docsTableBody = document.getElementById("docsTableBody");
-  renderTableLoading(docsTableBody, 7, "Loading documents...");
   renderSortHeaders();
   const query = new URLSearchParams({
     page: String(docsPage),
@@ -1392,7 +1391,12 @@ async function loadDocumentsList() {
 
   let payload;
   try {
-    payload = await fetchUiPartial(`/ui/partials/documents?${query.toString()}`);
+    payload = await loadTablePartial({
+      url: `/ui/partials/documents?${query.toString()}`,
+      tbody: docsTableBody,
+      loadingColspan: 7,
+      loadingMessage: "Loading documents...",
+    });
   } catch (error) {
     logActivity(`Document list failed: ${error.message}`);
     return;

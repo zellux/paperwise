@@ -27,7 +27,7 @@ function renderActivityTokenLoading() {
 
 function applyActivityPartial(payload) {
   const { processedDocsTableBody } = getActivityElements();
-  replaceElementHtml(processedDocsTableBody, payload.table_body_html);
+  applyTableBodyPartial(processedDocsTableBody, payload);
   renderActivityTokenTotal(Number(payload.activity_total_tokens || 0));
 }
 
@@ -35,11 +35,15 @@ async function loadProcessedDocumentsActivity() {
   const { processedDocsTableBody } = getActivityElements();
   const requestSeq = ++processedActivityRequestSeq;
   const limit = Math.max(1, normalizePageSize(docsPageSize));
-  renderTableLoading(processedDocsTableBody, 4, "Loading processed documents...");
   renderActivityTokenLoading();
   let payload;
   try {
-    payload = await fetchUiPartial(`/ui/partials/activity?limit=${encodeURIComponent(String(limit))}`);
+    payload = await loadTablePartial({
+      url: `/ui/partials/activity?limit=${encodeURIComponent(String(limit))}`,
+      tbody: processedDocsTableBody,
+      loadingColspan: 4,
+      loadingMessage: "Loading processed documents...",
+    });
   } catch (error) {
     logActivity(`Processed documents load failed: ${error.message}`);
     return;
