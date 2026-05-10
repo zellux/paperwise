@@ -19,6 +19,10 @@ from paperwise.application.services.document_listing import (
     normalized_sort_field,
     normalized_values,
 )
+from paperwise.application.services.llm_preferences import (
+    llm_provider_defaults_payload,
+    ocr_llm_provider_defaults_payload,
+)
 from paperwise.application.services.taxonomy import to_title_case
 from paperwise.domain.models import DocumentHistoryEvent, DocumentStatus, LLMParseResult, User
 from paperwise.server.dependencies import (
@@ -102,6 +106,8 @@ def _page_initial_data(
         "authenticated": current_user is not None,
         "ui_themes": list(SUPPORTED_UI_THEMES),
         "default_ui_theme": DEFAULT_UI_THEME,
+        "llm_provider_defaults": llm_provider_defaults_payload(),
+        "ocr_llm_provider_defaults": ocr_llm_provider_defaults_payload(),
     }
     if current_user is None:
         return initial_data

@@ -72,6 +72,32 @@ def default_model_for_task(provider: str, task: str) -> str:
     return ""
 
 
+def llm_provider_defaults_payload() -> dict[str, dict[str, str]]:
+    return {
+        "openai": {
+            "model": default_model_for_task("openai", LLM_TASK_METADATA),
+            "base_url": default_base_url_for_provider("openai"),
+        },
+        "gemini": {
+            "model": default_model_for_task("gemini", LLM_TASK_METADATA),
+            "base_url": default_base_url_for_provider("gemini"),
+        },
+    }
+
+
+def ocr_llm_provider_defaults_payload() -> dict[str, dict[str, str]]:
+    return {
+        "openai": {
+            "model": default_model_for_task("openai", LLM_TASK_OCR),
+            "base_url": default_base_url_for_provider("openai"),
+        },
+        "gemini": {
+            "model": default_model_for_task("gemini", LLM_TASK_OCR),
+            "base_url": default_base_url_for_provider("gemini"),
+        },
+    }
+
+
 def normalize_connection_name(provider: str, fallback: str) -> str:
     if provider == "openai":
         return "OpenAI"

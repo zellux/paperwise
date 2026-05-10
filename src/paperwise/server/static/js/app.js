@@ -84,26 +84,6 @@ const LLM_TASK_LABELS = {
   grounded_qa: "Search and Ask Your Docs",
   ocr: "OCR",
 };
-const LLM_PROVIDER_DEFAULTS = {
-  openai: {
-    model: "gpt-4.1-mini",
-    base_url: "https://api.openai.com/v1",
-  },
-  gemini: {
-    model: "gemini-2.5-flash",
-    base_url: "https://generativelanguage.googleapis.com/v1beta",
-  },
-};
-const OCR_LLM_PROVIDER_DEFAULTS = {
-  openai: {
-    model: "gpt-4.1-nano",
-    base_url: "https://api.openai.com/v1",
-  },
-  gemini: {
-    model: "gemini-2.5-flash",
-    base_url: "https://generativelanguage.googleapis.com/v1beta",
-  },
-};
 const SUPPORTED_OCR_PROVIDERS = ["tesseract", "llm"];
 let ocrProvider = "llm";
 let ocrImageDetail = "auto";
@@ -137,6 +117,8 @@ let docsListRequestSeq = 0;
 let initialDataCache;
 let initialUserPreferencesConsumed = false;
 let supportedThemesCache;
+let llmProviderDefaultsCache;
+let ocrLlmProviderDefaultsCache;
 
 function normalizePageSize(value) {
   const size = Number(value);
@@ -275,7 +257,7 @@ function getLlmProviderDefaults(provider) {
   if (!normalized) {
     return null;
   }
-  return LLM_PROVIDER_DEFAULTS[normalized] || null;
+  return getInitialLlmProviderDefaults()[normalized] || null;
 }
 
 function getOcrLlmProviderDefaults(provider) {
@@ -283,7 +265,41 @@ function getOcrLlmProviderDefaults(provider) {
   if (!normalized) {
     return null;
   }
-  return OCR_LLM_PROVIDER_DEFAULTS[normalized] || null;
+  return getInitialOcrLlmProviderDefaults()[normalized] || null;
+}
+
+function normalizeProviderDefaults(rawDefaults) {
+  if (!rawDefaults || typeof rawDefaults !== "object") {
+    return {};
+  }
+  const defaults = {};
+  for (const [provider, values] of Object.entries(rawDefaults)) {
+    const normalizedProvider = normalizeLlmProvider(provider);
+    if (!normalizedProvider || !values || typeof values !== "object") {
+      continue;
+    }
+    defaults[normalizedProvider] = {
+      model: String(values.model || "").trim(),
+      base_url: String(values.base_url || "").trim(),
+    };
+  }
+  return defaults;
+}
+
+function getInitialLlmProviderDefaults() {
+  if (llmProviderDefaultsCache !== undefined) {
+    return llmProviderDefaultsCache;
+  }
+  llmProviderDefaultsCache = normalizeProviderDefaults(readInitialData().llm_provider_defaults);
+  return llmProviderDefaultsCache;
+}
+
+function getInitialOcrLlmProviderDefaults() {
+  if (ocrLlmProviderDefaultsCache !== undefined) {
+    return ocrLlmProviderDefaultsCache;
+  }
+  ocrLlmProviderDefaultsCache = normalizeProviderDefaults(readInitialData().ocr_llm_provider_defaults);
+  return ocrLlmProviderDefaultsCache;
 }
 
 function providerUsesManagedBaseUrl(provider) {
