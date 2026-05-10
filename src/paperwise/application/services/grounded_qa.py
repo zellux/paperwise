@@ -1,13 +1,21 @@
 from datetime import datetime
 import re
-from typing import Any
+from typing import Any, Protocol
 
 import httpx
 
-from paperwise.application.interfaces import DocumentRepository, LLMProvider
+from paperwise.application.interfaces import DocumentChunkRepository, DocumentStore, LLMProvider, ParseResultRepository
 from paperwise.application.services.document_listing import normalized_values
 from paperwise.application.services.taxonomy import normalize_name
 from paperwise.domain.models import DocumentChunkSearchHit, User
+
+
+class MetadataScopeRepository(DocumentStore, Protocol):
+    pass
+
+
+class QAContextRepository(DocumentStore, ParseResultRepository, Protocol):
+    pass
 
 
 def is_timeout_error(exc: Exception) -> bool:
@@ -18,7 +26,7 @@ def is_timeout_error(exc: Exception) -> bool:
 
 def resolve_metadata_scoped_document_ids(
     *,
-    repository: DocumentRepository,
+    repository: MetadataScopeRepository,
     current_user: User,
     base_document_ids: list[str] | None,
     tag_filters: list[str] | None,
@@ -96,7 +104,7 @@ def resolve_metadata_scoped_document_ids(
 
 def search_document_chunks_multi_query(
     *,
-    repository: DocumentRepository,
+    repository: DocumentChunkRepository,
     owner_id: str,
     query: str,
     limit: int,
@@ -200,7 +208,7 @@ def search_document_chunks_multi_query(
 
 def build_qa_contexts(
     *,
-    repository: DocumentRepository,
+    repository: QAContextRepository,
     chunk_hits,
     top_k_chunks: int,
     max_documents: int,
