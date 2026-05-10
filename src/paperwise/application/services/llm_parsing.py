@@ -1,6 +1,13 @@
 from datetime import UTC, datetime
+from typing import Protocol
 
-from paperwise.application.interfaces import DocumentRepository, LLMProvider
+from paperwise.application.interfaces import (
+    HistoryRepository,
+    LLMProvider,
+    ParseResultRepository,
+    PreferenceRepository,
+    TaxonomyRepository,
+)
 from paperwise.application.services.history import build_metadata_history_events
 from paperwise.application.services.llm_runtime import summarize_llm_provider
 from paperwise.application.services.metadata_updates import validate_document_date
@@ -13,6 +20,10 @@ from paperwise.domain.models import (
     ParseResult,
     UserPreference,
 )
+
+
+class LLMParseRepository(ParseResultRepository, TaxonomyRepository, PreferenceRepository, HistoryRepository, Protocol):
+    pass
 
 
 def _build_metadata_llm_details(
@@ -35,7 +46,7 @@ def parse_with_llm(
     *,
     document: Document,
     parse_result: ParseResult,
-    repository: DocumentRepository,
+    repository: LLMParseRepository,
     llm_provider: LLMProvider,
     actor_type: HistoryActorType = HistoryActorType.SYSTEM,
     actor_id: str | None = None,
