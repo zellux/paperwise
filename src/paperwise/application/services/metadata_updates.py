@@ -1,9 +1,14 @@
 from datetime import UTC, datetime
+from typing import Protocol
 
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import DocumentStore, HistoryRepository, ParseResultRepository, TaxonomyRepository
 from paperwise.application.services.history import build_metadata_history_events
 from paperwise.application.services.taxonomy import resolve_existing_name, resolve_tags
 from paperwise.domain.models import Document, DocumentStatus, HistoryActorType, LLMParseResult
+
+
+class MetadataUpdateRepository(DocumentStore, ParseResultRepository, TaxonomyRepository, HistoryRepository, Protocol):
+    pass
 
 
 def validate_document_date(value: str | None) -> str | None:
@@ -23,7 +28,7 @@ def update_document_metadata(
     correspondent: str,
     document_type: str,
     tags: list[str],
-    repository: DocumentRepository,
+    repository: MetadataUpdateRepository,
     actor_type: HistoryActorType,
     actor_id: str | None,
     history_source: str,
