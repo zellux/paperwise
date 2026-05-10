@@ -77,21 +77,21 @@ const docsTableBody = document.getElementById("docsTableBody");
 const sortableHeaders = [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
 const filterDropdownState = new Map();
 let activeFilterDropdown = null;
-let currentViewId = "section-docs";
-const PATH_TO_VIEW_ID = {
-  "/ui/documents": "section-docs",
-  "/ui/document": "section-document",
-  "/ui/search": "section-search",
-  "/ui/grounded-qa": "section-search",
-  "/ui/tags": "section-tags",
-  "/ui/document-types": "section-document-types",
-  "/ui/pending": "section-pending",
-  "/ui/upload": "section-upload",
-  "/ui/activity": "section-activity",
-  "/ui/settings": "section-settings",
-  "/ui/settings/account": "section-settings",
-  "/ui/settings/display": "section-settings",
-  "/ui/settings/models": "section-settings",
+let currentPageKey = "documents";
+const PATH_TO_PAGE_KEY = {
+  "/ui/documents": "documents",
+  "/ui/document": "document",
+  "/ui/search": "search",
+  "/ui/grounded-qa": "search",
+  "/ui/tags": "tags",
+  "/ui/document-types": "document-types",
+  "/ui/pending": "pending",
+  "/ui/upload": "upload",
+  "/ui/activity": "activity",
+  "/ui/settings": "settings",
+  "/ui/settings/account": "settings",
+  "/ui/settings/display": "settings",
+  "/ui/settings/models": "settings",
 };
 let currentDocumentId = "";
 let currentUser = null;
@@ -155,7 +155,7 @@ let groundedQaMaxDocuments = 12;
 let docsTotalCount = 0;
 let docsListRequestSeq = 0;
 let initialDataCache;
-const initialPageDataConsumed = new Set();
+const initialPageDataHydrated = new Set();
 let initialUserPreferencesConsumed = false;
 
 function normalizePageSize(value) {
@@ -810,7 +810,7 @@ function clearSession() {
     document_type: [],
     status: ["ready"],
   });
-  currentViewId = "section-docs";
+  currentPageKey = "documents";
   if (typeof clearSearchStateForSession === "function") {
     clearSearchStateForSession();
   }
@@ -861,9 +861,9 @@ function restoreSession() {
   clearSession();
 }
 
-function getCurrentPathViewId() {
+function getCurrentPageKey() {
   const path = window.location.pathname.replace(/\/+$/, "") || "/";
-  return PATH_TO_VIEW_ID[path] || "section-docs";
+  return PATH_TO_PAGE_KEY[path] || "documents";
 }
 
 function splitTags(value) {
@@ -1281,8 +1281,7 @@ function readFiltersFromUrl() {
     },
     DOCS_SORT_FIELDS
   );
-  const pathViewId = getCurrentPathViewId();
-  currentViewId = pathViewId || "section-docs";
+  currentPageKey = getCurrentPageKey();
 }
 
 function navigateToDocumentsPageFromState() {
@@ -1322,7 +1321,7 @@ async function deleteDocumentById(documentId, options = {}) {
 
   const visibleDocRows = docsTableBody?.querySelectorAll("tr[data-doc-id]").length || 0;
   const shouldStepBackPage =
-    currentViewId === "section-docs" && docsPage > 1 && visibleDocRows <= 1;
+    currentPageKey === "documents" && docsPage > 1 && visibleDocRows <= 1;
 
   const response = await apiFetch(`/documents/${documentId}`, {
     method: "DELETE",
@@ -1342,7 +1341,7 @@ async function deleteDocumentById(documentId, options = {}) {
     return true;
   }
 
-  await loadDataForCurrentView();
+  await loadDataForCurrentPage();
 
   logActivity(`Deleted document ${documentId}.`);
   return true;
@@ -1516,8 +1515,8 @@ function renderTableLoading(tbody, colspan, message) {
   tbody.innerHTML = `<tr><td colspan="${colspan}">${message}</td></tr>`;
 }
 
-function hydrateInitialPageDataForCurrentView() {
-  if (initialPageDataConsumed.has(currentViewId)) {
+function hydrateInitialPageDataForCurrentPage() {
+  if (initialPageDataHydrated.has(currentPageKey)) {
     return true;
   }
   const initialData = readInitialData();
@@ -1525,7 +1524,7 @@ function hydrateInitialPageDataForCurrentView() {
     return false;
   }
 
-  if (currentViewId === "section-docs" && Array.isArray(initialData.documents)) {
+  if (currentPageKey === "documents" && Array.isArray(initialData.documents)) {
     docsTotalCount = Number(initialData.documents_total || initialData.documents.length || 0);
     docsPage = Math.max(1, Number(initialData.documents_page || docsPage || 1));
     docsPageSize = normalizePageSize(initialData.documents_page_size || docsPageSize);
@@ -1533,34 +1532,34 @@ function hydrateInitialPageDataForCurrentView() {
     renderPaginationControls(initialData.documents.length, { hasExactTotal: true });
     renderDocsProcessingCount(Number(initialData.documents_processing_count || 0));
     logActivity(`Loaded ${initialData.documents.length} document(s) of ${docsTotalCount} total`);
-    initialPageDataConsumed.add(currentViewId);
+    initialPageDataHydrated.add(currentPageKey);
     return true;
   }
 
-  if (currentViewId === "section-tags" && Array.isArray(initialData.tag_stats)) {
+  if (currentPageKey === "tags" && Array.isArray(initialData.tag_stats)) {
     renderSortHeaders();
     logActivity(`Loaded ${initialData.tag_stats.length} tag(s)`);
-    initialPageDataConsumed.add(currentViewId);
+    initialPageDataHydrated.add(currentPageKey);
     return true;
   }
 
-  if (currentViewId === "section-document-types" && Array.isArray(initialData.document_type_stats)) {
+  if (currentPageKey === "document-types" && Array.isArray(initialData.document_type_stats)) {
     renderSortHeaders();
     logActivity(`Loaded ${initialData.document_type_stats.length} document type(s)`);
-    initialPageDataConsumed.add(currentViewId);
+    initialPageDataHydrated.add(currentPageKey);
     return true;
   }
 
-  if (currentViewId === "section-activity" && Array.isArray(initialData.activity_documents)) {
+  if (currentPageKey === "activity" && Array.isArray(initialData.activity_documents)) {
     if (typeof renderActivityTokenTotal === "function") {
       renderActivityTokenTotal(Number(initialData.activity_total_tokens || 0));
     }
     logActivity(`Loaded ${initialData.activity_documents.length} latest processed document(s).`);
-    initialPageDataConsumed.add(currentViewId);
+    initialPageDataHydrated.add(currentPageKey);
     return true;
   }
 
-  if (currentViewId === "section-pending" && Array.isArray(initialData.pending_documents)) {
+  if (currentPageKey === "pending" && Array.isArray(initialData.pending_documents)) {
     const hasRestartable =
       typeof isRestartablePendingDocument === "function" &&
       initialData.pending_documents.some((doc) => isRestartablePendingDocument(doc));
@@ -1569,65 +1568,65 @@ function hydrateInitialPageDataForCurrentView() {
       setRestartPendingButtonEnabled(hasRestartable);
     }
     logActivity(`Loaded ${initialData.pending_documents.length} pending document(s)`);
-    initialPageDataConsumed.add(currentViewId);
+    initialPageDataHydrated.add(currentPageKey);
     return true;
   }
 
-  if (currentViewId === "section-document" && initialData.document_detail?.document?.id) {
+  if (currentPageKey === "document" && initialData.document_detail?.document?.id) {
     currentDocumentId = String(initialData.document_detail.document.id || "");
     logActivity(`Opened document ${currentDocumentId}`);
-    initialPageDataConsumed.add(currentViewId);
+    initialPageDataHydrated.add(currentPageKey);
     return true;
   }
 
   return false;
 }
 
-async function loadDataForCurrentView() {
-  if (hydrateInitialPageDataForCurrentView()) {
+async function loadDataForCurrentPage() {
+  if (hydrateInitialPageDataForCurrentPage()) {
     return;
   }
-  if (currentViewId === "section-tags") {
+  if (currentPageKey === "tags") {
     if (typeof initializeTagsView === "function") {
       await initializeTagsView();
     }
     return;
   }
-  if (currentViewId === "section-document-types") {
+  if (currentPageKey === "document-types") {
     if (typeof initializeDocumentTypesView === "function") {
       await initializeDocumentTypesView();
     }
     return;
   }
-  if (currentViewId === "section-activity") {
+  if (currentPageKey === "activity") {
     if (typeof initializeActivityView === "function") {
       await initializeActivityView();
     }
     return;
   }
-  if (currentViewId === "section-pending") {
+  if (currentPageKey === "pending") {
     if (typeof initializePendingView === "function") {
       await initializePendingView();
     }
     return;
   }
-  if (currentViewId === "section-search") {
+  if (currentPageKey === "search") {
     if (typeof initializeSearchView === "function") {
       await initializeSearchView();
     }
     return;
   }
-  if (currentViewId === "section-document" && currentDocumentId) {
+  if (currentPageKey === "document" && currentDocumentId) {
     await openDocumentView(currentDocumentId);
     return;
   }
-  if (currentViewId === "section-settings") {
+  if (currentPageKey === "settings") {
     if (!hydrateSettingsFormFromInitialPreferences()) {
       refreshSettingsForm();
     }
     return;
   }
-  if (currentViewId === "section-upload") {
+  if (currentPageKey === "upload") {
     return;
   }
   await loadDocumentsList();
@@ -1698,7 +1697,7 @@ signInForm?.addEventListener("submit", async (event) => {
     setAuthMessage(`Signed in as ${payload.user.email}.`);
     await hydrateUserPreferencesForSession();
     applyFiltersToControls();
-    await loadDataForCurrentView();
+    await loadDataForCurrentPage();
   } catch (error) {
     setAuthMessage(error.message || "Failed to sign in.", true);
   }
@@ -1741,7 +1740,7 @@ registerForm?.addEventListener("submit", async (event) => {
     setAuthMessage(`Registered ${registerPayload.email}.`);
     await hydrateUserPreferencesForSession();
     applyFiltersToControls();
-    await loadDataForCurrentView();
+    await loadDataForCurrentPage();
   } catch (error) {
     setAuthMessage(error.message || "Failed to create account.", true);
   }
@@ -1777,11 +1776,11 @@ async function initializeApp() {
   refreshSettingsForm();
   renderSortHeaders();
   refreshUploadAvailability();
-  if (currentViewId === "section-document") {
+  if (currentPageKey === "document") {
     currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";
   }
-  loadDataForCurrentView().catch((error) => {
-    logActivity(`Initial ${currentViewId} load failed: ${error.message}`);
+  loadDataForCurrentPage().catch((error) => {
+    logActivity(`Initial ${currentPageKey} load failed: ${error.message}`);
   });
 }
 

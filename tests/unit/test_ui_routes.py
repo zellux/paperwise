@@ -231,6 +231,12 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert app_js.status_code == 200
     assert "setActiveSettingsSection" not in app_js.text
     assert "PATH_TO_SETTINGS_SECTION_ID" not in app_js.text
+    assert "currentViewId" not in app_js.text
+    assert "PATH_TO_VIEW_ID" not in app_js.text
+    assert "getCurrentPathViewId" not in app_js.text
+    assert "loadDataForCurrentView" not in app_js.text
+    assert "currentPageKey" in app_js.text
+    assert "PATH_TO_PAGE_KEY" in app_js.text
 
 
 def test_static_assets_do_not_keep_legacy_tag_renderers() -> None:
