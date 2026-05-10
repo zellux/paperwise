@@ -39,6 +39,23 @@ class CollectionResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
+    @classmethod
+    def from_domain(
+        cls,
+        *,
+        collection: Collection,
+        document_count: int,
+    ) -> "CollectionResponse":
+        return cls(
+            id=collection.id,
+            owner_id=collection.owner_id,
+            name=collection.name,
+            description=collection.description,
+            document_count=document_count,
+            created_at=collection.created_at,
+            updated_at=collection.updated_at,
+        )
+
 
 class CollectionDocumentsRequest(BaseModel):
     document_ids: list[str] = Field(default_factory=list)
@@ -105,14 +122,9 @@ def _to_collection_response(
     collection: Collection,
 ) -> CollectionResponse:
     document_count = len(repository.list_collection_document_ids(collection.id))
-    return CollectionResponse(
-        id=collection.id,
-        owner_id=collection.owner_id,
-        name=collection.name,
-        description=collection.description,
+    return CollectionResponse.from_domain(
+        collection=collection,
         document_count=document_count,
-        created_at=collection.created_at,
-        updated_at=collection.updated_at,
     )
 
 
