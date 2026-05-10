@@ -785,34 +785,6 @@ function clearSession() {
   refreshUploadAvailability();
 }
 
-async function apiFetch(url, options = {}) {
-  const headers = new Headers(options.headers || {});
-  const allowUnauthorized = options.allowUnauthorized === true;
-  const { allowUnauthorized: _allowUnauthorized, ...fetchOptions } = options;
-  const response = await window.fetch(url, { credentials: "same-origin", ...fetchOptions, headers });
-  if (response.status === 401 && !allowUnauthorized) {
-    clearSession();
-    throw new Error("Authentication required");
-  }
-  return response;
-}
-
-async function fetchUiPartial(url) {
-  const response = await apiFetch(url);
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.detail || response.statusText);
-  }
-  return payload;
-}
-
-function replaceElementHtml(element, html) {
-  if (!element) {
-    return;
-  }
-  element.innerHTML = String(html || "");
-}
-
 function restoreSession() {
   const initialData = readInitialData();
   if (initialData.authenticated === true && initialData.current_user) {
@@ -1439,13 +1411,6 @@ async function loadDocumentsList() {
   }
   applyDocumentsPartial(payload);
   logActivity(`Loaded ${payload.documents.length} document(s) of ${docsTotalCount} total`);
-}
-
-function renderTableLoading(tbody, colspan, message) {
-  if (!tbody) {
-    return;
-  }
-  tbody.innerHTML = `<tr><td colspan="${colspan}">${message}</td></tr>`;
 }
 
 async function initializeCurrentPageData() {

@@ -510,7 +510,7 @@ def _render_ui_page(
     partial_name = _PAGE_PARTIAL_BY_NAME[page_name]
     html = _LAYOUT_TEMPLATE.read_text(encoding="utf-8")
     content = (_PARTIALS_DIR / partial_name).read_text(encoding="utf-8").rstrip()
-    script_names = ["app.js", *_PAGE_SCRIPTS_BY_VIEW.get(view_id, [])]
+    script_names = ["shared.js", "app.js", *_PAGE_SCRIPTS_BY_VIEW.get(view_id, [])]
     asset_version = str(
         max(
             (_STATIC_CSS_DIR / "styles.css").stat().st_mtime_ns,
@@ -520,7 +520,7 @@ def _render_ui_page(
     asset_query = f"?v={asset_version}"
     page_script_tags = "\n".join(
         f'    <script src="/static/js/{script_name}{asset_query}" defer></script>'
-        for script_name in script_names[1:]
+        for script_name in script_names[2:]
     )
     html = _apply_layout_replacements(
         html,
