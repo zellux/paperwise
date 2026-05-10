@@ -1,3 +1,6 @@
+from difflib import SequenceMatcher
+
+
 def normalize_name(value: str) -> str:
     cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
     return " ".join(cleaned.split())
@@ -33,18 +36,47 @@ def to_title_case(value: str) -> str:
     return " ".join(words)
 
 
-def resolve_existing_name(candidate: str, existing: list[str], fallback: str) -> tuple[str, bool]:
+def _find_existing_name(candidate: str, existing: list[str], fuzzy_threshold: float | None) -> str | None:
+    normalized_candidate = normalize_name(candidate)
+    best_name = None
+    best_score = 0.0
+    for name in existing:
+        normalized_existing = normalize_name(name)
+        if normalized_existing == normalized_candidate:
+            return name
+        if fuzzy_threshold is None:
+            continue
+        score = SequenceMatcher(None, normalized_candidate, normalized_existing).ratio()
+        if score > best_score:
+            best_score = score
+            best_name = name
+    if fuzzy_threshold is not None and best_score >= fuzzy_threshold:
+        return best_name
+    return None
+
+
+def resolve_existing_name(
+    candidate: str,
+    existing: list[str],
+    fallback: str,
+    *,
+    fuzzy_threshold: float | None = None,
+) -> tuple[str, bool]:
     normalized_candidate = normalize_name(candidate)
     if not normalized_candidate:
         return fallback, False
-    for name in existing:
-        if normalize_name(name) == normalized_candidate:
-            return name, False
+    existing_name = _find_existing_name(candidate, existing, fuzzy_threshold)
+    if existing_name is not None:
+        return existing_name, False
     return to_title_case(candidate), True
 
 
-def resolve_tags(candidate_tags: list[str], existing_tags: list[str]) -> tuple[list[str], list[str]]:
-    existing_by_norm = {normalize_name(tag): to_title_case(tag) for tag in existing_tags}
+def resolve_tags(
+    candidate_tags: list[str],
+    existing_tags: list[str],
+    *,
+    fuzzy_threshold: float | None = None,
+) -> tuple[list[str], list[str]]:
     resolved: list[str] = []
     created: list[str] = []
     seen: set[str] = set()
@@ -53,8 +85,10 @@ def resolve_tags(candidate_tags: list[str], existing_tags: list[str]) -> tuple[l
         if not normalized or normalized in seen:
             continue
         seen.add(normalized)
-        if normalized in existing_by_norm:
-            resolved.append(existing_by_norm[normalized])
+
+        existing_tag = _find_existing_name(tag, existing_tags + resolved, fuzzy_threshold)
+        if existing_tag is not None:
+            resolved.append(to_title_case(existing_tag))
             continue
         created_tag = to_title_case(tag)
         resolved.append(created_tag)

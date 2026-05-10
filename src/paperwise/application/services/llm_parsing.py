@@ -1,10 +1,10 @@
 from datetime import UTC, datetime
-from difflib import SequenceMatcher
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.history import build_metadata_history_events
 from paperwise.application.services.llm_runtime import summarize_llm_provider
 from paperwise.application.services.metadata_updates import validate_document_date
+from paperwise.application.services.taxonomy import resolve_existing_name, resolve_tags
 from paperwise.domain.models import (
     Document,
     HistoryActorType,
@@ -12,80 +12,6 @@ from paperwise.domain.models import (
     ParseResult,
     UserPreference,
 )
-
-
-def _normalize_name(value: str) -> str:
-    cleaned = "".join(ch.lower() if ch.isalnum() else " " for ch in value)
-    return " ".join(cleaned.split())
-
-
-def _to_title_case(value: str) -> str:
-    cleaned = " ".join(value.strip().split())
-    if not cleaned:
-        return cleaned
-
-    def looks_like_acronym_token(token: str) -> bool:
-        letters = "".join(ch for ch in token if ch.isalpha())
-        if not letters or not letters.isalpha():
-            return False
-        if len(letters) < 2 or len(letters) > 6:
-            return False
-        vowels = sum(ch in "aeiou" for ch in letters.lower())
-        return vowels == 0
-
-    words: list[str] = []
-    for word in cleaned.split(" "):
-        letters = "".join(ch for ch in word if ch.isalpha())
-        if len(letters) >= 2 and letters.isupper():
-            words.append(word)
-            continue
-        if looks_like_acronym_token(word):
-            words.append(word.upper())
-            continue
-        if word.islower():
-            words.append(word[:1].upper() + word[1:] if word else word)
-            continue
-        words.append(word)
-    return " ".join(words)
-
-
-def _resolve_name(candidate: str, existing: list[str]) -> tuple[str, bool]:
-    normalized_candidate = _normalize_name(candidate)
-    if not normalized_candidate:
-        return "Unknown", True
-
-    best_name = ""
-    best_score = 0.0
-    for name in existing:
-        normalized_existing = _normalize_name(name)
-        if normalized_existing == normalized_candidate:
-            return name, False
-        score = SequenceMatcher(None, normalized_candidate, normalized_existing).ratio()
-        if score > best_score:
-            best_score = score
-            best_name = name
-
-    if best_score >= 0.9:
-        return best_name, False
-    return _to_title_case(candidate), True
-
-
-def _resolve_tags(candidates: list[str], existing: list[str]) -> tuple[list[str], list[str]]:
-    resolved: list[str] = []
-    created: list[str] = []
-    seen: set[str] = set()
-
-    for tag in candidates:
-        resolved_tag, is_new = _resolve_name(tag, existing + resolved)
-        resolved_tag = _to_title_case(resolved_tag)
-        norm = _normalize_name(resolved_tag)
-        if not norm or norm in seen:
-            continue
-        seen.add(norm)
-        resolved.append(resolved_tag)
-        if is_new:
-            created.append(resolved_tag)
-    return resolved, created
 
 
 def _build_metadata_llm_details(
@@ -133,7 +59,12 @@ def parse_with_llm(
 
     if "correspondent" in raw and str(raw.get("correspondent") or "").strip():
         candidate_correspondent = str(raw.get("correspondent", "Unknown Sender"))
-        correspondent, created_correspondent = _resolve_name(candidate_correspondent, correspondents)
+        correspondent, created_correspondent = resolve_existing_name(
+            candidate_correspondent,
+            correspondents,
+            fallback="Unknown Sender",
+            fuzzy_threshold=0.9,
+        )
     elif previous is not None:
         correspondent = previous.correspondent
         created_correspondent = False
@@ -143,7 +74,12 @@ def parse_with_llm(
 
     if "document_type" in raw and str(raw.get("document_type") or "").strip():
         candidate_document_type = str(raw.get("document_type", "General Document"))
-        document_type, created_document_type = _resolve_name(candidate_document_type, document_types)
+        document_type, created_document_type = resolve_existing_name(
+            candidate_document_type,
+            document_types,
+            fallback="General Document",
+            fuzzy_threshold=0.9,
+        )
     elif previous is not None:
         document_type = previous.document_type
         created_document_type = False
@@ -154,7 +90,7 @@ def parse_with_llm(
     if "tags" in raw:
         raw_tags = raw.get("tags")
         candidate_tags = [str(t) for t in raw_tags if str(t).strip()] if isinstance(raw_tags, list) else []
-        resolved_tags, created_tags = _resolve_tags(candidate_tags, tags)
+        resolved_tags, created_tags = resolve_tags(candidate_tags, tags, fuzzy_threshold=0.9)
     elif previous is not None:
         resolved_tags = list(previous.tags)
         created_tags = []
