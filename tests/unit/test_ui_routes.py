@@ -312,6 +312,7 @@ def test_static_assets_split_theme_css() -> None:
     styles = client.get("/static/css/styles.css")
     assert styles.status_code == 200
     assert "body.theme-forge" not in styles.text
+    assert ".auth-card" not in styles.text
     assert ".settings-group" not in styles.text
     assert ".chat-composer" not in styles.text
 
@@ -324,6 +325,10 @@ def test_static_assets_split_theme_css() -> None:
     assert chat.status_code == 200
     assert ".chat-composer" in chat.text
 
+    auth = client.get("/static/css/auth.css")
+    assert auth.status_code == 200
+    assert ".auth-card" in auth.text
+
     settings = client.get("/static/css/settings.css")
     assert settings.status_code == 200
     assert ".settings-form" in settings.text
@@ -332,6 +337,7 @@ def test_static_assets_split_theme_css() -> None:
     assert html.status_code == 200
     assert "/static/css/themes.css?v=" in html.text
     assert "/static/css/styles.css?v=" in html.text
+    assert "/static/css/auth.css?v=" in html.text
     assert "/static/css/chat.css?v=" in html.text
     assert "/static/css/settings.css?v=" in html.text
 

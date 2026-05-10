@@ -250,87 +250,6 @@ h1 {
   gap: 14px;
 }
 
-.auth-gate {
-  position: relative;
-  z-index: 2;
-  width: min(560px, 94vw);
-  margin: 40px auto 8px;
-}
-
-:root.has-session .auth-gate {
-  display: none;
-}
-
-.auth-card {
-  background: var(--bg-panel);
-  border: 1px solid var(--stroke);
-  box-shadow: var(--shadow);
-  border-radius: 16px;
-  padding: 18px;
-}
-
-.auth-tabs {
-  display: inline-flex;
-  gap: 6px;
-  padding: 4px;
-  margin: 14px 0 10px;
-  border: 1px solid var(--stroke-soft);
-  border-radius: 999px;
-  background: rgba(246, 241, 230, 0.72);
-}
-
-.auth-tab {
-  border: 0;
-  border-radius: 999px;
-  padding: 9px 16px;
-  background: transparent;
-  color: var(--ink-soft);
-  font-family: var(--sans);
-  font-size: 0.9rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 140ms ease, color 140ms ease, box-shadow 140ms ease;
-}
-
-.auth-tab:hover {
-  color: var(--ink);
-}
-
-.auth-tab.is-active {
-  background: var(--accent);
-  color: var(--bg-base);
-  box-shadow: 0 8px 18px rgba(95, 88, 61, 0.18);
-}
-
-.auth-layout {
-  margin: 8px 0 8px;
-}
-
-.auth-panel {
-  border: 1px solid var(--stroke-soft);
-  background: rgba(252, 253, 251, 0.78);
-  border-radius: 12px;
-  padding: 14px;
-}
-
-.auth-panel-title {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
-.auth-panel-note {
-  margin: 6px 0 10px;
-  color: var(--ink-soft);
-  font-size: 0.84rem;
-}
-
-.auth-message {
-  margin: 10px 0 0;
-  color: var(--ink-soft);
-  font-size: 0.9rem;
-}
-
 .view-hidden {
   display: none;
 }
@@ -1269,12 +1188,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 @media (max-width: 980px) {
-  .auth-tabs {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    width: 100%;
-  }
-
   .topbar {
     flex-direction: column;
     align-items: flex-start;
@@ -1584,26 +1497,4 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   text-transform: uppercase;
   color: var(--ink-soft);
   opacity: 0.7;
-}
-
-/* ─── Auth gate brand ───────────────────────────────────── */
-.auth-brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.auth-brand-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 8px;
-  border: 1px solid var(--stroke-soft);
-  background: rgba(255, 255, 255, 0.75);
-}
-
-.auth-brand-title {
-  font-family: var(--serif);
-  font-weight: 700;
-  font-size: 1.3rem;
 }
