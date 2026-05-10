@@ -1,8 +1,3 @@
-const documentMetaForm = document.getElementById("documentMetaForm");
-const backToDocsBtn = document.getElementById("backToDocsBtn");
-const reprocessDocumentBtn = document.getElementById("reprocessDocumentBtn");
-const deleteDocumentBtn = document.getElementById("deleteDocumentBtn");
-const viewDocumentFileBtn = document.getElementById("viewDocumentFileBtn");
 const docsFilterForm = document.getElementById("docsFilterForm");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
 const documentsPaginationToolbar = document.getElementById("documentsPaginationToolbar");
@@ -44,23 +39,6 @@ const authMessage = document.getElementById("authMessage");
 const signOutBtn = document.getElementById("signOutBtn");
 const sessionUserLabel = document.getElementById("sessionUserLabel");
 const brandHomeBtn = document.getElementById("brandHomeBtn");
-const metaTitleInput = document.getElementById("metaTitle");
-const metaDateInput = document.getElementById("metaDate");
-const metaCorrespondentInput = document.getElementById("metaCorrespondent");
-const metaTypeInput = document.getElementById("metaType");
-const metaTagsInput = document.getElementById("metaTags");
-const detailDocId = document.getElementById("detailDocId");
-const detailOwnerId = document.getElementById("detailOwnerId");
-const detailFilename = document.getElementById("detailFilename");
-const detailStatus = document.getElementById("detailStatus");
-const detailOcrContent = document.getElementById("detailOcrContent");
-const detailCreatedAt = document.getElementById("detailCreatedAt");
-const detailOcrParsedAt = document.getElementById("detailOcrParsedAt");
-const detailContentType = document.getElementById("detailContentType");
-const detailSizeBytes = document.getElementById("detailSizeBytes");
-const detailChecksum = document.getElementById("detailChecksum");
-const detailBlobUri = document.getElementById("detailBlobUri");
-const documentHistoryList = document.getElementById("documentHistoryList");
 const filterTag = document.getElementById("filterTag");
 const filterCorrespondent = document.getElementById("filterCorrespondent");
 const filterType = document.getElementById("filterType");
@@ -1417,7 +1395,8 @@ function applyDocumentDetailPartial(payload) {
       element.value = value;
     }
   }
-  replaceElementHtml(documentHistoryList, payload.history_html);
+  replaceElementHtml(document.getElementById("documentHistoryList"), payload.history_html);
+  const detailBlobUri = document.getElementById("detailBlobUri");
   if (detailBlobUri && payload.blob_uri) {
     detailBlobUri.title = payload.blob_uri;
   }

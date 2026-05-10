@@ -1,3 +1,15 @@
+const documentMetaForm = document.getElementById("documentMetaForm");
+const backToDocsBtn = document.getElementById("backToDocsBtn");
+const reprocessDocumentBtn = document.getElementById("reprocessDocumentBtn");
+const deleteDocumentBtn = document.getElementById("deleteDocumentBtn");
+const viewDocumentFileBtn = document.getElementById("viewDocumentFileBtn");
+const metaTitleInput = document.getElementById("metaTitle");
+const metaDateInput = document.getElementById("metaDate");
+const metaCorrespondentInput = document.getElementById("metaCorrespondent");
+const metaTypeInput = document.getElementById("metaType");
+const metaTagsInput = document.getElementById("metaTags");
+const detailFilename = document.getElementById("detailFilename");
+
 async function refreshDocumentRelatedLists(options = {}) {
   await loadDocumentsList();
   if (typeof loadPendingDocuments === "function") {
