@@ -217,6 +217,16 @@ docker compose down
 
 ## Troubleshooting
 
+If sign-in succeeds but the app immediately shows the sign-in screen again:
+
+- if you serve Paperwise over plain HTTP, set `PAPERWISE_SESSION_COOKIE_SECURE` to `"false"` in both `api` and `worker`
+- if you serve Paperwise behind HTTPS, set `PAPERWISE_SESSION_COOKIE_SECURE` to `"true"` in both `api` and `worker`
+- run `docker compose pull`
+- run `docker compose up -d` so the containers are recreated with the new image and environment
+- clear the site's browser cookies if an old session is still cached
+
+This happens when a browser receives a `Secure` session cookie over HTTP. The browser will not send that cookie back, so login appears to work but the next request is unauthenticated. New Paperwise images support `PAPERWISE_SESSION_COOKIE_SECURE`; already-deployed hosts still need their local `docker-compose.yml` and running containers updated.
+
 If uploads stay stuck in `processing`:
 
 - check that the `worker` container is running
