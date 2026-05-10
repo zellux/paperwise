@@ -1,6 +1,7 @@
 from fastapi.testclient import TestClient
 
-from paperwise.server.dependencies import document_repository_dependency
+from paperwise.infrastructure.config import Settings
+from paperwise.server.dependencies import document_repository_dependency, settings_dependency
 from paperwise.server.main import app
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
@@ -105,6 +106,63 @@ def test_login_user_success_and_failure() -> None:
         logout_response = client.post("/users/logout")
         assert logout_response.status_code == 204
         assert logout_response.headers["set-cookie"].startswith("paperwise_session=\"\";")
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_login_cookie_secure_flag_defaults_to_http_friendly_docker() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: Settings(env="docker")
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "docker-login@example.com",
+                "full_name": "Docker Login",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "docker-login@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+        assert "secure" not in login_response.headers["set-cookie"].lower()
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_login_cookie_secure_flag_can_be_enabled_for_https() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: Settings(
+        env="docker",
+        session_cookie_secure=True,
+    )
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "https-login@example.com",
+                "full_name": "HTTPS Login",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "https-login@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+        assert "secure" in login_response.headers["set-cookie"].lower()
     finally:
         app.dependency_overrides.clear()
 

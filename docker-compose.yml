@@ -14,6 +14,7 @@ services:
       PAPERWISE_OBJECT_STORE_ROOT: /data/object-store
       PAPERWISE_AUTH_SECRET: ${PAPERWISE_AUTH_SECRET:-paperwise-change-me}
       PAPERWISE_SESSION_TTL_SECONDS: ${PAPERWISE_SESSION_TTL_SECONDS:-43200}
+      PAPERWISE_SESSION_COOKIE_SECURE: ${PAPERWISE_SESSION_COOKIE_SECURE:-false}
     depends_on:
       redis:
         condition: service_healthy
@@ -45,6 +46,7 @@ services:
       PAPERWISE_OBJECT_STORE_ROOT: /data/object-store
       PAPERWISE_AUTH_SECRET: ${PAPERWISE_AUTH_SECRET:-paperwise-change-me}
       PAPERWISE_SESSION_TTL_SECONDS: ${PAPERWISE_SESSION_TTL_SECONDS:-43200}
+      PAPERWISE_SESSION_COOKIE_SECURE: ${PAPERWISE_SESSION_COOKIE_SECURE:-false}
     depends_on:
       redis:
         condition: service_healthy

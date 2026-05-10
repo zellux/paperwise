@@ -76,6 +76,12 @@ def _to_user_response(user: User) -> UserResponse:
     )
 
 
+def _session_cookie_secure(settings: Settings) -> bool:
+    if settings.session_cookie_secure is not None:
+        return settings.session_cookie_secure
+    return settings.env.lower() not in {"local", "dev", "development", "test", "docker"}
+
+
 def _validate_llm_preferences(preferences: dict[str, Any]) -> None:
     normalized = get_normalized_llm_preferences(preferences)
     for connection in normalized["llm_connections"]:
@@ -167,7 +173,7 @@ def login_user_endpoint(
         max_age=max(settings.session_ttl_seconds, 60),
         httponly=True,
         samesite="lax",
-        secure=settings.env.lower() not in {"local", "dev", "development", "test"},
+        secure=_session_cookie_secure(settings),
         path="/",
     )
     return LoginResponse(user=_to_user_response(user))

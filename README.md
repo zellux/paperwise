@@ -40,6 +40,7 @@ services:
       PAPERWISE_OBJECT_STORE_ROOT: /data/object-store
       PAPERWISE_AUTH_SECRET: replace-with-a-strong-secret
       PAPERWISE_SESSION_TTL_SECONDS: "43200"
+      PAPERWISE_SESSION_COOKIE_SECURE: "false"
     depends_on:
       redis:
         condition: service_healthy
@@ -69,6 +70,7 @@ services:
       PAPERWISE_OBJECT_STORE_ROOT: /data/object-store
       PAPERWISE_AUTH_SECRET: replace-with-a-strong-secret
       PAPERWISE_SESSION_TTL_SECONDS: "43200"
+      PAPERWISE_SESSION_COOKIE_SECURE: "false"
     depends_on:
       redis:
         condition: service_healthy
@@ -114,6 +116,8 @@ docker compose up -d
 ```
 
 Before starting, replace `replace-with-a-strong-secret` with your own secret in both `api` and `worker`.
+
+The example is configured for direct HTTP access at `http://localhost:8080`. If you put Paperwise behind HTTPS, set `PAPERWISE_SESSION_COOKIE_SECURE` to `"true"` in both `api` and `worker`.
 
 To pin a specific release tag, replace the image value, for example:
 

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     llm_debug_log_max_bytes: int = 100 * 1024 * 1024
     auth_secret: str = "paperwise-dev-secret-change-me"
     session_ttl_seconds: int = 60 * 60 * 12
+    session_cookie_secure: bool | None = None
 
 
 @lru_cache
