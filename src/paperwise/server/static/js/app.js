@@ -1,5 +1,3 @@
-const activityOutput = document.getElementById("activityOutput");
-const sortableHeaders = [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
 const filterDropdownState = new Map();
 let activeFilterDropdown = null;
 let currentDocumentId = "";
@@ -677,6 +675,7 @@ function formatStatus(value) {
 }
 
 function logActivity(message) {
+  const activityOutput = document.getElementById("activityOutput");
   if (!activityOutput) {
     return;
   }
@@ -852,6 +851,10 @@ function getSortStateForTable(tableName) {
   return { field: "", direction: "" };
 }
 
+function getSortableHeaders() {
+  return [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
+}
+
 function getDocumentFilterControls() {
   const filterTag = document.getElementById("filterTag");
   const filterCorrespondent = document.getElementById("filterCorrespondent");
@@ -868,7 +871,7 @@ function getDocumentFilterControls() {
 }
 
 function renderSortHeaders() {
-  for (const header of sortableHeaders) {
+  for (const header of getSortableHeaders()) {
     const tableName = header.dataset.sortTable || "";
     const field = header.dataset.sortField || "";
     const sortState = getSortStateForTable(tableName);

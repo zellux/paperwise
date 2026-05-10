@@ -118,7 +118,7 @@ window.initializePaperwisePage = async ({ authenticated, initialData }) => {
   }
 };
 
-for (const header of sortableHeaders) {
+for (const header of getSortableHeaders()) {
   const button = header.querySelector(".table-sort-button");
   button?.addEventListener("click", () => {
     const tableName = header.dataset.sortTable || "";
