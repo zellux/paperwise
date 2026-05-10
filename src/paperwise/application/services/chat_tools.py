@@ -1,7 +1,13 @@
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Protocol
 
-from paperwise.application.interfaces import DocumentRepository, LLMProvider
+from paperwise.application.interfaces import (
+    DocumentChunkRepository,
+    DocumentStore,
+    LLMProvider,
+    ParseResultRepository,
+    TaxonomyRepository,
+)
 from paperwise.application.services.chat_contexts import compact_chat_search_contexts
 from paperwise.application.services.chat_tool_payloads import (
     taxonomy_counts_payload,
@@ -17,6 +23,16 @@ from paperwise.application.services.grounded_qa import (
 from paperwise.domain.models import User
 
 
+class ChatToolRepository(
+    DocumentStore,
+    ParseResultRepository,
+    TaxonomyRepository,
+    DocumentChunkRepository,
+    Protocol,
+):
+    pass
+
+
 @dataclass(frozen=True)
 class ChatToolScope:
     tag: list[str] = field(default_factory=list)
@@ -28,7 +44,7 @@ class ChatToolScope:
 
 def execute_chat_tool(
     *,
-    repository: DocumentRepository,
+    repository: ChatToolRepository,
     llm_provider: LLMProvider,
     current_user: User,
     scope: ChatToolScope,
