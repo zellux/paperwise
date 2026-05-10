@@ -1,12 +1,18 @@
 import json
 from typing import Any
-from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response, StreamingResponse
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
-from paperwise.application.services.chat_tools import ChatToolScope, execute_chat_tool
+from paperwise.application.services.chat_runtime import (
+    ChatRuntimeEvent,
+    ChatRuntimeResult,
+    ChatRuntimeUnsupportedError,
+    iter_chat_runtime_events,
+    run_chat_runtime,
+)
+from paperwise.application.services.chat_tools import ChatToolScope
 from paperwise.application.services.grounded_qa import is_timeout_error
 from paperwise.application.services.chat_threads import (
     migrate_legacy_chat_threads,
@@ -221,48 +227,34 @@ def _chat_tool_scope(scope: ChatScopeRequest) -> ChatToolScope:
     )
 
 
-def _record_chat_token_usage(token_usage: dict[str, int], response: dict[str, Any]) -> None:
-    total_tokens = response.get("llm_total_tokens") if isinstance(response, dict) else None
-    if not isinstance(total_tokens, int) or total_tokens <= 0:
-        return
-    token_usage["total_tokens"] = token_usage.get("total_tokens", 0) + total_tokens
-    token_usage["llm_requests"] = token_usage.get("llm_requests", 0) + 1
-
-
-def _parse_chat_tool_call(call: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
-    call_id = str(call.get("id") or uuid4())
-    name = str(call.get("name") or "").strip()
-    raw_arguments = call.get("arguments", "{}")
-    try:
-        arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else dict(raw_arguments or {})
-    except (TypeError, ValueError):
-        arguments = {}
-    return call_id, name, arguments
-
-
-def _append_chat_tool_messages(
+def _chat_response_from_runtime_result(
     *,
-    messages: list[dict[str, Any]],
-    last_response: dict[str, Any],
-    assistant_tool_calls: list[dict[str, Any]],
-    tool_results: list[tuple[str, str, dict[str, Any]]],
-) -> None:
-    messages.append(
-        {
-            "role": "assistant",
-            "content": str(last_response.get("content") or ""),
-            "tool_calls": assistant_tool_calls,
-        }
+    payload: ChatRequest,
+    result: ChatRuntimeResult,
+) -> ChatResponse:
+    return ChatResponse(
+        message=ChatMessageRequest(role="assistant", content=result.content),
+        citations=_extract_tool_citations(result.tool_payloads),
+        tool_calls=[ChatToolCallResponse(**tool_call) for tool_call in result.tool_calls],
+        token_usage=ChatTokenUsageResponse(**result.token_usage),
+        debug={"steps": result.debug_steps} if payload.debug else None,
     )
-    for call_id, name, result in tool_results:
-        messages.append(
-            {
-                "role": "tool",
-                "tool_call_id": call_id,
-                "name": name,
-                "content": json.dumps(result),
-            }
-        )
+
+
+def _raise_chat_runtime_http_exception(exc: Exception) -> None:
+    if isinstance(exc, ChatRuntimeUnsupportedError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    if is_timeout_error(exc):
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail=(
+                "The LLM request timed out before completion. "
+                "Please retry, reduce scope, or lower context limits in Settings."
+            ),
+        ) from exc
+    if isinstance(exc, RuntimeError):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    raise exc
 
 
 def _chat_with_tools(
@@ -272,113 +264,22 @@ def _chat_with_tools(
     current_user: User,
     payload: ChatRequest,
 ) -> ChatResponse:
-    answer_with_tools = getattr(llm_provider, "answer_with_tools", None)
-    if not callable(answer_with_tools):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Selected Grounded Q&A provider does not support conversational tool use.",
-        )
     messages = _build_chat_messages(payload)
-    tool_calls_for_response: list[ChatToolCallResponse] = []
-    tool_payloads: list[dict[str, Any]] = []
-    debug_steps: list[dict[str, Any]] = []
-    token_usage: dict[str, int] = {"total_tokens": 0, "llm_requests": 0}
-    last_response: dict[str, Any] = {}
-    exhausted_tool_rounds = False
-    tool_scope = _chat_tool_scope(payload.scope)
-    for _ in range(MAX_CHAT_TOOL_ROUNDS):
-        try:
-            last_response = answer_with_tools(messages=messages, tools=CHAT_TOOLS)
-            _record_chat_token_usage(token_usage, last_response)
-        except Exception as exc:
-            if is_timeout_error(exc):
-                raise HTTPException(
-                    status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                    detail=(
-                        "The LLM request timed out before completion. "
-                        "Please retry, reduce scope, or lower context limits in Settings."
-                    ),
-                ) from exc
-            if isinstance(exc, RuntimeError):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-            raise
-        tool_calls = last_response.get("tool_calls", []) if isinstance(last_response, dict) else []
-        if not tool_calls:
-            break
-        assistant_tool_calls: list[dict[str, Any]] = []
-        tool_results: list[tuple[str, str, dict[str, Any]]] = []
-        for call in tool_calls:
-            call_id, name, arguments = _parse_chat_tool_call(call)
-            assistant_tool_calls.append(
-                {
-                    "id": call_id,
-                    "type": "function",
-                    "function": {"name": name, "arguments": json.dumps(arguments)},
-                }
-            )
-            result = execute_chat_tool(
-                repository=repository,
-                llm_provider=llm_provider,
-                current_user=current_user,
-                scope=tool_scope,
-                top_k_chunks=payload.top_k_chunks,
-                max_documents=payload.max_documents,
-                name=name,
-                arguments=arguments,
-            )
-            tool_payloads.append(result)
-            tool_results.append((call_id, name, result))
-            result_count = int(result.get("total_results") or result.get("returned_results") or 0)
-            tool_calls_for_response.append(
-                ChatToolCallResponse(name=name, arguments=arguments, result_count=result_count)
-            )
-            debug_steps.append({"tool": name, "arguments": arguments, "result": result})
-        _append_chat_tool_messages(
+    try:
+        runtime_result = run_chat_runtime(
+            repository=repository,
+            llm_provider=llm_provider,
+            current_user=current_user,
             messages=messages,
-            last_response=last_response,
-            assistant_tool_calls=assistant_tool_calls,
-            tool_results=tool_results,
+            tools=CHAT_TOOLS,
+            scope=_chat_tool_scope(payload.scope),
+            top_k_chunks=payload.top_k_chunks,
+            max_documents=payload.max_documents,
+            max_tool_rounds=MAX_CHAT_TOOL_ROUNDS,
         )
-        if len(tool_calls_for_response) >= 8:
-            exhausted_tool_rounds = True
-            break
-    else:
-        exhausted_tool_rounds = True
-    if exhausted_tool_rounds:
-        messages.append(
-            {
-                "role": "user",
-                "content": (
-                    "Use the tool results already provided and write the final answer now. "
-                    "Do not request more tools."
-                ),
-            }
-        )
-        try:
-            last_response = answer_with_tools(messages=messages, tools=[])
-            _record_chat_token_usage(token_usage, last_response)
-        except Exception as exc:
-            if is_timeout_error(exc):
-                raise HTTPException(
-                    status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                    detail=(
-                        "The LLM request timed out before completion. "
-                        "Please retry, reduce scope, or lower context limits in Settings."
-                    ),
-                ) from exc
-            if isinstance(exc, RuntimeError):
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
-            raise
-    content = str(last_response.get("content") or "").strip()
-    if not content:
-        content = "I could not find enough evidence in the documents."
-    response = ChatResponse(
-        message=ChatMessageRequest(role="assistant", content=content),
-        citations=_extract_tool_citations(tool_payloads),
-        tool_calls=tool_calls_for_response,
-        token_usage=ChatTokenUsageResponse(**token_usage),
-        debug={"steps": debug_steps} if payload.debug else None,
-    )
+    except Exception as exc:
+        _raise_chat_runtime_http_exception(exc)
+    response = _chat_response_from_runtime_result(payload=payload, result=runtime_result)
     return _save_chat_thread(
         repository=repository,
         current_user=current_user,
@@ -391,6 +292,14 @@ def _sse_event(event: str, data: dict[str, Any]) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
+def _chat_sse_event_from_runtime_event(event: ChatRuntimeEvent) -> str:
+    if event.type == "final":
+        raise ValueError("Final chat runtime events need response assembly before SSE serialization.")
+    if not isinstance(event.data, dict):
+        raise ValueError(f"Unexpected data for chat runtime event {event.type}.")
+    return _sse_event(event.type, event.data)
+
+
 def _iter_chat_events(
     *,
     repository: DocumentRepository,
@@ -398,139 +307,40 @@ def _iter_chat_events(
     current_user: User,
     payload: ChatRequest,
 ):
-    answer_with_tools = getattr(llm_provider, "answer_with_tools", None)
-    if not callable(answer_with_tools):
-        yield _sse_event(
-            "error",
-            {"detail": "Selected Grounded Q&A provider does not support conversational tool use."},
-        )
-        return
-
     try:
         messages = _build_chat_messages(payload)
-    except HTTPException as exc:
-        yield _sse_event("error", {"detail": str(exc.detail)})
-        return
-
-    tool_calls_for_response: list[ChatToolCallResponse] = []
-    tool_payloads: list[dict[str, Any]] = []
-    debug_steps: list[dict[str, Any]] = []
-    token_usage: dict[str, int] = {"total_tokens": 0, "llm_requests": 0}
-    last_response: dict[str, Any] = {}
-    exhausted_tool_rounds = False
-    tool_scope = _chat_tool_scope(payload.scope)
-    try:
-        for round_index in range(MAX_CHAT_TOOL_ROUNDS):
-            if tool_calls_for_response:
-                status_detail = (
-                    f"Reading {len(tool_calls_for_response)} tool result(s) and writing an answer, "
-                    f"round {round_index + 1}."
-                )
-            else:
-                status_detail = f"Choosing document tools, round {round_index + 1}."
-            yield _sse_event(
-                "status",
-                {"label": "LLM request", "detail": status_detail},
-            )
-            last_response = answer_with_tools(messages=messages, tools=CHAT_TOOLS)
-            _record_chat_token_usage(token_usage, last_response)
-            tool_calls = last_response.get("tool_calls", []) if isinstance(last_response, dict) else []
-            yield _sse_event(
-                "llm_response",
-                {
-                    "label": "LLM response",
-                    "tool_call_count": len(tool_calls),
-                    "token_usage": token_usage,
-                },
-            )
-            yield _sse_event("token_usage", token_usage)
-            if not tool_calls:
-                break
-
-            assistant_tool_calls: list[dict[str, Any]] = []
-            tool_results: list[tuple[str, str, dict[str, Any]]] = []
-            for call in tool_calls:
-                call_id, name, arguments = _parse_chat_tool_call(call)
-                assistant_tool_calls.append(
-                    {
-                        "id": call_id,
-                        "type": "function",
-                        "function": {"name": name, "arguments": json.dumps(arguments)},
-                    }
-                )
-                yield _sse_event("tool_call", {"name": name, "arguments": arguments})
-                result = execute_chat_tool(
-                    repository=repository,
-                    llm_provider=llm_provider,
-                    current_user=current_user,
-                    scope=tool_scope,
-                    top_k_chunks=payload.top_k_chunks,
-                    max_documents=payload.max_documents,
-                    name=name,
-                    arguments=arguments,
-                )
-                tool_payloads.append(result)
-                tool_results.append((call_id, name, result))
-                result_count = int(result.get("total_results") or result.get("returned_results") or 0)
-                tool_calls_for_response.append(
-                    ChatToolCallResponse(name=name, arguments=arguments, result_count=result_count)
-                )
-                debug_steps.append({"tool": name, "arguments": arguments, "result": result})
-                yield _sse_event("tool_result", {"name": name, "result_count": result_count})
-
-            _append_chat_tool_messages(
-                messages=messages,
-                last_response=last_response,
-                assistant_tool_calls=assistant_tool_calls,
-                tool_results=tool_results,
-            )
-            if len(tool_calls_for_response) >= 8:
-                exhausted_tool_rounds = True
-                break
-        else:
-            exhausted_tool_rounds = True
-
-        if exhausted_tool_rounds:
-            messages.append(
-                {
-                    "role": "user",
-                    "content": (
-                        "Use the tool results already provided and write the final answer now. "
-                        "Do not request more tools."
-                    ),
-                }
-            )
-            yield _sse_event(
-                "status",
-                {"label": "LLM request", "detail": "Writing final answer from collected tool results."},
-            )
-            last_response = answer_with_tools(messages=messages, tools=[])
-            _record_chat_token_usage(token_usage, last_response)
-            yield _sse_event("token_usage", token_usage)
-
-        content = str(last_response.get("content") or "").strip()
-        if not content:
-            content = "I could not find enough evidence in the documents."
-        response = ChatResponse(
-            message=ChatMessageRequest(role="assistant", content=content),
-            citations=_extract_tool_citations(tool_payloads),
-            tool_calls=tool_calls_for_response,
-            token_usage=ChatTokenUsageResponse(**token_usage),
-            debug={"steps": debug_steps} if payload.debug else None,
-        )
-        response = _save_chat_thread(
+        for event in iter_chat_runtime_events(
             repository=repository,
+            llm_provider=llm_provider,
             current_user=current_user,
-            payload=payload,
-            response=response,
-        )
-        yield _sse_event("final", response.model_dump(mode="json"))
+            messages=messages,
+            tools=CHAT_TOOLS,
+            scope=_chat_tool_scope(payload.scope),
+            top_k_chunks=payload.top_k_chunks,
+            max_documents=payload.max_documents,
+            max_tool_rounds=MAX_CHAT_TOOL_ROUNDS,
+        ):
+            if event.type != "final":
+                yield _chat_sse_event_from_runtime_event(event)
+                continue
+            if not isinstance(event.data, ChatRuntimeResult):
+                raise RuntimeError("Chat runtime returned an invalid final event.")
+            response = _chat_response_from_runtime_result(payload=payload, result=event.data)
+            response = _save_chat_thread(
+                repository=repository,
+                current_user=current_user,
+                payload=payload,
+                response=response,
+            )
+            yield _sse_event("final", response.model_dump(mode="json"))
     except Exception as exc:
         if is_timeout_error(exc):
             detail = (
                 "The LLM request timed out before completion. "
                 "Please retry, reduce scope, or lower context limits in Settings."
             )
+        elif isinstance(exc, HTTPException):
+            detail = str(exc.detail)
         else:
             detail = str(exc)
         yield _sse_event("error", {"detail": detail})
