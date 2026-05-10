@@ -19,6 +19,7 @@ from paperwise.application.services.document_listing import (
     normalized_sort_field,
     normalized_values,
 )
+from paperwise.application.services.taxonomy import to_title_case
 from paperwise.domain.models import DocumentHistoryEvent, DocumentStatus, LLMParseResult, User
 from paperwise.server.dependencies import (
     current_user_dependency,
@@ -117,22 +118,6 @@ def _page_initial_data(
     return initial_data
 
 
-def _title_case_taxonomy_value(value: str) -> str:
-    cleaned = " ".join(str(value or "").strip().split())
-    if not cleaned:
-        return cleaned
-    words: list[str] = []
-    for word in cleaned.split(" "):
-        letters = "".join(ch for ch in word if ch.isalpha())
-        if len(letters) >= 2 and letters.isupper():
-            words.append(word)
-        elif word.islower():
-            words.append(word[:1].upper() + word[1:] if word else word)
-        else:
-            words.append(word)
-    return " ".join(words)
-
-
 def _document_list_item(repository: DocumentRepository, document_id: str) -> dict | None:
     document = repository.get(document_id)
     if document is None:
@@ -188,7 +173,7 @@ def _tag_stats_initial_data(repository: DocumentRepository, current_user: User |
             if key in seen_tags:
                 continue
             seen_tags.add(key)
-            display_name_by_key.setdefault(key, _title_case_taxonomy_value(cleaned))
+            display_name_by_key.setdefault(key, to_title_case(cleaned))
             counts[key] = counts.get(key, 0) + 1
     return {
         **initial_data,
@@ -213,7 +198,7 @@ def _document_type_stats_initial_data(repository: DocumentRepository, current_us
         if not cleaned:
             continue
         key = cleaned.casefold()
-        display_name_by_key.setdefault(key, _title_case_taxonomy_value(cleaned))
+        display_name_by_key.setdefault(key, to_title_case(cleaned))
         counts[key] = counts.get(key, 0) + 1
     return {
         **initial_data,
