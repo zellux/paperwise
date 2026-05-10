@@ -4,7 +4,8 @@ from dataclasses import dataclass
 from typing import Any
 
 
-SUPPORTED_LLM_PROVIDERS = {"openai", "gemini", "custom"}
+SUPPORTED_LLM_PROVIDERS = ("openai", "gemini", "custom")
+SUPPORTED_OCR_PROVIDERS = ("tesseract", "llm")
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 DEFAULT_OPENAI_TEXT_MODEL = "gpt-4.1-mini"
@@ -98,6 +99,14 @@ def ocr_llm_provider_defaults_payload() -> dict[str, dict[str, str]]:
     }
 
 
+def llm_supported_providers_payload() -> list[str]:
+    return list(SUPPORTED_LLM_PROVIDERS)
+
+
+def ocr_supported_providers_payload() -> list[str]:
+    return list(SUPPORTED_OCR_PROVIDERS)
+
+
 def normalize_connection_name(provider: str, fallback: str) -> str:
     if provider == "openai":
         return "OpenAI"
@@ -141,7 +150,7 @@ def _normalize_task_route(raw: Any) -> dict[str, Any]:
 def _normalize_ocr_route(raw: Any) -> dict[str, Any]:
     normalized = _normalize_task_route(raw)
     engine = str((raw or {}).get("engine") or "llm").strip().lower() if isinstance(raw, dict) else "llm"
-    if engine not in {"llm", "tesseract"}:
+    if engine not in SUPPORTED_OCR_PROVIDERS:
         engine = "llm"
     normalized["engine"] = engine
     return normalized

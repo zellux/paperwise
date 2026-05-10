@@ -13,7 +13,9 @@ from paperwise.application.services.document_listing import (
     list_filtered_documents,
 )
 from paperwise.application.services.llm_preferences import (
+    llm_supported_providers_payload,
     llm_provider_defaults_payload,
+    ocr_supported_providers_payload,
     ocr_llm_provider_defaults_payload,
 )
 from paperwise.application.services.pending_documents import (
@@ -110,6 +112,8 @@ def _page_initial_data(
         "authenticated": current_user is not None,
         "ui_themes": list(SUPPORTED_UI_THEMES),
         "default_ui_theme": DEFAULT_UI_THEME,
+        "llm_supported_providers": llm_supported_providers_payload(),
+        "ocr_supported_providers": ocr_supported_providers_payload(),
         "llm_provider_defaults": llm_provider_defaults_payload(),
         "ocr_llm_provider_defaults": ocr_llm_provider_defaults_payload(),
     }

@@ -241,6 +241,8 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "PATH_TO_PAGE_KEY" not in app_js.text
     assert "loadDataForCurrentPage" not in app_js.text
     assert "const SUPPORTED_THEMES" not in app_js.text
+    assert "const SUPPORTED_LLM_PROVIDERS" not in app_js.text
+    assert "const SUPPORTED_OCR_PROVIDERS" not in app_js.text
     assert "const LLM_PROVIDER_DEFAULTS" not in app_js.text
     assert "const OCR_LLM_PROVIDER_DEFAULTS" not in app_js.text
     app_initialization = app_js.text.split("\nfunction ", 1)[0]
@@ -418,6 +420,8 @@ def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> No
         assert payload["authenticated"] is True
         assert payload["ui_themes"] == ["atlas", "ledger", "moss", "ember", "folio", "forge"]
         assert payload["default_ui_theme"] == "forge"
+        assert payload["llm_supported_providers"] == ["openai", "gemini", "custom"]
+        assert payload["ocr_supported_providers"] == ["tesseract", "llm"]
         assert payload["llm_provider_defaults"]["openai"]["model"] == "gpt-4.1-mini"
         assert payload["ocr_llm_provider_defaults"]["openai"]["model"] == "gpt-4.1-nano"
         assert payload["current_user"]["email"] == "chat-ui@example.com"

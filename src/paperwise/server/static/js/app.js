@@ -5,13 +5,11 @@ let currentUser = null;
 const THEME_STORAGE_KEY =
   document.documentElement?.dataset?.uiThemeStorageKey || "paperwise.ui.theme";
 let currentTheme = "forge";
-const SUPPORTED_LLM_PROVIDERS = ["openai", "gemini", "custom"];
 const LLM_TASK_LABELS = {
   metadata: "Metadata Extraction",
   grounded_qa: "Search and Ask Your Docs",
   ocr: "OCR",
 };
-const SUPPORTED_OCR_PROVIDERS = ["tesseract", "llm"];
 let ocrProvider = "llm";
 let ocrImageDetail = "auto";
 let ocrAutoSwitch = false;
@@ -44,6 +42,8 @@ let docsListRequestSeq = 0;
 let initialDataCache;
 let initialUserPreferencesConsumed = false;
 let supportedThemesCache;
+let supportedLlmProvidersCache;
+let supportedOcrProvidersCache;
 let llmProviderDefaultsCache;
 let ocrLlmProviderDefaultsCache;
 
@@ -157,6 +157,38 @@ function getDefaultTheme() {
   return getSupportedThemes().includes(defaultTheme) ? defaultTheme : "forge";
 }
 
+function getSupportedLlmProviders() {
+  if (supportedLlmProvidersCache !== undefined) {
+    return supportedLlmProvidersCache;
+  }
+  const initialProviders = readInitialData().llm_supported_providers;
+  supportedLlmProvidersCache = Array.isArray(initialProviders)
+    ? initialProviders
+        .map((provider) => String(provider || "").trim().toLowerCase())
+        .filter((provider) => provider.length > 0)
+    : [];
+  if (!supportedLlmProvidersCache.length) {
+    supportedLlmProvidersCache = ["openai", "gemini", "custom"];
+  }
+  return supportedLlmProvidersCache;
+}
+
+function getSupportedOcrProviders() {
+  if (supportedOcrProvidersCache !== undefined) {
+    return supportedOcrProvidersCache;
+  }
+  const initialProviders = readInitialData().ocr_supported_providers;
+  supportedOcrProvidersCache = Array.isArray(initialProviders)
+    ? initialProviders
+        .map((provider) => String(provider || "").trim().toLowerCase())
+        .filter((provider) => provider.length > 0)
+    : [];
+  if (!supportedOcrProvidersCache.length) {
+    supportedOcrProvidersCache = ["tesseract", "llm"];
+  }
+  return supportedOcrProvidersCache;
+}
+
 function readBootTheme() {
   const bootTheme = normalizeThemeName(document.documentElement?.dataset?.uiTheme || "");
   if (bootTheme !== getDefaultTheme()) {
@@ -173,7 +205,7 @@ currentTheme = readBootTheme();
 
 function normalizeLlmProvider(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  if (SUPPORTED_LLM_PROVIDERS.includes(normalized)) {
+  if (getSupportedLlmProviders().includes(normalized)) {
     return normalized;
   }
   return "";
@@ -288,7 +320,7 @@ function formatApiErrorDetail(detail) {
 
 function normalizeOcrProvider(value) {
   const normalized = String(value || "").trim().toLowerCase();
-  if (SUPPORTED_OCR_PROVIDERS.includes(normalized)) {
+  if (getSupportedOcrProviders().includes(normalized)) {
     return normalized;
   }
   return "llm";
