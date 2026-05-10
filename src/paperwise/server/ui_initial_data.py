@@ -1,6 +1,14 @@
-from paperwise.application.interfaces import DocumentRepository
-from paperwise.application.services.activity import owner_activity_summary
-from paperwise.application.services.chat_threads import migrate_legacy_chat_threads
+from typing import Protocol
+
+from paperwise.application.interfaces import (
+    DocumentStore,
+    HistoryRepository,
+    ParseResultRepository,
+    PreferenceRepository,
+    TaxonomyRepository,
+)
+from paperwise.application.services.activity import ActivityRepository, owner_activity_summary
+from paperwise.application.services.chat_threads import LegacyChatThreadRepository, migrate_legacy_chat_threads
 from paperwise.application.services.document_listing import list_filtered_documents
 from paperwise.application.services.llm_preferences import (
     llm_provider_defaults_payload,
@@ -20,9 +28,27 @@ from paperwise.server.ui_payloads import document_list_item, history_event_item
 from paperwise.server.ui_fragments import chat_thread_list_html
 
 
+class DocumentsInitialDataRepository(DocumentStore, TaxonomyRepository, PreferenceRepository, Protocol):
+    pass
+
+
+class DocumentDetailInitialDataRepository(
+    DocumentStore,
+    ParseResultRepository,
+    HistoryRepository,
+    PreferenceRepository,
+    Protocol,
+):
+    pass
+
+
+class CatalogInitialDataRepository(TaxonomyRepository, PreferenceRepository, Protocol):
+    pass
+
+
 def page_initial_data(
     current_user: User | None,
-    repository: DocumentRepository | None = None,
+    repository: PreferenceRepository | None = None,
 ) -> dict:
     initial_data: dict = {
         "authenticated": current_user is not None,
@@ -50,28 +76,28 @@ def page_initial_data(
     return initial_data
 
 
-def tag_stats(repository: DocumentRepository, current_user: User) -> list[dict]:
+def tag_stats(repository: TaxonomyRepository, current_user: User) -> list[dict]:
     return [
         {"tag": tag, "document_count": count}
         for tag, count in repository.list_owner_tag_stats(current_user.id)
     ]
 
 
-def tag_stats_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
+def tag_stats_initial_data(repository: CatalogInitialDataRepository, current_user: User | None) -> dict:
     initial_data = page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "tag_stats": []}
     return {**initial_data, "tag_stats": tag_stats(repository, current_user)}
 
 
-def document_type_stats(repository: DocumentRepository, current_user: User) -> list[dict]:
+def document_type_stats(repository: TaxonomyRepository, current_user: User) -> list[dict]:
     return [
         {"document_type": document_type, "document_count": count}
         for document_type, count in repository.list_owner_document_type_stats(current_user.id)
     ]
 
 
-def document_type_stats_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
+def document_type_stats_initial_data(repository: CatalogInitialDataRepository, current_user: User | None) -> dict:
     initial_data = page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "document_type_stats": []}
@@ -81,7 +107,7 @@ def document_type_stats_initial_data(repository: DocumentRepository, current_use
     }
 
 
-def activity_data(repository: DocumentRepository, current_user: User, *, limit: int) -> dict:
+def activity_data(repository: ActivityRepository, current_user: User, *, limit: int) -> dict:
     summary = owner_activity_summary(
         repository=repository,
         owner_id=current_user.id,
@@ -96,7 +122,7 @@ def activity_data(repository: DocumentRepository, current_user: User, *, limit: 
     }
 
 
-def activity_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
+def activity_initial_data(repository: ActivityRepository, current_user: User | None) -> dict:
     initial_data = page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "activity_documents": [], "activity_total_tokens": 0}
@@ -107,7 +133,7 @@ def activity_initial_data(repository: DocumentRepository, current_user: User | N
 
 
 def activity_partial_data(
-    repository: DocumentRepository,
+    repository: ActivityRepository,
     current_user: User,
     *,
     limit: int = 20,
@@ -116,7 +142,7 @@ def activity_partial_data(
     return activity_data(repository, current_user, limit=normalized_limit)
 
 
-def document_filter_options(repository: DocumentRepository, current_user: User) -> dict:
+def document_filter_options(repository: TaxonomyRepository, current_user: User) -> dict:
     return {
         "tags": [tag for tag, _count in repository.list_owner_tag_stats(current_user.id)],
         "correspondents": [
@@ -132,7 +158,7 @@ def document_filter_options(repository: DocumentRepository, current_user: User) 
 
 
 def documents_initial_data(
-    repository: DocumentRepository,
+    repository: DocumentsInitialDataRepository,
     current_user: User | None,
     *,
     page: int = 1,
@@ -218,7 +244,7 @@ def documents_initial_data(
     return data
 
 
-def pending_documents(repository: DocumentRepository, current_user: User) -> list[dict]:
+def pending_documents(repository: DocumentStore, current_user: User) -> list[dict]:
     return [
         document_list_item(document, llm_result)
         for document, llm_result in list_pending_documents(
@@ -229,7 +255,7 @@ def pending_documents(repository: DocumentRepository, current_user: User) -> lis
     ]
 
 
-def pending_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
+def pending_initial_data(repository: DocumentsInitialDataRepository, current_user: User | None) -> dict:
     initial_data = page_initial_data(current_user, repository)
     if current_user is None:
         return {**initial_data, "pending_documents": []}
@@ -240,7 +266,7 @@ def pending_initial_data(repository: DocumentRepository, current_user: User | No
 
 
 def document_detail_initial_data(
-    repository: DocumentRepository,
+    repository: DocumentDetailInitialDataRepository,
     current_user: User | None,
     document_id: str | None,
 ) -> dict:
@@ -268,7 +294,7 @@ def document_detail_initial_data(
     }
 
 
-def chat_thread_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
+def chat_thread_initial_data(repository: LegacyChatThreadRepository, current_user: User | None) -> dict:
     if current_user is None:
         return {**page_initial_data(current_user, repository), "chat_threads": []}
     migrate_legacy_chat_threads(repository, current_user)
@@ -288,7 +314,7 @@ def chat_thread_initial_data(repository: DocumentRepository, current_user: User 
 
 
 def chat_threads_partial_data(
-    repository: DocumentRepository,
+    repository: LegacyChatThreadRepository,
     current_user: User,
     *,
     active_thread_id: str = "",
