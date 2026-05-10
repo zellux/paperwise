@@ -64,26 +64,52 @@ def list_filtered_documents(
     normalized_statuses = normalized_values(status)
     if not normalized_statuses:
         normalized_statuses = {normalize_name(DocumentStatus.READY.value)}
+    normalized_tags = normalized_values(tag)
+    normalized_correspondents = normalized_values(correspondent)
+    normalized_document_types = normalized_values(document_type)
+    sort_field = normalized_sort_field(sort_by)
+    sort_direction = normalized_sort_direction(sort_dir)
+    status_filter = _document_statuses_for_filter(normalized_statuses)
+    normalized_offset = max(0, int(offset or 0))
+    normalized_limit = max(0, int(limit or 0))
+    if (
+        not normalized_tags
+        and not normalized_correspondents
+        and not normalized_document_types
+        and not _normalized_text_query(query)
+        and not (sort_field and sort_direction)
+    ):
+        if status_filter is not None and not status_filter:
+            return FilteredDocumentListing(rows=[], total=0)
+        statuses = status_filter or set(DocumentStatus)
+        return FilteredDocumentListing(
+            rows=repository.list_owner_documents_with_llm_results(
+                owner_id=current_user.id,
+                limit=normalized_limit,
+                offset=normalized_offset,
+                statuses=statuses,
+            ),
+            total=repository.count_owner_documents_by_statuses(
+                owner_id=current_user.id,
+                statuses=statuses,
+            ),
+        )
     matching_documents = list(
         iter_filtered_documents(
             repository=repository,
             current_user=current_user,
             query=query,
-            normalized_tags=normalized_values(tag),
-            normalized_correspondents=normalized_values(correspondent),
-            normalized_document_types=normalized_values(document_type),
+            normalized_tags=normalized_tags,
+            normalized_correspondents=normalized_correspondents,
+            normalized_document_types=normalized_document_types,
             normalized_statuses=normalized_statuses,
         )
     )
-    sort_field = normalized_sort_field(sort_by)
-    sort_direction = normalized_sort_direction(sort_dir)
     if sort_field and sort_direction:
         matching_documents.sort(
             key=lambda item: document_sort_key(item[0], item[1], sort_field),
             reverse=sort_direction == "desc",
         )
-    normalized_offset = max(0, int(offset or 0))
-    normalized_limit = max(0, int(limit or 0))
     return FilteredDocumentListing(
         rows=matching_documents[normalized_offset : normalized_offset + normalized_limit],
         total=len(matching_documents),
@@ -185,7 +211,7 @@ def _matches_text_query(
     document: Document,
     llm_result: LLMParseResult | None,
 ) -> bool:
-    normalized_query = " ".join(str(query or "").strip().casefold().split())
+    normalized_query = _normalized_text_query(query)
     if not normalized_query:
         return True
 
@@ -203,6 +229,10 @@ def _matches_text_query(
 
     haystack = " ".join(" ".join(str(value).split()) for value in candidates).casefold()
     return normalized_query in haystack
+
+
+def _normalized_text_query(query: str | None) -> str:
+    return " ".join(str(query or "").strip().casefold().split())
 
 
 def _matches_document_filters(
