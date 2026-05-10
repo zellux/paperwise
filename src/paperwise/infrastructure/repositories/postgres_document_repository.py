@@ -7,8 +7,6 @@ from sqlalchemy import func, select
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.application.services.taxonomy import normalize_name, to_title_case
 from paperwise.application.services.taxonomy_stats import (
-    correspondent_stats_from_metadata,
-    document_type_stats_from_metadata,
     tag_stats_from_metadata,
 )
 from paperwise.domain.models import (
@@ -92,6 +90,10 @@ def _document_from_row(row: DocumentRow) -> Document:
         status=_coerce_document_status(row.status),
         created_at=row.created_at,
     )
+
+
+def _ordered_count_rows(rows: list[tuple[str, int]]) -> list[tuple[str, int]]:
+    return sorted(rows, key=lambda item: (-item[1], item[0].casefold()))
 
 
 def _llm_parse_result_from_row(row: LLMParseResultRow) -> LLMParseResult:
@@ -382,21 +384,31 @@ class PostgresDocumentRepository(DocumentRepository):
 
     def list_owner_document_type_stats(self, owner_id: str) -> list[tuple[str, int]]:
         with self._session_factory() as session:
-            rows = session.scalars(
-                select(LLMParseResultRow)
+            value = func.trim(LLMParseResultRow.document_type)
+            normalized = func.lower(value)
+            rows = session.execute(
+                select(normalized, func.min(value), func.count())
                 .join(DocumentRow, DocumentRow.id == LLMParseResultRow.document_id)
                 .where(DocumentRow.owner_id == owner_id)
+                .where(value != "")
+                .group_by(normalized)
             ).all()
-            return document_type_stats_from_metadata(rows)
+            return _ordered_count_rows(
+                [(to_title_case(str(display)), int(count)) for _key, display, count in rows]
+            )
 
     def list_owner_correspondent_stats(self, owner_id: str) -> list[tuple[str, int]]:
         with self._session_factory() as session:
-            rows = session.scalars(
-                select(LLMParseResultRow)
+            value = func.trim(LLMParseResultRow.correspondent)
+            normalized = func.lower(value)
+            rows = session.execute(
+                select(normalized, func.min(value), func.count())
                 .join(DocumentRow, DocumentRow.id == LLMParseResultRow.document_id)
                 .where(DocumentRow.owner_id == owner_id)
+                .where(value != "")
+                .group_by(normalized)
             ).all()
-            return correspondent_stats_from_metadata(rows)
+            return _ordered_count_rows([(str(display), int(count)) for _key, display, count in rows])
 
     def add_correspondent(self, name: str) -> None:
         cleaned = name.strip()

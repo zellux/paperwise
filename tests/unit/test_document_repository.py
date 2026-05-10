@@ -1,8 +1,12 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
+)
+from paperwise.infrastructure.repositories.postgres_document_repository import (
+    PostgresDocumentRepository,
 )
 
 
@@ -49,6 +53,32 @@ def _llm_result(
 
 def test_owner_taxonomy_stats_are_scoped_to_document_owner() -> None:
     repository = InMemoryDocumentRepository()
+    repository.save(_document("owner-a-1", "owner-a"))
+    repository.save(_document("owner-a-2", "owner-a"))
+    repository.save(_document("owner-b-1", "owner-b"))
+    repository.save_llm_parse_result(
+        _llm_result("owner-a-1", "invoice", ["tax", "Tax"], correspondent="Bank")
+    )
+    repository.save_llm_parse_result(
+        _llm_result("owner-a-2", "statement", ["finance"], correspondent="Credit Union")
+    )
+    repository.save_llm_parse_result(
+        _llm_result("owner-b-1", "invoice", ["tax"], correspondent="Bank")
+    )
+
+    assert repository.list_owner_tag_stats("owner-a") == [("Finance", 1), ("Tax", 1)]
+    assert repository.list_owner_document_type_stats("owner-a") == [
+        ("Invoice", 1),
+        ("Statement", 1),
+    ]
+    assert repository.list_owner_correspondent_stats("owner-a") == [
+        ("Bank", 1),
+        ("Credit Union", 1),
+    ]
+
+
+def test_postgres_owner_taxonomy_stats_are_scoped_to_document_owner(tmp_path: Path) -> None:
+    repository = PostgresDocumentRepository(f"sqlite:///{tmp_path / 'paperwise.db'}")
     repository.save(_document("owner-a-1", "owner-a"))
     repository.save(_document("owner-a-2", "owner-a"))
     repository.save(_document("owner-b-1", "owner-b"))
