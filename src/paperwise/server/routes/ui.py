@@ -1,7 +1,5 @@
 from pathlib import Path
-from html import escape
 import json
-import re
 
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
@@ -28,6 +26,14 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     optional_current_user_dependency,
 )
+from paperwise.server.html_rewriter import (
+    render_active_nav,
+    replace_activity_token_total,
+    replace_element_html,
+    replace_element_text,
+    replace_input_value,
+    replace_table_body,
+)
 from paperwise.server.routes.document_access import get_owned_document_or_404
 from paperwise.server.ui_fragments import (
     activity_rows_html,
@@ -48,22 +54,6 @@ _STATIC_JS_DIR = _STATIC_DIR / "js"
 _TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "ui"
 _LAYOUT_TEMPLATE = _TEMPLATE_DIR / "layout.html"
 _PARTIALS_DIR = _TEMPLATE_DIR / "partials"
-_TABLE_BODY_RE_TEMPLATE = (
-    r'(<tbody id="{element_id}"[^>]*>)'
-    r'.*?'
-    r'(</tbody>)'
-)
-_ACTIVITY_TOKEN_RE = re.compile(
-    r'(<p id="activityTokenTotal" class="activity-token-total">)'
-    r'.*?'
-    r"(</p>)",
-    re.DOTALL,
-)
-_NAV_LINK_RE = re.compile(
-    r'(<a\b(?=[^>]*\bclass="(?P<class>[^"]*\bnav-link\b[^"]*)")'
-    r'(?=[^>]*\bhref="(?P<href>[^"]+)")[^>]*>)',
-    re.DOTALL,
-)
 _ACTIVE_NAV_BY_VIEW = {
     "section-docs": "/ui/documents",
     "section-document": "/ui/documents",
@@ -357,42 +347,6 @@ def _document_detail_initial_data(
     }
 
 
-def _replace_table_body(html: str, element_id: str, rows_html: str) -> str:
-    pattern = re.compile(_TABLE_BODY_RE_TEMPLATE.format(element_id=re.escape(element_id)), re.DOTALL)
-    return pattern.sub(rf"\1\n{rows_html}\n              \2", html, count=1)
-
-
-def _replace_element_text(html: str, element_id: str, value: str) -> str:
-    pattern = re.compile(
-        rf'(<(?P<tag>[a-z0-9]+)\b[^>]*\bid="{re.escape(element_id)}"[^>]*>).*?(</(?P=tag)>)',
-        re.DOTALL | re.IGNORECASE,
-    )
-    escaped_value = escape(value)
-    return pattern.sub(lambda match: f"{match.group(1)}{escaped_value}{match.group(3)}", html, count=1)
-
-
-def _replace_element_html(html: str, element_id: str, value: str) -> str:
-    pattern = re.compile(
-        rf'(<(?P<tag>[a-z0-9]+)\b[^>]*\bid="{re.escape(element_id)}"[^>]*>).*?(</(?P=tag)>)',
-        re.DOTALL | re.IGNORECASE,
-    )
-    return pattern.sub(lambda match: f"{match.group(1)}{value}{match.group(3)}", html, count=1)
-
-
-def _replace_input_value(html: str, element_id: str, value: str) -> str:
-    pattern = re.compile(
-        rf'(<input\b(?=[^>]*\bid="{re.escape(element_id)}")[^>]*)(\s*/?>)',
-        re.DOTALL | re.IGNORECASE,
-    )
-    escaped_value = escape(value, quote=True)
-
-    def replace(match: re.Match[str]) -> str:
-        start = re.sub(r'\svalue="[^"]*"', "", match.group(1), count=1)
-        return f'{start} value="{escaped_value}"{match.group(2)}'
-
-    return pattern.sub(replace, html, count=1)
-
-
 def _sort_stat_rows(items: list[dict], *, sort_by: str | None, sort_dir: str | None) -> list[dict]:
     field = str(sort_by or "").strip()
     direction = str(sort_dir or "").strip().lower()
@@ -427,25 +381,25 @@ def _render_document_detail_data(html: str, initial_data: dict) -> str:
     if not fragments["document_id"]:
         return html
     for element_id, value in fragments["text"].items():
-        html = _replace_element_text(html, element_id, value)
+        html = replace_element_text(html, element_id, value)
     for element_id, value in fragments["html"].items():
-        html = _replace_element_html(html, element_id, value)
+        html = replace_element_html(html, element_id, value)
     for element_id, value in fragments["inputs"].items():
-        html = _replace_input_value(html, element_id, value)
+        html = replace_input_value(html, element_id, value)
 
-    html = _replace_element_html(html, "documentHistoryList", fragments["history_html"])
+    html = replace_element_html(html, "documentHistoryList", fragments["history_html"])
     return html
 
 
 def _render_initial_page_data(html: str, initial_data: dict) -> str:
     html = _render_document_detail_data(html, initial_data)
     if isinstance(initial_data.get("documents"), list):
-        html = _replace_table_body(html, "docsTableBody", document_rows_html(initial_data["documents"]))
+        html = replace_table_body(html, "docsTableBody", document_rows_html(initial_data["documents"]))
         total = int(initial_data.get("documents_total") or 0)
         processing_count = int(initial_data.get("documents_processing_count") or 0)
         page = max(1, int(initial_data.get("documents_page") or 1))
         page_size = max(1, int(initial_data.get("documents_page_size") or 20))
-        html = _replace_element_html(
+        html = replace_element_html(
             html,
             "documentsPaginationToolbar",
             documents_pagination_toolbar_html(
@@ -456,50 +410,34 @@ def _render_initial_page_data(html: str, initial_data: dict) -> str:
             ),
         )
     if isinstance(initial_data.get("tag_stats"), list):
-        html = _replace_table_body(html, "tagsTableBody", tag_rows_html(initial_data["tag_stats"]))
+        html = replace_table_body(html, "tagsTableBody", tag_rows_html(initial_data["tag_stats"]))
     if isinstance(initial_data.get("document_type_stats"), list):
-        html = _replace_table_body(
+        html = replace_table_body(
             html,
             "documentTypesTableBody",
             document_type_rows_html(initial_data["document_type_stats"]),
         )
     if isinstance(initial_data.get("activity_documents"), list):
-        html = _replace_table_body(
+        html = replace_table_body(
             html,
             "processedDocsTableBody",
             activity_rows_html(initial_data["activity_documents"]),
         )
         total_tokens = int(initial_data.get("activity_total_tokens") or 0)
-        html = _ACTIVITY_TOKEN_RE.sub(
-            rf"\1LLM tokens processed: {total_tokens:,}\2",
-            html,
-            count=1,
-        )
+        html = replace_activity_token_total(html, total_tokens)
     if isinstance(initial_data.get("pending_documents"), list):
-        html = _replace_table_body(
+        html = replace_table_body(
             html,
             "pendingTableBody",
             pending_rows_html(initial_data["pending_documents"]),
         )
     if isinstance(initial_data.get("chat_threads"), list):
-        html = _replace_element_html(
+        html = replace_element_html(
             html,
             "searchAskThreadList",
             chat_thread_list_html(initial_data["chat_threads"]),
         )
     return html
-
-
-def _render_active_nav(html: str, active_href: str) -> str:
-    def replace_link(match: re.Match[str]) -> str:
-        tag = match.group(0)
-        original_classes = match.group("class")
-        classes = [class_name for class_name in original_classes.split() if class_name != "active"]
-        if match.group("href") == active_href:
-            classes.append("active")
-        return tag.replace(f'class="{original_classes}"', f'class="{" ".join(classes)}"', 1)
-
-    return _NAV_LINK_RE.sub(replace_link, html)
 
 
 def _apply_layout_replacements(
@@ -591,7 +529,7 @@ def _render_ui_page(
         page_script_tags=page_script_tags,
         initial_data_script="{{initial_data_script}}",
     )
-    html = _render_active_nav(html, active_nav_href or _ACTIVE_NAV_BY_VIEW.get(view_id, "/ui/documents"))
+    html = render_active_nav(html, active_nav_href or _ACTIVE_NAV_BY_VIEW.get(view_id, "/ui/documents"))
     initial_data_script = ""
     if initial_data is not None:
         html = _render_initial_page_data(html, initial_data)
