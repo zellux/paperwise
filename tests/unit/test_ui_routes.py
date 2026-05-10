@@ -612,6 +612,8 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         documents_partial_payload = documents_partial.json()
         assert documents_partial_payload["documents_total"] == 2
         assert documents_partial_payload["documents_processing_count"] == 1
+        assert documents_partial_payload["documents_returned"] == 1
+        assert "documents" not in documents_partial_payload
         assert 'data-doc-id="doc-tax"' in documents_partial_payload["table_body_html"]
         assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in documents_partial_payload["table_body_html"]
         assert "Total documents: 2" in documents_partial_payload["pagination_toolbar_html"]

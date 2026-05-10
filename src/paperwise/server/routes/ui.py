@@ -767,7 +767,7 @@ def documents_partial(
                 page=data["documents_page"],
                 page_size=data["documents_page_size"],
             ),
-            "documents": data["documents"],
+            "documents_returned": len(data["documents"]),
             "documents_total": data["documents_total"],
             "documents_processing_count": data["documents_processing_count"],
             "documents_page": data["documents_page"],

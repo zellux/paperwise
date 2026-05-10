@@ -1343,7 +1343,6 @@ function applyDocumentsPartial(payload) {
   docsTotalCount = Number(payload.documents_total || 0);
   docsPage = Math.max(1, Number(payload.documents_page || docsPage || 1));
   docsPageSize = normalizePageSize(payload.documents_page_size || docsPageSize);
-  refreshFilterOptionsFromDocuments(Array.isArray(payload.documents) ? payload.documents : []);
 }
 
 function applyDocumentDetailPartial(payload) {
@@ -1410,7 +1409,7 @@ async function loadDocumentsList() {
     return;
   }
   applyDocumentsPartial(payload);
-  logActivity(`Loaded ${payload.documents.length} document(s) of ${docsTotalCount} total`);
+  logActivity(`Loaded ${Number(payload.documents_returned || 0)} document(s) of ${docsTotalCount} total`);
 }
 
 async function initializeCurrentPageData() {
