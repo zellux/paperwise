@@ -4,10 +4,8 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 
 from paperwise.application.interfaces import DocumentRepository
-from paperwise.application.services.search_text import extract_search_snippet, tokenize_search_query
 from paperwise.domain.models import (
     Document,
-    DocumentSearchHit,
     DocumentStatus,
     LLMParseResult,
 )
@@ -19,11 +17,13 @@ from paperwise.infrastructure.repositories.postgres_chunk_repository import Post
 from paperwise.infrastructure.repositories.postgres_collection_repository import (
     PostgresCollectionRepositoryMixin,
 )
+from paperwise.infrastructure.repositories.postgres_document_mapper import document_from_row
 from paperwise.infrastructure.repositories.postgres_history_repository import PostgresHistoryRepositoryMixin
 from paperwise.infrastructure.repositories.postgres_parse_result_repository import (
     PostgresParseResultRepositoryMixin,
     llm_parse_result_from_row,
 )
+from paperwise.infrastructure.repositories.postgres_search_repository import PostgresSearchRepositoryMixin
 from paperwise.infrastructure.repositories.postgres_models import (
     CollectionDocumentRow,
     CollectionRow,
@@ -37,39 +37,13 @@ from paperwise.infrastructure.repositories.postgres_taxonomy_repository import P
 from paperwise.infrastructure.repositories.postgres_user_repository import PostgresUserRepositoryMixin
 
 
-def _coerce_document_status(value: str) -> DocumentStatus:
-    legacy_map = {
-        "parsing": DocumentStatus.PROCESSING,
-        "parsed": DocumentStatus.PROCESSING,
-        "enriching": DocumentStatus.PROCESSING,
-        "failed": DocumentStatus.PROCESSING,
-    }
-    normalized = (value or "").strip().lower()
-    if normalized in legacy_map:
-        return legacy_map[normalized]
-    return DocumentStatus(normalized)
-
-
-def _document_from_row(row: DocumentRow) -> Document:
-    return Document(
-        id=row.id,
-        filename=row.filename,
-        owner_id=row.owner_id,
-        blob_uri=row.blob_uri,
-        checksum_sha256=row.checksum_sha256,
-        content_type=row.content_type,
-        size_bytes=row.size_bytes,
-        status=_coerce_document_status(row.status),
-        created_at=row.created_at,
-    )
-
-
 class PostgresDocumentRepository(
     PostgresChatThreadRepositoryMixin,
     PostgresChunkRepositoryMixin,
     PostgresCollectionRepositoryMixin,
     PostgresHistoryRepositoryMixin,
     PostgresParseResultRepositoryMixin,
+    PostgresSearchRepositoryMixin,
     PostgresTaxonomyRepositoryMixin,
     PostgresUserRepositoryMixin,
     DocumentRepository,
@@ -100,7 +74,7 @@ class PostgresDocumentRepository(
             row = session.get(DocumentRow, document_id)
             if row is None:
                 return None
-            return _document_from_row(row)
+            return document_from_row(row)
 
     def get_by_owner_checksum(self, owner_id: str, checksum_sha256: str) -> Document | None:
         with self._session_factory() as session:
@@ -113,7 +87,7 @@ class PostgresDocumentRepository(
             )
             if row is None:
                 return None
-            return _document_from_row(row)
+            return document_from_row(row)
 
     def list_documents(self, limit: int = 100, *, offset: int = 0) -> list[Document]:
         with self._session_factory() as session:
@@ -123,7 +97,7 @@ class PostgresDocumentRepository(
                 .offset(max(0, offset))
                 .limit(limit)
             ).all()
-            return [_document_from_row(row) for row in rows]
+            return [document_from_row(row) for row in rows]
 
     def list_owner_documents_with_llm_results(
         self,
@@ -152,7 +126,7 @@ class PostgresDocumentRepository(
             ).all()
             return [
                 (
-                    _document_from_row(document_row),
+                    document_from_row(document_row),
                     llm_parse_result_from_row(llm_row) if llm_row is not None else None,
                 )
                 for document_row, llm_row in rows
@@ -218,74 +192,3 @@ class PostgresDocumentRepository(
             if document_row is not None:
                 session.delete(document_row)
             session.commit()
-
-    def search_documents(
-        self,
-        *,
-        owner_id: str,
-        query: str,
-        limit: int = 20,
-        document_ids: list[str] | None = None,
-    ) -> list[DocumentSearchHit]:
-        terms = tokenize_search_query(query)
-        if not terms:
-            return []
-        scoped_ids = sorted(set(document_ids or []))
-        has_scope = document_ids is not None
-        with self._session_factory() as session:
-            query_stmt = select(DocumentRow).where(DocumentRow.owner_id == owner_id)
-            if has_scope:
-                if not scoped_ids:
-                    return []
-                query_stmt = query_stmt.where(DocumentRow.id.in_(scoped_ids))
-            doc_rows = session.scalars(query_stmt.order_by(DocumentRow.created_at.desc())).all()
-            if not doc_rows:
-                return []
-            ids = [row.id for row in doc_rows]
-            parse_rows = session.scalars(select(ParseResultRow).where(ParseResultRow.document_id.in_(ids))).all()
-            llm_rows = session.scalars(select(LLMParseResultRow).where(LLMParseResultRow.document_id.in_(ids))).all()
-            parse_by_id = {row.document_id: row for row in parse_rows}
-            llm_by_id = {row.document_id: row for row in llm_rows}
-
-            hits: list[DocumentSearchHit] = []
-            for row in doc_rows:
-                parse_row = parse_by_id.get(row.id)
-                llm_row = llm_by_id.get(row.id)
-                searchable_parts = [
-                    row.filename or "",
-                    parse_row.text_preview if parse_row is not None else "",
-                    llm_row.suggested_title if llm_row is not None else "",
-                    llm_row.correspondent if llm_row is not None else "",
-                    llm_row.document_type if llm_row is not None else "",
-                    " ".join(llm_row.tags or []) if llm_row is not None else "",
-                ]
-                searchable_text = " ".join(part for part in searchable_parts if part).strip()
-                lowered = searchable_text.lower()
-                matched = [term for term in terms if term in lowered]
-                if not matched:
-                    continue
-                score = float(sum(lowered.count(term) for term in matched))
-                snippet = extract_search_snippet(
-                    parse_row.text_preview if parse_row is not None else searchable_text,
-                    matched,
-                )
-                hits.append(
-                    DocumentSearchHit(
-                        document=Document(
-                            id=row.id,
-                            filename=row.filename,
-                            owner_id=row.owner_id,
-                            blob_uri=row.blob_uri,
-                            checksum_sha256=row.checksum_sha256,
-                            content_type=row.content_type,
-                            size_bytes=row.size_bytes,
-                            status=_coerce_document_status(row.status),
-                            created_at=row.created_at,
-                        ),
-                        score=score,
-                        snippet=snippet,
-                        matched_terms=matched,
-                    )
-                )
-            hits.sort(key=lambda hit: (hit.score, hit.document.created_at), reverse=True)
-            return hits[: max(1, limit)]
