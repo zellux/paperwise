@@ -14,7 +14,6 @@ from paperwise.infrastructure.config import Settings, get_settings
 from paperwise.infrastructure.dispatchers.celery_ingestion_dispatcher import (
     CeleryIngestionDispatcher,
 )
-from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -49,9 +48,8 @@ def storage_dependency() -> StorageProvider:
     return LocalStorageAdapter(settings_dependency().object_store_root)
 
 
-@lru_cache
-def llm_provider_dependency() -> LLMProvider:
-    return MissingOpenAIProvider()
+def llm_provider_dependency() -> LLMProvider | None:
+    return None
 
 
 def current_user_dependency(

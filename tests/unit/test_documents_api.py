@@ -30,7 +30,6 @@ from paperwise.domain.models import UserPreference
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
-from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 from paperwise.infrastructure.storage.local_storage import LocalStorageAdapter
 
 
@@ -1577,7 +1576,6 @@ def test_llm_parse_requires_user_llm_provider_configuration() -> None:
     app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
     app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
     app.dependency_overrides[storage_dependency] = lambda: storage
-    app.dependency_overrides[llm_provider_dependency] = lambda: MissingOpenAIProvider()
 
     try:
         client = TestClient(app)

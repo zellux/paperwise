@@ -267,13 +267,13 @@ def _resolve_llm_provider_for_user(
     *,
     repository: DocumentRepository,
     current_user: User,
-    default_llm_provider: LLMProvider,
+    provider_override: LLMProvider | None,
 ) -> LLMProvider:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
     return _resolve_llm_provider_from_preferences(
         preferences=preferences,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
         task=LLM_TASK_METADATA,
     )
 
@@ -282,13 +282,13 @@ def _resolve_ocr_llm_provider_for_user(
     *,
     repository: DocumentRepository,
     current_user: User,
-    default_llm_provider: LLMProvider,
+    provider_override: LLMProvider | None,
 ) -> LLMProvider:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
     return _resolve_llm_provider_from_preferences(
         preferences=preferences,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
         task=LLM_TASK_OCR,
         missing_provider_detail="Configure an OCR LLM connection in Settings before OCR parsing.",
         missing_api_key_detail="Selected OCR LLM connection requires an API key in Settings.",
@@ -749,7 +749,7 @@ def test_llm_connection_endpoint(
     payload: LLMConnectionTestRequest,
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
-    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
+    provider_override: LLMProvider | None = Depends(llm_provider_dependency),
 ) -> LLMConnectionTestResponse:
     preference = repository.get_user_preference(current_user.id)
     base_preferences = dict(preference.preferences) if preference is not None else {}
@@ -764,7 +764,7 @@ def test_llm_connection_endpoint(
                 base_url=payload.base_url,
                 api_key=payload.api_key,
             ),
-            default_llm_provider=default_llm_provider,
+            provider_override=provider_override,
         )
     except LLMConnectionConfigError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -934,7 +934,7 @@ def reprocess_document_endpoint(
 def parse_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
-    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
+    provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> ParseResultResponse:
     document = _get_owned_document_or_404(
@@ -961,7 +961,7 @@ def parse_document_endpoint(
             ocr_llm_provider = _resolve_llm_provider_for_user(
                 repository=repository,
                 current_user=current_user,
-                default_llm_provider=default_llm_provider,
+                provider_override=provider_override,
             )
         except HTTPException:
             ocr_llm_provider = None
@@ -970,7 +970,7 @@ def parse_document_endpoint(
             ocr_llm_provider = _resolve_ocr_llm_provider_for_user(
                 repository=repository,
                 current_user=current_user,
-                default_llm_provider=default_llm_provider,
+                provider_override=provider_override,
             )
         except HTTPException:
             ocr_llm_provider = None
@@ -1015,7 +1015,7 @@ def get_parse_document_endpoint(
 def llm_parse_document_endpoint(
     document_id: str,
     repository: DocumentRepository = Depends(document_repository_dependency),
-    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
+    provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> LLMParseResultResponse:
     document = _get_owned_document_or_404(
@@ -1026,7 +1026,7 @@ def llm_parse_document_endpoint(
     llm_provider = _resolve_llm_provider_for_user(
         repository=repository,
         current_user=current_user,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
     )
     ocr_provider = _resolve_ocr_provider_for_user(
         repository=repository,
@@ -1044,7 +1044,7 @@ def llm_parse_document_endpoint(
             ocr_llm_provider = _resolve_ocr_llm_provider_for_user(
                 repository=repository,
                 current_user=current_user,
-                default_llm_provider=default_llm_provider,
+                provider_override=provider_override,
             )
         except HTTPException:
             ocr_llm_provider = None

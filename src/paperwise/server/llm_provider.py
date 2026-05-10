@@ -10,7 +10,7 @@ from paperwise.application.services.llm_provider_factory import resolve_llm_prov
 def resolve_http_llm_provider_from_preferences(
     *,
     preferences: dict[str, Any],
-    default_llm_provider: LLMProvider,
+    provider_override: LLMProvider | None = None,
     task: str = LLM_TASK_METADATA,
     missing_provider_detail: str = "Configure an LLM provider in Settings before running LLM parse.",
     missing_api_key_detail: str = "Selected LLM provider requires your API key in Settings.",
@@ -18,7 +18,7 @@ def resolve_http_llm_provider_from_preferences(
 ) -> LLMProvider:
     return resolve_llm_provider_from_preferences(
         preferences=preferences,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
         task=task,
         missing_provider_detail=missing_provider_detail,
         missing_api_key_detail=missing_api_key_detail,

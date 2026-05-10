@@ -11,9 +11,7 @@ from paperwise.application.services.llm_preferences import (
     validate_api_key_for_provider,
 )
 from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
-from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
-from paperwise.infrastructure.llm.simple_llm_provider import SimpleLLMProvider
 
 ProviderErrorFactory = Callable[[str], Exception]
 
@@ -21,7 +19,7 @@ ProviderErrorFactory = Callable[[str], Exception]
 def resolve_llm_provider_from_preferences(
     *,
     preferences: dict[str, Any],
-    default_llm_provider: LLMProvider,
+    provider_override: LLMProvider | None = None,
     task: str = LLM_TASK_METADATA,
     missing_provider_detail: str = "Configure an LLM provider in Settings before running LLM parse.",
     missing_api_key_detail: str = "Selected LLM provider requires your API key in Settings.",
@@ -35,7 +33,7 @@ def resolve_llm_provider_from_preferences(
         ocr_image_detail = "auto"
     return build_provider_from_task_config(
         config=config,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
         task=task,
         ocr_image_detail=ocr_image_detail,
         missing_provider_detail=missing_provider_detail,
@@ -49,7 +47,7 @@ def resolve_llm_provider_from_preferences(
 def build_provider_from_task_config(
     *,
     config: ResolvedLLMTaskConfig | None,
-    default_llm_provider: LLMProvider,
+    provider_override: LLMProvider | None = None,
     task: str,
     ocr_image_detail: str = "auto",
     missing_provider_detail: str,
@@ -58,12 +56,8 @@ def build_provider_from_task_config(
     custom_response_format_type: str | None = None,
     error_factory: ProviderErrorFactory = RuntimeError,
 ) -> LLMProvider:
-    # Preserve testability when a fake provider is injected via dependency override.
-    if not isinstance(
-        default_llm_provider,
-        (MissingOpenAIProvider, OpenAILLMProvider, GeminiLLMProvider, SimpleLLMProvider),
-    ):
-        return default_llm_provider
+    if provider_override is not None:
+        return provider_override
 
     if config is None or not config.provider:
         raise error_factory(missing_provider_detail)

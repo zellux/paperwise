@@ -895,14 +895,14 @@ def _iter_chat_events(
 def chat_all_documents_endpoint(
     payload: ChatRequest,
     repository: DocumentRepository = Depends(document_repository_dependency),
-    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
+    provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> ChatResponse:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
     llm_provider = _resolve_llm_provider_from_preferences(
         preferences=preferences,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
         task=LLM_TASK_GROUNDED_QA,
         missing_provider_detail="Configure a Grounded Q&A LLM connection in Settings before chatting with your documents.",
         missing_api_key_detail="Selected Grounded Q&A LLM connection requires an API key in Settings.",
@@ -920,14 +920,14 @@ def chat_all_documents_endpoint(
 def stream_chat_all_documents_endpoint(
     payload: ChatRequest,
     repository: DocumentRepository = Depends(document_repository_dependency),
-    default_llm_provider: LLMProvider = Depends(llm_provider_dependency),
+    provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> StreamingResponse:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
     llm_provider = _resolve_llm_provider_from_preferences(
         preferences=preferences,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
         task=LLM_TASK_GROUNDED_QA,
         missing_provider_detail="Configure a Grounded Q&A LLM connection in Settings before chatting with your documents.",
         missing_api_key_detail="Selected Grounded Q&A LLM connection requires an API key in Settings.",

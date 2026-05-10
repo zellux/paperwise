@@ -20,7 +20,6 @@ from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.domain.models import DocumentStatus, HistoryActorType
 from paperwise.infrastructure.config import get_settings
-from paperwise.infrastructure.llm.missing_openai_provider import MissingOpenAIProvider
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -39,8 +38,8 @@ def _build_repository() -> DocumentRepository:
     return InMemoryDocumentRepository()
 
 
-def _build_llm_provider() -> LLMProvider:
-    return MissingOpenAIProvider()
+def _build_llm_provider() -> LLMProvider | None:
+    return None
 
 
 def _resolve_ocr_provider_for_owner(repository: DocumentRepository, owner_id: str) -> str:
@@ -71,12 +70,12 @@ def _resolve_ocr_auto_switch_for_owner(repository: DocumentRepository, owner_id:
 def _resolve_llm_provider_from_preferences(
     *,
     preferences: dict[str, str],
-    default_llm_provider: LLMProvider,
+    provider_override: LLMProvider | None,
     task: str = LLM_TASK_METADATA,
 ) -> LLMProvider:
     return resolve_configured_llm_provider(
         preferences=preferences,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
         task=task,
         missing_provider_detail=f"missing provider setting for task: {task}",
         missing_api_key_detail=f"missing API key setting for task: {task}",
@@ -88,13 +87,13 @@ def _resolve_llm_provider_from_preferences(
 def _resolve_metadata_llm_provider_for_owner(
     repository: DocumentRepository,
     owner_id: str,
-    default_llm_provider: LLMProvider,
+    provider_override: LLMProvider | None,
 ) -> LLMProvider:
     preference = repository.get_user_preference(owner_id)
     preferences = dict(preference.preferences) if preference is not None else {}
     return _resolve_llm_provider_from_preferences(
         preferences=preferences,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
         task=LLM_TASK_METADATA,
     )
 
@@ -102,7 +101,7 @@ def _resolve_metadata_llm_provider_for_owner(
 def _resolve_ocr_llm_provider_for_owner(
     repository: DocumentRepository,
     owner_id: str,
-    default_llm_provider: LLMProvider,
+    provider_override: LLMProvider | None,
     ocr_provider: str,
 ) -> LLMProvider | None:
     if ocr_provider == "tesseract":
@@ -112,12 +111,12 @@ def _resolve_ocr_llm_provider_for_owner(
     if ocr_provider == "llm_separate":
         return _resolve_llm_provider_from_preferences(
             preferences=preferences,
-            default_llm_provider=default_llm_provider,
+            provider_override=provider_override,
             task=LLM_TASK_OCR,
         )
     return _resolve_llm_provider_from_preferences(
         preferences=preferences,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
         task=LLM_TASK_OCR,
     )
 
@@ -207,7 +206,7 @@ def parse_document_task(
     content_type: str,
 ) -> dict[str, str | int]:
     repository = _build_repository()
-    default_llm_provider = _build_llm_provider()
+    provider_override = _build_llm_provider()
     document = repository.get(document_id)
     if document is None:
         logger.error("parse task failed; document_id=%s not found", document_id)
@@ -237,12 +236,12 @@ def parse_document_task(
         metadata_llm_provider = _resolve_metadata_llm_provider_for_owner(
             repository=repository,
             owner_id=document.owner_id,
-            default_llm_provider=default_llm_provider,
+            provider_override=provider_override,
         )
         ocr_llm_provider = _resolve_ocr_llm_provider_for_owner(
             repository=repository,
             owner_id=document.owner_id,
-            default_llm_provider=default_llm_provider,
+            provider_override=provider_override,
             ocr_provider=ocr_provider,
         )
         parsed = parse_document_blob(

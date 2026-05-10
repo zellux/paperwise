@@ -49,7 +49,7 @@ def run_llm_connection_test(
     *,
     preferences: dict[str, Any],
     payload: LLMConnectionTestInput,
-    default_llm_provider: LLMProvider,
+    provider_override: LLMProvider | None,
 ) -> LLMConnectionTestResult:
     merged_preferences = _merge_llm_preferences(preferences, payload)
     requested_task = str(payload.task or "").strip().lower()
@@ -58,7 +58,7 @@ def run_llm_connection_test(
     missing_provider_detail, missing_api_key_detail, missing_base_url_detail = _llm_connection_test_missing_details(task)
     llm_provider = resolve_llm_provider_from_preferences(
         preferences=merged_preferences,
-        default_llm_provider=default_llm_provider,
+        provider_override=provider_override,
         task=task,
         missing_provider_detail=missing_provider_detail,
         missing_api_key_detail=missing_api_key_detail,
