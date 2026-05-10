@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 import json
+from pathlib import Path
 import re
 
 from fastapi.testclient import TestClient
@@ -105,7 +106,7 @@ def _save_pending_document(
     )
 
 
-def test_ui_routes_serve_index_html() -> None:
+def test_ui_routes_serve_page_html() -> None:
     client = TestClient(app)
     routes = (
         "/ui/documents",
@@ -129,6 +130,31 @@ def test_ui_routes_serve_index_html() -> None:
         assert "<!doctype html>" in response.text.lower()
 
 
+def test_ui_html_is_split_into_layout_and_partials() -> None:
+    server_dir = Path(__file__).resolve().parents[2] / "src" / "paperwise" / "server"
+    partials_dir = server_dir / "templates" / "ui" / "partials"
+
+    assert (server_dir / "templates" / "ui" / "layout.html").exists()
+    assert not (server_dir / "static" / "index.html").exists()
+    assert {
+        path.name
+        for path in partials_dir.glob("*.html")
+    } >= {
+        "documents.html",
+        "document.html",
+        "search.html",
+        "grounded_qa.html",
+        "tags.html",
+        "document_types.html",
+        "pending.html",
+        "upload.html",
+        "activity.html",
+        "settings_display.html",
+        "settings_models.html",
+        "settings_account.html",
+    }
+
+
 def test_ui_routes_render_active_nav_server_side() -> None:
     client = TestClient(app)
     expected_active_hrefs = {
@@ -148,34 +174,73 @@ def test_ui_routes_render_active_nav_server_side() -> None:
     for route, active_href in expected_active_hrefs.items():
         response = client.get(route)
         assert response.status_code == 200
-        active_links = re.findall(r'<a\b[^>]*class="[^"]*\bactive\b[^"]*"[^>]*href="([^"]+)"', response.text)
+        active_links = [
+            href
+            for classes, href in re.findall(
+                r'<a\b(?=[^>]*class="([^"]*)")(?=[^>]*href="([^"]+)")[^>]*>',
+                response.text,
+            )
+            if {"nav-link", "active"}.issubset(set(classes.split()))
+        ]
         assert active_links == [active_href]
 
 
 def test_ui_routes_load_page_specific_scripts() -> None:
     client = TestClient(app)
 
-    assert "/static/documents.js" in client.get("/ui/documents").text
-    assert "/static/document.js" in client.get("/ui/document").text
-    assert "/static/search.js" in client.get("/ui/search").text
-    assert "/static/search.js" in client.get("/ui/grounded-qa").text
-    assert "/static/catalog.js" in client.get("/ui/tags").text
-    assert "/static/catalog.js" in client.get("/ui/document-types").text
-    assert "/static/pending.js" in client.get("/ui/pending").text
-    assert "/static/upload.js" in client.get("/ui/upload").text
-    assert "/static/activity.js" in client.get("/ui/activity").text
-    assert "/static/settings.js" in client.get("/ui/settings").text
-    assert "/static/pending.js" not in client.get("/ui/documents").text
+    assert "/static/js/documents.js" in client.get("/ui/documents").text
+    assert "/static/js/document.js" in client.get("/ui/document").text
+    assert "/static/js/search.js" in client.get("/ui/search").text
+    assert "/static/js/search.js" in client.get("/ui/grounded-qa").text
+    assert "/static/js/catalog.js" in client.get("/ui/tags").text
+    assert "/static/js/catalog.js" in client.get("/ui/document-types").text
+    assert "/static/js/pending.js" in client.get("/ui/pending").text
+    assert "/static/js/upload.js" in client.get("/ui/upload").text
+    assert "/static/js/activity.js" in client.get("/ui/activity").text
+    assert "/static/js/settings.js" in client.get("/ui/settings").text
+    assert "/static/js/pending.js" not in client.get("/ui/documents").text
+
+
+def test_settings_subroutes_are_server_selected_partials() -> None:
+    client = TestClient(app)
+
+    account = client.get("/ui/settings/account").text
+    assert 'id="settings-section-account"' in account
+    assert 'id="settings-section-display"' not in account
+    assert 'id="settings-section-models"' not in account
+    assert (
+        '<a class="settings-subnav-link active" data-settings-section="settings-section-account" '
+        'href="/ui/settings/account">User Account</a>'
+    ) in account
+
+    display = client.get("/ui/settings/display").text
+    assert 'id="settings-section-display"' in display
+    assert 'id="settings-section-account"' not in display
+    assert 'id="settings-section-models"' not in display
+
+    models = client.get("/ui/settings/models").text
+    assert 'id="settings-section-models"' in models
+    assert 'id="settings-section-account"' not in models
+    assert 'id="settings-section-display"' not in models
+
+
+def test_static_assets_do_not_keep_page_selection_logic() -> None:
+    client = TestClient(app)
+
+    app_js = client.get("/static/js/app.js")
+    assert app_js.status_code == 200
+    assert "setActiveSettingsSection" not in app_js.text
+    assert "PATH_TO_SETTINGS_SECTION_ID" not in app_js.text
 
 
 def test_static_assets_do_not_keep_legacy_tag_renderers() -> None:
     client = TestClient(app)
 
-    app_js = client.get("/static/app.js")
+    app_js = client.get("/static/js/app.js")
     assert app_js.status_code == 200
     assert "createTagFilterButton" not in app_js.text
 
-    styles = client.get("/static/styles.css")
+    styles = client.get("/static/css/styles.css")
     assert styles.status_code == 200
     assert ".tag-pill-button" not in styles.text
 
@@ -183,12 +248,12 @@ def test_static_assets_do_not_keep_legacy_tag_renderers() -> None:
 def test_static_assets_keep_search_logic_in_page_script() -> None:
     client = TestClient(app)
 
-    app_js = client.get("/static/app.js")
+    app_js = client.get("/static/js/app.js")
     assert app_js.status_code == 200
     assert "runKeywordSearch" not in app_js.text
     assert "renderSearchAskMessages" not in app_js.text
 
-    search_js = client.get("/static/search.js")
+    search_js = client.get("/static/js/search.js")
     assert search_js.status_code == 200
     assert "runKeywordSearch" in search_js.text
     assert "renderSearchAskMessages" in search_js.text
@@ -200,7 +265,7 @@ def test_static_assets_keep_auth_state_cookie_only() -> None:
     html = client.get("/ui/documents")
     assert html.status_code == 200
 
-    app_js = client.get("/static/app.js")
+    app_js = client.get("/static/js/app.js")
     assert app_js.status_code == 200
     assert 'document.documentElement.classList.toggle("has-session", signedIn)' in app_js.text
     assert 'apiFetch("/users/me")' not in app_js.text
@@ -245,11 +310,11 @@ def test_grounded_qa_ui_does_not_include_keyword_search_shell() -> None:
 def test_static_assets_serve_upload_progress_ui() -> None:
     client = TestClient(app)
 
-    upload_js = client.get("/static/upload.js")
+    upload_js = client.get("/static/js/upload.js")
     assert upload_js.status_code == 200
     assert "showUploadProgress" in upload_js.text
 
-    styles = client.get("/static/styles.css")
+    styles = client.get("/static/css/styles.css")
     assert styles.status_code == 200
     assert ".upload-progress" in styles.text
 

@@ -20,7 +20,7 @@
 - Create the env with `make setup`.
 - Run the app locally with `make dev-up`; check status with `make dev-status`; stop with `make dev-stop`.
 - Run tests with `uv run pytest` or `make test`.
-- For static UI edits, a quick syntax check with `node --check src/paperwise/server/static/app.js` is useful.
+- For static UI edits, a quick syntax check with `node --check src/paperwise/server/static/js/app.js` is useful.
 
 ## Repo-Specific Notes
 
