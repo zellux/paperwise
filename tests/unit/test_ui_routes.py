@@ -261,7 +261,15 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
         assert script.status_code == 200
         assert "initializePaperwisePage" in script.text
 
-    for script_name in ["documents.js", "single-document.js", "catalog.js", "pending.js", "activity.js", "upload.js"]:
+    for script_name in [
+        "documents.js",
+        "single-document.js",
+        "catalog.js",
+        "search.js",
+        "pending.js",
+        "activity.js",
+        "upload.js",
+    ]:
         script = client.get(f"/static/js/{script_name}")
         top_level_statements = script.text.split("\nfunction ", 1)[0]
         assert "document.getElementById" not in top_level_statements

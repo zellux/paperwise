@@ -1,15 +1,15 @@
-const searchKeywordForm = document.getElementById("searchKeywordForm");
-const searchKeywordInput = document.getElementById("searchKeywordInput");
-const searchKeywordLimitSelect = document.getElementById("searchKeywordLimitSelect");
-const searchResultsMeta = document.getElementById("searchResultsMeta");
-const searchResultsTableBody = document.getElementById("searchResultsTableBody");
-const searchAskForm = document.getElementById("searchAskForm");
-const searchAskQuestion = document.getElementById("searchAskQuestion");
-const searchAskNewChatBtn = document.getElementById("searchAskNewChatBtn");
-const searchAskThreadSearch = document.getElementById("searchAskThreadSearch");
-const searchAskThreadList = document.getElementById("searchAskThreadList");
-const searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
-const searchAskMessages = document.getElementById("searchAskMessages");
+let searchKeywordForm = null;
+let searchKeywordInput = null;
+let searchKeywordLimitSelect = null;
+let searchResultsMeta = null;
+let searchResultsTableBody = null;
+let searchAskForm = null;
+let searchAskQuestion = null;
+let searchAskNewChatBtn = null;
+let searchAskThreadSearch = null;
+let searchAskThreadList = null;
+let searchAskTokenUsage = null;
+let searchAskMessages = null;
 
 let searchAskMessagesState = [];
 let searchAskInFlight = false;
@@ -19,6 +19,22 @@ let searchAskTimerId = 0;
 let searchAskThreadId = "";
 let searchAskThreads = [];
 let initialChatThreadsConsumed = false;
+let searchEventsBound = false;
+
+function bindSearchElements() {
+  searchKeywordForm = document.getElementById("searchKeywordForm");
+  searchKeywordInput = document.getElementById("searchKeywordInput");
+  searchKeywordLimitSelect = document.getElementById("searchKeywordLimitSelect");
+  searchResultsMeta = document.getElementById("searchResultsMeta");
+  searchResultsTableBody = document.getElementById("searchResultsTableBody");
+  searchAskForm = document.getElementById("searchAskForm");
+  searchAskQuestion = document.getElementById("searchAskQuestion");
+  searchAskNewChatBtn = document.getElementById("searchAskNewChatBtn");
+  searchAskThreadSearch = document.getElementById("searchAskThreadSearch");
+  searchAskThreadList = document.getElementById("searchAskThreadList");
+  searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
+  searchAskMessages = document.getElementById("searchAskMessages");
+}
 
 function normalizeChatThreadSummary(thread) {
   return {
@@ -1077,86 +1093,93 @@ async function runAsk() {
   }
 }
 
-window.initializePaperwisePage = async ({ authenticated }) => {
-  if (authenticated !== true) {
-    return;
-  }
-  await loadSearchAskThreads();
-  renderSearchResultsMeta("Ready.");
-};
-
-searchKeywordForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await runKeywordSearch();
-});
-
-searchAskForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  await runAsk();
-});
-
-searchAskNewChatBtn?.addEventListener("click", () => {
-  resetSearchAskChat();
-  logActivity("Ask Your Docs chat reset.");
-});
-
-searchAskThreadSearch?.addEventListener("input", () => {
-  loadSearchAskThreads().catch((error) => {
-    logActivity(`Chat history failed: ${error.message}`);
-  });
-});
-
-searchAskThreadList?.addEventListener("click", async (event) => {
-  const deleteButton = event.target instanceof Element ? event.target.closest("[data-delete-thread-id]") : null;
-  if (deleteButton instanceof HTMLElement) {
-    await deleteSearchAskThread(deleteButton.dataset.deleteThreadId || "");
-    return;
-  }
-  const threadButton = event.target instanceof Element ? event.target.closest("[data-thread-id]") : null;
-  if (threadButton instanceof HTMLElement) {
-    await loadSearchAskThread(threadButton.dataset.threadId || "");
-  }
-});
-
-searchAskQuestion?.addEventListener("keydown", async (event) => {
-  if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) {
-    return;
-  }
-  event.preventDefault();
-  await runAsk();
-});
-
 function autoResizeChatTextarea(el) {
   el.style.height = "auto";
   el.style.height = Math.min(el.scrollHeight, 200) + "px";
 }
 
-if (searchAskQuestion) {
-  searchAskQuestion.addEventListener("input", () => autoResizeChatTextarea(searchAskQuestion));
-}
+function bindSearchEvents() {
+  if (searchEventsBound) {
+    return;
+  }
+  searchKeywordForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await runKeywordSearch();
+  });
 
-searchAskMessages?.addEventListener("click", (event) => {
-  const button = event.target instanceof Element ? event.target.closest(".chat-status-summary") : null;
-  if (!(button instanceof HTMLElement)) {
-    return;
-  }
-  const message = searchAskMessagesState.find((item) => item.id === button.dataset.messageId);
-  if (!message) {
-    return;
-  }
-  if (message.activity) {
-    const roundIndex = Number(button.dataset.roundIndex || 0);
-    const round = message.activityRounds.find((item) => Number(item.index) === roundIndex);
-    if (!round || !round.details?.length) {
+  searchAskForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    await runAsk();
+  });
+
+  searchAskNewChatBtn?.addEventListener("click", () => {
+    resetSearchAskChat();
+    logActivity("Ask Your Docs chat reset.");
+  });
+
+  searchAskThreadSearch?.addEventListener("input", () => {
+    loadSearchAskThreads().catch((error) => {
+      logActivity(`Chat history failed: ${error.message}`);
+    });
+  });
+
+  searchAskThreadList?.addEventListener("click", async (event) => {
+    const deleteButton = event.target instanceof Element ? event.target.closest("[data-delete-thread-id]") : null;
+    if (deleteButton instanceof HTMLElement) {
+      await deleteSearchAskThread(deleteButton.dataset.deleteThreadId || "");
       return;
     }
-    round.expanded = !round.expanded;
+    const threadButton = event.target instanceof Element ? event.target.closest("[data-thread-id]") : null;
+    if (threadButton instanceof HTMLElement) {
+      await loadSearchAskThread(threadButton.dataset.threadId || "");
+    }
+  });
+
+  searchAskQuestion?.addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) {
+      return;
+    }
+    event.preventDefault();
+    await runAsk();
+  });
+
+  searchAskQuestion?.addEventListener("input", () => autoResizeChatTextarea(searchAskQuestion));
+
+  searchAskMessages?.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest(".chat-status-summary") : null;
+    if (!(button instanceof HTMLElement)) {
+      return;
+    }
+    const message = searchAskMessagesState.find((item) => item.id === button.dataset.messageId);
+    if (!message) {
+      return;
+    }
+    if (message.activity) {
+      const roundIndex = Number(button.dataset.roundIndex || 0);
+      const round = message.activityRounds.find((item) => Number(item.index) === roundIndex);
+      if (!round || !round.details?.length) {
+        return;
+      }
+      round.expanded = !round.expanded;
+      renderSearchAskMessages();
+      return;
+    }
+    if (!message.statusDetail) {
+      return;
+    }
+    message.expanded = !message.expanded;
     renderSearchAskMessages();
+  });
+
+  searchEventsBound = true;
+}
+
+window.initializePaperwisePage = async ({ authenticated }) => {
+  if (authenticated !== true) {
     return;
   }
-  if (!message.statusDetail) {
-    return;
-  }
-  message.expanded = !message.expanded;
-  renderSearchAskMessages();
-});
+  bindSearchElements();
+  bindSearchEvents();
+  await loadSearchAskThreads();
+  renderSearchResultsMeta("Ready.");
+};
