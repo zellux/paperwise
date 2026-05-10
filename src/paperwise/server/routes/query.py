@@ -11,15 +11,15 @@ from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.chat_contexts import compact_chat_search_contexts
 from paperwise.application.services.document_scope import all_owned_document_ids
 from paperwise.application.services.grounded_qa import (
-    build_qa_contexts as _build_qa_contexts,
-    is_timeout_error as _is_timeout_error,
-    resolve_metadata_scoped_document_ids as _resolve_metadata_scoped_document_ids,
-    search_document_chunks_multi_query as _search_document_chunks_multi_query,
+    build_qa_contexts,
+    is_timeout_error,
+    resolve_metadata_scoped_document_ids,
+    search_document_chunks_multi_query,
 )
 from paperwise.application.services.chat_threads import (
     MAX_STORED_CHAT_MESSAGES,
     migrate_legacy_chat_threads,
-    thread_title_from_messages as _thread_title_from_messages,
+    thread_title_from_messages,
 )
 from paperwise.application.services.llm_preferences import LLM_TASK_GROUNDED_QA
 from paperwise.domain.models import ChatThread, User
@@ -28,9 +28,7 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     llm_provider_dependency,
 )
-from paperwise.server.llm_provider import (
-    resolve_http_llm_provider_from_preferences as _resolve_llm_provider_from_preferences,
-)
+from paperwise.server.llm_provider import resolve_http_llm_provider_from_preferences
 
 router = APIRouter(prefix="/query", tags=["query"])
 
@@ -213,12 +211,12 @@ def _save_chat_thread(
     now = datetime.now(UTC)
     previous = repository.get_chat_thread(current_user.id, thread_id)
     messages = _stored_chat_messages(payload, response)
-    title = previous.title.strip() if previous is not None else _thread_title_from_messages(messages)
+    title = previous.title.strip() if previous is not None else thread_title_from_messages(messages)
     repository.save_chat_thread(
         ChatThread(
             id=thread_id,
             owner_id=current_user.id,
-            title=(title or _thread_title_from_messages(messages))[:256],
+            title=(title or thread_title_from_messages(messages))[:256],
             messages=messages,
             token_usage=response.token_usage.model_dump(mode="json"),
             created_at=previous.created_at if previous is not None else now,
@@ -334,7 +332,7 @@ def _execute_chat_tool(
     arguments: dict[str, Any],
 ) -> dict[str, Any]:
     merged_filters = _merge_tool_filters(scope, arguments)
-    scoped_ids = _resolve_metadata_scoped_document_ids(
+    scoped_ids = resolve_metadata_scoped_document_ids(
         repository=repository,
         current_user=current_user,
         base_document_ids=None,
@@ -348,7 +346,7 @@ def _execute_chat_tool(
     if name == "search_document_chunks":
         query = " ".join(str(arguments.get("query") or "").split()).strip()
         limit = max(1, min(60, int(arguments.get("limit") or top_k_chunks)))
-        hits = _search_document_chunks_multi_query(
+        hits = search_document_chunks_multi_query(
             repository=repository,
             owner_id=current_user.id,
             query=query,
@@ -356,7 +354,7 @@ def _execute_chat_tool(
             document_ids=scoped_ids,
             llm_provider=llm_provider,
         )
-        contexts = _build_qa_contexts(
+        contexts = build_qa_contexts(
             repository=repository,
             chunk_hits=hits,
             top_k_chunks=limit,
@@ -506,7 +504,7 @@ def _chat_with_tools(
             last_response = answer_with_tools(messages=messages, tools=CHAT_TOOLS)
             _record_chat_token_usage(token_usage, last_response)
         except Exception as exc:
-            if _is_timeout_error(exc):
+            if is_timeout_error(exc):
                 raise HTTPException(
                     status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                     detail=(
@@ -589,7 +587,7 @@ def _chat_with_tools(
             last_response = answer_with_tools(messages=messages, tools=[])
             _record_chat_token_usage(token_usage, last_response)
         except Exception as exc:
-            if _is_timeout_error(exc):
+            if is_timeout_error(exc):
                 raise HTTPException(
                     status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                     detail=(
@@ -772,7 +770,7 @@ def _iter_chat_events(
         )
         yield _sse_event("final", response.model_dump(mode="json"))
     except Exception as exc:
-        if _is_timeout_error(exc):
+        if is_timeout_error(exc):
             detail = (
                 "The LLM request timed out before completion. "
                 "Please retry, reduce scope, or lower context limits in Settings."
@@ -791,7 +789,7 @@ def chat_all_documents_endpoint(
 ) -> ChatResponse:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    llm_provider = _resolve_llm_provider_from_preferences(
+    llm_provider = resolve_http_llm_provider_from_preferences(
         preferences=preferences,
         provider_override=provider_override,
         task=LLM_TASK_GROUNDED_QA,
@@ -816,7 +814,7 @@ def stream_chat_all_documents_endpoint(
 ) -> StreamingResponse:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    llm_provider = _resolve_llm_provider_from_preferences(
+    llm_provider = resolve_http_llm_provider_from_preferences(
         preferences=preferences,
         provider_override=provider_override,
         task=LLM_TASK_GROUNDED_QA,

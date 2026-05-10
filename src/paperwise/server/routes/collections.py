@@ -7,24 +7,23 @@ from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.grounded_qa import (
-    build_qa_contexts as _build_qa_contexts,
-    is_timeout_error as _is_timeout_error,
-    resolve_metadata_scoped_document_ids as _resolve_metadata_scoped_document_ids,
-    search_document_chunks_multi_query as _search_document_chunks_multi_query,
+    build_qa_contexts,
+    is_timeout_error,
+    resolve_metadata_scoped_document_ids,
+    search_document_chunks_multi_query,
 )
 from paperwise.application.services.llm_preferences import LLM_TASK_GROUNDED_QA
 from paperwise.domain.models import Collection, User
+from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
     llm_provider_dependency,
 )
-from paperwise.server.llm_provider import (
-    resolve_http_llm_provider_from_preferences as _resolve_llm_provider_from_preferences,
-)
-from paperwise.infrastructure.llm.debug_log import log_llm_exchange
+from paperwise.server.llm_provider import resolve_http_llm_provider_from_preferences
 
 router = APIRouter(prefix="/collections", tags=["collections"])
+
 
 class CollectionCreateRequest(BaseModel):
     name: str = Field(min_length=1, max_length=256)
@@ -188,7 +187,7 @@ def _ask_grounded(
     debug_enabled: bool = False,
 ) -> AskResponse:
     retrieval_debug: dict[str, object] = {}
-    chunk_hits = _search_document_chunks_multi_query(
+    chunk_hits = search_document_chunks_multi_query(
         repository=repository,
         owner_id=owner_id,
         query=question,
@@ -197,7 +196,7 @@ def _ask_grounded(
         llm_provider=llm_provider,
         debug=retrieval_debug,
     )
-    contexts = _build_qa_contexts(
+    contexts = build_qa_contexts(
         repository=repository,
         chunk_hits=chunk_hits,
         top_k_chunks=top_k_chunks,
@@ -260,7 +259,7 @@ def _ask_grounded(
             contexts=contexts,
         )
     except Exception as exc:
-        if _is_timeout_error(exc):
+        if is_timeout_error(exc):
             message = (
                 "The LLM request timed out before completion. "
                 "Results may be incomplete. Please retry, reduce scope, or lower context limits in Settings."
@@ -468,14 +467,14 @@ def search_all_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> SearchResponse:
-    scoped_ids = _resolve_metadata_scoped_document_ids(
+    scoped_ids = resolve_metadata_scoped_document_ids(
         repository=repository,
         current_user=current_user,
         base_document_ids=None,
         tag_filters=payload.tag,
         document_type_filters=payload.document_type,
     )
-    hits = _search_document_chunks_multi_query(
+    hits = search_document_chunks_multi_query(
         repository=repository,
         owner_id=current_user.id,
         query=payload.query,
@@ -498,14 +497,14 @@ def search_collection_documents_endpoint(
         current_user=current_user,
     )
     collection_doc_ids = repository.list_collection_document_ids(collection_id)
-    scoped_ids = _resolve_metadata_scoped_document_ids(
+    scoped_ids = resolve_metadata_scoped_document_ids(
         repository=repository,
         current_user=current_user,
         base_document_ids=collection_doc_ids,
         tag_filters=payload.tag,
         document_type_filters=payload.document_type,
     )
-    hits = _search_document_chunks_multi_query(
+    hits = search_document_chunks_multi_query(
         repository=repository,
         owner_id=current_user.id,
         query=payload.query,
@@ -524,7 +523,7 @@ def ask_all_documents_endpoint(
 ) -> AskResponse:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    llm_provider = _resolve_llm_provider_from_preferences(
+    llm_provider = resolve_http_llm_provider_from_preferences(
         preferences=preferences,
         provider_override=provider_override,
         task=LLM_TASK_GROUNDED_QA,
@@ -532,7 +531,7 @@ def ask_all_documents_endpoint(
         missing_api_key_detail="Selected Grounded Q&A LLM connection requires an API key in Settings.",
         missing_base_url_detail="Custom Grounded Q&A connection requires a base URL in Settings.",
     )
-    scoped_ids = _resolve_metadata_scoped_document_ids(
+    scoped_ids = resolve_metadata_scoped_document_ids(
         repository=repository,
         current_user=current_user,
         base_document_ids=None,
@@ -572,7 +571,7 @@ def ask_collection_documents_endpoint(
     )
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    llm_provider = _resolve_llm_provider_from_preferences(
+    llm_provider = resolve_http_llm_provider_from_preferences(
         preferences=preferences,
         provider_override=provider_override,
         task=LLM_TASK_GROUNDED_QA,
@@ -581,7 +580,7 @@ def ask_collection_documents_endpoint(
         missing_base_url_detail="Custom Grounded Q&A connection requires a base URL in Settings.",
     )
     collection_doc_ids = repository.list_collection_document_ids(collection_id)
-    scoped_ids = _resolve_metadata_scoped_document_ids(
+    scoped_ids = resolve_metadata_scoped_document_ids(
         repository=repository,
         current_user=current_user,
         base_document_ids=collection_doc_ids,

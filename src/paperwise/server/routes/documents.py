@@ -17,10 +17,8 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
     storage_dependency,
 )
-from paperwise.server.llm_provider import (
-    resolve_http_llm_provider_from_preferences as _resolve_llm_provider_from_preferences,
-)
-from paperwise.server.routes.document_access import get_owned_document_or_404 as _get_owned_document_or_404
+from paperwise.server.llm_provider import resolve_http_llm_provider_from_preferences
+from paperwise.server.routes.document_access import get_owned_document_or_404
 from paperwise.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
@@ -57,10 +55,7 @@ from paperwise.application.services.llm_preferences import (
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.application.services.storage_paths import blob_ref_to_path
-from paperwise.application.services.taxonomy import (
-    resolve_existing_name as _resolve_existing_name,
-    resolve_tags as _resolve_tags,
-)
+from paperwise.application.services.taxonomy import resolve_existing_name, resolve_tags
 from paperwise.domain.models import (
     Document,
     DocumentHistoryEvent,
@@ -320,7 +315,7 @@ def _resolve_llm_provider_for_user(
 ) -> LLMProvider:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    return _resolve_llm_provider_from_preferences(
+    return resolve_http_llm_provider_from_preferences(
         preferences=preferences,
         provider_override=provider_override,
         task=LLM_TASK_METADATA,
@@ -335,7 +330,7 @@ def _resolve_ocr_llm_provider_for_user(
 ) -> LLMProvider:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    return _resolve_llm_provider_from_preferences(
+    return resolve_http_llm_provider_from_preferences(
         preferences=preferences,
         provider_override=provider_override,
         task=LLM_TASK_OCR,
@@ -719,7 +714,7 @@ def get_document_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> DocumentResponse:
-    document = _get_owned_document_or_404(
+    document = get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -733,7 +728,7 @@ def get_document_detail_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> DocumentDetailResponse:
-    document = _get_owned_document_or_404(
+    document = get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -753,7 +748,7 @@ def get_document_file_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> FileResponse:
-    document = _get_owned_document_or_404(
+    document = get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -779,7 +774,7 @@ def delete_document_endpoint(
     storage: StorageProvider = Depends(storage_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> None:
-    document = _get_owned_document_or_404(
+    document = get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -804,7 +799,7 @@ def reprocess_document_endpoint(
     dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> CreateDocumentResponse:
-    document = _get_owned_document_or_404(
+    document = get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -848,7 +843,7 @@ def parse_document_endpoint(
     provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> ParseResultResponse:
-    document = _get_owned_document_or_404(
+    document = get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -908,7 +903,7 @@ def get_parse_document_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> ParseResultResponse:
-    _get_owned_document_or_404(
+    get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -929,7 +924,7 @@ def llm_parse_document_endpoint(
     provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> LLMParseResultResponse:
-    document = _get_owned_document_or_404(
+    document = get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -1048,7 +1043,7 @@ def get_llm_parse_document_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> LLMParseResultResponse:
-    _get_owned_document_or_404(
+    get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -1069,7 +1064,7 @@ def update_document_metadata_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> LLMParseResultResponse:
-    document = _get_owned_document_or_404(
+    document = get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
@@ -1079,17 +1074,17 @@ def update_document_metadata_endpoint(
     document_types = repository.list_document_types()
     existing_tags = repository.list_tags()
 
-    correspondent, created_correspondent = _resolve_existing_name(
+    correspondent, created_correspondent = resolve_existing_name(
         payload.correspondent,
         correspondents,
         fallback="Unknown Sender",
     )
-    document_type, created_document_type = _resolve_existing_name(
+    document_type, created_document_type = resolve_existing_name(
         payload.document_type,
         document_types,
         fallback="General Document",
     )
-    tags, created_tags = _resolve_tags(payload.tags, existing_tags)
+    tags, created_tags = resolve_tags(payload.tags, existing_tags)
 
     if created_correspondent:
         repository.add_correspondent(correspondent)
@@ -1136,7 +1131,7 @@ def list_document_history_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentHistoryEventResponse]:
-    _get_owned_document_or_404(
+    get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
         current_user=current_user,
