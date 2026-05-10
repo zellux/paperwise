@@ -30,6 +30,13 @@ from paperwise.application.services.documents import (
     create_document,
     delete_document,
 )
+from paperwise.application.services.document_file_cleanup import (
+    cleanup_empty_storage_dirs,
+    delete_local_path_if_present,
+    metadata_paths_for_blob_path,
+    resolve_blob_path_from_uri,
+    resolve_file_path_from_uri,
+)
 from paperwise.application.services.file_relocation import move_blob_to_processed
 from paperwise.application.services.filenames import sanitize_storage_filename
 from paperwise.application.services.document_listing import count_filtered_documents, list_filtered_documents
@@ -54,7 +61,6 @@ from paperwise.application.services.llm_preferences import (
 )
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
-from paperwise.application.services.storage_paths import blob_ref_to_path
 from paperwise.application.services.taxonomy import resolve_existing_name, resolve_tags
 from paperwise.domain.models import (
     Document,
@@ -356,52 +362,6 @@ def _resolve_ocr_auto_switch_for_user(
     return resolve_ocr_auto_switch(
         load_user_preferences(repository=repository, user_id=current_user.id)
     )
-
-
-def _resolve_file_path_from_uri(blob_uri: str) -> Path | None:
-    resolved = _resolve_blob_path_from_uri(blob_uri)
-    if resolved is None:
-        return None
-    if not resolved.exists() or not resolved.is_file():
-        return None
-    return resolved
-
-
-def _resolve_blob_path_from_uri(blob_uri: str) -> Path | None:
-    return blob_ref_to_path(blob_uri, settings.object_store_root)
-
-
-def _metadata_paths_for_blob_path(blob_path: Path) -> list[Path]:
-    token_prefix = blob_path.name.split("_", 1)[0].strip()
-    candidates = [
-        blob_path.with_name(f"{token_prefix}.metadata.json") if token_prefix else blob_path,
-        blob_path.with_name(f"{blob_path.stem}.metadata.json"),
-        blob_path.with_name(f"{blob_path.name}.metadata.json"),
-    ]
-    unique_paths: list[Path] = []
-    seen: set[Path] = set()
-    for candidate in candidates:
-        if candidate in seen:
-            continue
-        seen.add(candidate)
-        unique_paths.append(candidate)
-    return unique_paths
-
-
-def _delete_local_path_if_present(path: Path) -> None:
-    if path.exists() and path.is_file():
-        path.unlink()
-
-
-def _cleanup_empty_storage_dirs(start: Path) -> None:
-    root_dir = Path(settings.object_store_root).expanduser().resolve()
-    current = start.resolve()
-    while current != root_dir and root_dir in current.parents:
-        try:
-            current.rmdir()
-        except OSError:
-            break
-        current = current.parent
 
 
 def _run_parse_document_blob_or_400(
@@ -751,7 +711,7 @@ def get_document_file_endpoint(
         repository=repository,
         current_user=current_user,
     )
-    file_path = _resolve_file_path_from_uri(document.blob_uri)
+    file_path = resolve_file_path_from_uri(document.blob_uri, settings.object_store_root)
     if file_path is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -777,15 +737,15 @@ def delete_document_endpoint(
         repository=repository,
         current_user=current_user,
     )
-    blob_path = _resolve_blob_path_from_uri(document.blob_uri)
-    metadata_paths = _metadata_paths_for_blob_path(blob_path) if blob_path is not None else []
+    blob_path = resolve_blob_path_from_uri(document.blob_uri, settings.object_store_root)
+    metadata_paths = metadata_paths_for_blob_path(blob_path) if blob_path is not None else []
 
     storage.delete(document.blob_uri)
     for metadata_path in metadata_paths:
-        _delete_local_path_if_present(metadata_path)
+        delete_local_path_if_present(metadata_path)
 
     if blob_path is not None:
-        _cleanup_empty_storage_dirs(blob_path.parent)
+        cleanup_empty_storage_dirs(blob_path.parent, settings.object_store_root)
 
     delete_document(document_id=document.id, repository=repository)
 
