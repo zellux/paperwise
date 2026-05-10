@@ -315,6 +315,13 @@ def _to_tool_document_item(repository: DocumentRepository, document_id: str) -> 
     }
 
 
+def _taxonomy_stats_payload(items: list[tuple[str, int]]) -> list[dict[str, Any]]:
+    return [
+        {"name": item_name, "document_count": count}
+        for item_name, count in items[:30]
+    ]
+
+
 def _execute_chat_tool(
     *,
     repository: DocumentRepository,
@@ -371,7 +378,19 @@ def _execute_chat_tool(
                 items.append(item)
         return {"documents": items, "total_results": len(document_ids), "returned_results": len(items)}
     if name == "summarize_taxonomy":
-        document_ids = scoped_ids if scoped_ids is not None else all_owned_document_ids(repository, current_user)
+        if scoped_ids is None:
+            document_ids = all_owned_document_ids(repository, current_user)
+            return {
+                "document_count": len(document_ids),
+                "tags": _taxonomy_stats_payload(repository.list_owner_tag_stats(current_user.id)),
+                "document_types": _taxonomy_stats_payload(
+                    repository.list_owner_document_type_stats(current_user.id)
+                ),
+                "correspondents": _taxonomy_stats_payload(
+                    repository.list_owner_correspondent_stats(current_user.id)
+                ),
+            }
+        document_ids = scoped_ids
         tag_counts: dict[str, int] = {}
         type_counts: dict[str, int] = {}
         correspondent_counts: dict[str, int] = {}

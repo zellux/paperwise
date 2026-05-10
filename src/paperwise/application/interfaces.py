@@ -155,6 +155,9 @@ class TaxonomyRepository(Protocol):
     def list_owner_document_type_stats(self, owner_id: str) -> list[tuple[str, int]]:
         """Return owner-scoped document type counts as (document_type, document_count)."""
 
+    def list_owner_correspondent_stats(self, owner_id: str) -> list[tuple[str, int]]:
+        """Return owner-scoped correspondent counts as (correspondent, document_count)."""
+
     def add_correspondent(self, name: str) -> None:
         """Add a correspondent if missing."""
 

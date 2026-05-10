@@ -81,6 +81,22 @@ def _document_type_stats_from_llm_results(results: Iterable[LLMParseResult]) -> 
     )
 
 
+def _correspondent_stats_from_llm_results(results: Iterable[LLMParseResult]) -> list[tuple[str, int]]:
+    counts: dict[str, int] = {}
+    display_name_by_key: dict[str, str] = {}
+    for result in results:
+        cleaned = str(result.correspondent).strip()
+        if not cleaned:
+            continue
+        key = cleaned.casefold()
+        display_name_by_key.setdefault(key, cleaned)
+        counts[key] = counts.get(key, 0) + 1
+    return sorted(
+        [(display_name_by_key[key], count) for key, count in counts.items()],
+        key=lambda item: (-item[1], item[0].casefold()),
+    )
+
+
 class InMemoryDocumentRepository(DocumentRepository):
     def __init__(self) -> None:
         self._documents: dict[str, Document] = {}
@@ -258,6 +274,16 @@ class InMemoryDocumentRepository(DocumentRepository):
                 and self._documents[document_id].owner_id == owner_id
             ]
             return _document_type_stats_from_llm_results(results)
+
+    def list_owner_correspondent_stats(self, owner_id: str) -> list[tuple[str, int]]:
+        with self._lock:
+            results = [
+                result
+                for document_id, result in self._llm_parse_results.items()
+                if self._documents.get(document_id) is not None
+                and self._documents[document_id].owner_id == owner_id
+            ]
+            return _correspondent_stats_from_llm_results(results)
 
     def add_correspondent(self, name: str) -> None:
         with self._lock:

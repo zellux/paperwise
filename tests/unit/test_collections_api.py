@@ -223,6 +223,35 @@ class FakeMetadataToolChatLLM(FakeGroundedLLM):
         }
 
 
+class FakeTaxonomyToolChatLLM(FakeGroundedLLM):
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def answer_with_tools(self, *, messages: list[dict], tools: list[dict]) -> dict:
+        del messages
+        del tools
+        self.calls += 1
+        if self.calls == 1:
+            return {
+                "role": "assistant",
+                "content": "",
+                "llm_total_tokens": 7,
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "name": "summarize_taxonomy",
+                        "arguments": "{}",
+                    }
+                ],
+            }
+        return {
+            "role": "assistant",
+            "content": "I summarized your document taxonomy.",
+            "llm_total_tokens": 9,
+            "tool_calls": [],
+        }
+
+
 def _save_document(
     repository: InMemoryDocumentRepository,
     *,
@@ -736,6 +765,70 @@ def test_chat_metadata_tool_scans_all_owned_documents() -> None:
         assert payload["token_usage"]["total_tokens"] == 36
         documents = payload["debug"]["steps"][0]["result"]["documents"]
         assert [item["document_id"] for item in documents] == ["doc-invoice"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_chat_taxonomy_tool_uses_owner_aggregates() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-invoice",
+        owner_id=TEST_USER.id,
+        filename="invoice.pdf",
+        text_preview="Invoice amount details.",
+        title="Invoice Doc",
+        document_type="Invoice",
+        tags=["Finance"],
+    )
+    _save_document(
+        repository,
+        doc_id="doc-contract",
+        owner_id=TEST_USER.id,
+        filename="contract.pdf",
+        text_preview="Service agreement details.",
+        title="Contract Doc",
+        document_type="Contract",
+        tags=["Legal"],
+    )
+    _save_document(
+        repository,
+        doc_id="doc-other-owner",
+        owner_id="other-user",
+        filename="other.pdf",
+        text_preview="Other invoice details.",
+        title="Other Invoice",
+        document_type="Invoice",
+        tags=["Finance"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeTaxonomyToolChatLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/query/chat",
+            json={
+                "messages": [{"role": "user", "content": "What taxonomy values do I have?"}],
+                "debug": True,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["tool_calls"][0]["name"] == "summarize_taxonomy"
+        result = payload["debug"]["steps"][0]["result"]
+        assert result["document_count"] == 2
+        assert result["document_types"] == [
+            {"name": "Contract", "document_count": 1},
+            {"name": "Invoice", "document_count": 1},
+        ]
+        assert result["tags"] == [
+            {"name": "Finance", "document_count": 1},
+            {"name": "Legal", "document_count": 1},
+        ]
+        assert result["correspondents"] == [{"name": "Example Corp", "document_count": 2}]
     finally:
         app.dependency_overrides.clear()
 
