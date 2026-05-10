@@ -1,10 +1,14 @@
 from datetime import UTC, datetime
 import re
 from threading import RLock
-from collections.abc import Iterable
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.application.services.taxonomy import normalize_name, to_title_case
+from paperwise.application.services.taxonomy_stats import (
+    correspondent_stats_from_metadata,
+    document_type_stats_from_metadata,
+    tag_stats_from_metadata,
+)
 from paperwise.domain.models import (
     ChatThread,
     Collection,
@@ -42,59 +46,6 @@ def _extract_snippet(text: str, terms: list[str], *, max_len: int = 240) -> str:
     start = max(0, pos - max_len // 3)
     end = min(len(source), start + max_len)
     return " ".join(source[start:end].split())
-
-
-def _tag_stats_from_llm_results(results: Iterable[LLMParseResult]) -> list[tuple[str, int]]:
-    counts: dict[str, int] = {}
-    display_name_by_key: dict[str, str] = {}
-    for result in results:
-        seen: set[str] = set()
-        for tag in result.tags:
-            cleaned = tag.strip()
-            if not cleaned:
-                continue
-            key = cleaned.casefold()
-            if key in seen:
-                continue
-            seen.add(key)
-            display_name_by_key.setdefault(key, to_title_case(cleaned))
-            counts[key] = counts.get(key, 0) + 1
-    return sorted(
-        [(display_name_by_key[key], count) for key, count in counts.items()],
-        key=lambda item: (-item[1], item[0].casefold()),
-    )
-
-
-def _document_type_stats_from_llm_results(results: Iterable[LLMParseResult]) -> list[tuple[str, int]]:
-    counts: dict[str, int] = {}
-    display_name_by_key: dict[str, str] = {}
-    for result in results:
-        cleaned = str(result.document_type).strip()
-        if not cleaned:
-            continue
-        key = cleaned.casefold()
-        display_name_by_key.setdefault(key, to_title_case(cleaned))
-        counts[key] = counts.get(key, 0) + 1
-    return sorted(
-        [(display_name_by_key[key], count) for key, count in counts.items()],
-        key=lambda item: (-item[1], item[0].casefold()),
-    )
-
-
-def _correspondent_stats_from_llm_results(results: Iterable[LLMParseResult]) -> list[tuple[str, int]]:
-    counts: dict[str, int] = {}
-    display_name_by_key: dict[str, str] = {}
-    for result in results:
-        cleaned = str(result.correspondent).strip()
-        if not cleaned:
-            continue
-        key = cleaned.casefold()
-        display_name_by_key.setdefault(key, cleaned)
-        counts[key] = counts.get(key, 0) + 1
-    return sorted(
-        [(display_name_by_key[key], count) for key, count in counts.items()],
-        key=lambda item: (-item[1], item[0].casefold()),
-    )
 
 
 class InMemoryDocumentRepository(DocumentRepository):
@@ -253,7 +204,7 @@ class InMemoryDocumentRepository(DocumentRepository):
 
     def list_tag_stats(self) -> list[tuple[str, int]]:
         with self._lock:
-            return _tag_stats_from_llm_results(self._llm_parse_results.values())
+            return tag_stats_from_metadata(self._llm_parse_results.values())
 
     def list_owner_tag_stats(self, owner_id: str) -> list[tuple[str, int]]:
         with self._lock:
@@ -263,7 +214,7 @@ class InMemoryDocumentRepository(DocumentRepository):
                 if self._documents.get(document_id) is not None
                 and self._documents[document_id].owner_id == owner_id
             ]
-            return _tag_stats_from_llm_results(results)
+            return tag_stats_from_metadata(results)
 
     def list_owner_document_type_stats(self, owner_id: str) -> list[tuple[str, int]]:
         with self._lock:
@@ -273,7 +224,7 @@ class InMemoryDocumentRepository(DocumentRepository):
                 if self._documents.get(document_id) is not None
                 and self._documents[document_id].owner_id == owner_id
             ]
-            return _document_type_stats_from_llm_results(results)
+            return document_type_stats_from_metadata(results)
 
     def list_owner_correspondent_stats(self, owner_id: str) -> list[tuple[str, int]]:
         with self._lock:
@@ -283,7 +234,7 @@ class InMemoryDocumentRepository(DocumentRepository):
                 if self._documents.get(document_id) is not None
                 and self._documents[document_id].owner_id == owner_id
             ]
-            return _correspondent_stats_from_llm_results(results)
+            return correspondent_stats_from_metadata(results)
 
     def add_correspondent(self, name: str) -> None:
         with self._lock:
