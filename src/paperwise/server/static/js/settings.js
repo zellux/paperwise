@@ -1,29 +1,59 @@
-const settingsForm = document.getElementById("settingsForm");
-const settingsThemeSelect = document.getElementById("settingsThemeSelect");
-const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
-const settingsGroundedQaTopKInput = document.getElementById("settingsGroundedQaTopKInput");
-const settingsGroundedQaMaxDocsInput = document.getElementById("settingsGroundedQaMaxDocsInput");
-const settingsConnectionsList = document.getElementById("settingsConnectionsList");
-const settingsAddConnectionBtn = document.getElementById("settingsAddConnectionBtn");
-const settingsModelSummary = document.getElementById("settingsModelSummary");
-const settingsMetadataRouteFields = document.getElementById("settingsMetadataRouteFields");
-const settingsMetadataConnectionSelect = document.getElementById("settingsMetadataConnectionSelect");
-const settingsMetadataModelInput = document.getElementById("settingsMetadataModelInput");
-const settingsGroundedQaRouteFields = document.getElementById("settingsGroundedQaRouteFields");
-const settingsGroundedQaConnectionSelect = document.getElementById("settingsGroundedQaConnectionSelect");
-const settingsGroundedQaModelInput = document.getElementById("settingsGroundedQaModelInput");
-const settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
-const settingsOcrStatus = document.getElementById("settingsOcrStatus");
-const settingsOcrRouteFields = document.getElementById("settingsOcrRouteFields");
-const settingsOcrConnectionSelect = document.getElementById("settingsOcrConnectionSelect");
-const settingsOcrModelInput = document.getElementById("settingsOcrModelInput");
-const settingsOcrAutoSwitchCheckbox = document.getElementById("settingsOcrAutoSwitchCheckbox");
-const settingsOcrImageDetailSelect = document.getElementById("settingsOcrImageDetailSelect");
-const settingsCurrentPasswordInput = document.getElementById("settingsCurrentPasswordInput");
-const settingsNewPasswordInput = document.getElementById("settingsNewPasswordInput");
-const settingsConfirmPasswordInput = document.getElementById("settingsConfirmPasswordInput");
-const settingsChangePasswordBtn = document.getElementById("settingsChangePasswordBtn");
-const settingsPasswordStatus = document.getElementById("settingsPasswordStatus");
+let settingsForm = null;
+let settingsThemeSelect = null;
+let settingsPageSizeSelect = null;
+let settingsGroundedQaTopKInput = null;
+let settingsGroundedQaMaxDocsInput = null;
+let settingsConnectionsList = null;
+let settingsAddConnectionBtn = null;
+let settingsModelSummary = null;
+let settingsMetadataRouteFields = null;
+let settingsMetadataConnectionSelect = null;
+let settingsMetadataModelInput = null;
+let settingsGroundedQaRouteFields = null;
+let settingsGroundedQaConnectionSelect = null;
+let settingsGroundedQaModelInput = null;
+let settingsOcrProviderSelect = null;
+let settingsOcrStatus = null;
+let settingsOcrRouteFields = null;
+let settingsOcrConnectionSelect = null;
+let settingsOcrModelInput = null;
+let settingsOcrAutoSwitchCheckbox = null;
+let settingsOcrImageDetailSelect = null;
+let settingsCurrentPasswordInput = null;
+let settingsNewPasswordInput = null;
+let settingsConfirmPasswordInput = null;
+let settingsChangePasswordBtn = null;
+let settingsPasswordStatus = null;
+let settingsEventsBound = false;
+
+function bindSettingsElements() {
+  settingsForm = document.getElementById("settingsForm");
+  settingsThemeSelect = document.getElementById("settingsThemeSelect");
+  settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
+  settingsGroundedQaTopKInput = document.getElementById("settingsGroundedQaTopKInput");
+  settingsGroundedQaMaxDocsInput = document.getElementById("settingsGroundedQaMaxDocsInput");
+  settingsConnectionsList = document.getElementById("settingsConnectionsList");
+  settingsAddConnectionBtn = document.getElementById("settingsAddConnectionBtn");
+  settingsModelSummary = document.getElementById("settingsModelSummary");
+  settingsMetadataRouteFields = document.getElementById("settingsMetadataRouteFields");
+  settingsMetadataConnectionSelect = document.getElementById("settingsMetadataConnectionSelect");
+  settingsMetadataModelInput = document.getElementById("settingsMetadataModelInput");
+  settingsGroundedQaRouteFields = document.getElementById("settingsGroundedQaRouteFields");
+  settingsGroundedQaConnectionSelect = document.getElementById("settingsGroundedQaConnectionSelect");
+  settingsGroundedQaModelInput = document.getElementById("settingsGroundedQaModelInput");
+  settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
+  settingsOcrStatus = document.getElementById("settingsOcrStatus");
+  settingsOcrRouteFields = document.getElementById("settingsOcrRouteFields");
+  settingsOcrConnectionSelect = document.getElementById("settingsOcrConnectionSelect");
+  settingsOcrModelInput = document.getElementById("settingsOcrModelInput");
+  settingsOcrAutoSwitchCheckbox = document.getElementById("settingsOcrAutoSwitchCheckbox");
+  settingsOcrImageDetailSelect = document.getElementById("settingsOcrImageDetailSelect");
+  settingsCurrentPasswordInput = document.getElementById("settingsCurrentPasswordInput");
+  settingsNewPasswordInput = document.getElementById("settingsNewPasswordInput");
+  settingsConfirmPasswordInput = document.getElementById("settingsConfirmPasswordInput");
+  settingsChangePasswordBtn = document.getElementById("settingsChangePasswordBtn");
+  settingsPasswordStatus = document.getElementById("settingsPasswordStatus");
+}
 
 function renderSettingsForm() {
   if (settingsThemeSelect && settingsThemeSelect.value !== currentTheme) {
@@ -521,136 +551,146 @@ async function refreshLocalOcrStatus() {
   }
 }
 
-settingsForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const nextTheme = normalizeThemeName(settingsThemeSelect?.value || currentTheme);
-  const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || docsPageSize);
-  groundedQaTopK = normalizeGroundedQaTopK(settingsGroundedQaTopKInput?.value || groundedQaTopK);
-  groundedQaMaxDocuments = normalizeGroundedQaMaxDocuments(
-    settingsGroundedQaMaxDocsInput?.value || groundedQaMaxDocuments
-  );
-  llmConnections = llmConnections
-    .map((connection, index) => normalizeConnection(connection, index))
-    .filter(Boolean);
-  llmRouting = sanitizeLlmRouting(llmConnections, {
-    metadata: {
-      connection_id: String(settingsMetadataConnectionSelect?.value || "").trim(),
-      model: String(settingsMetadataModelInput?.value || "").trim(),
-    },
-    grounded_qa: {
-      connection_id: String(settingsGroundedQaConnectionSelect?.value || "").trim(),
-      model: String(settingsGroundedQaModelInput?.value || "").trim(),
-    },
-    ocr: {
-      engine: normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider),
-      connection_id: String(settingsOcrConnectionSelect?.value || "").trim(),
-      model: String(settingsOcrModelInput?.value || "").trim(),
-    },
-  });
-  ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
-  ocrAutoSwitch = Boolean(settingsOcrAutoSwitchCheckbox?.checked);
-  ocrImageDetail = normalizeOcrImageDetail(settingsOcrImageDetailSelect?.value || ocrImageDetail);
-  renderTaskRoutingControls();
-  syncTaskRoutingVisibility();
-  refreshUploadAvailability();
-  applyTheme(nextTheme);
-  docsPageSize = nextPageSize;
-  docsPage = 1;
-  await saveUserPreferences();
-  logActivity("Saved settings.");
-  window.location.reload();
-});
-
-settingsOcrProviderSelect?.addEventListener("change", () => {
-  ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect.value);
-  llmRouting.ocr.engine = ocrProvider;
-  syncTaskRoutingVisibility();
-  refreshLocalOcrStatus().catch(() => {});
-});
-
-settingsAddConnectionBtn?.addEventListener("click", () => {
-  llmConnections.push(createEmptyConnection());
-  llmRouting = sanitizeLlmRouting(llmConnections, llmRouting);
-  renderSettingsForm();
-});
-
-settingsMetadataConnectionSelect?.addEventListener("change", () => {
-  llmRouting.metadata.connection_id = String(settingsMetadataConnectionSelect.value || "").trim();
-});
-
-settingsMetadataModelInput?.addEventListener("input", () => {
-  llmRouting.metadata.model = String(settingsMetadataModelInput.value || "").trim();
-});
-
-settingsGroundedQaConnectionSelect?.addEventListener("change", () => {
-  llmRouting.grounded_qa.connection_id = String(settingsGroundedQaConnectionSelect.value || "").trim();
-});
-
-settingsGroundedQaModelInput?.addEventListener("input", () => {
-  llmRouting.grounded_qa.model = String(settingsGroundedQaModelInput.value || "").trim();
-});
-
-settingsOcrConnectionSelect?.addEventListener("change", () => {
-  llmRouting.ocr.connection_id = String(settingsOcrConnectionSelect.value || "").trim();
-});
-
-settingsOcrModelInput?.addEventListener("input", () => {
-  llmRouting.ocr.model = String(settingsOcrModelInput.value || "").trim();
-});
-
-settingsChangePasswordBtn?.addEventListener("click", async () => {
-  const currentPassword = String(settingsCurrentPasswordInput?.value || "");
-  const newPassword = String(settingsNewPasswordInput?.value || "");
-  const confirmPassword = String(settingsConfirmPasswordInput?.value || "");
-
-  if (!currentPassword) {
-    setSettingsPasswordStatus("Enter your current password.", "error");
-    return;
-  }
-  if (newPassword.length < 8) {
-    setSettingsPasswordStatus("New password must be at least 8 characters.", "error");
-    return;
-  }
-  if (newPassword !== confirmPassword) {
-    setSettingsPasswordStatus("New password and confirmation do not match.", "error");
+function bindSettingsEvents() {
+  if (settingsEventsBound) {
     return;
   }
 
-  setSettingsPasswordStatus("Updating password...");
-  try {
-    const response = await apiFetch("/users/me/password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        current_password: currentPassword,
-        new_password: newPassword,
-      }),
+  settingsForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const nextTheme = normalizeThemeName(settingsThemeSelect?.value || currentTheme);
+    const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || docsPageSize);
+    groundedQaTopK = normalizeGroundedQaTopK(settingsGroundedQaTopKInput?.value || groundedQaTopK);
+    groundedQaMaxDocuments = normalizeGroundedQaMaxDocuments(
+      settingsGroundedQaMaxDocsInput?.value || groundedQaMaxDocuments
+    );
+    llmConnections = llmConnections
+      .map((connection, index) => normalizeConnection(connection, index))
+      .filter(Boolean);
+    llmRouting = sanitizeLlmRouting(llmConnections, {
+      metadata: {
+        connection_id: String(settingsMetadataConnectionSelect?.value || "").trim(),
+        model: String(settingsMetadataModelInput?.value || "").trim(),
+      },
+      grounded_qa: {
+        connection_id: String(settingsGroundedQaConnectionSelect?.value || "").trim(),
+        model: String(settingsGroundedQaModelInput?.value || "").trim(),
+      },
+      ocr: {
+        engine: normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider),
+        connection_id: String(settingsOcrConnectionSelect?.value || "").trim(),
+        model: String(settingsOcrModelInput?.value || "").trim(),
+      },
     });
-    const payload = await response.json();
-    if (!response.ok) {
-      setSettingsPasswordStatus(payload.detail || response.statusText, "error");
+    ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
+    ocrAutoSwitch = Boolean(settingsOcrAutoSwitchCheckbox?.checked);
+    ocrImageDetail = normalizeOcrImageDetail(settingsOcrImageDetailSelect?.value || ocrImageDetail);
+    renderTaskRoutingControls();
+    syncTaskRoutingVisibility();
+    refreshUploadAvailability();
+    applyTheme(nextTheme);
+    docsPageSize = nextPageSize;
+    docsPage = 1;
+    await saveUserPreferences();
+    logActivity("Saved settings.");
+    window.location.reload();
+  });
+
+  settingsOcrProviderSelect?.addEventListener("change", () => {
+    ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect.value);
+    llmRouting.ocr.engine = ocrProvider;
+    syncTaskRoutingVisibility();
+    refreshLocalOcrStatus().catch(() => {});
+  });
+
+  settingsAddConnectionBtn?.addEventListener("click", () => {
+    llmConnections.push(createEmptyConnection());
+    llmRouting = sanitizeLlmRouting(llmConnections, llmRouting);
+    renderSettingsForm();
+  });
+
+  settingsMetadataConnectionSelect?.addEventListener("change", () => {
+    llmRouting.metadata.connection_id = String(settingsMetadataConnectionSelect.value || "").trim();
+  });
+
+  settingsMetadataModelInput?.addEventListener("input", () => {
+    llmRouting.metadata.model = String(settingsMetadataModelInput.value || "").trim();
+  });
+
+  settingsGroundedQaConnectionSelect?.addEventListener("change", () => {
+    llmRouting.grounded_qa.connection_id = String(settingsGroundedQaConnectionSelect.value || "").trim();
+  });
+
+  settingsGroundedQaModelInput?.addEventListener("input", () => {
+    llmRouting.grounded_qa.model = String(settingsGroundedQaModelInput.value || "").trim();
+  });
+
+  settingsOcrConnectionSelect?.addEventListener("change", () => {
+    llmRouting.ocr.connection_id = String(settingsOcrConnectionSelect.value || "").trim();
+  });
+
+  settingsOcrModelInput?.addEventListener("input", () => {
+    llmRouting.ocr.model = String(settingsOcrModelInput.value || "").trim();
+  });
+
+  settingsChangePasswordBtn?.addEventListener("click", async () => {
+    const currentPassword = String(settingsCurrentPasswordInput?.value || "");
+    const newPassword = String(settingsNewPasswordInput?.value || "");
+    const confirmPassword = String(settingsConfirmPasswordInput?.value || "");
+
+    if (!currentPassword) {
+      setSettingsPasswordStatus("Enter your current password.", "error");
       return;
     }
-    if (settingsCurrentPasswordInput) {
-      settingsCurrentPasswordInput.value = "";
+    if (newPassword.length < 8) {
+      setSettingsPasswordStatus("New password must be at least 8 characters.", "error");
+      return;
     }
-    if (settingsNewPasswordInput) {
-      settingsNewPasswordInput.value = "";
+    if (newPassword !== confirmPassword) {
+      setSettingsPasswordStatus("New password and confirmation do not match.", "error");
+      return;
     }
-    if (settingsConfirmPasswordInput) {
-      settingsConfirmPasswordInput.value = "";
+
+    setSettingsPasswordStatus("Updating password...");
+    try {
+      const response = await apiFetch("/users/me/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        setSettingsPasswordStatus(payload.detail || response.statusText, "error");
+        return;
+      }
+      if (settingsCurrentPasswordInput) {
+        settingsCurrentPasswordInput.value = "";
+      }
+      if (settingsNewPasswordInput) {
+        settingsNewPasswordInput.value = "";
+      }
+      if (settingsConfirmPasswordInput) {
+        settingsConfirmPasswordInput.value = "";
+      }
+      setSettingsPasswordStatus(payload.message || "Password updated successfully.", "success");
+      logActivity("Password updated successfully.");
+    } catch (error) {
+      setSettingsPasswordStatus(error.message || "Failed to update password.", "error");
     }
-    setSettingsPasswordStatus(payload.message || "Password updated successfully.", "success");
-    logActivity("Password updated successfully.");
-  } catch (error) {
-    setSettingsPasswordStatus(error.message || "Failed to update password.", "error");
-  }
-});
+  });
+
+  settingsEventsBound = true;
+}
 
 window.initializePaperwisePage = async ({ authenticated }) => {
   if (authenticated !== true) {
     return;
   }
+  bindSettingsElements();
+  bindSettingsEvents();
   if (!hydrateSettingsFormFromInitialPreferences()) {
     refreshSettingsForm();
   }

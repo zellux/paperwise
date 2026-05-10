@@ -269,6 +269,7 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
         "pending.js",
         "activity.js",
         "upload.js",
+        "settings.js",
     ]:
         script = client.get(f"/static/js/{script_name}")
         top_level_statements = script.text.split("\nfunction ", 1)[0]
