@@ -19,7 +19,7 @@ from paperwise.domain.models import (
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from paperwise.server.dependencies import document_repository_dependency
 from paperwise.server.main import app
-from paperwise.server.ui_page import find_template_placeholders
+from paperwise.server.ui.page import find_template_placeholders
 
 
 def _initial_data_from_response(html: str) -> dict:

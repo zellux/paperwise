@@ -12,7 +12,7 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     optional_current_user_dependency,
 )
-from paperwise.server.ui_initial_data import (
+from paperwise.server.ui.initial_data import (
     activity_initial_data,
     activity_partial_data,
     chat_thread_initial_data,
@@ -27,8 +27,8 @@ from paperwise.server.ui_initial_data import (
     tag_stats as build_tag_stats,
     tag_stats_initial_data,
 )
-from paperwise.server.ui_page import STATIC_DIR, render_ui_page
-from paperwise.server.ui_fragments import (
+from paperwise.server.ui.page import STATIC_DIR, render_ui_page
+from paperwise.server.ui.fragments import (
     activity_rows_html,
     document_detail_fragments,
     document_rows_html,

@@ -5,7 +5,7 @@ import re
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from paperwise.server.ui_fragments import (
+from paperwise.server.ui.fragments import (
     activity_rows_html,
     chat_thread_list_html,
     document_detail_fragments,
@@ -16,10 +16,11 @@ from paperwise.server.ui_fragments import (
     tag_rows_html,
 )
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+_SERVER_DIR = Path(__file__).resolve().parent.parent
+STATIC_DIR = _SERVER_DIR / "static"
 _STATIC_CSS_DIR = STATIC_DIR / "css"
 _STATIC_JS_DIR = STATIC_DIR / "js"
-_TEMPLATE_DIR = Path(__file__).resolve().parent / "templates" / "ui"
+_TEMPLATE_DIR = _SERVER_DIR / "templates" / "ui"
 _TEMPLATE_ENV = Environment(
     loader=FileSystemLoader(_TEMPLATE_DIR),
     autoescape=select_autoescape(("html", "xml")),

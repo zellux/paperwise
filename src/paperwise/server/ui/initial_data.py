@@ -23,9 +23,9 @@ from paperwise.application.services.pending_documents import (
 from paperwise.application.services.user_preferences import load_normalized_user_preferences
 from paperwise.domain.models import User
 from paperwise.server.document_access import get_owned_document_or_404
-from paperwise.server.ui_page import DEFAULT_UI_THEME, SUPPORTED_UI_THEMES
-from paperwise.server.ui_payloads import document_list_item, history_event_item
-from paperwise.server.ui_fragments import chat_thread_list_html
+from paperwise.server.ui.page import DEFAULT_UI_THEME, SUPPORTED_UI_THEMES
+from paperwise.server.ui.payloads import document_list_item, history_event_item
+from paperwise.server.ui.fragments import chat_thread_list_html
 
 
 class DocumentsInitialDataRepository(DocumentStore, TaxonomyRepository, PreferenceRepository, Protocol):
