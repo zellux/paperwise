@@ -5,11 +5,7 @@ const deleteDocumentBtn = document.getElementById("deleteDocumentBtn");
 const viewDocumentFileBtn = document.getElementById("viewDocumentFileBtn");
 const docsFilterForm = document.getElementById("docsFilterForm");
 const clearFiltersBtn = document.getElementById("clearFiltersBtn");
-const pagePrevBtn = document.getElementById("pagePrevBtn");
-const pageNextBtn = document.getElementById("pageNextBtn");
-const pageIndicator = document.getElementById("pageIndicator");
-const docsTotalLabel = document.getElementById("docsTotalLabel");
-const docsProcessingLabel = document.getElementById("docsProcessingLabel");
+const documentsPaginationToolbar = document.getElementById("documentsPaginationToolbar");
 const settingsForm = document.getElementById("settingsForm");
 const settingsThemeSelect = document.getElementById("settingsThemeSelect");
 const settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
@@ -1384,12 +1380,11 @@ function hydrateSettingsFormFromInitialPreferences() {
 
 function applyDocumentsPartial(payload) {
   replaceElementHtml(docsTableBody, payload.table_body_html);
+  replaceElementHtml(documentsPaginationToolbar, payload.pagination_toolbar_html);
   docsTotalCount = Number(payload.documents_total || 0);
   docsPage = Math.max(1, Number(payload.documents_page || docsPage || 1));
   docsPageSize = normalizePageSize(payload.documents_page_size || docsPageSize);
   refreshFilterOptionsFromDocuments(Array.isArray(payload.documents) ? payload.documents : []);
-  renderPaginationControls(Number(payload.documents?.length || 0), { hasExactTotal: true });
-  renderDocsProcessingCount(Number(payload.documents_processing_count || 0));
 }
 
 function applyDocumentDetailPartial(payload) {
@@ -1419,7 +1414,6 @@ async function loadDocumentsList() {
   const requestSeq = ++docsListRequestSeq;
   renderTableLoading(docsTableBody, 7, "Loading documents...");
   renderSortHeaders();
-  renderPaginationControls(0, { hasExactTotal: false });
   const query = new URLSearchParams({
     page: String(docsPage),
     page_size: String(docsPageSize),
@@ -1458,56 +1452,6 @@ async function loadDocumentsList() {
   logActivity(`Loaded ${payload.documents.length} document(s) of ${docsTotalCount} total`);
 }
 
-function renderPaginationControls(currentCount, options = {}) {
-  const hasExactTotal = options.hasExactTotal !== false;
-  if (!hasExactTotal) {
-    if (docsTotalLabel) {
-      docsTotalLabel.textContent = "Total documents: loading...";
-    }
-    if (pageIndicator) {
-      pageIndicator.textContent = `Page ${docsPage} / ...`;
-    }
-    if (pagePrevBtn) {
-      pagePrevBtn.disabled = docsPage <= 1;
-    }
-    if (pageNextBtn) {
-      pageNextBtn.disabled = currentCount < docsPageSize;
-    }
-    return;
-  }
-  const totalPages = Math.max(1, Math.ceil(docsTotalCount / docsPageSize));
-  if (docsPage > totalPages) {
-    docsPage = totalPages;
-  }
-  if (docsTotalLabel) {
-    docsTotalLabel.textContent = `Total documents: ${docsTotalCount.toLocaleString()}`;
-  }
-  if (pageIndicator) {
-    pageIndicator.textContent = `Page ${docsPage} / ${totalPages}`;
-  }
-  if (pagePrevBtn) {
-    pagePrevBtn.disabled = docsPage <= 1;
-  }
-  if (pageNextBtn) {
-    pageNextBtn.disabled = docsPage >= totalPages;
-  }
-}
-
-function renderDocsProcessingCount(count, options = {}) {
-  if (!docsProcessingLabel) {
-    return;
-  }
-  if (options.loading) {
-    docsProcessingLabel.textContent = "Processing: loading...";
-    return;
-  }
-  if (options.unavailable) {
-    docsProcessingLabel.textContent = "Processing: unavailable";
-    return;
-  }
-  docsProcessingLabel.textContent = `Processing: ${Math.max(0, Number(count) || 0).toLocaleString()}`;
-}
-
 function renderTableLoading(tbody, colspan, message) {
   if (!tbody) {
     return;
@@ -1529,8 +1473,6 @@ function hydrateInitialPageDataForCurrentPage() {
     docsPage = Math.max(1, Number(initialData.documents_page || docsPage || 1));
     docsPageSize = normalizePageSize(initialData.documents_page_size || docsPageSize);
     refreshFilterOptionsFromDocuments(initialData.documents);
-    renderPaginationControls(initialData.documents.length, { hasExactTotal: true });
-    renderDocsProcessingCount(Number(initialData.documents_processing_count || 0));
     logActivity(`Loaded ${initialData.documents.length} document(s) of ${docsTotalCount} total`);
     initialPageDataHydrated.add(currentPageKey);
     return true;
@@ -1563,7 +1505,6 @@ function hydrateInitialPageDataForCurrentPage() {
     const hasRestartable =
       typeof isRestartablePendingDocument === "function" &&
       initialData.pending_documents.some((doc) => isRestartablePendingDocument(doc));
-    renderDocsProcessingCount(initialData.pending_documents.length);
     if (typeof setRestartPendingButtonEnabled === "function") {
       setRestartPendingButtonEnabled(hasRestartable);
     }

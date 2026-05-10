@@ -239,6 +239,18 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "PATH_TO_PAGE_KEY" in app_js.text
 
 
+def test_static_assets_do_not_render_document_pagination_controls() -> None:
+    client = TestClient(app)
+
+    app_js = client.get("/static/js/app.js")
+    assert app_js.status_code == 200
+    assert "renderPaginationControls" not in app_js.text
+    assert "renderDocsProcessingCount" not in app_js.text
+    assert "Total documents:" not in app_js.text
+    assert "Processing:" not in app_js.text
+    assert "pageIndicator" not in app_js.text
+
+
 def test_static_assets_do_not_keep_legacy_tag_renderers() -> None:
     client = TestClient(app)
 
@@ -493,6 +505,11 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert paged_documents_payload["documents_total"] == 2
         assert "Page 2 / 2" in paged_documents_html
 
+        overlarge_page_html = client.get("/ui/documents?page_size=1&page=99").text
+        overlarge_page_payload = _initial_data_from_response(overlarge_page_html)
+        assert overlarge_page_payload["documents_page"] == 2
+        assert "Page 2 / 2" in overlarge_page_html
+
         tags_payload = _initial_data_from_response(client.get("/ui/tags").text)
         assert tags_payload["tag_stats"] == [
             {"tag": "Finance", "document_count": 2},
@@ -555,6 +572,16 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert documents_partial_payload["documents_processing_count"] == 1
         assert 'data-doc-id="doc-tax"' in documents_partial_payload["table_body_html"]
         assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in documents_partial_payload["table_body_html"]
+        assert "Total documents: 2" in documents_partial_payload["pagination_toolbar_html"]
+        assert "Processing: 1" in documents_partial_payload["pagination_toolbar_html"]
+        assert "Page 1 / 2" in documents_partial_payload["pagination_toolbar_html"]
+        assert 'data-docs-page-action="next"' in documents_partial_payload["pagination_toolbar_html"]
+
+        overlarge_documents_partial = client.get("/ui/partials/documents?page_size=1&page=99")
+        assert overlarge_documents_partial.status_code == 200
+        overlarge_documents_partial_payload = overlarge_documents_partial.json()
+        assert overlarge_documents_partial_payload["documents_page"] == 2
+        assert "Page 2 / 2" in overlarge_documents_partial_payload["pagination_toolbar_html"]
 
         tags_partial = client.get("/ui/partials/tags?sort_by=tag&sort_dir=desc")
         assert tags_partial.status_code == 200

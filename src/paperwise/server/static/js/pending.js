@@ -25,13 +25,11 @@ function getVisiblePendingRowCount() {
 function applyPendingPartial(payload) {
   const documents = Array.isArray(payload.pending_documents) ? payload.pending_documents : [];
   replaceElementHtml(pendingTableBody, payload.table_body_html);
-  renderDocsProcessingCount(documents.length);
   setRestartPendingButtonEnabled(documents.some((doc) => isRestartablePendingDocument(doc)));
 }
 
 async function loadPendingDocuments() {
   const requestSeq = ++pendingDocsRequestSeq;
-  renderDocsProcessingCount(0, { loading: true });
   renderTableLoading(pendingTableBody, 4, "Loading pending documents...");
   let payload;
   try {
@@ -39,7 +37,6 @@ async function loadPendingDocuments() {
   } catch (error) {
     // Keep restart enabled if the UI still has visible pending rows.
     setRestartPendingButtonEnabled(getVisiblePendingRowCount() > 0);
-    renderDocsProcessingCount(0, { unavailable: true });
     logActivity(`Pending list failed: ${error.message}`);
     return;
   }

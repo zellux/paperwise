@@ -320,6 +320,9 @@ def _documents_initial_data(
             key=lambda item: _document_sort_key(item[0], item[1], normalized_sort_field),
             reverse=normalized_sort_direction == "desc",
         )
+    documents_total = len(matching_documents)
+    total_pages = max(1, (documents_total + normalized_page_size - 1) // normalized_page_size)
+    normalized_page = min(normalized_page, total_pages)
     offset = (normalized_page - 1) * normalized_page_size
     processing_count = sum(
         1
@@ -336,7 +339,7 @@ def _documents_initial_data(
             )
             if item is not None
         ],
-        "documents_total": len(matching_documents),
+        "documents_total": documents_total,
         "documents_processing_count": processing_count,
         "documents_page": normalized_page,
         "documents_page_size": normalized_page_size,
@@ -764,6 +767,35 @@ def _document_rows_html(documents: list[dict]) -> str:
     return "\n".join(rows)
 
 
+def _documents_pagination_toolbar_html(
+    *,
+    total: int,
+    processing_count: int,
+    page: int,
+    page_size: int,
+) -> str:
+    normalized_total = max(0, int(total or 0))
+    normalized_processing_count = max(0, int(processing_count or 0))
+    normalized_page_size = max(1, int(page_size or 20))
+    total_pages = max(1, (normalized_total + normalized_page_size - 1) // normalized_page_size)
+    normalized_page = min(max(1, int(page or 1)), total_pages)
+    prev_disabled = " disabled" if normalized_page <= 1 else ""
+    next_disabled = " disabled" if normalized_page >= total_pages else ""
+    return (
+        '            <div class="docs-summary">\n'
+        f'              <span id="docsTotalLabel" class="docs-total-label">Total documents: {normalized_total:,}</span>\n'
+        f'              <span id="docsProcessingLabel" class="docs-total-label">Processing: {normalized_processing_count:,}</span>\n'
+        "            </div>\n"
+        '            <div class="pagination-controls">\n'
+        f'              <button id="pagePrevBtn" type="button" class="btn btn-muted" '
+        f'data-docs-page-action="prev"{prev_disabled}>Prev</button>\n'
+        f'              <span id="pageIndicator" class="page-indicator">Page {normalized_page} / {total_pages}</span>\n'
+        f'              <button id="pageNextBtn" type="button" class="btn btn-muted" '
+        f'data-docs-page-action="next"{next_disabled}>Next</button>\n'
+        "            </div>"
+    )
+
+
 def _status_badge_html(status_value: str) -> str:
     status = str(status_value or "").lower()
     label = escape(_format_status(status))
@@ -841,24 +873,15 @@ def _render_initial_page_data(html: str, initial_data: dict) -> str:
         processing_count = int(initial_data.get("documents_processing_count") or 0)
         page = max(1, int(initial_data.get("documents_page") or 1))
         page_size = max(1, int(initial_data.get("documents_page_size") or 20))
-        total_pages = max(1, (total + page_size - 1) // page_size)
-        html = re.sub(
-            r'(<span id="docsTotalLabel" class="docs-total-label">).*?(</span>)',
-            rf"\1Total documents: {total:,}\2",
+        html = _replace_element_html(
             html,
-            count=1,
-        )
-        html = re.sub(
-            r'(<span id="docsProcessingLabel" class="docs-total-label">).*?(</span>)',
-            rf"\1Processing: {processing_count:,}\2",
-            html,
-            count=1,
-        )
-        html = re.sub(
-            r'(<span id="pageIndicator" class="page-indicator">).*?(</span>)',
-            rf"\1Page {min(page, total_pages)} / {total_pages}\2",
-            html,
-            count=1,
+            "documentsPaginationToolbar",
+            _documents_pagination_toolbar_html(
+                total=total,
+                processing_count=processing_count,
+                page=page,
+                page_size=page_size,
+            ),
         )
     if isinstance(initial_data.get("tag_stats"), list):
         html = _replace_table_body(html, "tagsTableBody", _tag_rows_html(initial_data["tag_stats"]))
@@ -1289,6 +1312,12 @@ def documents_partial(
     return JSONResponse(
         {
             "table_body_html": _document_rows_html(data["documents"]),
+            "pagination_toolbar_html": _documents_pagination_toolbar_html(
+                total=data["documents_total"],
+                processing_count=data["documents_processing_count"],
+                page=data["documents_page"],
+                page_size=data["documents_page_size"],
+            ),
             "documents": data["documents"],
             "documents_total": data["documents_total"],
             "documents_processing_count": data["documents_processing_count"],

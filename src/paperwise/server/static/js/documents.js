@@ -73,15 +73,18 @@ filterQuery?.addEventListener("input", () => {
   }, 350);
 });
 
-pagePrevBtn?.addEventListener("click", () => {
-  if (docsPage <= 1) {
+document.addEventListener("click", (event) => {
+  const button =
+    event.target instanceof Element ? event.target.closest("[data-docs-page-action]") : null;
+  if (!(button instanceof HTMLButtonElement) || button.disabled) {
     return;
   }
-  docsPage -= 1;
-  navigateToDocumentsPageFromState();
-});
-
-pageNextBtn?.addEventListener("click", () => {
-  docsPage += 1;
+  if (button.dataset.docsPageAction === "prev") {
+    docsPage = Math.max(1, docsPage - 1);
+  } else if (button.dataset.docsPageAction === "next") {
+    docsPage += 1;
+  } else {
+    return;
+  }
   navigateToDocumentsPageFromState();
 });
