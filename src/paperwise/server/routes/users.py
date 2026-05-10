@@ -13,7 +13,11 @@ from paperwise.server.dependencies import (
 from paperwise.application.interfaces import PreferenceRepository, UserRepository
 from paperwise.application.services.session_tokens import create_session_token
 from paperwise.application.services.llm_preferences import get_normalized_llm_preferences, validate_api_key_for_provider
-from paperwise.application.services.user_preferences import load_user_preferences
+from paperwise.application.services.user_preferences import (
+    load_normalized_user_preferences,
+    load_user_preferences,
+    normalized_user_preferences,
+)
 from paperwise.application.services.users import (
     CreateUserCommand,
     authenticate_user,
@@ -193,7 +197,7 @@ def get_me_preferences_endpoint(
     current_user: User = Depends(current_user_dependency),
 ) -> UserPreferenceResponse:
     return UserPreferenceResponse(
-        preferences=load_user_preferences(repository=repository, user_id=current_user.id)
+        preferences=load_normalized_user_preferences(repository=repository, user_id=current_user.id)
     )
 
 
@@ -208,7 +212,7 @@ def put_me_preferences_endpoint(
     _validate_llm_preferences(merged_preferences)
     preference = UserPreference(user_id=current_user.id, preferences=merged_preferences)
     repository.save_user_preference(preference)
-    return UserPreferenceResponse(preferences=dict(preference.preferences))
+    return UserPreferenceResponse(preferences=normalized_user_preferences(preference.preferences))
 
 
 @router.post("/me/password", response_model=ChangePasswordResponse)

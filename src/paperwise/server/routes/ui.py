@@ -24,7 +24,7 @@ from paperwise.application.services.pending_documents import (
 )
 from paperwise.application.services.chat_threads import migrate_legacy_chat_threads
 from paperwise.application.services.taxonomy_stats import sort_stat_rows
-from paperwise.application.services.user_preferences import load_user_preferences
+from paperwise.application.services.user_preferences import load_normalized_user_preferences
 from paperwise.domain.models import User
 from paperwise.server.dependencies import (
     current_user_dependency,
@@ -129,7 +129,7 @@ def _page_initial_data(
         "created_at": current_user.created_at.isoformat(),
     }
     if repository is not None:
-        initial_data["user_preferences"] = load_user_preferences(
+        initial_data["user_preferences"] = load_normalized_user_preferences(
             repository=repository,
             user_id=current_user.id,
         )

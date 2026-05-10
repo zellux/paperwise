@@ -246,7 +246,9 @@ def test_user_preferences_round_trip() -> None:
         assert login_response.status_code == 200
         get_empty = client.get("/users/me/preferences")
         assert get_empty.status_code == 200
-        assert get_empty.json()["preferences"] == {}
+        empty_preferences = get_empty.json()["preferences"]
+        assert empty_preferences["llm_connections"] == []
+        assert empty_preferences["llm_routing"]["ocr"]["engine"] == "llm"
         assert TestClient(app).get("/users/me/preferences").status_code == 401
 
         put_response = client.put(
@@ -289,6 +291,33 @@ def test_user_preferences_round_trip() -> None:
         assert put_response.json()["preferences"]["ocr_auto_switch"] is True
         assert put_response.json()["preferences"]["ocr_llm_provider"] == "gemini"
         assert put_response.json()["preferences"]["ocr_llm_model"] == "gemini-2.5-flash"
+        assert put_response.json()["preferences"]["llm_connections"] == [
+            {
+                "id": "default-connection",
+                "name": "Primary Connection",
+                "provider": "openai",
+                "base_url": "https://api.openai.com/v1",
+                "api_key": "sk-test",
+                "default_model": "gpt-4.1-mini",
+            },
+            {
+                "id": "ocr-connection",
+                "name": "OCR Connection",
+                "provider": "gemini",
+                "base_url": "https://generativelanguage.googleapis.com/v1beta",
+                "api_key": "gk-test",
+                "default_model": "gemini-2.5-flash",
+            },
+        ]
+        assert put_response.json()["preferences"]["llm_routing"]["metadata"] == {
+            "connection_id": "default-connection",
+            "model": "gpt-4.1-mini",
+        }
+        assert put_response.json()["preferences"]["llm_routing"]["ocr"] == {
+            "engine": "llm",
+            "connection_id": "ocr-connection",
+            "model": "gemini-2.5-flash",
+        }
 
         get_saved = client.get("/users/me/preferences")
         assert get_saved.status_code == 200
@@ -303,6 +332,11 @@ def test_user_preferences_round_trip() -> None:
         assert get_saved.json()["preferences"]["ocr_auto_switch"] is True
         assert get_saved.json()["preferences"]["ocr_llm_provider"] == "gemini"
         assert get_saved.json()["preferences"]["ocr_llm_model"] == "gemini-2.5-flash"
+        assert get_saved.json()["preferences"]["llm_connections"][0]["id"] == "default-connection"
+        assert get_saved.json()["preferences"]["llm_routing"]["grounded_qa"] == {
+            "connection_id": "default-connection",
+            "model": "gpt-4.1-mini",
+        }
         assert get_saved.json()["preferences"]["docs_filters"]["tag"] == ["Credit"]
     finally:
         app.dependency_overrides.clear()

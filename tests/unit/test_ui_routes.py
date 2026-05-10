@@ -519,7 +519,15 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             tags=["Finance"],
         )
         repository.save_user_preference(
-            UserPreference(user_id=user_id, preferences={"llm_total_tokens_processed": 42})
+            UserPreference(
+                user_id=user_id,
+                preferences={
+                    "llm_total_tokens_processed": 42,
+                    "llm_provider": "openai",
+                    "llm_model": "gpt-4.1-mini",
+                    "llm_api_key": "sk-test",
+                },
+            )
         )
 
         login_response = client.post(
@@ -539,6 +547,11 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             "statuses": ["received", "processing", "failed", "ready"],
         }
         assert documents_payload["user_preferences"]["llm_total_tokens_processed"] == 42
+        assert documents_payload["user_preferences"]["llm_connections"][0]["provider"] == "openai"
+        assert documents_payload["user_preferences"]["llm_routing"]["metadata"] == {
+            "connection_id": "default-connection",
+            "model": "gpt-4.1-mini",
+        }
         assert "Total documents: 2" in documents_html
         assert "Processing: 0" in documents_html
         assert 'data-doc-id="doc-tax"' in documents_html
