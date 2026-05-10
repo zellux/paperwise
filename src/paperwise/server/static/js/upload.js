@@ -1,16 +1,21 @@
-const uploadForm = document.getElementById("uploadForm");
-const fileInput = document.getElementById("fileInput");
-const folderInput = document.getElementById("folderInput");
-const uploadFolderBtn = document.getElementById("uploadFolderBtn");
-const uploadDropzone = document.getElementById("uploadDropzone");
-const uploadSelectionLabel = document.getElementById("uploadSelectionLabel");
-const uploadSubmitBtn = document.getElementById("uploadSubmitBtn");
-const uploadProgressWrap = document.getElementById("uploadProgressWrap");
-const uploadProgressBar = document.getElementById("uploadProgressBar");
-const uploadProgressStatus = document.getElementById("uploadProgressStatus");
-
 let uploadInProgress = false;
 let uploadSelectionContext = { source: "files", folderName: "" };
+let uploadEventsBound = false;
+
+function getUploadElements() {
+  return {
+    uploadForm: document.getElementById("uploadForm"),
+    fileInput: document.getElementById("fileInput"),
+    folderInput: document.getElementById("folderInput"),
+    uploadFolderBtn: document.getElementById("uploadFolderBtn"),
+    uploadDropzone: document.getElementById("uploadDropzone"),
+    uploadSelectionLabel: document.getElementById("uploadSelectionLabel"),
+    uploadSubmitBtn: document.getElementById("uploadSubmitBtn"),
+    uploadProgressWrap: document.getElementById("uploadProgressWrap"),
+    uploadProgressBar: document.getElementById("uploadProgressBar"),
+    uploadProgressStatus: document.getElementById("uploadProgressStatus"),
+  };
+}
 
 const SUPPORTED_UPLOAD_LABEL = "Supports: PDF, TXT, MD, DOCX, DOC, PNG, JPG, WEBP, GIF";
 const SUPPORTED_UPLOAD_EXTENSIONS = new Set([
@@ -103,6 +108,7 @@ function applyFolderSelection(selectedFiles, folderName = "") {
 }
 
 function updateSelectedFilesLabel() {
+  const { fileInput, uploadSelectionLabel } = getUploadElements();
   if (!uploadSelectionLabel || !fileInput) {
     return;
   }
@@ -123,6 +129,7 @@ function updateSelectedFilesLabel() {
 }
 
 function hideUploadProgress() {
+  const { uploadProgressWrap, uploadProgressBar, uploadProgressStatus } = getUploadElements();
   if (uploadProgressWrap) {
     uploadProgressWrap.hidden = true;
   }
@@ -136,6 +143,7 @@ function hideUploadProgress() {
 }
 
 function showUploadProgress(processed, total, message) {
+  const { uploadProgressWrap, uploadProgressBar, uploadProgressStatus } = getUploadElements();
   if (!uploadProgressWrap || !uploadProgressBar || !uploadProgressStatus) {
     return;
   }
@@ -146,6 +154,7 @@ function showUploadProgress(processed, total, message) {
 }
 
 function syncUploadProgressFromSelection() {
+  const { fileInput } = getUploadElements();
   if (!fileInput || uploadInProgress) {
     return;
   }
@@ -158,6 +167,7 @@ function syncUploadProgressFromSelection() {
 }
 
 function setSelectedFiles(files, options = {}) {
+  const { fileInput } = getUploadElements();
   if (!fileInput) {
     return;
   }
@@ -186,6 +196,14 @@ async function uploadDocumentFile(file) {
 }
 
 function syncUploadAvailability(options = {}) {
+  const {
+    fileInput,
+    folderInput,
+    uploadFolderBtn,
+    uploadDropzone,
+    uploadSelectionLabel,
+    uploadSubmitBtn,
+  } = getUploadElements();
   const announce = options.announce === true;
   const navigateToSettings = options.navigateToSettings === true;
   const reason = getLlmUploadBlockReason();
@@ -226,166 +244,190 @@ function syncUploadAvailability(options = {}) {
   return true;
 }
 
-uploadForm?.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
+function bindUploadEvents() {
+  if (uploadEventsBound) {
     return;
   }
+  const {
+    uploadForm,
+    fileInput,
+    folderInput,
+    uploadFolderBtn,
+    uploadDropzone,
+    uploadSubmitBtn,
+  } = getUploadElements();
 
-  const files = collectSupportedFiles(fileInput?.files || []);
-  if (!files.length) {
-    logActivity("Upload blocked: select at least one supported document or image file.");
-    return;
-  }
+  uploadForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
+      return;
+    }
 
-  const uploadedIds = [];
-  let failedUploads = 0;
-  uploadInProgress = true;
-  if (uploadSubmitBtn) {
-    uploadSubmitBtn.disabled = true;
-  }
-  if (fileInput) {
-    fileInput.disabled = true;
-  }
-  if (folderInput) {
-    folderInput.disabled = true;
-  }
-  if (uploadFolderBtn) {
-    uploadFolderBtn.disabled = true;
-  }
-  if (uploadDropzone) {
-    uploadDropzone.classList.add("is-disabled");
-    uploadDropzone.setAttribute("aria-disabled", "true");
-    uploadDropzone.tabIndex = -1;
-  }
-  if (files.length > 1) {
-    showUploadProgress(0, files.length, `Uploading 0 of ${files.length} files...`);
-  }
-  try {
-    for (const [index, file] of files.entries()) {
-      logActivity(`Uploading ${file.name}...`);
-      try {
-        const payload = await uploadDocumentFile(file);
-        uploadedIds.push(payload.id);
-        logActivity(`Uploaded ${file.name} => document ${payload.id}`);
-      } catch (error) {
-        failedUploads += 1;
-        logActivity(`Upload failed for ${file.name}: ${error.message}`);
+    const files = collectSupportedFiles(fileInput?.files || []);
+    if (!files.length) {
+      logActivity("Upload blocked: select at least one supported document or image file.");
+      return;
+    }
+
+    const uploadedIds = [];
+    let failedUploads = 0;
+    uploadInProgress = true;
+    if (uploadSubmitBtn) {
+      uploadSubmitBtn.disabled = true;
+    }
+    if (fileInput) {
+      fileInput.disabled = true;
+    }
+    if (folderInput) {
+      folderInput.disabled = true;
+    }
+    if (uploadFolderBtn) {
+      uploadFolderBtn.disabled = true;
+    }
+    if (uploadDropzone) {
+      uploadDropzone.classList.add("is-disabled");
+      uploadDropzone.setAttribute("aria-disabled", "true");
+      uploadDropzone.tabIndex = -1;
+    }
+    if (files.length > 1) {
+      showUploadProgress(0, files.length, `Uploading 0 of ${files.length} files...`);
+    }
+    try {
+      for (const [index, file] of files.entries()) {
+        logActivity(`Uploading ${file.name}...`);
+        try {
+          const payload = await uploadDocumentFile(file);
+          uploadedIds.push(payload.id);
+          logActivity(`Uploaded ${file.name} => document ${payload.id}`);
+        } catch (error) {
+          failedUploads += 1;
+          logActivity(`Upload failed for ${file.name}: ${error.message}`);
+        }
+        if (files.length > 1) {
+          const processed = index + 1;
+          const message =
+            failedUploads > 0
+              ? `Uploading ${processed} of ${files.length} files... ${failedUploads} failed so far.`
+              : `Uploading ${processed} of ${files.length} files...`;
+          showUploadProgress(processed, files.length, message);
+        }
       }
-      if (files.length > 1) {
-        const processed = index + 1;
-        const message =
-          failedUploads > 0
-            ? `Uploading ${processed} of ${files.length} files... ${failedUploads} failed so far.`
-            : `Uploading ${processed} of ${files.length} files...`;
-        showUploadProgress(processed, files.length, message);
+    } finally {
+      uploadInProgress = false;
+      syncUploadAvailability();
+    }
+
+    updateSelectedFilesLabel();
+    if (files.length > 1) {
+      const successCount = uploadedIds.length;
+      const summary =
+        failedUploads > 0
+          ? `Finished ${successCount} of ${files.length} files. ${failedUploads} failed.`
+          : `Finished uploading ${files.length} files.`;
+      showUploadProgress(files.length, files.length, summary);
+    }
+    if (!uploadedIds.length) {
+      return;
+    }
+    if (uploadedIds.length === 1) {
+      navigateToDocument(uploadedIds[0]);
+      return;
+    }
+    logActivity(`Uploaded ${uploadedIds.length} files.`);
+    window.location.href = "/ui/documents";
+  });
+
+  fileInput?.addEventListener("change", () => {
+    uploadSelectionContext = { source: "files", folderName: "" };
+    updateSelectedFilesLabel();
+    syncUploadProgressFromSelection();
+  });
+
+  folderInput?.addEventListener("change", () => {
+    const selectedFiles = [...(folderInput.files || [])];
+    const folderName = getFolderNameFromFiles(selectedFiles);
+    applyFolderSelection(selectedFiles, folderName);
+    folderInput.value = "";
+  });
+
+  uploadFolderBtn?.addEventListener("click", async () => {
+    if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
+      return;
+    }
+    if (typeof window.showDirectoryPicker === "function") {
+      try {
+        const directoryHandle = await window.showDirectoryPicker();
+        const selectedFiles = await collectFilesFromDirectoryHandle(directoryHandle);
+        applyFolderSelection(selectedFiles, directoryHandle.name || "");
+        return;
+      } catch (error) {
+        if (error?.name === "AbortError") {
+          return;
+        }
+        logActivity("Directory picker unavailable in this browser context. Falling back to file input.");
       }
     }
-  } finally {
-    uploadInProgress = false;
-    syncUploadAvailability();
-  }
+    folderInput?.click();
+  });
 
-  updateSelectedFilesLabel();
-  if (files.length > 1) {
-    const successCount = uploadedIds.length;
-    const summary =
-      failedUploads > 0
-        ? `Finished ${successCount} of ${files.length} files. ${failedUploads} failed.`
-        : `Finished uploading ${files.length} files.`;
-    showUploadProgress(files.length, files.length, summary);
-  }
-  if (!uploadedIds.length) {
-    return;
-  }
-  if (uploadedIds.length === 1) {
-    navigateToDocument(uploadedIds[0]);
-    return;
-  }
-  logActivity(`Uploaded ${uploadedIds.length} files.`);
-  window.location.href = "/ui/documents";
-});
-
-fileInput?.addEventListener("change", () => {
-  uploadSelectionContext = { source: "files", folderName: "" };
-  updateSelectedFilesLabel();
-  syncUploadProgressFromSelection();
-});
-
-folderInput?.addEventListener("change", () => {
-  const selectedFiles = [...(folderInput.files || [])];
-  const folderName = getFolderNameFromFiles(selectedFiles);
-  applyFolderSelection(selectedFiles, folderName);
-  folderInput.value = "";
-});
-
-uploadFolderBtn?.addEventListener("click", async () => {
-  if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
-    return;
-  }
-  if (typeof window.showDirectoryPicker === "function") {
-    try {
-      const directoryHandle = await window.showDirectoryPicker();
-      const selectedFiles = await collectFilesFromDirectoryHandle(directoryHandle);
-      applyFolderSelection(selectedFiles, directoryHandle.name || "");
+  uploadDropzone?.addEventListener("click", (event) => {
+    if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
       return;
-    } catch (error) {
-      if (error?.name === "AbortError") {
+    }
+    if (event.target === fileInput) {
+      return;
+    }
+    fileInput?.click();
+  });
+
+  uploadDropzone?.addEventListener("keydown", (event) => {
+    if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
+      return;
+    }
+    if (event.key !== "Enter" && event.key !== " ") {
+      return;
+    }
+    event.preventDefault();
+    fileInput?.click();
+  });
+
+  ["dragenter", "dragover"].forEach((eventName) => {
+    uploadDropzone?.addEventListener(eventName, (event) => {
+      if (!syncUploadAvailability()) {
         return;
       }
-      logActivity("Directory picker unavailable in this browser context. Falling back to file input.");
-    }
-  }
-  folderInput?.click();
-});
+      event.preventDefault();
+      uploadDropzone.classList.add("is-drag-over");
+    });
+  });
 
-uploadDropzone?.addEventListener("click", (event) => {
-  if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
-    return;
-  }
-  if (event.target === fileInput) {
-    return;
-  }
-  fileInput?.click();
-});
+  ["dragleave", "drop"].forEach((eventName) => {
+    uploadDropzone?.addEventListener(eventName, (event) => {
+      event.preventDefault();
+      uploadDropzone.classList.remove("is-drag-over");
+    });
+  });
 
-uploadDropzone?.addEventListener("keydown", (event) => {
-  if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
-    return;
-  }
-  if (event.key !== "Enter" && event.key !== " ") {
-    return;
-  }
-  event.preventDefault();
-  fileInput?.click();
-});
-
-["dragenter", "dragover"].forEach((eventName) => {
-  uploadDropzone?.addEventListener(eventName, (event) => {
-    if (!syncUploadAvailability()) {
+  uploadDropzone?.addEventListener("drop", (event) => {
+    if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
       return;
     }
-    event.preventDefault();
-    uploadDropzone.classList.add("is-drag-over");
+    const dropped = collectSupportedFiles(event.dataTransfer?.files || []);
+    if (!dropped.length) {
+      logActivity("Drop ignored: only supported document and image types are accepted.");
+      return;
+    }
+    setSelectedFiles(dropped);
+    logActivity(`Ready to upload ${dropped.length} file(s).`);
   });
-});
 
-["dragleave", "drop"].forEach((eventName) => {
-  uploadDropzone?.addEventListener(eventName, (event) => {
-    event.preventDefault();
-    uploadDropzone.classList.remove("is-drag-over");
-  });
-});
+  uploadEventsBound = true;
+}
 
-uploadDropzone?.addEventListener("drop", (event) => {
-  if (!syncUploadAvailability({ announce: true, navigateToSettings: true })) {
+window.initializePaperwisePage = async ({ authenticated }) => {
+  if (authenticated !== true) {
     return;
   }
-  const dropped = collectSupportedFiles(event.dataTransfer?.files || []);
-  if (!dropped.length) {
-    logActivity("Drop ignored: only supported document and image types are accepted.");
-    return;
-  }
-  setSelectedFiles(dropped);
-  logActivity(`Ready to upload ${dropped.length} file(s).`);
-});
+  bindUploadEvents();
+  syncUploadAvailability();
+};
