@@ -31,7 +31,11 @@ function hydrateInitialDocumentsData(initialData) {
   docsTotalCount = Number(initialData.documents_total || initialData.documents.length || 0);
   docsPage = Math.max(1, Number(initialData.documents_page || docsPage || 1));
   docsPageSize = normalizePageSize(initialData.documents_page_size || docsPageSize);
-  refreshFilterOptionsFromDocuments(initialData.documents);
+  if (initialData.document_filter_options) {
+    refreshFilterOptions(initialData.document_filter_options);
+  } else {
+    refreshFilterOptionsFromDocuments(initialData.documents);
+  }
   logActivity(`Loaded ${initialData.documents.length} document(s) of ${docsTotalCount} total`);
   initialDocumentsHydrated = true;
   return true;

@@ -228,6 +228,21 @@ def _activity_partial_data(
     }
 
 
+def _document_filter_options(repository: DocumentRepository, current_user: User) -> dict:
+    return {
+        "tags": [tag for tag, _count in repository.list_owner_tag_stats(current_user.id)],
+        "correspondents": [
+            correspondent
+            for correspondent, _count in repository.list_owner_correspondent_stats(current_user.id)
+        ],
+        "document_types": [
+            document_type
+            for document_type, _count in repository.list_owner_document_type_stats(current_user.id)
+        ],
+        "statuses": ["received", "processing", "failed", "ready"],
+    }
+
+
 def _documents_initial_data(
     repository: DocumentRepository,
     current_user: User | None,
@@ -241,12 +256,13 @@ def _documents_initial_data(
     correspondent: list[str] | None = None,
     document_type: list[str] | None = None,
     status: list[str] | None = None,
+    include_filter_options: bool = False,
 ) -> dict:
     initial_data = _page_initial_data(current_user, repository)
     normalized_page = max(1, int(page or 1))
     normalized_page_size = min(100, max(1, int(page_size or 20)))
     if current_user is None:
-        return {
+        data = {
             **initial_data,
             "documents": [],
             "documents_total": 0,
@@ -254,6 +270,14 @@ def _documents_initial_data(
             "documents_page": normalized_page,
             "documents_page_size": normalized_page_size,
         }
+        if include_filter_options:
+            data["document_filter_options"] = {
+                "tags": [],
+                "correspondents": [],
+                "document_types": [],
+                "statuses": ["received", "processing", "failed", "ready"],
+            }
+        return data
 
     normalized_statuses = normalized_values(status)
     if not normalized_statuses:
@@ -284,7 +308,7 @@ def _documents_initial_data(
         owner_id=current_user.id,
         statuses=PENDING_DOCUMENT_STATUSES,
     )
-    return {
+    data = {
         **initial_data,
         "documents": [
             _document_list_item(document, llm_result)
@@ -295,6 +319,9 @@ def _documents_initial_data(
         "documents_page": normalized_page,
         "documents_page_size": normalized_page_size,
     }
+    if include_filter_options:
+        data["document_filter_options"] = _document_filter_options(repository, current_user)
+    return data
 
 
 def _pending_documents(repository: DocumentRepository, current_user: User) -> list[dict]:
@@ -581,6 +608,7 @@ def documents_page(
             correspondent=correspondent,
             document_type=document_type,
             status=status,
+            include_filter_options=True,
         ),
     )
 

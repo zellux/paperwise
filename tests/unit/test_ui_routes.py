@@ -508,6 +508,12 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         documents_payload = _initial_data_from_response(documents_html)
         assert documents_payload["documents_total"] == 2
         assert documents_payload["documents_processing_count"] == 0
+        assert documents_payload["document_filter_options"] == {
+            "tags": ["Finance", "Tax"],
+            "correspondents": ["Paperwise"],
+            "document_types": ["Invoice", "Notice"],
+            "statuses": ["received", "processing", "failed", "ready"],
+        }
         assert documents_payload["user_preferences"]["llm_total_tokens_processed"] == 42
         assert "Total documents: 2" in documents_html
         assert "Processing: 0" in documents_html

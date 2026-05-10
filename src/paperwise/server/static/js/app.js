@@ -1135,8 +1135,19 @@ function readFiltersFromControls() {
   docsFilters.status = getSelectedValues(filterStatus);
 }
 
-function refreshFilterOptionsFromDocuments(documents) {
+function refreshFilterOptions(options) {
   const { filterTag, filterCorrespondent, filterType, filterStatus } = getDocumentFilterControls();
+  const source = options && typeof options === "object" ? options : {};
+  setSelectOptions(filterTag, Array.isArray(source.tags) ? source.tags : []);
+  setSelectOptions(filterCorrespondent, Array.isArray(source.correspondents) ? source.correspondents : []);
+  setSelectOptions(filterType, Array.isArray(source.document_types) ? source.document_types : []);
+  setSelectOptions(
+    filterStatus,
+    Array.isArray(source.statuses) ? source.statuses : ["received", "processing", "failed", "ready"]
+  );
+}
+
+function refreshFilterOptionsFromDocuments(documents) {
   const tags = new Set();
   const correspondents = new Set();
   const documentTypes = new Set();
@@ -1163,10 +1174,12 @@ function refreshFilterOptionsFromDocuments(documents) {
     }
   }
 
-  setSelectOptions(filterTag, [...tags]);
-  setSelectOptions(filterCorrespondent, [...correspondents]);
-  setSelectOptions(filterType, [...documentTypes]);
-  setSelectOptions(filterStatus, ["received", "processing", "failed", "ready", ...statuses]);
+  refreshFilterOptions({
+    tags: [...tags],
+    correspondents: [...correspondents],
+    document_types: [...documentTypes],
+    statuses: ["received", "processing", "failed", "ready", ...statuses],
+  });
 }
 
 function applyDocsStateToUrl(url) {
