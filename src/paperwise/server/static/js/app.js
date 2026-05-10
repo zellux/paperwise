@@ -411,59 +411,6 @@ function normalizeConnection(connection, index = 0) {
   return normalized;
 }
 
-function migrateLegacyLlmPreferences(preferences) {
-  const connections = [];
-  const primaryProvider = normalizeLlmProvider(preferences?.llm_provider);
-  const primaryBaseUrl = String(preferences?.llm_base_url || "").trim();
-  const primaryApiKey = String(preferences?.llm_api_key || "").trim();
-  if (primaryProvider || primaryBaseUrl || primaryApiKey) {
-    connections.push({
-      id: "default-connection",
-      name: "Primary Connection",
-      provider: primaryProvider,
-      base_url: primaryBaseUrl,
-      api_key: primaryApiKey,
-      default_model: String(preferences?.llm_model || "").trim(),
-    });
-  }
-  const routing = createDefaultLlmRouting();
-  routing.metadata.connection_id = connections[0]?.id || "";
-  routing.metadata.model = String(preferences?.llm_model || "").trim();
-  routing.grounded_qa.connection_id = connections[0]?.id || "";
-  routing.grounded_qa.model = String(preferences?.llm_model || "").trim();
-  routing.ocr.connection_id = connections[0]?.id || "";
-  routing.ocr.model = String(preferences?.llm_model || "").trim();
-  const legacyOcrProvider = String(preferences?.ocr_provider || "llm").trim().toLowerCase();
-  if (legacyOcrProvider === "tesseract") {
-    routing.ocr.engine = "tesseract";
-  } else if (legacyOcrProvider === "llm_separate") {
-    const ocrProviderName = normalizeLlmProvider(preferences?.ocr_llm_provider);
-    const ocrBaseUrl = String(preferences?.ocr_llm_base_url || "").trim();
-    const ocrApiKey = String(preferences?.ocr_llm_api_key || "").trim();
-    if (ocrProviderName || ocrBaseUrl || ocrApiKey) {
-      const sameAsDefault =
-        connections[0] &&
-        connections[0].provider === ocrProviderName &&
-        connections[0].base_url === ocrBaseUrl &&
-        connections[0].api_key === ocrApiKey;
-      const connectionId = sameAsDefault ? connections[0].id : "ocr-connection";
-      if (!sameAsDefault) {
-        connections.push({
-          id: connectionId,
-          name: "OCR Connection",
-          provider: ocrProviderName,
-          base_url: ocrBaseUrl,
-          api_key: ocrApiKey,
-          default_model: String(preferences?.ocr_llm_model || "").trim(),
-        });
-      }
-      routing.ocr.connection_id = connectionId;
-      routing.ocr.model = String(preferences?.ocr_llm_model || "").trim();
-    }
-  }
-  return { llm_connections: connections, llm_routing: routing };
-}
-
 function normalizeLlmPreferences(preferences) {
   if (
     Array.isArray(preferences?.llm_connections) &&
@@ -484,7 +431,7 @@ function normalizeLlmPreferences(preferences) {
     routing.ocr.model = String(rawRouting.ocr?.model || "").trim();
     return { llm_connections: connections, llm_routing: routing };
   }
-  return migrateLegacyLlmPreferences(preferences || {});
+  return { llm_connections: [], llm_routing: createDefaultLlmRouting() };
 }
 
 function sanitizeLlmRouting(connections, routing) {
