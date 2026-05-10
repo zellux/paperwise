@@ -1,10 +1,18 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import BaseModel, Field
 
-from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.interfaces import CollectionRepository, DocumentStore, ParseResultRepository
 from paperwise.domain.models import Collection
+
+
+class CollectionResponseRepository(CollectionRepository, Protocol):
+    pass
+
+
+class CollectionSearchResponseRepository(DocumentStore, ParseResultRepository, Protocol):
+    pass
 
 
 class CollectionResponse(BaseModel):
@@ -37,7 +45,7 @@ class CollectionResponse(BaseModel):
     def from_repository(
         cls,
         *,
-        repository: DocumentRepository,
+        repository: CollectionResponseRepository,
         collection: Collection,
     ) -> "CollectionResponse":
         return cls.from_domain(
@@ -67,7 +75,7 @@ class SearchHitResponse(BaseModel):
     def from_chunk_hit(
         cls,
         *,
-        repository: DocumentRepository,
+        repository: CollectionSearchResponseRepository,
         hit: Any,
     ) -> "SearchHitResponse | None":
         doc_id = hit.chunk.document_id
@@ -99,7 +107,7 @@ class SearchResponse(BaseModel):
     def from_chunk_hits(
         cls,
         *,
-        repository: DocumentRepository,
+        repository: CollectionSearchResponseRepository,
         query: str,
         limit: int,
         hits: list[Any],
