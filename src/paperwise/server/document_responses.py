@@ -136,6 +136,20 @@ class CountResponse(BaseModel):
     total: int
 
 
+class LLMConnectionTestResponse(BaseModel):
+    ok: bool
+    provider: str
+    model: str
+    message: str
+
+
+class LocalOCRStatusResponse(BaseModel):
+    available: bool
+    tesseract_available: bool
+    pdftoppm_available: bool
+    detail: str
+
+
 class DocumentDetailResponse(BaseModel):
     document: DocumentResponse
     llm_metadata: DocumentListMetadata | None = None

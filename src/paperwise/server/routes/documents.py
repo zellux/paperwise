@@ -6,7 +6,6 @@ from uuid import uuid4
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
 
 from paperwise.server.dependencies import (
     current_user_dependency,
@@ -28,12 +27,15 @@ from paperwise.server.document_responses import (
     DocumentListItemResponse,
     DocumentResponse,
     DocumentTypeStatResponse,
+    LLMConnectionTestResponse,
     LLMParseResultResponse,
+    LocalOCRStatusResponse,
     ParseResultResponse,
     RestartPendingResponse,
     TagStatResponse,
     TaxonomyResponse,
 )
+from paperwise.server.document_requests import LLMConnectionTestRequest, MetadataUpdateRequest
 from paperwise.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
@@ -94,37 +96,6 @@ from paperwise.infrastructure.config import get_settings
 
 router = APIRouter(prefix="/documents", tags=["documents"])
 settings = get_settings()
-
-
-class MetadataUpdateRequest(BaseModel):
-    suggested_title: str
-    document_date: str | None = None
-    correspondent: str
-    document_type: str
-    tags: list[str]
-
-
-class LLMConnectionTestRequest(BaseModel):
-    task: str | None = None
-    connection_name: str | None = None
-    provider: str | None = None
-    model: str | None = None
-    base_url: str | None = None
-    api_key: str | None = None
-
-
-class LLMConnectionTestResponse(BaseModel):
-    ok: bool
-    provider: str
-    model: str
-    message: str
-
-
-class LocalOCRStatusResponse(BaseModel):
-    available: bool
-    tesseract_available: bool
-    pdftoppm_available: bool
-    detail: str
 
 
 def _run_parse_document_blob_or_400(
