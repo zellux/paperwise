@@ -390,13 +390,22 @@ def _to_tool_document_item(repository: DocumentRepository, document_id: str) -> 
 
 
 def _all_owned_document_ids(repository: DocumentRepository, current_user: User) -> list[str]:
-    return [
-        document.id
-        for document, _llm_result in repository.list_owner_documents_with_llm_results(
+    document_ids: list[str] = []
+    batch_size = 1000
+    offset = 0
+    while True:
+        rows = repository.list_owner_documents_with_llm_results(
             owner_id=current_user.id,
-            limit=10_000,
+            limit=batch_size,
+            offset=offset,
         )
-    ]
+        if not rows:
+            break
+        document_ids.extend(document.id for document, _llm_result in rows)
+        if len(rows) < batch_size:
+            break
+        offset += batch_size
+    return document_ids
 
 
 def _extract_chat_query_terms(query: str) -> list[str]:

@@ -21,7 +21,7 @@ from paperwise.server.dependencies import (
 )
 from paperwise.server.main import app
 from paperwise.application.services.grounded_qa import build_qa_contexts
-from paperwise.server.routes.query import _compact_chat_context_content
+from paperwise.server.routes.query import _all_owned_document_ids, _compact_chat_context_content
 
 
 TEST_USER = User(
@@ -75,6 +75,44 @@ def test_compact_chat_context_keeps_query_centered_excerpt() -> None:
     assert "Height 2 ft 10 in" in excerpt
     assert excerpt.startswith("...")
     assert excerpt.endswith("...")
+
+
+def test_all_owned_document_ids_batches_past_first_page() -> None:
+    repository = InMemoryDocumentRepository()
+    now = datetime.now(UTC)
+    for index in range(1005):
+        repository.save(
+            Document(
+                id=f"doc-{index}",
+                filename=f"doc-{index}.pdf",
+                owner_id=TEST_USER.id,
+                blob_uri=f"processed/doc-{index}.pdf",
+                checksum_sha256=f"sha-{index}",
+                content_type="application/pdf",
+                size_bytes=100,
+                status=DocumentStatus.READY,
+                created_at=now,
+            )
+        )
+    repository.save(
+        Document(
+            id="other-owner-doc",
+            filename="other.pdf",
+            owner_id="other-user",
+            blob_uri="processed/other.pdf",
+            checksum_sha256="sha-other",
+            content_type="application/pdf",
+            size_bytes=100,
+            status=DocumentStatus.READY,
+            created_at=now,
+        )
+    )
+
+    document_ids = _all_owned_document_ids(repository, TEST_USER)
+
+    assert len(document_ids) == 1005
+    assert "doc-1004" in document_ids
+    assert "other-owner-doc" not in document_ids
 
 
 class FakeAnchoredGroundedLLM(FakeGroundedLLM):

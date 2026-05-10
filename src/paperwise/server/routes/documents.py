@@ -666,18 +666,16 @@ def list_pending_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentListItemResponse]:
-    documents = repository.list_documents(limit=limit)
-    pending_docs = [
-        document
-        for document in documents
-        if document.status in PENDING_STATUSES and document.owner_id == current_user.id
-    ]
     return [
         _to_list_item_response(
             document=document,
-            llm_result=repository.get_llm_parse_result(document.id),
+            llm_result=llm_result,
         )
-        for document in pending_docs
+        for document, llm_result in repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=limit,
+            statuses=PENDING_STATUSES,
+        )
     ]
 
 
@@ -688,14 +686,18 @@ def restart_pending_documents_endpoint(
     dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> RestartPendingResponse:
-    documents = repository.list_documents(limit=limit)
+    documents = [
+        document
+        for document, _llm_result in repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=limit,
+        )
+    ]
     restarted_count = 0
     skipped_ready_count = 0
     history_events: list[DocumentHistoryEvent] = []
 
     for document in documents:
-        if document.owner_id != current_user.id:
-            continue
         if document.status == DocumentStatus.READY:
             skipped_ready_count += 1
             continue

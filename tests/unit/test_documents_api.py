@@ -20,6 +20,7 @@ from paperwise.domain.models import (
     Collection,
     DocumentChunk,
     DocumentHistoryEvent,
+    DocumentStatus,
     HistoryActorType,
     HistoryEventType,
     LLMParseResult,
@@ -1021,8 +1022,10 @@ def test_list_pending_documents_excludes_ready() -> None:
         )
         assert ready_create_response.status_code == 201
         ready_id = ready_create_response.json()["id"]
-        llm_response = client.post(f"/documents/{ready_id}/llm-parse")
-        assert llm_response.status_code == 200
+        ready_document = repository.get(ready_id)
+        assert ready_document is not None
+        ready_document.status = DocumentStatus.READY
+        repository.save(ready_document)
 
         pending_response = client.get("/documents/pending")
         assert pending_response.status_code == 200
@@ -1062,8 +1065,10 @@ def test_restart_pending_documents_requeues_non_ready_only() -> None:
         )
         assert ready_create_response.status_code == 201
         ready_id = ready_create_response.json()["id"]
-        llm_response = client.post(f"/documents/{ready_id}/llm-parse")
-        assert llm_response.status_code == 200
+        ready_document = repository.get(ready_id)
+        assert ready_document is not None
+        ready_document.status = DocumentStatus.READY
+        repository.save(ready_document)
 
         restart_response = client.post("/documents/pending/restart?limit=200")
         assert restart_response.status_code == 200
