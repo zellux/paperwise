@@ -313,11 +313,16 @@ def test_static_assets_split_theme_css() -> None:
     assert styles.status_code == 200
     assert "body.theme-forge" not in styles.text
     assert ".settings-group" not in styles.text
+    assert ".chat-composer" not in styles.text
 
     themes = client.get("/static/css/themes.css")
     assert themes.status_code == 200
     assert "body.theme-forge" in themes.text
     assert "--bg-main" in themes.text
+
+    chat = client.get("/static/css/chat.css")
+    assert chat.status_code == 200
+    assert ".chat-composer" in chat.text
 
     settings = client.get("/static/css/settings.css")
     assert settings.status_code == 200
@@ -327,6 +332,7 @@ def test_static_assets_split_theme_css() -> None:
     assert html.status_code == 200
     assert "/static/css/themes.css?v=" in html.text
     assert "/static/css/styles.css?v=" in html.text
+    assert "/static/css/chat.css?v=" in html.text
     assert "/static/css/settings.css?v=" in html.text
 
 
