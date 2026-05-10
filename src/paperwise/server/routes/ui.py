@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 
 from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.services.activity import owner_activity_summary
 from paperwise.application.services.document_listing import (
     list_filtered_documents,
 )
@@ -15,8 +16,12 @@ from paperwise.application.services.llm_preferences import (
     llm_provider_defaults_payload,
     ocr_llm_provider_defaults_payload,
 )
+from paperwise.application.services.pending_documents import (
+    PENDING_DOCUMENT_STATUSES,
+    list_pending_documents,
+)
 from paperwise.application.services.chat_threads import migrate_legacy_chat_threads
-from paperwise.domain.models import Document, DocumentHistoryEvent, DocumentStatus, LLMParseResult, User
+from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult, User
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
@@ -90,13 +95,6 @@ _PAGE_SCRIPTS_BY_VIEW = {
 SUPPORTED_UI_THEMES = ("atlas", "ledger", "moss", "ember", "folio", "forge")
 DEFAULT_UI_THEME = "forge"
 UI_THEME_STORAGE_KEY = "paperwise.ui.theme"
-PENDING_DOCUMENT_STATUSES = {
-    DocumentStatus.RECEIVED,
-    DocumentStatus.PROCESSING,
-    DocumentStatus.FAILED,
-}
-
-
 def _theme_options_html() -> str:
     return "\n".join(
         f'                      <option value="{theme}">{theme.replace("-", " ").title()}</option>'
@@ -187,25 +185,19 @@ def _document_type_stats_initial_data(repository: DocumentRepository, current_us
     }
 
 
-def _activity_documents(
-    repository: DocumentRepository,
-    current_user: User,
-    *,
-    limit: int,
-) -> list[dict]:
-    return [
-        _document_list_item(document, llm_result)
-        for document, llm_result in repository.list_owner_documents_with_llm_results(
-            owner_id=current_user.id,
-            limit=limit,
-            statuses={DocumentStatus.READY},
-        )
-    ]
-
-
-def _activity_total_tokens(repository: DocumentRepository, current_user: User) -> int:
-    preferences = load_user_preferences(repository=repository, user_id=current_user.id)
-    return int(preferences.get("llm_total_tokens_processed") or 0)
+def _activity_data(repository: DocumentRepository, current_user: User, *, limit: int) -> dict:
+    summary = owner_activity_summary(
+        repository=repository,
+        owner_id=current_user.id,
+        limit=limit,
+    )
+    return {
+        "activity_documents": [
+            _document_list_item(document, llm_result)
+            for document, llm_result in summary.documents
+        ],
+        "activity_total_tokens": summary.total_tokens,
+    }
 
 
 def _activity_initial_data(repository: DocumentRepository, current_user: User | None) -> dict:
@@ -214,8 +206,7 @@ def _activity_initial_data(repository: DocumentRepository, current_user: User | 
         return {**initial_data, "activity_documents": [], "activity_total_tokens": 0}
     return {
         **initial_data,
-        "activity_documents": _activity_documents(repository, current_user, limit=20),
-        "activity_total_tokens": _activity_total_tokens(repository, current_user),
+        **_activity_data(repository, current_user, limit=20),
     }
 
 
@@ -226,10 +217,7 @@ def _activity_partial_data(
     limit: int = 20,
 ) -> dict:
     normalized_limit = min(100, max(1, int(limit or 20)))
-    return {
-        "activity_documents": _activity_documents(repository, current_user, limit=normalized_limit),
-        "activity_total_tokens": _activity_total_tokens(repository, current_user),
-    }
+    return _activity_data(repository, current_user, limit=normalized_limit)
 
 
 def _document_filter_options(repository: DocumentRepository, current_user: User) -> dict:
@@ -338,10 +326,10 @@ def _documents_initial_data(
 def _pending_documents(repository: DocumentRepository, current_user: User) -> list[dict]:
     return [
         _document_list_item(document, llm_result)
-        for document, llm_result in repository.list_owner_documents_with_llm_results(
+        for document, llm_result in list_pending_documents(
+            repository=repository,
             owner_id=current_user.id,
             limit=200,
-            statuses=PENDING_DOCUMENT_STATUSES,
         )
     ]
 
