@@ -85,11 +85,70 @@ class SearchHitResponse(BaseModel):
     correspondent: str | None = None
     tags: list[str] = Field(default_factory=list)
 
+    @classmethod
+    def from_chunk_hit(
+        cls,
+        *,
+        repository: DocumentRepository,
+        hit: Any,
+    ) -> "SearchHitResponse | None":
+        doc_id = hit.chunk.document_id
+        document = repository.get(doc_id)
+        if document is None:
+            return None
+        llm = repository.get_llm_parse_result(doc_id)
+        title = llm.suggested_title if llm is not None and llm.suggested_title else document.filename
+        return cls(
+            document_id=doc_id,
+            title=title,
+            filename=document.filename,
+            score=hit.score,
+            snippet=hit.chunk.content[:280],
+            matched_terms=hit.matched_terms,
+            created_at=document.created_at,
+            document_type=llm.document_type if llm is not None else None,
+            correspondent=llm.correspondent if llm is not None else None,
+            tags=list(llm.tags or []) if llm is not None else [],
+        )
+
 
 class SearchResponse(BaseModel):
     query: str
     total_hits: int
     hits: list[SearchHitResponse]
+
+    @classmethod
+    def from_chunk_hits(
+        cls,
+        *,
+        repository: DocumentRepository,
+        query: str,
+        limit: int,
+        hits: list[Any],
+    ) -> "SearchResponse":
+        best_hits_by_doc: dict[str, tuple[Any, float]] = {}
+        ordered_doc_ids: list[str] = []
+        for hit in hits:
+            doc_id = hit.chunk.document_id
+            score = float(hit.score)
+            current = best_hits_by_doc.get(doc_id)
+            if current is None:
+                best_hits_by_doc[doc_id] = (hit, score)
+                ordered_doc_ids.append(doc_id)
+                continue
+            if score > current[1]:
+                best_hits_by_doc[doc_id] = (hit, score)
+        items: list[SearchHitResponse] = []
+        for doc_id in ordered_doc_ids:
+            item = SearchHitResponse.from_chunk_hit(
+                repository=repository,
+                hit=best_hits_by_doc[doc_id][0],
+            )
+            if item is not None:
+                items.append(item)
+            if len(items) >= max(1, limit):
+                break
+        return cls(query=query, total_hits=len(items), hits=items)
 
 
 class AskRequest(BaseModel):
@@ -138,52 +197,6 @@ def _get_collection_or_404(
     if collection is None or collection.owner_id != current_user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Collection not found")
     return collection
-
-
-def _build_search_response(
-    *,
-    repository: DocumentRepository,
-    query: str,
-    limit: int,
-    hits,
-) -> SearchResponse:
-    best_hits_by_doc: dict[str, tuple[object, float]] = {}
-    ordered_doc_ids: list[str] = []
-    for hit in hits:
-        doc_id = hit.chunk.document_id
-        score = float(hit.score)
-        current = best_hits_by_doc.get(doc_id)
-        if current is None:
-            best_hits_by_doc[doc_id] = (hit, score)
-            ordered_doc_ids.append(doc_id)
-            continue
-        if score > current[1]:
-            best_hits_by_doc[doc_id] = (hit, score)
-    items: list[SearchHitResponse] = []
-    for doc_id in ordered_doc_ids:
-        hit = best_hits_by_doc[doc_id][0]
-        document = repository.get(doc_id)
-        if document is None:
-            continue
-        llm = repository.get_llm_parse_result(doc_id)
-        title = llm.suggested_title if llm is not None and llm.suggested_title else document.filename
-        items.append(
-            SearchHitResponse(
-                document_id=doc_id,
-                title=title,
-                filename=document.filename,
-                score=hit.score,
-                snippet=hit.chunk.content[:280],
-                matched_terms=hit.matched_terms,
-                created_at=document.created_at,
-                document_type=llm.document_type if llm is not None else None,
-                correspondent=llm.correspondent if llm is not None else None,
-                tags=list(llm.tags or []) if llm is not None else [],
-            )
-        )
-        if len(items) >= max(1, limit):
-            break
-    return SearchResponse(query=query, total_hits=len(items), hits=items)
 
 
 def _ask_grounded(
@@ -493,7 +506,12 @@ def search_all_documents_endpoint(
         limit=max(payload.limit * 4, payload.limit),
         document_ids=scoped_ids,
     )
-    return _build_search_response(repository=repository, query=payload.query, limit=payload.limit, hits=hits)
+    return SearchResponse.from_chunk_hits(
+        repository=repository,
+        query=payload.query,
+        limit=payload.limit,
+        hits=hits,
+    )
 
 
 @router.post("/{collection_id}/search", response_model=SearchResponse)
@@ -523,7 +541,12 @@ def search_collection_documents_endpoint(
         limit=max(payload.limit * 4, payload.limit),
         document_ids=scoped_ids,
     )
-    return _build_search_response(repository=repository, query=payload.query, limit=payload.limit, hits=hits)
+    return SearchResponse.from_chunk_hits(
+        repository=repository,
+        query=payload.query,
+        limit=payload.limit,
+        hits=hits,
+    )
 
 
 @router.post("/ask", response_model=AskResponse)
