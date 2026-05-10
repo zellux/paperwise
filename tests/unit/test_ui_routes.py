@@ -319,6 +319,9 @@ def test_static_assets_split_theme_css() -> None:
     assert ".filter-chip" not in styles.text
     assert ".table-sort-button" not in styles.text
     assert ".upload-dropzone" not in styles.text
+    assert ".search-card" not in styles.text
+    assert ".markdown-output" not in styles.text
+    assert ".activity-token-total" not in styles.text
     assert ".settings-group" not in styles.text
     assert ".chat-composer" not in styles.text
 
@@ -348,6 +351,14 @@ def test_static_assets_split_theme_css() -> None:
     assert upload.status_code == 200
     assert ".upload-dropzone" in upload.text
 
+    search = client.get("/static/css/search.css")
+    assert search.status_code == 200
+    assert ".search-card" in search.text
+
+    activity = client.get("/static/css/activity.css")
+    assert activity.status_code == 200
+    assert ".activity-token-total" in activity.text
+
     settings = client.get("/static/css/settings.css")
     assert settings.status_code == 200
     assert ".settings-form" in settings.text
@@ -360,7 +371,9 @@ def test_static_assets_split_theme_css() -> None:
     assert "/static/css/documents.css?v=" in html.text
     assert "/static/css/tables.css?v=" in html.text
     assert "/static/css/upload.css?v=" in html.text
+    assert "/static/css/search.css?v=" in html.text
     assert "/static/css/chat.css?v=" in html.text
+    assert "/static/css/activity.css?v=" in html.text
     assert "/static/css/settings.css?v=" in html.text
 
 

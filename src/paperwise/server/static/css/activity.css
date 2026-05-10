@@ -1,0 +1,19 @@
+.activity-token-total {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+  font-family: var(--mono);
+}
+
+.output {
+  margin: 0;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke-soft);
+  background: rgba(247, 248, 246, 0.88);
+  min-height: 150px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}

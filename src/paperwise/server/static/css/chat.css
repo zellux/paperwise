@@ -325,6 +325,88 @@
   line-height: 1.65;
 }
 
+.markdown-output {
+  font-family: var(--sans);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  white-space: normal;
+}
+
+.markdown-output p,
+.markdown-output ul,
+.markdown-output ol,
+.markdown-output blockquote,
+.markdown-output table {
+  margin: 0 0 10px 0;
+}
+
+.markdown-output h1,
+.markdown-output h2 {
+  margin: 0 0 8px 0;
+  font-family: var(--serif);
+  line-height: 1.25;
+}
+
+.markdown-output h3 {
+  margin: 0 0 8px 0;
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.markdown-output h1 {
+  font-size: 1.15rem;
+}
+
+.markdown-output h2 {
+  font-size: 1.05rem;
+}
+
+.markdown-output h3 {
+  font-size: 0.98rem;
+}
+
+.markdown-output ul,
+.markdown-output ol {
+  padding-left: 18px;
+}
+
+.markdown-output code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  background: color-mix(in srgb, var(--accent-soft) 38%, white);
+  border-radius: 5px;
+  padding: 1px 4px;
+}
+
+.markdown-output blockquote {
+  border-left: 3px solid var(--stroke);
+  padding-left: 10px;
+  color: var(--ink-soft);
+}
+
+.markdown-output table {
+  width: 100%;
+  border-collapse: collapse;
+  border: 1px solid var(--stroke);
+  background: var(--table-bg);
+}
+
+.markdown-output th,
+.markdown-output td {
+  border: 1px solid var(--stroke-soft);
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.markdown-output th {
+  background: var(--table-head-bg);
+  color: var(--table-head-ink);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .chat-message-user .chat-message-body {
   background: var(--accent-soft);
   border-color: color-mix(in srgb, var(--accent) 20%, transparent);
