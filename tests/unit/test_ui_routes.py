@@ -316,7 +316,9 @@ def test_static_assets_split_theme_css() -> None:
     assert "body.theme-forge" not in styles.text
     assert ".auth-card" not in styles.text
     assert ".document-detail-card" not in styles.text
+    assert ".filter-chip" not in styles.text
     assert ".table-sort-button" not in styles.text
+    assert ".upload-dropzone" not in styles.text
     assert ".settings-group" not in styles.text
     assert ".chat-composer" not in styles.text
 
@@ -336,10 +338,15 @@ def test_static_assets_split_theme_css() -> None:
     documents = client.get("/static/css/documents.css")
     assert documents.status_code == 200
     assert ".document-detail-card" in documents.text
+    assert ".filter-chip" in documents.text
 
     tables = client.get("/static/css/tables.css")
     assert tables.status_code == 200
     assert ".docs-table-wrap" in tables.text
+
+    upload = client.get("/static/css/upload.css")
+    assert upload.status_code == 200
+    assert ".upload-dropzone" in upload.text
 
     settings = client.get("/static/css/settings.css")
     assert settings.status_code == 200
@@ -352,6 +359,7 @@ def test_static_assets_split_theme_css() -> None:
     assert "/static/css/auth.css?v=" in html.text
     assert "/static/css/documents.css?v=" in html.text
     assert "/static/css/tables.css?v=" in html.text
+    assert "/static/css/upload.css?v=" in html.text
     assert "/static/css/chat.css?v=" in html.text
     assert "/static/css/settings.css?v=" in html.text
 
@@ -425,9 +433,9 @@ def test_static_assets_serve_upload_progress_ui() -> None:
     assert upload_js.status_code == 200
     assert "showUploadProgress" in upload_js.text
 
-    styles = client.get("/static/css/styles.css")
-    assert styles.status_code == 200
-    assert ".upload-progress" in styles.text
+    upload_css = client.get("/static/css/upload.css")
+    assert upload_css.status_code == 200
+    assert ".upload-progress" in upload_css.text
 
 
 def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> None:

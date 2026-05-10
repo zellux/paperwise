@@ -1,0 +1,100 @@
+.upload-dropzone {
+  border: 1px dashed #6f8f85;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  padding: 18px 14px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.upload-dropzone:hover,
+.upload-dropzone:focus-visible,
+.upload-dropzone.is-drag-over {
+  background: rgba(215, 233, 225, 0.45);
+  border-color: #3d7a67;
+  outline: none;
+}
+
+.upload-dropzone.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+  background: rgba(244, 244, 242, 0.86);
+  border-color: var(--stroke-strong);
+}
+
+.upload-dropzone-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.upload-dropzone-subtitle {
+  margin: 6px 0 0;
+  color: var(--ink-soft);
+  font-size: 0.9rem;
+}
+
+.upload-progress {
+  display: grid;
+  gap: 8px;
+  margin-top: 4px;
+  padding: 12px;
+  border: 1px solid var(--stroke-soft);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.upload-progress-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.upload-progress-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.upload-progress-status {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+}
+
+.upload-progress-bar {
+  width: 100%;
+  height: 12px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(205, 215, 210, 0.9);
+  appearance: none;
+}
+
+.upload-progress-bar::-webkit-progress-bar {
+  background: rgba(205, 215, 210, 0.9);
+  border-radius: 999px;
+}
+
+.upload-progress-bar::-webkit-progress-value {
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 72%, white));
+  border-radius: 999px;
+}
+
+.upload-progress-bar::-moz-progress-bar {
+  background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 72%, white));
+  border-radius: 999px;
+}
+
+#fileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
