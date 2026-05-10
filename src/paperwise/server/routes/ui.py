@@ -25,7 +25,7 @@ from paperwise.application.services.pending_documents import (
 from paperwise.application.services.chat_threads import migrate_legacy_chat_threads
 from paperwise.application.services.taxonomy_stats import sort_stat_rows
 from paperwise.application.services.user_preferences import load_user_preferences
-from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult, User
+from paperwise.domain.models import User
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
@@ -40,6 +40,7 @@ from paperwise.server.html_rewriter import (
     replace_table_body,
 )
 from paperwise.server.routes.document_access import get_owned_document_or_404
+from paperwise.server.ui_payloads import document_list_item, history_event_item
 from paperwise.server.ui_fragments import (
     activity_rows_html,
     chat_thread_list_html,
@@ -135,30 +136,6 @@ def _page_initial_data(
     return initial_data
 
 
-def _document_list_item(document: Document, llm_result: LLMParseResult | None) -> dict:
-    metadata = None
-    if llm_result is not None:
-        metadata = {
-            "suggested_title": llm_result.suggested_title,
-            "document_date": llm_result.document_date,
-            "correspondent": llm_result.correspondent,
-            "document_type": llm_result.document_type,
-            "tags": list(llm_result.tags),
-        }
-    return {
-        "id": document.id,
-        "filename": document.filename,
-        "owner_id": document.owner_id,
-        "blob_uri": document.blob_uri,
-        "checksum_sha256": document.checksum_sha256,
-        "content_type": document.content_type,
-        "size_bytes": document.size_bytes,
-        "status": document.status.value,
-        "created_at": document.created_at.isoformat(),
-        "llm_metadata": metadata,
-    }
-
-
 def _tag_stats(repository: DocumentRepository, current_user: User) -> list[dict]:
     return [
         {"tag": tag, "document_count": count}
@@ -198,7 +175,7 @@ def _activity_data(repository: DocumentRepository, current_user: User, *, limit:
     )
     return {
         "activity_documents": [
-            _document_list_item(document, llm_result)
+            document_list_item(document, llm_result)
             for document, llm_result in summary.documents
         ],
         "activity_total_tokens": summary.total_tokens,
@@ -315,7 +292,7 @@ def _documents_initial_data(
     data = {
         **initial_data,
         "documents": [
-            _document_list_item(document, llm_result)
+            document_list_item(document, llm_result)
             for document, llm_result in listing.rows
         ],
         "documents_total": documents_total,
@@ -330,7 +307,7 @@ def _documents_initial_data(
 
 def _pending_documents(repository: DocumentRepository, current_user: User) -> list[dict]:
     return [
-        _document_list_item(document, llm_result)
+        document_list_item(document, llm_result)
         for document, llm_result in list_pending_documents(
             repository=repository,
             owner_id=current_user.id,
@@ -363,7 +340,7 @@ def _document_detail_initial_data(
         current_user=current_user,
     )
     parse_result = repository.get_parse_result(document.id)
-    item = _document_list_item(document, repository.get_llm_parse_result(document.id))
+    item = document_list_item(document, repository.get_llm_parse_result(document.id))
     return {
         **initial_data,
         "document_detail": {
@@ -372,22 +349,9 @@ def _document_detail_initial_data(
             "ocr_parsed_at": parse_result.created_at.isoformat() if parse_result is not None else None,
         },
         "document_history": [
-            _history_event_item(event)
+            history_event_item(event)
             for event in repository.list_history(document_id=document.id, limit=100)
         ],
-    }
-
-
-def _history_event_item(event: DocumentHistoryEvent) -> dict:
-    return {
-        "id": event.id,
-        "document_id": event.document_id,
-        "event_type": event.event_type.value,
-        "actor_type": event.actor_type.value,
-        "actor_id": event.actor_id,
-        "source": event.source,
-        "changes": event.changes,
-        "created_at": event.created_at.isoformat(),
     }
 
 
