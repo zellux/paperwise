@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.application.services.chat_contexts import compact_chat_context_content
+from paperwise.application.services.document_scope import all_owned_document_ids
 from paperwise.application.services.grounded_qa import build_qa_contexts
 from paperwise.domain.models import (
     Document,
@@ -22,7 +23,6 @@ from paperwise.server.dependencies import (
     llm_provider_dependency,
 )
 from paperwise.server.main import app
-from paperwise.server.routes.query import _all_owned_document_ids
 
 
 TEST_USER = User(
@@ -109,7 +109,7 @@ def test_all_owned_document_ids_batches_past_first_page() -> None:
         )
     )
 
-    document_ids = _all_owned_document_ids(repository, TEST_USER)
+    document_ids = all_owned_document_ids(repository, TEST_USER)
 
     assert len(document_ids) == 1005
     assert "doc-1004" in document_ids

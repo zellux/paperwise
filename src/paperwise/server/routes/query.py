@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
 from paperwise.application.services.chat_contexts import compact_chat_search_contexts
+from paperwise.application.services.document_scope import all_owned_document_ids
 from paperwise.application.services.grounded_qa import (
     build_qa_contexts as _build_qa_contexts,
     is_timeout_error as _is_timeout_error,
@@ -314,25 +315,6 @@ def _to_tool_document_item(repository: DocumentRepository, document_id: str) -> 
     }
 
 
-def _all_owned_document_ids(repository: DocumentRepository, current_user: User) -> list[str]:
-    document_ids: list[str] = []
-    batch_size = 1000
-    offset = 0
-    while True:
-        rows = repository.list_owner_documents_with_llm_results(
-            owner_id=current_user.id,
-            limit=batch_size,
-            offset=offset,
-        )
-        if not rows:
-            break
-        document_ids.extend(document.id for document, _llm_result in rows)
-        if len(rows) < batch_size:
-            break
-        offset += batch_size
-    return document_ids
-
-
 def _execute_chat_tool(
     *,
     repository: DocumentRepository,
@@ -381,7 +363,7 @@ def _execute_chat_tool(
         }
     if name == "query_document_metadata":
         limit = max(1, min(100, int(arguments.get("limit") or 25)))
-        document_ids = scoped_ids if scoped_ids is not None else _all_owned_document_ids(repository, current_user)
+        document_ids = scoped_ids if scoped_ids is not None else all_owned_document_ids(repository, current_user)
         items = []
         for document_id in document_ids[:limit]:
             item = _to_tool_document_item(repository, document_id)
@@ -389,7 +371,7 @@ def _execute_chat_tool(
                 items.append(item)
         return {"documents": items, "total_results": len(document_ids), "returned_results": len(items)}
     if name == "summarize_taxonomy":
-        document_ids = scoped_ids if scoped_ids is not None else _all_owned_document_ids(repository, current_user)
+        document_ids = scoped_ids if scoped_ids is not None else all_owned_document_ids(repository, current_user)
         tag_counts: dict[str, int] = {}
         type_counts: dict[str, int] = {}
         correspondent_counts: dict[str, int] = {}
