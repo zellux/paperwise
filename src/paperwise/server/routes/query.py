@@ -392,8 +392,10 @@ def _to_tool_document_item(repository: DocumentRepository, document_id: str) -> 
 def _all_owned_document_ids(repository: DocumentRepository, current_user: User) -> list[str]:
     return [
         document.id
-        for document in repository.list_documents(limit=10_000)
-        if document.owner_id == current_user.id
+        for document, _llm_result in repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=10_000,
+        )
     ]
 
 

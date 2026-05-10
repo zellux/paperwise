@@ -52,15 +52,16 @@ def resolve_metadata_scoped_document_ids(
     batch_size = 1000
     offset = 0
     while True:
-        documents = repository.list_documents(limit=batch_size, offset=offset)
-        if not documents:
+        documents_with_metadata = repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=batch_size,
+            offset=offset,
+        )
+        if not documents_with_metadata:
             break
-        for document in documents:
-            if document.owner_id != current_user.id:
-                continue
+        for document, llm_result in documents_with_metadata:
             if scoped_ids is not None and document.id not in scoped_ids:
                 continue
-            llm_result = repository.get_llm_parse_result(document.id)
             if llm_result is None:
                 continue
             if normalized_tags:
@@ -87,7 +88,7 @@ def resolve_metadata_scoped_document_ids(
                 continue
             seen_ids.add(document.id)
             matched_ids.append(document.id)
-        if len(documents) < batch_size:
+        if len(documents_with_metadata) < batch_size:
             break
         offset += batch_size
     return sorted(matched_ids)
