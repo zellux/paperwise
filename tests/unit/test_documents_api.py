@@ -6,6 +6,7 @@ from zipfile import ZipFile
 import httpx
 from fastapi.testclient import TestClient
 
+from paperwise.application.services import llm_connection_test
 from paperwise.server.routes import documents as documents_routes
 from paperwise.server.dependencies import (
     current_user_dependency,
@@ -1743,7 +1744,7 @@ def test_llm_connection_test_custom_task_runs_task_probe(monkeypatch) -> None:
     def fail_if_models_endpoint_is_used(*_args, **_kwargs):
         raise AssertionError("custom task tests should run the selected task probe")
 
-    monkeypatch.setattr(documents_routes.httpx, "Client", fail_if_models_endpoint_is_used)
+    monkeypatch.setattr(llm_connection_test.httpx, "Client", fail_if_models_endpoint_is_used)
 
     try:
         client = TestClient(app)
@@ -1838,7 +1839,7 @@ def test_llm_connection_test_uses_models_endpoint_for_custom_provider(monkeypatc
 
             return Response()
 
-    monkeypatch.setattr(documents_routes.httpx, "Client", FakeModelsClient)
+    monkeypatch.setattr(llm_connection_test.httpx, "Client", FakeModelsClient)
 
     try:
         client = TestClient(app)
