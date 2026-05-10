@@ -322,6 +322,9 @@ def test_static_assets_split_theme_css() -> None:
     assert ".search-card" not in styles.text
     assert ".markdown-output" not in styles.text
     assert ".activity-token-total" not in styles.text
+    assert ".settings-form select" not in styles.text
+    assert "#metaDate" not in styles.text
+    assert "#restartPendingBtn" not in styles.text
     assert ".settings-group" not in styles.text
     assert ".chat-composer" not in styles.text
 
@@ -342,10 +345,12 @@ def test_static_assets_split_theme_css() -> None:
     assert documents.status_code == 200
     assert ".document-detail-card" in documents.text
     assert ".filter-chip" in documents.text
+    assert "#metaDate" in documents.text
 
     tables = client.get("/static/css/tables.css")
     assert tables.status_code == 200
     assert ".docs-table-wrap" in tables.text
+    assert "#restartPendingBtn" in tables.text
 
     upload = client.get("/static/css/upload.css")
     assert upload.status_code == 200
@@ -362,6 +367,7 @@ def test_static_assets_split_theme_css() -> None:
     settings = client.get("/static/css/settings.css")
     assert settings.status_code == 200
     assert ".settings-form" in settings.text
+    assert ".settings-form select" in settings.text
 
     html = client.get("/ui/documents")
     assert html.status_code == 200

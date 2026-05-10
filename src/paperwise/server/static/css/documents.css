@@ -217,6 +217,11 @@
   font-size: 0.9rem;
 }
 
+#metaDate {
+  width: min(220px, 100%);
+  justify-self: start;
+}
+
 .document-actions {
   align-items: center;
   justify-content: space-between;

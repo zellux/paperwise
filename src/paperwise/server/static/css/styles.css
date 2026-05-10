@@ -290,8 +290,7 @@ input[type="file"],
 input[type="date"],
 input[type="number"],
 input[type="password"],
-textarea,
-.settings-form select {
+textarea {
   width: 100%;
   border: 1px solid var(--stroke);
   border-radius: 10px;
@@ -299,19 +298,6 @@ textarea,
   background: rgba(255, 255, 255, 0.88);
   color: var(--ink);
   font-family: var(--sans);
-}
-
-.settings-form select {
-  min-height: 44px;
-  padding-right: 36px;
-  appearance: none;
-  -webkit-appearance: none;
-  background-image: linear-gradient(45deg, transparent 50%, #4e5d58 50%),
-    linear-gradient(135deg, #4e5d58 50%, transparent 50%);
-  background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
-  background-size: 6px 6px, 6px 6px;
-  background-repeat: no-repeat;
-  cursor: pointer;
 }
 
 input[type="date"] {
@@ -328,8 +314,7 @@ input[type="file"]:focus-visible,
 input[type="date"]:focus-visible,
 input[type="number"]:focus-visible,
 input[type="password"]:focus-visible,
-textarea:focus-visible,
-.settings-form select:focus-visible {
+textarea:focus-visible {
   outline: 2px solid rgba(29, 106, 85, 0.35);
   outline-offset: 1px;
   border-color: #5a8378;
@@ -347,11 +332,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   height: 20px;
   margin-right: 2px;
   background: transparent;
-}
-
-#metaDate {
-  width: min(220px, 100%);
-  justify-self: start;
 }
 
 .btn {
@@ -414,16 +394,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .btn-muted:hover:not(:disabled) {
   box-shadow: 0 8px 16px rgba(70, 78, 83, 0.14);
-}
-
-#restartPendingBtn:not(:disabled) {
-  background: color-mix(in srgb, var(--accent) 22%, white);
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--stroke));
-  color: color-mix(in srgb, var(--accent) 80%, black);
-}
-
-#restartPendingBtn:not(:disabled):hover {
-  box-shadow: 0 8px 16px color-mix(in srgb, var(--accent) 25%, transparent);
 }
 
 @media (max-width: 980px) {

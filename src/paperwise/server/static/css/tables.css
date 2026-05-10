@@ -20,6 +20,16 @@
   min-width: 600px;
 }
 
+#restartPendingBtn:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 22%, white);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--stroke));
+  color: color-mix(in srgb, var(--accent) 80%, black);
+}
+
+#restartPendingBtn:not(:disabled):hover {
+  box-shadow: 0 8px 16px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
 .docs-table th,
 .docs-table td {
   border-bottom: 1px solid var(--stroke-soft);

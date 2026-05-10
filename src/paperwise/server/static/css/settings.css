@@ -12,6 +12,31 @@
   align-content: start;
 }
 
+.settings-form select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  padding: 10px 36px 10px 11px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--ink);
+  font-family: var(--sans);
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #4e5d58 50%),
+    linear-gradient(135deg, #4e5d58 50%, transparent 50%);
+  background-position: calc(100% - 18px) calc(50% - 2px), calc(100% - 12px) calc(50% - 2px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
+  cursor: pointer;
+}
+
+.settings-form select:focus-visible {
+  outline: 2px solid rgba(29, 106, 85, 0.35);
+  outline-offset: 1px;
+  border-color: #5a8378;
+}
+
 .settings-subnav {
   display: flex;
   gap: 8px;
