@@ -229,6 +229,42 @@ def _record_chat_token_usage(token_usage: dict[str, int], response: dict[str, An
     token_usage["llm_requests"] = token_usage.get("llm_requests", 0) + 1
 
 
+def _parse_chat_tool_call(call: dict[str, Any]) -> tuple[str, str, dict[str, Any]]:
+    call_id = str(call.get("id") or uuid4())
+    name = str(call.get("name") or "").strip()
+    raw_arguments = call.get("arguments", "{}")
+    try:
+        arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else dict(raw_arguments or {})
+    except (TypeError, ValueError):
+        arguments = {}
+    return call_id, name, arguments
+
+
+def _append_chat_tool_messages(
+    *,
+    messages: list[dict[str, Any]],
+    last_response: dict[str, Any],
+    assistant_tool_calls: list[dict[str, Any]],
+    tool_results: list[tuple[str, str, dict[str, Any]]],
+) -> None:
+    messages.append(
+        {
+            "role": "assistant",
+            "content": str(last_response.get("content") or ""),
+            "tool_calls": assistant_tool_calls,
+        }
+    )
+    for call_id, name, result in tool_results:
+        messages.append(
+            {
+                "role": "tool",
+                "tool_call_id": call_id,
+                "name": name,
+                "content": json.dumps(result),
+            }
+        )
+
+
 def _chat_with_tools(
     *,
     repository: DocumentRepository,
@@ -272,13 +308,7 @@ def _chat_with_tools(
         assistant_tool_calls: list[dict[str, Any]] = []
         tool_results: list[tuple[str, str, dict[str, Any]]] = []
         for call in tool_calls:
-            call_id = str(call.get("id") or uuid4())
-            name = str(call.get("name") or "").strip()
-            raw_arguments = call.get("arguments", "{}")
-            try:
-                arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else dict(raw_arguments or {})
-            except (TypeError, ValueError):
-                arguments = {}
+            call_id, name, arguments = _parse_chat_tool_call(call)
             assistant_tool_calls.append(
                 {
                     "id": call_id,
@@ -303,22 +333,12 @@ def _chat_with_tools(
                 ChatToolCallResponse(name=name, arguments=arguments, result_count=result_count)
             )
             debug_steps.append({"tool": name, "arguments": arguments, "result": result})
-        messages.append(
-            {
-                "role": "assistant",
-                "content": str(last_response.get("content") or ""),
-                "tool_calls": assistant_tool_calls,
-            }
+        _append_chat_tool_messages(
+            messages=messages,
+            last_response=last_response,
+            assistant_tool_calls=assistant_tool_calls,
+            tool_results=tool_results,
         )
-        for call_id, name, result in tool_results:
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": call_id,
-                    "name": name,
-                    "content": json.dumps(result),
-                }
-            )
         if len(tool_calls_for_response) >= 8:
             exhausted_tool_rounds = True
             break
@@ -430,13 +450,7 @@ def _iter_chat_events(
             assistant_tool_calls: list[dict[str, Any]] = []
             tool_results: list[tuple[str, str, dict[str, Any]]] = []
             for call in tool_calls:
-                call_id = str(call.get("id") or uuid4())
-                name = str(call.get("name") or "").strip()
-                raw_arguments = call.get("arguments", "{}")
-                try:
-                    arguments = json.loads(raw_arguments) if isinstance(raw_arguments, str) else dict(raw_arguments or {})
-                except (TypeError, ValueError):
-                    arguments = {}
+                call_id, name, arguments = _parse_chat_tool_call(call)
                 assistant_tool_calls.append(
                     {
                         "id": call_id,
@@ -464,22 +478,12 @@ def _iter_chat_events(
                 debug_steps.append({"tool": name, "arguments": arguments, "result": result})
                 yield _sse_event("tool_result", {"name": name, "result_count": result_count})
 
-            messages.append(
-                {
-                    "role": "assistant",
-                    "content": str(last_response.get("content") or ""),
-                    "tool_calls": assistant_tool_calls,
-                }
+            _append_chat_tool_messages(
+                messages=messages,
+                last_response=last_response,
+                assistant_tool_calls=assistant_tool_calls,
+                tool_results=tool_results,
             )
-            for call_id, name, result in tool_results:
-                messages.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": call_id,
-                        "name": name,
-                        "content": json.dumps(result),
-                    }
-                )
             if len(tool_calls_for_response) >= 8:
                 exhausted_tool_rounds = True
                 break
