@@ -275,6 +275,27 @@ def get_normalized_llm_preferences(preferences: dict[str, Any]) -> dict[str, Any
     }
 
 
+def resolve_ocr_provider(preferences: dict[str, Any]) -> str:
+    normalized_llm = get_normalized_llm_preferences(preferences)
+    if normalized_llm["llm_connections"]:
+        ocr_route = normalized_llm["llm_routing"]["ocr"]
+        if ocr_route["engine"] == "tesseract":
+            return "tesseract"
+        return "llm_separate"
+    provider_name = str(preferences.get("ocr_provider", "llm")).strip().lower()
+    if provider_name in {"tesseract", "llm", "llm_separate"}:
+        return provider_name
+    return "llm"
+
+
+def resolve_ocr_auto_switch(preferences: dict[str, Any]) -> bool:
+    raw = preferences.get("ocr_auto_switch", False)
+    if isinstance(raw, bool):
+        return raw
+    normalized = str(raw).strip().lower()
+    return normalized in {"true", "1", "on", "yes"}
+
+
 def resolve_task_config(preferences: dict[str, Any], task: str) -> ResolvedLLMTaskConfig | None:
     normalized = get_normalized_llm_preferences(preferences)
     connections = {

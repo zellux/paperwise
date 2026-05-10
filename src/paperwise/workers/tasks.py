@@ -10,7 +10,8 @@ from paperwise.application.services.history import (
 from paperwise.application.services.llm_preferences import (
     LLM_TASK_METADATA,
     LLM_TASK_OCR,
-    get_normalized_llm_preferences,
+    resolve_ocr_auto_switch,
+    resolve_ocr_provider,
 )
 from paperwise.application.services.llm_provider_factory import (
     resolve_llm_provider_from_preferences as resolve_configured_llm_provider,
@@ -45,26 +46,13 @@ def _build_llm_provider() -> LLMProvider | None:
 def _resolve_ocr_provider_for_owner(repository: DocumentRepository, owner_id: str) -> str:
     preference = repository.get_user_preference(owner_id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    normalized_llm = get_normalized_llm_preferences(preferences)
-    if normalized_llm["llm_connections"]:
-        ocr_route = normalized_llm["llm_routing"]["ocr"]
-        if ocr_route["engine"] == "tesseract":
-            return "tesseract"
-        return "llm_separate"
-    provider_name = str(preferences.get("ocr_provider", "llm")).strip().lower()
-    if provider_name in {"tesseract", "llm", "llm_separate"}:
-        return provider_name
-    return "llm"
+    return resolve_ocr_provider(preferences)
 
 
 def _resolve_ocr_auto_switch_for_owner(repository: DocumentRepository, owner_id: str) -> bool:
     preference = repository.get_user_preference(owner_id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    raw = preferences.get("ocr_auto_switch", False)
-    if isinstance(raw, bool):
-        return raw
-    normalized = str(raw).strip().lower()
-    return normalized in {"true", "1", "on", "yes"}
+    return resolve_ocr_auto_switch(preferences)
 
 
 def _resolve_llm_provider_from_preferences(

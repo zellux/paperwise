@@ -57,7 +57,8 @@ from paperwise.application.services.llm_connection_test import (
 from paperwise.application.services.llm_preferences import (
     LLM_TASK_METADATA,
     LLM_TASK_OCR,
-    get_normalized_llm_preferences,
+    resolve_ocr_auto_switch,
+    resolve_ocr_provider,
 )
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
@@ -358,16 +359,7 @@ def _resolve_ocr_provider_for_user(
 ) -> str:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    normalized_llm = get_normalized_llm_preferences(preferences)
-    if normalized_llm["llm_connections"]:
-        ocr_route = normalized_llm["llm_routing"]["ocr"]
-        if ocr_route["engine"] == "tesseract":
-            return "tesseract"
-        return "llm_separate"
-    provider_name = str(preferences.get("ocr_provider", "llm")).strip().lower()
-    if provider_name in {"tesseract", "llm", "llm_separate"}:
-        return provider_name
-    return "llm"
+    return resolve_ocr_provider(preferences)
 
 
 def _resolve_ocr_auto_switch_for_user(
@@ -377,11 +369,7 @@ def _resolve_ocr_auto_switch_for_user(
 ) -> bool:
     preference = repository.get_user_preference(current_user.id)
     preferences = dict(preference.preferences) if preference is not None else {}
-    raw = preferences.get("ocr_auto_switch", False)
-    if isinstance(raw, bool):
-        return raw
-    normalized = str(raw).strip().lower()
-    return normalized in {"true", "1", "on", "yes"}
+    return resolve_ocr_auto_switch(preferences)
 
 
 def _resolve_file_path_from_uri(blob_uri: str) -> Path | None:
