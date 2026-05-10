@@ -1,12 +1,14 @@
 from datetime import UTC, datetime
 from typing import Any
 from typing import Protocol
+from uuid import uuid4
 
 from paperwise.application.interfaces import ChatThreadRepository, PreferenceRepository
 from paperwise.domain.models import ChatThread, User, UserPreference
 
 CHAT_THREADS_PREFERENCE_KEY = "chat_threads"
 MAX_STORED_CHAT_MESSAGES = 40
+MAX_STORED_CHAT_MESSAGE_CHARS = 8000
 
 
 class LegacyChatThreadRepository(PreferenceRepository, ChatThreadRepository, Protocol):
@@ -21,6 +23,67 @@ def thread_title_from_messages(messages: list[dict[str, Any]]) -> str:
         if content:
             return content[:80]
     return "New chat"
+
+
+def truncate_stored_chat_content(value: str) -> str:
+    content = str(value or "").strip()
+    if len(content) <= MAX_STORED_CHAT_MESSAGE_CHARS:
+        return content
+    return content[:MAX_STORED_CHAT_MESSAGE_CHARS].rstrip() + "\n\n[truncated]"
+
+
+def stored_chat_messages(
+    *,
+    request_messages: list[dict[str, Any]],
+    assistant_message: dict[str, Any],
+) -> list[dict[str, Any]]:
+    messages: list[dict[str, Any]] = []
+    for message in request_messages:
+        role = str(message.get("role") or "").strip().lower()
+        content = str(message.get("content") or "").strip()
+        if role not in {"user", "assistant"} or not content:
+            continue
+        messages.append({"role": role, "content": truncate_stored_chat_content(content)})
+
+    stored_assistant_message = {
+        **assistant_message,
+        "role": "assistant",
+        "content": truncate_stored_chat_content(str(assistant_message.get("content") or "")),
+    }
+    messages.append(stored_assistant_message)
+    return messages[-MAX_STORED_CHAT_MESSAGES:]
+
+
+def save_chat_thread_turn(
+    *,
+    repository: LegacyChatThreadRepository,
+    current_user: User,
+    thread_id: str | None,
+    request_messages: list[dict[str, Any]],
+    assistant_message: dict[str, Any],
+    token_usage: dict[str, Any],
+) -> str:
+    migrate_legacy_chat_threads(repository, current_user)
+    resolved_thread_id = (thread_id or "").strip() or str(uuid4())
+    now = datetime.now(UTC)
+    previous = repository.get_chat_thread(current_user.id, resolved_thread_id)
+    messages = stored_chat_messages(
+        request_messages=request_messages,
+        assistant_message=assistant_message,
+    )
+    title = previous.title.strip() if previous is not None else thread_title_from_messages(messages)
+    repository.save_chat_thread(
+        ChatThread(
+            id=resolved_thread_id,
+            owner_id=current_user.id,
+            title=(title or thread_title_from_messages(messages))[:256],
+            messages=messages,
+            token_usage=token_usage,
+            created_at=previous.created_at if previous is not None else now,
+            updated_at=now,
+        )
+    )
+    return resolved_thread_id
 
 
 def migrate_legacy_chat_threads(repository: LegacyChatThreadRepository, current_user: User) -> None:

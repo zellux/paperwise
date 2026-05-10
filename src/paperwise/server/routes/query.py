@@ -1,5 +1,4 @@
 import json
-from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -17,9 +16,8 @@ from paperwise.application.services.grounded_qa import (
     search_document_chunks_multi_query,
 )
 from paperwise.application.services.chat_threads import (
-    MAX_STORED_CHAT_MESSAGES,
     migrate_legacy_chat_threads,
-    thread_title_from_messages,
+    save_chat_thread_turn,
 )
 from paperwise.application.services.llm_preferences import LLM_TASK_GROUNDED_QA
 from paperwise.domain.models import ChatThread, User
@@ -105,7 +103,6 @@ CHAT_SYSTEM_PROMPT = (
 )
 MAX_CHAT_TOOL_ROUNDS = 3
 MAX_CHAT_THREADS = 20
-MAX_STORED_CHAT_MESSAGE_CHARS = 8000
 
 
 CHAT_TOOLS: list[dict[str, Any]] = [
@@ -174,31 +171,6 @@ CHAT_TOOLS: list[dict[str, Any]] = [
 ]
 
 
-def _truncate_stored_chat_content(value: str) -> str:
-    content = str(value or "").strip()
-    if len(content) <= MAX_STORED_CHAT_MESSAGE_CHARS:
-        return content
-    return content[:MAX_STORED_CHAT_MESSAGE_CHARS].rstrip() + "\n\n[truncated]"
-
-
-def _stored_chat_messages(payload: ChatRequest, response: ChatResponse) -> list[dict[str, Any]]:
-    messages: list[dict[str, Any]] = []
-    for message in payload.messages:
-        role = message.role.strip().lower()
-        content = message.content.strip()
-        if role not in {"user", "assistant"} or not content:
-            continue
-        messages.append({"role": role, "content": _truncate_stored_chat_content(content)})
-    assistant_message: dict[str, Any] = {
-        "role": "assistant",
-        "content": _truncate_stored_chat_content(response.message.content),
-    }
-    if response.citations:
-        assistant_message["citations"] = [citation.model_dump(mode="json") for citation in response.citations]
-    messages.append(assistant_message)
-    return messages[-MAX_STORED_CHAT_MESSAGES:]
-
-
 def _save_chat_thread(
     *,
     repository: DocumentRepository,
@@ -206,24 +178,19 @@ def _save_chat_thread(
     payload: ChatRequest,
     response: ChatResponse,
 ) -> ChatResponse:
-    migrate_legacy_chat_threads(repository, current_user)
-    thread_id = (payload.thread_id or "").strip() or str(uuid4())
-    now = datetime.now(UTC)
-    previous = repository.get_chat_thread(current_user.id, thread_id)
-    messages = _stored_chat_messages(payload, response)
-    title = previous.title.strip() if previous is not None else thread_title_from_messages(messages)
-    repository.save_chat_thread(
-        ChatThread(
-            id=thread_id,
-            owner_id=current_user.id,
-            title=(title or thread_title_from_messages(messages))[:256],
-            messages=messages,
-            token_usage=response.token_usage.model_dump(mode="json"),
-            created_at=previous.created_at if previous is not None else now,
-            updated_at=now,
-        )
+    assistant_message: dict[str, Any] = {"content": response.message.content}
+    if response.citations:
+        assistant_message["citations"] = [
+            citation.model_dump(mode="json") for citation in response.citations
+        ]
+    response.thread_id = save_chat_thread_turn(
+        repository=repository,
+        current_user=current_user,
+        thread_id=payload.thread_id,
+        request_messages=[message.model_dump(mode="json") for message in payload.messages],
+        assistant_message=assistant_message,
+        token_usage=response.token_usage.model_dump(mode="json"),
     )
-    response.thread_id = thread_id
     return response
 
 
