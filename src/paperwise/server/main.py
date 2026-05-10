@@ -19,7 +19,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="paperwise API",
-        version="0.3.2",
+        version="0.4.0",
         description="AI-native document management platform API",
     )
     static_dir = Path(__file__).resolve().parent / "static"
