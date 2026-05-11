@@ -1,12 +1,10 @@
 from celery.utils.log import get_task_logger
 
 from paperwise.application.interfaces import DocumentRepository, LLMProvider
-from paperwise.application.services.file_relocation import move_blob_to_processed
 from paperwise.application.services.history import (
-    build_file_moved_history_event,
-    build_processing_completed_history_event,
     build_processing_failed_history_event,
 )
+from paperwise.application.services.document_pipeline import process_document
 from paperwise.application.services.llm_preferences import (
     LLM_TASK_METADATA,
     LLM_TASK_OCR,
@@ -15,13 +13,10 @@ from paperwise.application.services.llm_provider_factory import (
     resolve_llm_provider_for_user,
     resolve_ocr_llm_provider_for_user,
 )
-from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.ocr_preferences import (
     resolve_owner_ocr_auto_switch,
     resolve_owner_ocr_provider,
 )
-from paperwise.application.services.parsing import parse_document_blob
-from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.domain.models import DocumentStatus, HistoryActorType
 from paperwise.infrastructure.config import get_settings
 from paperwise.infrastructure.factories import build_document_repository, build_llm_provider
@@ -189,67 +184,21 @@ def parse_document_task(
             provider_override=provider_override,
             ocr_provider=ocr_provider,
         )
-        parsed = parse_document_blob(
-            document_id=document_id,
-            blob_uri=active_blob_uri,
-            content_type=content_type,
+        pipeline_result = process_document(
+            document=document,
+            repository=repository,
+            object_store_root=settings.object_store_root,
+            metadata_llm_provider=metadata_llm_provider,
             ocr_provider=ocr_provider,
-            llm_provider=ocr_llm_provider,
+            ocr_llm_provider=ocr_llm_provider,
             ocr_auto_switch=ocr_auto_switch,
-        )
-        repository.save_parse_result(parsed)
-        chunk_count = index_document_chunks(
-            repository=repository,
-            document=document,
-            parse_result=parsed,
-        )
-        logger.info("Indexed %d chunk(s) for document_id=%s", chunk_count, document.id)
-        llm_result = parse_with_llm(
-            document=document,
-            parse_result=parsed,
-            repository=repository,
-            llm_provider=metadata_llm_provider,
             actor_type=HistoryActorType.SYSTEM,
             actor_id=None,
             history_source="worker.parse_document",
+            parse_blob_uri=active_blob_uri,
+            content_type=content_type,
         )
-        previous_blob_uri = document.blob_uri
-        document.blob_uri = move_blob_to_processed(
-            blob_uri=previous_blob_uri,
-            object_store_root=settings.object_store_root,
-            document_id=document.id,
-            original_filename=document.filename,
-            content_type=document.content_type,
-            checksum_sha256=document.checksum_sha256,
-            size_bytes=document.size_bytes,
-        )
-        previous_status = document.status.value
-        document.status = DocumentStatus.READY
-        repository.save(document)
-        repository.append_history_events(
-            [
-                build_processing_completed_history_event(
-                    document_id=document.id,
-                    actor_type=HistoryActorType.SYSTEM,
-                    actor_id=None,
-                    source="worker.parse_document",
-                    previous_status=previous_status,
-                    current_status=document.status.value,
-                    parse_result=parsed,
-                    llm_result=llm_result,
-                )
-            ]
-        )
-        file_move_event = build_file_moved_history_event(
-            document_id=document.id,
-            actor_type=HistoryActorType.SYSTEM,
-            actor_id=None,
-            source="worker.parse_document",
-            from_blob_uri=previous_blob_uri,
-            to_blob_uri=document.blob_uri,
-        )
-        if file_move_event is not None:
-            repository.append_history_events([file_move_event])
+        logger.info("Indexed %d chunk(s) for document_id=%s", pipeline_result.indexed_chunk_count, document.id)
     except Exception as exc:
         logger.exception("analysis pipeline failed for document_id=%s", document_id)
         previous_status = document.status.value
@@ -275,13 +224,13 @@ def parse_document_task(
         "analysis complete document_id=%s filename=%s bytes=%d pages=%d content_type=%s",
         document_id,
         filename,
-        parsed.size_bytes,
-        parsed.page_count,
+        pipeline_result.parse_result.size_bytes,
+        pipeline_result.parse_result.page_count,
         content_type,
     )
     return {
         "document_id": document_id,
-        "bytes": parsed.size_bytes,
-        "parser": parsed.parser,
+        "bytes": pipeline_result.parse_result.size_bytes,
+        "parser": pipeline_result.parse_result.parser,
         "status": "ready",
     }

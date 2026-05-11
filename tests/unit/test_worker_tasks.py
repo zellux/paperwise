@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from paperwise.domain.models import Document, DocumentStatus, ParseResult, UserPreference
+from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, ParseResult, UserPreference
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -8,6 +8,7 @@ from paperwise.application.services.ocr_preferences import (
     resolve_owner_ocr_auto_switch,
     resolve_owner_ocr_provider,
 )
+from paperwise.application.services import document_pipeline
 from paperwise.workers import tasks as worker_tasks
 
 
@@ -88,11 +89,11 @@ def test_parse_document_task_uses_current_document_blob_uri(monkeypatch) -> None
     monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_auto_switch", lambda *args, **kwargs: False)
     monkeypatch.setattr(worker_tasks, "_resolve_metadata_llm_provider_for_owner", lambda *args, **kwargs: object())
     monkeypatch.setattr(worker_tasks, "_resolve_ocr_llm_provider_for_owner", lambda *args, **kwargs: object())
-    monkeypatch.setattr(worker_tasks, "parse_document_blob", fake_parse_document_blob)
-    monkeypatch.setattr(worker_tasks, "index_document_chunks", lambda **kwargs: 1)
-    monkeypatch.setattr(worker_tasks, "parse_with_llm", lambda **kwargs: None)
+    monkeypatch.setattr(document_pipeline, "parse_document_blob", fake_parse_document_blob)
+    monkeypatch.setattr(document_pipeline, "index_document_chunks", lambda **kwargs: 1)
+    monkeypatch.setattr(document_pipeline, "parse_with_llm", lambda **kwargs: _fake_llm_parse_result("doc-1"))
     monkeypatch.setattr(
-        worker_tasks,
+        document_pipeline,
         "move_blob_to_processed",
         lambda **kwargs: "processed/doc-1/doc-1_image.jpg",
     )
@@ -136,7 +137,7 @@ def test_parse_document_task_marks_document_failed_and_records_history(monkeypat
     monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_auto_switch", lambda *args, **kwargs: False)
     monkeypatch.setattr(worker_tasks, "_resolve_metadata_llm_provider_for_owner", lambda *args, **kwargs: object())
     monkeypatch.setattr(worker_tasks, "_resolve_ocr_llm_provider_for_owner", lambda *args, **kwargs: object())
-    monkeypatch.setattr(worker_tasks, "parse_document_blob", fail_parse_document_blob)
+    monkeypatch.setattr(document_pipeline, "parse_document_blob", fail_parse_document_blob)
 
     try:
         worker_tasks.parse_document_task(
@@ -196,7 +197,7 @@ def test_parse_document_task_skips_duplicate_ready_document(monkeypatch) -> None
         raise AssertionError("parse_document_blob should not be called for already-ready documents")
 
     monkeypatch.setattr(worker_tasks, "build_document_repository", lambda settings: repository)
-    monkeypatch.setattr(worker_tasks, "parse_document_blob", fake_parse_document_blob)
+    monkeypatch.setattr(document_pipeline, "parse_document_blob", fake_parse_document_blob)
 
     result = worker_tasks.parse_document_task(
         document_id="doc-1",
@@ -215,3 +216,18 @@ def test_parse_document_task_skips_duplicate_ready_document(monkeypatch) -> None
         "parser": "stub-llm-ocr-separate",
         "status": "ready",
     }
+
+
+def _fake_llm_parse_result(document_id: str) -> LLMParseResult:
+    return LLMParseResult(
+        document_id=document_id,
+        suggested_title="Sample",
+        document_date=None,
+        correspondent="",
+        document_type="",
+        tags=[],
+        created_correspondent=False,
+        created_document_type=False,
+        created_tags=[],
+        created_at=datetime.now(UTC),
+    )

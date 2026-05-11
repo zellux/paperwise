@@ -64,15 +64,12 @@ from paperwise.application.services.document_file_cleanup import (
     resolve_blob_path_from_uri,
     resolve_file_path_from_uri,
 )
-from paperwise.application.services.file_relocation import move_blob_to_processed
 from paperwise.application.services.filenames import sanitize_storage_filename
 from paperwise.application.services.document_listing import count_filtered_documents, list_filtered_documents
 from paperwise.application.services.history import (
-    build_file_moved_history_event,
-    build_processing_completed_history_event,
     build_processing_restarted_history_event,
 )
-from paperwise.application.services.llm_parsing import parse_with_llm
+from paperwise.application.services.document_pipeline import process_document
 from paperwise.application.services.llm_connection_test import (
     LLMConnectionConfigError,
     LLMConnectionTestInput,
@@ -597,86 +594,24 @@ def llm_parse_document_endpoint(
         ocr_provider=ocr_provider,
     )
     try:
-        parse_result = repository.get_parse_result(document_id)
-        if parse_result is None:
-            _set_document_status(
-                document=document,
-                repository=repository,
-                status_value=DocumentStatus.PROCESSING,
-            )
-            parse_result = _run_parse_document_blob_or_400(
-                document_id=document.id,
-                blob_uri=document.blob_uri,
-                content_type=document.content_type,
-                ocr_provider=ocr_provider,
-                llm_provider=ocr_llm_provider,
-                ocr_auto_switch=ocr_auto_switch,
-            )
-            repository.save_parse_result(parse_result)
-            index_document_chunks(
-                repository=repository,
-                document=document,
-                parse_result=parse_result,
-            )
-        else:
-            _set_document_status(
-                document=document,
-                repository=repository,
-                status_value=DocumentStatus.PROCESSING,
-            )
-        result = parse_with_llm(
+        pipeline_result = process_document(
             document=document,
-            parse_result=parse_result,
             repository=repository,
-            llm_provider=llm_provider,
+            object_store_root=settings.object_store_root,
+            metadata_llm_provider=llm_provider,
+            ocr_provider=ocr_provider,
+            ocr_llm_provider=ocr_llm_provider,
+            ocr_auto_switch=ocr_auto_switch,
             actor_type=HistoryActorType.USER,
             actor_id=current_user.id,
             history_source="api.llm_parse",
         )
-    except Exception:
-        raise
-
-    _set_document_status(
-        document=document,
-        repository=repository,
-        status_value=DocumentStatus.READY,
-    )
-    previous_blob_uri = document.blob_uri
-    document.blob_uri = move_blob_to_processed(
-        blob_uri=previous_blob_uri,
-        object_store_root=settings.object_store_root,
-        document_id=document.id,
-        original_filename=document.filename,
-        content_type=document.content_type,
-        checksum_sha256=document.checksum_sha256,
-        size_bytes=document.size_bytes,
-    )
-    repository.save(document)
-    repository.append_history_events(
-        [
-            build_processing_completed_history_event(
-                document_id=document.id,
-                actor_type=HistoryActorType.USER,
-                actor_id=current_user.id,
-                source="api.llm_parse",
-                previous_status=DocumentStatus.PROCESSING.value,
-                current_status=document.status.value,
-                parse_result=parse_result,
-                llm_result=result,
-            )
-        ]
-    )
-    file_move_event = build_file_moved_history_event(
-        document_id=document.id,
-        actor_type=HistoryActorType.USER,
-        actor_id=current_user.id,
-        source="api.llm_parse",
-        from_blob_uri=previous_blob_uri,
-        to_blob_uri=document.blob_uri,
-    )
-    if file_move_event is not None:
-        repository.append_history_events([file_move_event])
-    return present_llm_parse_result(result)
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    return present_llm_parse_result(pipeline_result.llm_result)
 
 
 @router.get("/{document_id}/llm-parse", response_model=LLMParseResultResponse)
