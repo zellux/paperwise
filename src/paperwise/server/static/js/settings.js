@@ -2,11 +2,18 @@ import {
   apiFetch,
 } from "paperwise/shared";
 import {
-  LLM_TASK_LABELS,
   appState,
   applyTheme,
-  createEmptyConnection,
   formatApiErrorDetail,
+  hydrateSettingsFormFromInitialPreferences,
+  logActivity,
+  normalizeThemeName,
+  refreshUploadAvailability,
+  saveUserPreferences,
+} from "paperwise/app";
+import {
+  LLM_TASK_LABELS,
+  createEmptyConnection,
   getConnectionApiKeyPlaceholder,
   getConnectionBaseUrlHelpText,
   getConnectionById,
@@ -14,18 +21,13 @@ import {
   getLlmProviderDefaults,
   getOcrLlmProviderDefaults,
   getResolvedTaskSettings,
-  hydrateSettingsFormFromInitialPreferences,
-  logActivity,
   normalizeConnection,
   normalizeLlmProvider,
   normalizeOcrProvider,
-  normalizeThemeName,
   providerShowsBaseUrlField,
   providerUsesManagedBaseUrl,
-  refreshUploadAvailability,
   sanitizeLlmRouting,
-  saveUserPreferences,
-} from "paperwise/app";
+} from "./state/llm.js";
 import {
   normalizeGroundedQaMaxDocuments,
   normalizeGroundedQaTopK,

@@ -2,10 +2,10 @@ import {
   apiFetch,
 } from "paperwise/shared";
 import {
-  getLlmUploadBlockReason,
   logActivity,
   navigateToDocument,
 } from "paperwise/app";
+import { getLlmUploadBlockReason } from "./state/llm.js";
 
 let uploadInProgress = false;
 let uploadSelectionContext = { source: "files", folderName: "" };
