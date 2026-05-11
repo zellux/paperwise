@@ -4,6 +4,36 @@ import json
 from urllib.parse import quote
 
 
+_TAG_COLOR_SET = (
+    "#8e5bcb",
+    "#1d6a55",
+    "#b0552f",
+    "#c47a2a",
+    "#2c6488",
+    "#7a5c2e",
+    "#8b4778",
+    "#3d7a66",
+    "#9f4a28",
+    "#4f6f9f",
+    "#6b5b95",
+    "#2f7a8a",
+)
+
+
+def _stable_tag_color(value: str) -> str:
+    normalized = str(value or "").strip().casefold()
+    if not normalized:
+        return "#7c8783"
+    hash_value = 0
+    for char in normalized:
+        hash_value = ((hash_value * 33) + ord(char)) % 2147483647
+    return _TAG_COLOR_SET[hash_value % len(_TAG_COLOR_SET)]
+
+
+def _tag_color_style(value: str) -> str:
+    return f' style="--tag-color: {_stable_tag_color(value)};"'
+
+
 def tag_rows_html(tag_stats: list[dict]) -> str:
     if not tag_stats:
         return '                <tr><td colspan="3">No tags found.</td></tr>'
@@ -15,7 +45,9 @@ def tag_rows_html(tag_stats: list[dict]) -> str:
         count = int(stat.get("document_count") or 0)
         rows.append(
             "                <tr>"
-            f'<td data-label="Tag">{tag}</td>'
+            f'<td data-label="Tag"><span class="tag-list-label"{_tag_color_style(raw_tag)}>'
+            '<span class="tag-swatch" aria-hidden="true"></span>'
+            f"<span>{tag}</span></span></td>"
             f'<td data-label="Documents">{count}</td>'
             '<td data-label="Action"><div class="table-actions">'
             f'<a class="btn" href="/ui/documents?tag={tag_query}" title="View documents for tag {tag}">'
@@ -137,23 +169,6 @@ def _initials(value: str) -> str:
     return cleaned[:2].upper()
 
 
-def _tag_slug(value: str) -> str:
-    lowered = str(value or "").strip().lower()
-    if not lowered:
-        return "misc"
-    if lowered.startswith("identity"):
-        return "identity"
-    if lowered.startswith("finance"):
-        return "finance"
-    if lowered.startswith("health"):
-        return "health"
-    if lowered.startswith("home"):
-        return "home"
-    if lowered.startswith("work"):
-        return "work"
-    return "misc"
-
-
 def document_sidebar_tags_html(tag_stats: list[dict], *, limit: int = 12) -> str:
     if not tag_stats:
         return '<span class="docs-side-empty">No tags yet</span>'
@@ -167,7 +182,7 @@ def document_sidebar_tags_html(tag_stats: list[dict], *, limit: int = 12) -> str
         count = int(stat.get("document_count") or 0)
         rows.append(
             f'<a class="docs-side-row docs-tag-row" href="/ui/documents?tag={tag_query}">'
-            f'<span class="tag-swatch tag-{escape(_tag_slug(raw_tag), quote=True)}" aria-hidden="true"></span>'
+            f'<span class="tag-swatch"{_tag_color_style(raw_tag)} aria-hidden="true"></span>'
             f"<span>{tag}</span>"
             f'<span class="docs-side-count">{count:,}</span>'
             "</a>"
@@ -412,8 +427,8 @@ def document_rows_html(documents: list[dict]) -> str:
         correspondent = escape(correspondent_raw)
         tags = metadata.get("tags") if isinstance(metadata.get("tags"), list) else []
         tag_pills = "".join(
-            '<span class="tag-pill">'
-            f'<span class="tag-swatch tag-swatch-xs tag-{escape(_tag_slug(str(tag)), quote=True)}" aria-hidden="true"></span>'
+            f'<span class="tag-pill"{_tag_color_style(str(tag))}>'
+            '<span class="tag-swatch tag-swatch-xs" aria-hidden="true"></span>'
             f"{escape(str(tag))}</span>"
             for tag in tags[:3]
         )

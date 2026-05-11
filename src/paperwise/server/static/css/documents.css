@@ -814,10 +814,10 @@
   gap: 6px;
   min-height: 24px;
   padding: 4px 9px;
-  border: 1px solid var(--stroke-soft);
+  border: 1px solid color-mix(in srgb, var(--tag-color, var(--stroke)) 28%, var(--stroke-soft));
   border-radius: 5px;
-  background: var(--paper);
-  color: var(--ink);
+  background: color-mix(in srgb, var(--tag-color, var(--paper)) 8%, var(--paper));
+  color: color-mix(in srgb, var(--tag-color, var(--ink)) 72%, var(--ink));
   font-size: 0.72rem;
   font-weight: 600;
   line-height: 1.2;
@@ -831,7 +831,7 @@
   width: 8px;
   height: 8px;
   border-radius: 2px;
-  background: var(--ink-mute);
+  background: var(--tag-color, var(--ink-mute));
 }
 
 .tag-swatch-xs {
@@ -839,28 +839,12 @@
   height: 7px;
 }
 
-.tag-identity {
-  background: #8e5bcb;
-}
-
-.tag-finance {
-  background: var(--accent);
-}
-
-.tag-health {
-  background: #b0552f;
-}
-
-.tag-home {
-  background: #c47a2a;
-}
-
-.tag-work {
-  background: #2c6488;
-}
-
-.tag-misc {
-  background: var(--ink-mute);
+.tag-list-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: color-mix(in srgb, var(--tag-color, var(--ink)) 72%, var(--ink));
+  font-weight: 700;
 }
 
 .td-date,

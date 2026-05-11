@@ -697,7 +697,8 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             {"tag": "Tax", "document_count": 1},
         ]
         tags_html = client.get("/ui/tags").text
-        assert '<td data-label="Tag">Finance</td>' in tags_html
+        assert '<td data-label="Tag"><span class="tag-list-label" style="--tag-color: ' in tags_html
+        assert '<span class="tag-swatch" aria-hidden="true"></span><span>Finance</span>' in tags_html
         assert '<td data-label="Documents">2</td>' in tags_html
         assert (
             '<a class="btn" href="/ui/documents?tag=Finance" '
