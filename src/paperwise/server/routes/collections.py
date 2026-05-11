@@ -29,6 +29,11 @@ from paperwise.server.schemas.collections import (
     SearchRequest,
     SearchResponse,
 )
+from paperwise.server.presenters.collections import (
+    present_ask_response,
+    present_collection_from_repository,
+    present_search_response,
+)
 from paperwise.server.llm_provider import resolve_http_llm_provider_for_user
 
 router = APIRouter(prefix="/collections", tags=["collections"])
@@ -68,7 +73,7 @@ def create_collection_endpoint(
         updated_at=now,
     )
     repository.create_collection(collection)
-    return CollectionResponse.from_repository(repository=repository, collection=collection)
+    return present_collection_from_repository(repository=repository, collection=collection)
 
 
 @router.get("", response_model=list[CollectionResponse])
@@ -77,7 +82,7 @@ def list_collections_endpoint(
     current_user: User = Depends(current_user_dependency),
 ) -> list[CollectionResponse]:
     collections = repository.list_collections(current_user.id)
-    return [CollectionResponse.from_repository(repository=repository, collection=item) for item in collections]
+    return [present_collection_from_repository(repository=repository, collection=item) for item in collections]
 
 
 @router.get("/{collection_id}", response_model=CollectionResponse)
@@ -91,7 +96,7 @@ def get_collection_endpoint(
         repository=repository,
         current_user=current_user,
     )
-    return CollectionResponse.from_repository(repository=repository, collection=collection)
+    return present_collection_from_repository(repository=repository, collection=collection)
 
 
 @router.delete("/{collection_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -195,7 +200,7 @@ def search_all_documents_endpoint(
         limit=max(payload.limit * 4, payload.limit),
         document_ids=scoped_ids,
     )
-    return SearchResponse.from_chunk_hits(
+    return present_search_response(
         repository=repository,
         query=payload.query,
         limit=payload.limit,
@@ -230,7 +235,7 @@ def search_collection_documents_endpoint(
         limit=max(payload.limit * 4, payload.limit),
         document_ids=scoped_ids,
     )
-    return SearchResponse.from_chunk_hits(
+    return present_search_response(
         repository=repository,
         query=payload.query,
         limit=payload.limit,
@@ -281,7 +286,7 @@ def ask_all_documents_endpoint(
         )
     except GroundedQATimeoutError as exc:
         raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(exc)) from exc
-    return AskResponse.from_grounded_qa_result(result)
+    return present_ask_response(result)
 
 
 @router.post("/{collection_id}/ask", response_model=AskResponse)
@@ -334,4 +339,4 @@ def ask_collection_documents_endpoint(
         )
     except GroundedQATimeoutError as exc:
         raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail=str(exc)) from exc
-    return AskResponse.from_grounded_qa_result(result)
+    return present_ask_response(result)

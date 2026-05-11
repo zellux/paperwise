@@ -31,6 +31,10 @@ from paperwise.server.schemas.chat import (
     ChatTokenUsageResponse,
     ChatToolCallResponse,
 )
+from paperwise.server.presenters.chat import (
+    present_chat_thread,
+    present_chat_thread_summary,
+)
 from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
@@ -153,7 +157,7 @@ def list_chat_threads_endpoint(
 ) -> list[ChatThreadSummaryResponse]:
     migrate_legacy_chat_threads(repository, current_user)
     return [
-        ChatThreadSummaryResponse.from_domain(thread)
+        present_chat_thread_summary(thread)
         for thread in repository.list_chat_threads(current_user.id, MAX_CHAT_THREADS)
     ]
 
@@ -167,7 +171,7 @@ def get_chat_thread_endpoint(
     migrate_legacy_chat_threads(repository, current_user)
     thread = repository.get_chat_thread(current_user.id, thread_id)
     if thread is not None:
-        return ChatThreadResponse.from_domain(thread)
+        return present_chat_thread(thread)
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat thread not found.")
 
 

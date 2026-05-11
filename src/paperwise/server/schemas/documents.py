@@ -3,8 +3,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult, ParseResult
-
 
 class MetadataUpdateRequest(BaseModel):
     suggested_title: str
@@ -42,10 +40,6 @@ class DocumentResponse(BaseModel):
     status: str
     created_at: datetime
 
-    @classmethod
-    def from_domain(cls, document: Document) -> "DocumentResponse":
-        return cls.model_validate(document)
-
 
 class DocumentListMetadata(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -56,24 +50,9 @@ class DocumentListMetadata(BaseModel):
     document_type: str
     tags: list[str]
 
-    @classmethod
-    def from_llm_result(cls, result: LLMParseResult | None) -> "DocumentListMetadata | None":
-        if result is None:
-            return None
-        return cls.model_validate(result)
-
 
 class DocumentListItemResponse(DocumentResponse):
     llm_metadata: DocumentListMetadata | None = None
-
-    @classmethod
-    def from_domain(
-        cls,
-        document: Document,
-        llm_result: LLMParseResult | None = None,
-    ) -> "DocumentListItemResponse":
-        base = DocumentResponse.from_domain(document).model_dump()
-        return cls(**base, llm_metadata=DocumentListMetadata.from_llm_result(llm_result))
 
 
 class ParseResultResponse(BaseModel):
@@ -86,10 +65,6 @@ class ParseResultResponse(BaseModel):
     page_count: int
     text_preview: str
     created_at: datetime
-
-    @classmethod
-    def from_domain(cls, result: ParseResult) -> "ParseResultResponse":
-        return cls.model_validate(result)
 
 
 class LLMParseResultResponse(BaseModel):
@@ -106,10 +81,6 @@ class LLMParseResultResponse(BaseModel):
     created_tags: list[str]
     created_at: datetime
 
-    @classmethod
-    def from_domain(cls, result: LLMParseResult) -> "LLMParseResultResponse":
-        return cls.model_validate(result)
-
 
 class DocumentHistoryEventResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -122,10 +93,6 @@ class DocumentHistoryEventResponse(BaseModel):
     source: str
     changes: dict[str, Any]
     created_at: datetime
-
-    @classmethod
-    def from_domain(cls, event: DocumentHistoryEvent) -> "DocumentHistoryEventResponse":
-        return cls.model_validate(event)
 
 
 class TaxonomyResponse(BaseModel):
@@ -172,18 +139,3 @@ class DocumentDetailResponse(BaseModel):
     llm_metadata: DocumentListMetadata | None = None
     ocr_text_preview: str | None = None
     ocr_parsed_at: datetime | None = None
-
-    @classmethod
-    def from_domain(
-        cls,
-        *,
-        document: Document,
-        llm_result: LLMParseResult | None,
-        parse_result: ParseResult | None,
-    ) -> "DocumentDetailResponse":
-        return cls(
-            document=DocumentResponse.from_domain(document),
-            llm_metadata=DocumentListMetadata.from_llm_result(llm_result),
-            ocr_text_preview=parse_result.text_preview if parse_result is not None else None,
-            ocr_parsed_at=parse_result.created_at if parse_result is not None else None,
-        )

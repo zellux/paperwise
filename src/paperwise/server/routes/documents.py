@@ -38,6 +38,14 @@ from paperwise.server.schemas.documents import (
     LLMConnectionTestRequest,
     MetadataUpdateRequest,
 )
+from paperwise.server.presenters.documents import (
+    present_document,
+    present_document_detail,
+    present_document_history_event,
+    present_document_list_item,
+    present_llm_parse_result,
+    present_parse_result,
+)
 from paperwise.application.interfaces import (
     DocumentRepository,
     IngestionDispatcher,
@@ -239,7 +247,7 @@ def list_documents_endpoint(
         offset=offset,
     )
     return [
-        DocumentListItemResponse.from_domain(document=document, llm_result=llm_result)
+        present_document_list_item(document=document, llm_result=llm_result)
         for document, llm_result in listing.rows
     ]
 
@@ -274,7 +282,7 @@ def list_pending_documents_endpoint(
     current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentListItemResponse]:
     return [
-        DocumentListItemResponse.from_domain(
+        present_document_list_item(
             document=document,
             llm_result=llm_result,
         )
@@ -377,7 +385,7 @@ def get_document_endpoint(
         repository=repository,
         current_user=current_user,
     )
-    return DocumentResponse.from_domain(document)
+    return present_document(document)
 
 
 @router.get("/{document_id}/detail", response_model=DocumentDetailResponse)
@@ -393,7 +401,7 @@ def get_document_detail_endpoint(
     )
     llm_result = repository.get_llm_parse_result(document_id)
     parse_result = repository.get_parse_result(document_id)
-    return DocumentDetailResponse.from_domain(
+    return present_document_detail(
         document=document,
         llm_result=llm_result,
         parse_result=parse_result,
@@ -548,7 +556,7 @@ def parse_document_endpoint(
         document=document,
         parse_result=result,
     )
-    return ParseResultResponse.from_domain(result)
+    return present_parse_result(result)
 
 
 @router.get("/{document_id}/parse", response_model=ParseResultResponse)
@@ -568,7 +576,7 @@ def get_parse_document_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Parse result not found",
         )
-    return ParseResultResponse.from_domain(result)
+    return present_parse_result(result)
 
 
 @router.post("/{document_id}/llm-parse", response_model=LLMParseResultResponse)
@@ -683,7 +691,7 @@ def llm_parse_document_endpoint(
     )
     if file_move_event is not None:
         repository.append_history_events([file_move_event])
-    return LLMParseResultResponse.from_domain(result)
+    return present_llm_parse_result(result)
 
 
 @router.get("/{document_id}/llm-parse", response_model=LLMParseResultResponse)
@@ -703,7 +711,7 @@ def get_llm_parse_document_endpoint(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="LLM parse result not found",
         )
-    return LLMParseResultResponse.from_domain(result)
+    return present_llm_parse_result(result)
 
 
 @router.patch("/{document_id}/metadata", response_model=LLMParseResultResponse)
@@ -731,7 +739,7 @@ def update_document_metadata_endpoint(
         actor_id=current_user.id,
         history_source="api.patch_metadata",
     )
-    return LLMParseResultResponse.from_domain(result)
+    return present_llm_parse_result(result)
 
 
 @router.get("/{document_id}/history", response_model=list[DocumentHistoryEventResponse])
@@ -747,7 +755,7 @@ def list_document_history_endpoint(
         current_user=current_user,
     )
     return [
-        DocumentHistoryEventResponse.from_domain(event)
+        present_document_history_event(event)
         for event in repository.list_history(document_id=document_id, limit=limit)
     ]
 

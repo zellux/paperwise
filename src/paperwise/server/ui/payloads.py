@@ -1,16 +1,16 @@
 from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult
-from paperwise.server.schemas.documents import (
-    DocumentHistoryEventResponse,
-    DocumentListItemResponse,
+from paperwise.server.presenters.documents import (
+    present_document_history_event,
+    present_document_list_item,
 )
 
 
 def document_list_item(document: Document, llm_result: LLMParseResult | None) -> dict:
-    return DocumentListItemResponse.from_domain(
+    return present_document_list_item(
         document=document,
         llm_result=llm_result,
     ).model_dump(mode="json")
 
 
 def history_event_item(event: DocumentHistoryEvent) -> dict:
-    return DocumentHistoryEventResponse.from_domain(event).model_dump(mode="json")
+    return present_document_history_event(event).model_dump(mode="json")

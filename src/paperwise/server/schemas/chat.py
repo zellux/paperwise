@@ -2,8 +2,6 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from paperwise.domain.models import ChatThread
-
 
 class ChatMessageRequest(BaseModel):
     role: str = Field(min_length=1, max_length=20)
@@ -61,29 +59,7 @@ class ChatThreadSummaryResponse(BaseModel):
     created_at: str
     updated_at: str
 
-    @classmethod
-    def from_domain(cls, thread: ChatThread) -> "ChatThreadSummaryResponse":
-        return cls(
-            id=thread.id,
-            title=thread.title or "Untitled chat",
-            message_count=len(thread.messages),
-            created_at=thread.created_at.isoformat(),
-            updated_at=thread.updated_at.isoformat(),
-        )
-
 
 class ChatThreadResponse(ChatThreadSummaryResponse):
     messages: list[dict[str, Any]]
     token_usage: ChatTokenUsageResponse = Field(default_factory=ChatTokenUsageResponse)
-
-    @classmethod
-    def from_domain(cls, thread: ChatThread) -> "ChatThreadResponse":
-        usage = dict(thread.token_usage or {})
-        return cls(
-            **ChatThreadSummaryResponse.from_domain(thread).model_dump(mode="json"),
-            messages=[dict(message) for message in thread.messages],
-            token_usage=ChatTokenUsageResponse(
-                total_tokens=int(usage.get("total_tokens") or 0),
-                llm_requests=int(usage.get("llm_requests") or 0),
-            ),
-        )
