@@ -405,6 +405,8 @@
 
 .docs-tag-row {
   grid-template-columns: 20px minmax(0, 1fr) auto;
+  padding-left: 10px;
+  padding-right: 10px;
 }
 
 .docs-corr-row {
@@ -430,11 +432,6 @@
   gap: 16px;
   padding: 22px 26px 16px;
   border-bottom: 1px solid var(--stroke-soft);
-}
-
-.documents-workbench .page-eyebrow {
-  margin: 0 0 6px;
-  font-size: 0.82rem;
 }
 
 .docs-head-actions {
@@ -808,20 +805,22 @@
 .td-tags {
   display: flex !important;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 6px;
 }
 
 .tag-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 7px;
+  min-height: 24px;
+  padding: 4px 9px;
   border: 1px solid var(--stroke-soft);
   border-radius: 5px;
   background: var(--paper);
   color: var(--ink);
   font-size: 0.72rem;
   font-weight: 600;
+  line-height: 1.2;
 }
 
 .tag-more {
