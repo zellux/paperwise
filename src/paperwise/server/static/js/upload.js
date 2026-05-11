@@ -1,3 +1,12 @@
+import {
+  apiFetch,
+} from "paperwise/shared";
+import {
+  getLlmUploadBlockReason,
+  logActivity,
+  navigateToDocument,
+} from "paperwise/app";
+
 let uploadInProgress = false;
 let uploadSelectionContext = { source: "files", folderName: "" };
 let uploadEventsBound = false;
@@ -195,7 +204,7 @@ async function uploadDocumentFile(file) {
   return payload;
 }
 
-function syncUploadAvailability(options = {}) {
+export function syncUploadAvailability(options = {}) {
   const {
     fileInput,
     folderInput,
@@ -424,10 +433,10 @@ function bindUploadEvents() {
   uploadEventsBound = true;
 }
 
-window.initializePaperwisePage = async ({ authenticated }) => {
+export async function initializePage({ authenticated }) {
   if (authenticated !== true) {
     return;
   }
   bindUploadEvents();
   syncUploadAvailability();
-};
+}

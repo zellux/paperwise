@@ -1,13 +1,14 @@
+import {
+  apiFetch,
+  fetchHtmlPartial,
+  replaceElementHtml,
+} from "paperwise/shared";
+
 let currentDocumentId = "";
 let currentUser = null;
 const THEME_STORAGE_KEY =
   document.documentElement?.dataset?.uiThemeStorageKey || "paperwise.ui.theme";
 let currentTheme = "forge";
-const LLM_TASK_LABELS = {
-  metadata: "Metadata Extraction",
-  grounded_qa: "Search and Ask Your Docs",
-  ocr: "OCR",
-};
 let ocrProvider = "llm";
 let ocrImageDetail = "auto";
 let ocrAutoSwitch = false;
@@ -31,8 +32,89 @@ let supportedLlmProvidersCache;
 let supportedOcrProvidersCache;
 let llmProviderDefaultsCache;
 let ocrLlmProviderDefaultsCache;
+let activePageModule = null;
+let activePageModuleName = "";
+let activePageAssetQuery = "";
 
-function normalizePageSize(value) {
+export const LLM_TASK_LABELS = {
+  metadata: "Metadata Extraction",
+  grounded_qa: "Search and Ask Your Docs",
+  ocr: "OCR",
+};
+
+export const appState = {
+  get currentDocumentId() {
+    return currentDocumentId;
+  },
+  set currentDocumentId(value) {
+    currentDocumentId = String(value || "");
+  },
+  get currentUser() {
+    return currentUser;
+  },
+  get currentTheme() {
+    return currentTheme;
+  },
+  get docsPageSize() {
+    return docsPageSize;
+  },
+  set docsPageSize(value) {
+    docsPageSize = normalizePageSize(value);
+  },
+  get groundedQaTopK() {
+    return groundedQaTopK;
+  },
+  set groundedQaTopK(value) {
+    groundedQaTopK = normalizeGroundedQaTopK(value);
+  },
+  get groundedQaMaxDocuments() {
+    return groundedQaMaxDocuments;
+  },
+  set groundedQaMaxDocuments(value) {
+    groundedQaMaxDocuments = normalizeGroundedQaMaxDocuments(value);
+  },
+  get ocrProvider() {
+    return ocrProvider;
+  },
+  set ocrProvider(value) {
+    ocrProvider = normalizeOcrProvider(value);
+  },
+  get ocrAutoSwitch() {
+    return ocrAutoSwitch;
+  },
+  set ocrAutoSwitch(value) {
+    ocrAutoSwitch = Boolean(value);
+  },
+  get ocrImageDetail() {
+    return ocrImageDetail;
+  },
+  set ocrImageDetail(value) {
+    ocrImageDetail = normalizeOcrImageDetail(value);
+  },
+  get llmConnections() {
+    return llmConnections;
+  },
+  set llmConnections(value) {
+    llmConnections = Array.isArray(value) ? value : [];
+  },
+  get llmRouting() {
+    return llmRouting;
+  },
+  set llmRouting(value) {
+    llmRouting = value && typeof value === "object" ? value : createDefaultLlmRouting();
+  },
+  connectionTestStatuses,
+  taskTestStatuses,
+  taskTestsInFlight,
+  get ocrStatusRequestSeq() {
+    return ocrStatusRequestSeq;
+  },
+  set ocrStatusRequestSeq(value) {
+    ocrStatusRequestSeq = Number(value) || 0;
+  },
+};
+
+export function normalizePageSize(value) {
   const size = Number(value);
   if (!Number.isInteger(size) || size <= 0) {
     return 20;
@@ -40,7 +122,7 @@ function normalizePageSize(value) {
   return size;
 }
 
-function normalizeSortDirection(value) {
+export function normalizeSortDirection(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (normalized === "asc" || normalized === "desc") {
     return normalized;
@@ -48,7 +130,7 @@ function normalizeSortDirection(value) {
   return "";
 }
 
-function normalizeSortField(value, allowedFields) {
+export function normalizeSortField(value, allowedFields) {
   const normalized = String(value || "").trim();
   if (allowedFields.has(normalized)) {
     return normalized;
@@ -56,7 +138,7 @@ function normalizeSortField(value, allowedFields) {
   return "";
 }
 
-function normalizeSortState(value, allowedFields) {
+export function normalizeSortState(value, allowedFields) {
   const field = normalizeSortField(value?.field, allowedFields);
   const direction = normalizeSortDirection(value?.direction);
   if (!field || !direction) {
@@ -65,7 +147,7 @@ function normalizeSortState(value, allowedFields) {
   return { field, direction };
 }
 
-function getNextSortState(currentState, field) {
+export function getNextSortState(currentState, field) {
   if (currentState.field !== field || !currentState.direction) {
     return { field, direction: "asc" };
   }
@@ -75,7 +157,7 @@ function getNextSortState(currentState, field) {
   return { field: "", direction: "" };
 }
 
-function normalizeGroundedQaTopK(value) {
+export function normalizeGroundedQaTopK(value) {
   const size = Number(value);
   if (!Number.isInteger(size)) {
     return 18;
@@ -83,7 +165,7 @@ function normalizeGroundedQaTopK(value) {
   return Math.max(3, Math.min(60, size));
 }
 
-function normalizeGroundedQaMaxDocuments(value) {
+export function normalizeGroundedQaMaxDocuments(value) {
   const size = Number(value);
   if (!Number.isInteger(size)) {
     return 12;
@@ -91,7 +173,7 @@ function normalizeGroundedQaMaxDocuments(value) {
   return Math.max(1, Math.min(50, size));
 }
 
-function normalizeThemeName(value) {
+export function normalizeThemeName(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (getSupportedThemes().includes(normalized)) {
     return normalized;
@@ -99,7 +181,7 @@ function normalizeThemeName(value) {
   return getDefaultTheme();
 }
 
-function getSupportedThemes() {
+export function getSupportedThemes() {
   if (supportedThemesCache !== undefined) {
     return supportedThemesCache;
   }
@@ -115,12 +197,12 @@ function getSupportedThemes() {
   return supportedThemesCache;
 }
 
-function getDefaultTheme() {
+export function getDefaultTheme() {
   const defaultTheme = String(readInitialData().default_ui_theme || "forge").trim().toLowerCase();
   return getSupportedThemes().includes(defaultTheme) ? defaultTheme : "forge";
 }
 
-function getSupportedLlmProviders() {
+export function getSupportedLlmProviders() {
   if (supportedLlmProvidersCache !== undefined) {
     return supportedLlmProvidersCache;
   }
@@ -136,7 +218,7 @@ function getSupportedLlmProviders() {
   return supportedLlmProvidersCache;
 }
 
-function getSupportedOcrProviders() {
+export function getSupportedOcrProviders() {
   if (supportedOcrProvidersCache !== undefined) {
     return supportedOcrProvidersCache;
   }
@@ -152,7 +234,7 @@ function getSupportedOcrProviders() {
   return supportedOcrProvidersCache;
 }
 
-function readBootTheme() {
+export function readBootTheme() {
   const bootTheme = normalizeThemeName(document.documentElement?.dataset?.uiTheme || "");
   if (bootTheme !== getDefaultTheme()) {
     return bootTheme;
@@ -166,7 +248,7 @@ function readBootTheme() {
 
 currentTheme = readBootTheme();
 
-function normalizeLlmProvider(value) {
+export function normalizeLlmProvider(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (getSupportedLlmProviders().includes(normalized)) {
     return normalized;
@@ -174,7 +256,7 @@ function normalizeLlmProvider(value) {
   return "";
 }
 
-function getLlmProviderDefaults(provider) {
+export function getLlmProviderDefaults(provider) {
   const normalized = normalizeLlmProvider(provider);
   if (!normalized) {
     return null;
@@ -182,7 +264,7 @@ function getLlmProviderDefaults(provider) {
   return getInitialLlmProviderDefaults()[normalized] || null;
 }
 
-function getOcrLlmProviderDefaults(provider) {
+export function getOcrLlmProviderDefaults(provider) {
   const normalized = normalizeLlmProvider(provider);
   if (!normalized) {
     return null;
@@ -190,7 +272,7 @@ function getOcrLlmProviderDefaults(provider) {
   return getInitialOcrLlmProviderDefaults()[normalized] || null;
 }
 
-function normalizeProviderDefaults(rawDefaults) {
+export function normalizeProviderDefaults(rawDefaults) {
   if (!rawDefaults || typeof rawDefaults !== "object") {
     return {};
   }
@@ -208,7 +290,7 @@ function normalizeProviderDefaults(rawDefaults) {
   return defaults;
 }
 
-function getInitialLlmProviderDefaults() {
+export function getInitialLlmProviderDefaults() {
   if (llmProviderDefaultsCache !== undefined) {
     return llmProviderDefaultsCache;
   }
@@ -216,7 +298,7 @@ function getInitialLlmProviderDefaults() {
   return llmProviderDefaultsCache;
 }
 
-function getInitialOcrLlmProviderDefaults() {
+export function getInitialOcrLlmProviderDefaults() {
   if (ocrLlmProviderDefaultsCache !== undefined) {
     return ocrLlmProviderDefaultsCache;
   }
@@ -224,16 +306,16 @@ function getInitialOcrLlmProviderDefaults() {
   return ocrLlmProviderDefaultsCache;
 }
 
-function providerUsesManagedBaseUrl(provider) {
+export function providerUsesManagedBaseUrl(provider) {
   const normalized = normalizeLlmProvider(provider);
   return normalized === "openai" || normalized === "gemini";
 }
 
-function providerShowsBaseUrlField(provider) {
+export function providerShowsBaseUrlField(provider) {
   return !providerUsesManagedBaseUrl(provider);
 }
 
-function getConnectionBaseUrlHelpText(provider) {
+export function getConnectionBaseUrlHelpText(provider) {
   const normalized = normalizeLlmProvider(provider);
   if (normalized === "gemini") {
     return "Uses Google's default Gemini API endpoint automatically.";
@@ -247,7 +329,7 @@ function getConnectionBaseUrlHelpText(provider) {
   return "";
 }
 
-function getConnectionApiKeyPlaceholder(provider) {
+export function getConnectionApiKeyPlaceholder(provider) {
   const normalized = normalizeLlmProvider(provider);
   if (normalized === "gemini") {
     return "AIza...";
@@ -255,7 +337,7 @@ function getConnectionApiKeyPlaceholder(provider) {
   return "sk-...";
 }
 
-function getConnectionApiKeyValidationError(provider, apiKey) {
+export function getConnectionApiKeyValidationError(provider, apiKey) {
   const normalized = normalizeLlmProvider(provider);
   const normalizedApiKey = String(apiKey || "").trim();
   if (!normalizedApiKey) {
@@ -267,7 +349,7 @@ function getConnectionApiKeyValidationError(provider, apiKey) {
   return "";
 }
 
-function formatApiErrorDetail(detail) {
+export function formatApiErrorDetail(detail) {
   if (typeof detail === "string") {
     return detail;
   }
@@ -281,7 +363,7 @@ function formatApiErrorDetail(detail) {
   }
 }
 
-function normalizeOcrProvider(value) {
+export function normalizeOcrProvider(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (getSupportedOcrProviders().includes(normalized)) {
     return normalized;
@@ -289,7 +371,7 @@ function normalizeOcrProvider(value) {
   return "llm";
 }
 
-function normalizeOcrImageDetail(value) {
+export function normalizeOcrImageDetail(value) {
   const normalized = String(value || "").trim().toLowerCase();
   if (["auto", "low", "high"].includes(normalized)) {
     return normalized;
@@ -297,7 +379,7 @@ function normalizeOcrImageDetail(value) {
   return "auto";
 }
 
-function normalizeOcrAutoSwitch(value) {
+export function normalizeOcrAutoSwitch(value) {
   if (typeof value === "boolean") {
     return value;
   }
@@ -305,7 +387,7 @@ function normalizeOcrAutoSwitch(value) {
   return normalized === "true" || normalized === "1" || normalized === "on" || normalized === "yes";
 }
 
-function applyTheme(themeName) {
+export function applyTheme(themeName) {
   currentTheme = normalizeThemeName(themeName);
   const classNames = getSupportedThemes().map((name) => `theme-${name}`);
   if (document.documentElement) {
@@ -328,7 +410,7 @@ function applyTheme(themeName) {
   }
 }
 
-function createEmptyConnection(index = llmConnections.length + 1) {
+export function createEmptyConnection(index = llmConnections.length + 1) {
   return {
     id: `connection-${Date.now()}-${index}`,
     name: `Connection ${index}`,
@@ -338,7 +420,7 @@ function createEmptyConnection(index = llmConnections.length + 1) {
   };
 }
 
-function createDefaultLlmRouting() {
+export function createDefaultLlmRouting() {
   return {
     metadata: { connection_id: "", model: "" },
     grounded_qa: { connection_id: "", model: "" },
@@ -346,7 +428,7 @@ function createDefaultLlmRouting() {
   };
 }
 
-function normalizeConnection(connection, index = 0) {
+export function normalizeConnection(connection, index = 0) {
   const provider = normalizeLlmProvider(connection?.provider);
   const normalized = {
     id: String(connection?.id || `connection-${index + 1}`).trim() || `connection-${index + 1}`,
@@ -374,7 +456,7 @@ function normalizeConnection(connection, index = 0) {
   return normalized;
 }
 
-function normalizeLlmPreferences(preferences) {
+export function normalizeLlmPreferences(preferences) {
   if (
     Array.isArray(preferences?.llm_connections) &&
     preferences?.llm_routing &&
@@ -397,7 +479,7 @@ function normalizeLlmPreferences(preferences) {
   return { llm_connections: [], llm_routing: createDefaultLlmRouting() };
 }
 
-function sanitizeLlmRouting(connections, routing) {
+export function sanitizeLlmRouting(connections, routing) {
   const connectionIds = new Set(connections.map((connection) => connection.id));
   const nextRouting = createDefaultLlmRouting();
   nextRouting.metadata.connection_id = connectionIds.has(routing?.metadata?.connection_id)
@@ -416,11 +498,11 @@ function sanitizeLlmRouting(connections, routing) {
   return nextRouting;
 }
 
-function getConnectionById(connectionId) {
+export function getConnectionById(connectionId) {
   return llmConnections.find((connection) => connection.id === connectionId) || null;
 }
 
-function getResolvedTaskSettings(task) {
+export function getResolvedTaskSettings(task) {
   if (task === "ocr") {
     if (llmRouting.ocr.engine === "tesseract") {
       return null;
@@ -446,7 +528,7 @@ function getResolvedTaskSettings(task) {
   };
 }
 
-function getConnectionValidationError(connection) {
+export function getConnectionValidationError(connection) {
   const provider = normalizeLlmProvider(connection?.provider);
   if (!provider) {
     return "configure a provider.";
@@ -464,7 +546,7 @@ function getConnectionValidationError(connection) {
   return "";
 }
 
-function getLlmUploadBlockReason() {
+export function getLlmUploadBlockReason() {
   const metadataSettings = getResolvedTaskSettings("metadata");
   if (!metadataSettings) {
     return "configure a metadata LLM connection in Settings.";
@@ -486,16 +568,16 @@ function getLlmUploadBlockReason() {
   return "";
 }
 
-function refreshUploadAvailability(options = {}) {
-  if (typeof syncUploadAvailability === "function") {
-    return syncUploadAvailability(options);
+export function refreshUploadAvailability(options = {}) {
+  if (typeof activePageModule?.syncUploadAvailability === "function") {
+    return activePageModule.syncUploadAvailability(options);
   }
   return true;
 }
 
-function refreshSettingsForm() {
-  if (typeof renderSettingsForm === "function") {
-    renderSettingsForm();
+export function refreshSettingsForm() {
+  if (typeof activePageModule?.renderSettingsForm === "function") {
+    activePageModule.renderSettingsForm();
   }
 }
 
@@ -527,7 +609,7 @@ async function loadUserPreferences() {
   }
 }
 
-async function saveUserPreferences() {
+export async function saveUserPreferences() {
   if (!currentUser) {
     return;
   }
@@ -558,7 +640,7 @@ async function saveUserPreferences() {
   }
 }
 
-function applyUserPreferences(preferences) {
+export function applyUserPreferences(preferences) {
   if (!preferences || typeof preferences !== "object") {
     return;
   }
@@ -578,15 +660,9 @@ function applyUserPreferences(preferences) {
 async function hydrateUserPreferencesForSession() {
   const preferences = await loadUserPreferences();
   applyUserPreferences(preferences);
-  if (typeof searchAskThreadList !== "undefined" && searchAskThreadList) {
-    await loadSearchAskThreads();
-  }
-  if (typeof readDocumentListStateFromUrl === "function") {
-    readDocumentListStateFromUrl();
-  }
 }
 
-function getAuthElements() {
+export function getAuthElements() {
   return {
     authGate: document.getElementById("authGate"),
     appShell: document.querySelector(".app-shell"),
@@ -607,7 +683,7 @@ if (document.documentElement.classList.contains("has-session")) {
   appShell?.classList.remove("view-hidden");
 }
 
-function formatStatus(value) {
+export function formatStatus(value) {
   if (!value) {
     return "-";
   }
@@ -617,7 +693,7 @@ function formatStatus(value) {
     .toUpperCase();
 }
 
-function logActivity(message) {
+export function logActivity(message) {
   const activityOutput = document.getElementById("activityOutput");
   if (!activityOutput) {
     return;
@@ -626,13 +702,13 @@ function logActivity(message) {
   activityOutput.textContent = `[${now}] ${message}\n${activityOutput.textContent}`;
 }
 
-function delay(ms) {
+export function delay(ms) {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
 }
 
-function escapeHtml(value) {
+export function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
@@ -641,7 +717,7 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function setAuthMessage(message, isError = false) {
+export function setAuthMessage(message, isError = false) {
   const { authMessage } = getAuthElements();
   if (!authMessage) {
     return;
@@ -650,7 +726,7 @@ function setAuthMessage(message, isError = false) {
   authMessage.style.color = isError ? "#9f3f1d" : "";
 }
 
-function setActiveAuthTab(tab) {
+export function setActiveAuthTab(tab) {
   const isSignUp = tab === "signup";
   const { authTabSignIn, authTabSignUp, authPanelSignIn, authPanelSignUp } = getAuthElements();
   authTabSignIn?.classList.toggle("is-active", !isSignUp);
@@ -661,7 +737,7 @@ function setActiveAuthTab(tab) {
   authPanelSignUp?.classList.toggle("view-hidden", !isSignUp);
 }
 
-function readInitialData() {
+export function readInitialData() {
   if (initialDataCache !== undefined) {
     return initialDataCache;
   }
@@ -678,11 +754,11 @@ function readInitialData() {
   return initialDataCache;
 }
 
-function persistSession(user) {
+export function persistSession(user) {
   currentUser = user || null;
 }
 
-function renderSessionState() {
+export function renderSessionState() {
   const signedIn = Boolean(currentUser);
   const { authGate, appShell, sessionUserLabel } = getAuthElements();
   document.documentElement.classList.toggle("has-session", signedIn);
@@ -695,7 +771,7 @@ function renderSessionState() {
   }
 }
 
-function clearSession() {
+export function clearSession() {
   persistSession(null);
   applyTheme(getDefaultTheme());
   llmConnections = [];
@@ -705,25 +781,15 @@ function clearSession() {
   ocrImageDetail = "auto";
   connectionTestStatuses.clear();
   docsPageSize = 20;
-  if (typeof clearDocumentListStateForSession === "function") {
-    clearDocumentListStateForSession();
-  }
-  if (typeof clearCatalogStateForSession === "function") {
-    clearCatalogStateForSession();
-  }
-  if (typeof clearSearchStateForSession === "function") {
-    clearSearchStateForSession();
-  }
+  activePageModule?.clearSessionState?.();
   refreshSettingsForm();
   renderSortHeaders();
-  if (typeof renderActivityTokenTotal === "function") {
-    renderActivityTokenTotal(0);
-  }
+  activePageModule?.renderActivityTokenTotal?.(0);
   renderSessionState();
   refreshUploadAvailability();
 }
 
-function restoreSession() {
+export function restoreSession() {
   const initialData = readInitialData();
   if (initialData.authenticated === true && initialData.current_user) {
     persistSession(initialData.current_user);
@@ -733,43 +799,33 @@ function restoreSession() {
   clearSession();
 }
 
-function splitTags(value) {
+export function splitTags(value) {
   return value
     .split(",")
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
 }
 
-function unique(values) {
+export function unique(values) {
   return [...new Set(values.filter((item) => item && item.trim()))];
 }
 
-function sortValues(values) {
+export function sortValues(values) {
   return [...values].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
-function getSortStateForTable(tableName) {
-  if (tableName === "docs") {
-    return typeof getDocumentListSortState === "function"
-      ? getDocumentListSortState()
-      : { field: "", direction: "" };
-  }
-  if (tableName === "tags") {
-    return typeof tagStatsSort !== "undefined" ? tagStatsSort : { field: "", direction: "" };
-  }
-  if (tableName === "document-types") {
-    return typeof documentTypesSort !== "undefined"
-      ? documentTypesSort
-      : { field: "", direction: "" };
+export function getSortStateForTable(tableName) {
+  if (typeof activePageModule?.getSortStateForTable === "function") {
+    return activePageModule.getSortStateForTable(tableName);
   }
   return { field: "", direction: "" };
 }
 
-function getSortableHeaders() {
+export function getSortableHeaders() {
   return [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
 }
 
-function renderSortHeaders() {
+export function renderSortHeaders() {
   for (const header of getSortableHeaders()) {
     const tableName = header.dataset.sortTable || "";
     const field = header.dataset.sortField || "";
@@ -792,13 +848,13 @@ function renderSortHeaders() {
   }
 }
 
-function navigateToDocument(documentId) {
+export function navigateToDocument(documentId) {
   const url = new URL("/ui/document", window.location.origin);
   url.searchParams.set("id", documentId);
   window.location.href = `${url.pathname}?${url.searchParams.toString()}`;
 }
 
-async function openDocumentFile(documentId) {
+export async function openDocumentFile(documentId) {
   const response = await apiFetch(`/documents/${documentId}/file`);
   if (!response.ok) {
     const payload = await response.json().catch(() => ({}));
@@ -810,16 +866,14 @@ async function openDocumentFile(documentId) {
   window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
 }
 
-async function deleteDocumentById(documentId, options = {}) {
+export async function deleteDocumentById(documentId, options = {}) {
   const documentLabel = String(options.documentLabel || documentId || "").trim() || "this document";
   const confirmMessage = `Delete "${documentLabel}"? This permanently removes the file and its metadata.`;
   if (!window.confirm(confirmMessage)) {
     return false;
   }
 
-  if (typeof prepareDocumentListDelete === "function") {
-    prepareDocumentListDelete();
-  }
+  activePageModule?.prepareDocumentListDelete?.();
 
   const response = await apiFetch(`/documents/${documentId}`, {
     method: "DELETE",
@@ -833,12 +887,14 @@ async function deleteDocumentById(documentId, options = {}) {
   if (currentDocumentId === documentId) {
     currentDocumentId = "";
     window.location.href =
-      typeof buildDocumentsUrl === "function" ? buildDocumentsUrl() : "/ui/documents";
+      typeof activePageModule?.buildDocumentsUrl === "function"
+        ? activePageModule.buildDocumentsUrl()
+        : "/ui/documents";
     return true;
   }
 
-  if (typeof refreshDocumentListAfterDelete === "function") {
-    await refreshDocumentListAfterDelete();
+  if (typeof activePageModule?.refreshDocumentListAfterDelete === "function") {
+    await activePageModule.refreshDocumentListAfterDelete();
   } else {
     await initializeCurrentPageData();
   }
@@ -867,7 +923,7 @@ window.document.addEventListener("click", async (event) => {
   }
 });
 
-function hydrateSettingsFormFromInitialPreferences() {
+export function hydrateSettingsFormFromInitialPreferences() {
   const initialData = readInitialData();
   if (
     initialData.authenticated !== true ||
@@ -882,7 +938,7 @@ function hydrateSettingsFormFromInitialPreferences() {
   return true;
 }
 
-function applyDocumentDetailPartial(partialRoot) {
+export function applyDocumentDetailPartial(partialRoot) {
   currentDocumentId = String(partialRoot?.dataset?.documentId || "");
   partialRoot?.querySelectorAll("template[data-text-target]").forEach((template) => {
     const element = document.getElementById(template.dataset.textTarget || "");
@@ -908,24 +964,24 @@ function applyDocumentDetailPartial(partialRoot) {
   }
 }
 
-async function initializeCurrentPageData() {
-  if (typeof window.initializePaperwisePage !== "function") {
+export async function initializeCurrentPageData() {
+  if (typeof activePageModule?.initializePage !== "function") {
     return;
   }
-  await window.initializePaperwisePage({
+  await activePageModule.initializePage({
     authenticated: Boolean(currentUser),
     initialData: readInitialData(),
   });
 }
 
-async function openDocumentView(documentId) {
+export async function openDocumentView(documentId) {
   const query = new URLSearchParams({ id: documentId });
   const payload = await fetchHtmlPartial(`/ui/partials/document?${query.toString()}`);
   applyDocumentDetailPartial(payload);
   logActivity(`Opened document ${documentId}`);
 }
 
-async function waitForDocumentReady(
+export async function waitForDocumentReady(
   documentId,
   fastPhaseMs = 45000,
   fastIntervalMs = 1500,
@@ -982,9 +1038,6 @@ async function handleSignInSubmit(event) {
     renderSessionState();
     setAuthMessage(`Signed in as ${payload.user.email}.`);
     await hydrateUserPreferencesForSession();
-    if (typeof applyDocumentListFiltersToControls === "function") {
-      applyDocumentListFiltersToControls();
-    }
     await initializeCurrentPageData();
   } catch (error) {
     setAuthMessage(error.message || "Failed to sign in.", true);
@@ -1027,22 +1080,19 @@ async function handleRegisterSubmit(event) {
     renderSessionState();
     setAuthMessage(`Registered ${registerPayload.email}.`);
     await hydrateUserPreferencesForSession();
-    if (typeof applyDocumentListFiltersToControls === "function") {
-      applyDocumentListFiltersToControls();
-    }
     await initializeCurrentPageData();
   } catch (error) {
     setAuthMessage(error.message || "Failed to create account.", true);
   }
 }
 
-async function handleSignOutClick() {
+export async function handleSignOutClick() {
   await apiFetch("/users/logout", { method: "POST", allowUnauthorized: true }).catch(() => {});
   clearSession();
   setAuthMessage("Signed out.");
 }
 
-function bindAppShellEvents() {
+export function bindAppShellEvents() {
   document.getElementById("signInForm")?.addEventListener("submit", handleSignInSubmit);
   document.getElementById("registerForm")?.addEventListener("submit", handleRegisterSubmit);
   document.getElementById("authTabSignIn")?.addEventListener("click", () => {
@@ -1057,7 +1107,16 @@ function bindAppShellEvents() {
   });
 }
 
-async function initializeApp() {
+async function loadActivePageModule() {
+  if (!activePageModuleName || activePageModule) {
+    return activePageModule;
+  }
+  activePageModule = await import(`/static/js/${activePageModuleName}${activePageAssetQuery}`);
+  return activePageModule;
+}
+
+export async function initializeApp() {
+  await loadActivePageModule();
   restoreSession();
   if (!currentUser) {
     renderSortHeaders();
@@ -1065,9 +1124,6 @@ async function initializeApp() {
   }
 
   await hydrateUserPreferencesForSession();
-  if (typeof applyDocumentListFiltersToControls === "function") {
-    applyDocumentListFiltersToControls();
-  }
   refreshSettingsForm();
   renderSortHeaders();
   refreshUploadAvailability();
@@ -1078,9 +1134,13 @@ async function initializeApp() {
 
 applyTheme(currentTheme);
 
-document.addEventListener("DOMContentLoaded", () => {
-  bindAppShellEvents();
-  initializeApp().catch((error) => {
-    setAuthMessage(error.message || "Failed to initialize app.", true);
+export function startApp({ pageModuleName = "", assetQuery = "" } = {}) {
+  activePageModuleName = String(pageModuleName || "");
+  activePageAssetQuery = String(assetQuery || "");
+  document.addEventListener("DOMContentLoaded", () => {
+    bindAppShellEvents();
+    initializeApp().catch((error) => {
+      setAuthMessage(error.message || "Failed to initialize app.", true);
+    });
   });
-});
+}

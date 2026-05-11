@@ -1,3 +1,37 @@
+import {
+  apiFetch,
+} from "paperwise/shared";
+import {
+  LLM_TASK_LABELS,
+  appState,
+  applyTheme,
+  createEmptyConnection,
+  escapeHtml,
+  formatApiErrorDetail,
+  getConnectionApiKeyPlaceholder,
+  getConnectionBaseUrlHelpText,
+  getConnectionById,
+  getConnectionValidationError,
+  getLlmProviderDefaults,
+  getOcrLlmProviderDefaults,
+  getResolvedTaskSettings,
+  hydrateSettingsFormFromInitialPreferences,
+  logActivity,
+  normalizeConnection,
+  normalizeGroundedQaMaxDocuments,
+  normalizeGroundedQaTopK,
+  normalizeLlmProvider,
+  normalizeOcrImageDetail,
+  normalizeOcrProvider,
+  normalizePageSize,
+  normalizeThemeName,
+  providerShowsBaseUrlField,
+  providerUsesManagedBaseUrl,
+  refreshUploadAvailability,
+  sanitizeLlmRouting,
+  saveUserPreferences,
+} from "paperwise/app";
+
 let settingsForm = null;
 let settingsThemeSelect = null;
 let settingsPageSizeSelect = null;
@@ -55,30 +89,30 @@ function bindSettingsElements() {
   settingsPasswordStatus = document.getElementById("settingsPasswordStatus");
 }
 
-function renderSettingsForm() {
-  if (settingsThemeSelect && settingsThemeSelect.value !== currentTheme) {
-    settingsThemeSelect.value = currentTheme;
+export function renderSettingsForm() {
+  if (settingsThemeSelect && settingsThemeSelect.value !== appState.currentTheme) {
+    settingsThemeSelect.value = appState.currentTheme;
   }
-  if (settingsPageSizeSelect && settingsPageSizeSelect.value !== String(docsPageSize)) {
-    settingsPageSizeSelect.value = String(docsPageSize);
+  if (settingsPageSizeSelect && settingsPageSizeSelect.value !== String(appState.docsPageSize)) {
+    settingsPageSizeSelect.value = String(appState.docsPageSize);
   }
-  if (settingsGroundedQaTopKInput && settingsGroundedQaTopKInput.value !== String(groundedQaTopK)) {
-    settingsGroundedQaTopKInput.value = String(groundedQaTopK);
+  if (settingsGroundedQaTopKInput && settingsGroundedQaTopKInput.value !== String(appState.groundedQaTopK)) {
+    settingsGroundedQaTopKInput.value = String(appState.groundedQaTopK);
   }
   if (
     settingsGroundedQaMaxDocsInput &&
-    settingsGroundedQaMaxDocsInput.value !== String(groundedQaMaxDocuments)
+    settingsGroundedQaMaxDocsInput.value !== String(appState.groundedQaMaxDocuments)
   ) {
-    settingsGroundedQaMaxDocsInput.value = String(groundedQaMaxDocuments);
+    settingsGroundedQaMaxDocsInput.value = String(appState.groundedQaMaxDocuments);
   }
-  if (settingsOcrProviderSelect && settingsOcrProviderSelect.value !== ocrProvider) {
-    settingsOcrProviderSelect.value = ocrProvider;
+  if (settingsOcrProviderSelect && settingsOcrProviderSelect.value !== appState.ocrProvider) {
+    settingsOcrProviderSelect.value = appState.ocrProvider;
   }
   if (settingsOcrAutoSwitchCheckbox) {
-    settingsOcrAutoSwitchCheckbox.checked = ocrAutoSwitch;
+    settingsOcrAutoSwitchCheckbox.checked = appState.ocrAutoSwitch;
   }
-  if (settingsOcrImageDetailSelect && settingsOcrImageDetailSelect.value !== ocrImageDetail) {
-    settingsOcrImageDetailSelect.value = ocrImageDetail;
+  if (settingsOcrImageDetailSelect && settingsOcrImageDetailSelect.value !== appState.ocrImageDetail) {
+    settingsOcrImageDetailSelect.value = appState.ocrImageDetail;
   }
   renderConnectionsList();
   renderTaskRoutingControls();
@@ -91,8 +125,8 @@ function renderSettingsForm() {
 }
 
 function updateModelSummaryTestCell(rowEl, task) {
-  const status = taskTestStatuses.get(task) || { message: "", tone: "" };
-  const isTesting = taskTestsInFlight.has(task);
+  const status = appState.taskTestStatuses.get(task) || { message: "", tone: "" };
+  const isTesting = appState.taskTestsInFlight.has(task);
   const buttonEl = rowEl.querySelector("[data-task-test]");
   if (buttonEl) {
     buttonEl.disabled = isTesting;
@@ -119,7 +153,7 @@ function renderModelConfigSummary() {
     let settings = getResolvedTaskSettings(task);
     let connectionText = "-";
     let configurationText = "Not configured";
-    if (task === "ocr" && ocrProvider === "tesseract") {
+    if (task === "ocr" && appState.ocrProvider === "tesseract") {
       settings = null;
       connectionText = "Local";
       configurationText = "local only";
@@ -127,7 +161,7 @@ function renderModelConfigSummary() {
       connectionText = settings.connection_name;
       configurationText = settings.model;
       if (task === "ocr") {
-        configurationText += `, auto switch ${ocrAutoSwitch ? "on" : "off"}`;
+        configurationText += `, auto switch ${appState.ocrAutoSwitch ? "on" : "off"}`;
       }
     }
     const connectionEl = rowEl.querySelector("[data-summary-connection]");
@@ -156,12 +190,12 @@ function bindModelConfigSummaryActions() {
 }
 
 function setConnectionTestStatus(connectionId, message, tone = "") {
-  connectionTestStatuses.set(connectionId, { message, tone });
+  appState.connectionTestStatuses.set(connectionId, { message, tone });
   renderConnectionsList();
 }
 
 function setTaskTestStatus(task, message, tone = "") {
-  taskTestStatuses.set(task, { message, tone });
+  appState.taskTestStatuses.set(task, { message, tone });
   renderModelConfigSummary();
 }
 
@@ -170,7 +204,7 @@ function renderConnectionSelect(selectEl, selectedValue) {
     return;
   }
   const options = ["<option value=\"\">Select connection</option>"];
-  for (const connection of llmConnections) {
+  for (const connection of appState.llmConnections) {
     options.push(
       `<option value="${escapeHtml(connection.id)}"${connection.id === selectedValue ? " selected" : ""}>${escapeHtml(connection.name)}</option>`
     );
@@ -179,26 +213,26 @@ function renderConnectionSelect(selectEl, selectedValue) {
 }
 
 function syncTaskRoutingVisibility() {
-  const ocrLlmMode = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider) === "llm";
+  const ocrLlmMode = normalizeOcrProvider(settingsOcrProviderSelect?.value || appState.ocrProvider) === "llm";
   if (settingsOcrRouteFields) {
     settingsOcrRouteFields.hidden = !ocrLlmMode;
   }
 }
 
 function renderTaskRoutingControls() {
-  renderConnectionSelect(settingsMetadataConnectionSelect, llmRouting.metadata.connection_id);
-  if (settingsMetadataModelInput && settingsMetadataModelInput.value !== llmRouting.metadata.model) {
-    settingsMetadataModelInput.value = llmRouting.metadata.model;
+  renderConnectionSelect(settingsMetadataConnectionSelect, appState.llmRouting.metadata.connection_id);
+  if (settingsMetadataModelInput && settingsMetadataModelInput.value !== appState.llmRouting.metadata.model) {
+    settingsMetadataModelInput.value = appState.llmRouting.metadata.model;
   }
 
-  renderConnectionSelect(settingsGroundedQaConnectionSelect, llmRouting.grounded_qa.connection_id);
-  if (settingsGroundedQaModelInput && settingsGroundedQaModelInput.value !== llmRouting.grounded_qa.model) {
-    settingsGroundedQaModelInput.value = llmRouting.grounded_qa.model;
+  renderConnectionSelect(settingsGroundedQaConnectionSelect, appState.llmRouting.grounded_qa.connection_id);
+  if (settingsGroundedQaModelInput && settingsGroundedQaModelInput.value !== appState.llmRouting.grounded_qa.model) {
+    settingsGroundedQaModelInput.value = appState.llmRouting.grounded_qa.model;
   }
 
-  renderConnectionSelect(settingsOcrConnectionSelect, llmRouting.ocr.connection_id);
-  if (settingsOcrModelInput && settingsOcrModelInput.value !== llmRouting.ocr.model) {
-    settingsOcrModelInput.value = llmRouting.ocr.model;
+  renderConnectionSelect(settingsOcrConnectionSelect, appState.llmRouting.ocr.connection_id);
+  if (settingsOcrModelInput && settingsOcrModelInput.value !== appState.llmRouting.ocr.model) {
+    settingsOcrModelInput.value = appState.llmRouting.ocr.model;
   }
 }
 
@@ -287,7 +321,7 @@ async function testConnection(connectionId, buttonEl) {
 
 async function testLocalOcrTask(buttonEl) {
   const previousText = buttonEl?.textContent;
-  taskTestsInFlight.add("ocr");
+  appState.taskTestsInFlight.add("ocr");
   if (buttonEl) {
     buttonEl.disabled = true;
     buttonEl.textContent = "Testing...";
@@ -308,7 +342,7 @@ async function testLocalOcrTask(buttonEl) {
     setTaskTestStatus("ocr", error.message || "Failed to test local OCR tools.", "error");
     logActivity(`OCR config test failed: ${error.message}`);
   } finally {
-    taskTestsInFlight.delete("ocr");
+    appState.taskTestsInFlight.delete("ocr");
     renderModelConfigSummary();
     if (buttonEl) {
       buttonEl.disabled = false;
@@ -321,7 +355,7 @@ async function testTaskConfig(task, buttonEl) {
   if (!["metadata", "grounded_qa", "ocr"].includes(task)) {
     return;
   }
-  if (task === "ocr" && normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider) === "tesseract") {
+  if (task === "ocr" && normalizeOcrProvider(settingsOcrProviderSelect?.value || appState.ocrProvider) === "tesseract") {
     await testLocalOcrTask(buttonEl);
     return;
   }
@@ -341,7 +375,7 @@ async function testTaskConfig(task, buttonEl) {
   }
 
   const previousText = buttonEl?.textContent;
-  taskTestsInFlight.add(task);
+  appState.taskTestsInFlight.add(task);
   if (buttonEl) {
     buttonEl.disabled = true;
     buttonEl.textContent = "Testing...";
@@ -379,7 +413,7 @@ async function testTaskConfig(task, buttonEl) {
     setTaskTestStatus(task, error.message, "error");
     logActivity(`${taskLabel} config test failed: ${error.message}`);
   } finally {
-    taskTestsInFlight.delete(task);
+    appState.taskTestsInFlight.delete(task);
     renderModelConfigSummary();
     if (buttonEl) {
       buttonEl.disabled = false;
@@ -392,13 +426,13 @@ function renderConnectionsList() {
   if (!settingsConnectionsList) {
     return;
   }
-  if (!llmConnections.length) {
+  if (!appState.llmConnections.length) {
     settingsConnectionsList.innerHTML = "<p class=\"settings-group-note\">No model connections yet. Add one to configure LLM-backed tasks.</p>";
     return;
   }
-  settingsConnectionsList.innerHTML = llmConnections
+  settingsConnectionsList.innerHTML = appState.llmConnections
     .map((connection, index) => {
-      const status = connectionTestStatuses.get(connection.id) || { message: "", tone: "" };
+      const status = appState.connectionTestStatuses.get(connection.id) || { message: "", tone: "" };
       const showBaseUrlField = providerShowsBaseUrlField(connection.provider);
       const baseUrlHelpText = getConnectionBaseUrlHelpText(connection.provider);
       const apiKeyPlaceholder = getConnectionApiKeyPlaceholder(connection.provider);
@@ -479,9 +513,9 @@ function renderConnectionsList() {
   settingsConnectionsList.querySelectorAll("[data-connection-remove]").forEach((buttonEl) => {
     buttonEl.addEventListener("click", () => {
       const connectionId = buttonEl.getAttribute("data-connection-remove");
-      llmConnections = llmConnections.filter((connection) => connection.id !== connectionId);
-      connectionTestStatuses.delete(connectionId);
-      llmRouting = sanitizeLlmRouting(llmConnections, llmRouting);
+      appState.llmConnections = appState.llmConnections.filter((connection) => connection.id !== connectionId);
+      appState.connectionTestStatuses.delete(connectionId);
+      appState.llmRouting = sanitizeLlmRouting(appState.llmConnections, appState.llmRouting);
       renderSettingsForm();
     });
   });
@@ -521,18 +555,18 @@ function setSettingsPasswordStatus(message, tone = "") {
 }
 
 async function refreshLocalOcrStatus() {
-  const selectedProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
+  const selectedProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || appState.ocrProvider);
   if (selectedProvider !== "tesseract") {
     setSettingsOcrStatus("");
     return;
   }
 
-  const requestId = ++ocrStatusRequestSeq;
+  const requestId = ++appState.ocrStatusRequestSeq;
   setSettingsOcrStatus("Checking local OCR tools...");
   try {
     const response = await apiFetch("/documents/ocr/local-status");
     const payload = await response.json();
-    if (requestId !== ocrStatusRequestSeq) {
+    if (requestId !== appState.ocrStatusRequestSeq) {
       return;
     }
     if (!response.ok) {
@@ -544,7 +578,7 @@ async function refreshLocalOcrStatus() {
       payload.available ? "success" : "error"
     );
   } catch (error) {
-    if (requestId !== ocrStatusRequestSeq) {
+    if (requestId !== appState.ocrStatusRequestSeq) {
       return;
     }
     setSettingsOcrStatus(error.message || "Failed to check local OCR tools.", "error");
@@ -558,16 +592,16 @@ function bindSettingsEvents() {
 
   settingsForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const nextTheme = normalizeThemeName(settingsThemeSelect?.value || currentTheme);
-    const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || docsPageSize);
-    groundedQaTopK = normalizeGroundedQaTopK(settingsGroundedQaTopKInput?.value || groundedQaTopK);
-    groundedQaMaxDocuments = normalizeGroundedQaMaxDocuments(
-      settingsGroundedQaMaxDocsInput?.value || groundedQaMaxDocuments
+    const nextTheme = normalizeThemeName(settingsThemeSelect?.value || appState.currentTheme);
+    const nextPageSize = normalizePageSize(settingsPageSizeSelect?.value || appState.docsPageSize);
+    appState.groundedQaTopK = normalizeGroundedQaTopK(settingsGroundedQaTopKInput?.value || appState.groundedQaTopK);
+    appState.groundedQaMaxDocuments = normalizeGroundedQaMaxDocuments(
+      settingsGroundedQaMaxDocsInput?.value || appState.groundedQaMaxDocuments
     );
-    llmConnections = llmConnections
+    appState.llmConnections = appState.llmConnections
       .map((connection, index) => normalizeConnection(connection, index))
       .filter(Boolean);
-    llmRouting = sanitizeLlmRouting(llmConnections, {
+    appState.llmRouting = sanitizeLlmRouting(appState.llmConnections, {
       metadata: {
         connection_id: String(settingsMetadataConnectionSelect?.value || "").trim(),
         model: String(settingsMetadataModelInput?.value || "").trim(),
@@ -577,62 +611,59 @@ function bindSettingsEvents() {
         model: String(settingsGroundedQaModelInput?.value || "").trim(),
       },
       ocr: {
-        engine: normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider),
+        engine: normalizeOcrProvider(settingsOcrProviderSelect?.value || appState.ocrProvider),
         connection_id: String(settingsOcrConnectionSelect?.value || "").trim(),
         model: String(settingsOcrModelInput?.value || "").trim(),
       },
     });
-    ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || ocrProvider);
-    ocrAutoSwitch = Boolean(settingsOcrAutoSwitchCheckbox?.checked);
-    ocrImageDetail = normalizeOcrImageDetail(settingsOcrImageDetailSelect?.value || ocrImageDetail);
+    appState.ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect?.value || appState.ocrProvider);
+    appState.ocrAutoSwitch = Boolean(settingsOcrAutoSwitchCheckbox?.checked);
+    appState.ocrImageDetail = normalizeOcrImageDetail(settingsOcrImageDetailSelect?.value || appState.ocrImageDetail);
     renderTaskRoutingControls();
     syncTaskRoutingVisibility();
     refreshUploadAvailability();
     applyTheme(nextTheme);
-    docsPageSize = nextPageSize;
-    if (typeof resetDocumentListPage === "function") {
-      resetDocumentListPage();
-    }
+    appState.docsPageSize = nextPageSize;
     await saveUserPreferences();
     logActivity("Saved settings.");
     window.location.reload();
   });
 
   settingsOcrProviderSelect?.addEventListener("change", () => {
-    ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect.value);
-    llmRouting.ocr.engine = ocrProvider;
+    appState.ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect.value);
+    appState.llmRouting.ocr.engine = appState.ocrProvider;
     syncTaskRoutingVisibility();
     refreshLocalOcrStatus().catch(() => {});
   });
 
   settingsAddConnectionBtn?.addEventListener("click", () => {
-    llmConnections.push(createEmptyConnection());
-    llmRouting = sanitizeLlmRouting(llmConnections, llmRouting);
+    appState.llmConnections.push(createEmptyConnection());
+    appState.llmRouting = sanitizeLlmRouting(appState.llmConnections, appState.llmRouting);
     renderSettingsForm();
   });
 
   settingsMetadataConnectionSelect?.addEventListener("change", () => {
-    llmRouting.metadata.connection_id = String(settingsMetadataConnectionSelect.value || "").trim();
+    appState.llmRouting.metadata.connection_id = String(settingsMetadataConnectionSelect.value || "").trim();
   });
 
   settingsMetadataModelInput?.addEventListener("input", () => {
-    llmRouting.metadata.model = String(settingsMetadataModelInput.value || "").trim();
+    appState.llmRouting.metadata.model = String(settingsMetadataModelInput.value || "").trim();
   });
 
   settingsGroundedQaConnectionSelect?.addEventListener("change", () => {
-    llmRouting.grounded_qa.connection_id = String(settingsGroundedQaConnectionSelect.value || "").trim();
+    appState.llmRouting.grounded_qa.connection_id = String(settingsGroundedQaConnectionSelect.value || "").trim();
   });
 
   settingsGroundedQaModelInput?.addEventListener("input", () => {
-    llmRouting.grounded_qa.model = String(settingsGroundedQaModelInput.value || "").trim();
+    appState.llmRouting.grounded_qa.model = String(settingsGroundedQaModelInput.value || "").trim();
   });
 
   settingsOcrConnectionSelect?.addEventListener("change", () => {
-    llmRouting.ocr.connection_id = String(settingsOcrConnectionSelect.value || "").trim();
+    appState.llmRouting.ocr.connection_id = String(settingsOcrConnectionSelect.value || "").trim();
   });
 
   settingsOcrModelInput?.addEventListener("input", () => {
-    llmRouting.ocr.model = String(settingsOcrModelInput.value || "").trim();
+    appState.llmRouting.ocr.model = String(settingsOcrModelInput.value || "").trim();
   });
 
   settingsChangePasswordBtn?.addEventListener("click", async () => {
@@ -687,13 +718,13 @@ function bindSettingsEvents() {
   settingsEventsBound = true;
 }
 
-window.initializePaperwisePage = async ({ authenticated }) => {
+export async function initializePage({ authenticated }) {
   if (authenticated !== true) {
     return;
   }
   bindSettingsElements();
   bindSettingsEvents();
   if (!hydrateSettingsFormFromInitialPreferences()) {
-    refreshSettingsForm();
+    renderSettingsForm();
   }
-};
+}

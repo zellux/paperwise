@@ -1,3 +1,14 @@
+import {
+  applyTableBodyPartial,
+  loadTablePartial,
+} from "paperwise/shared";
+import {
+  getNextSortState,
+  getSortableHeaders,
+  logActivity,
+  renderSortHeaders,
+} from "paperwise/app";
+
 let tagStatsSort = { field: "", direction: "" };
 let documentTypesSort = { field: "", direction: "" };
 let tagStatsRequestSeq = 0;
@@ -12,9 +23,19 @@ function getCatalogElements() {
   };
 }
 
-function clearCatalogStateForSession() {
+export function clearSessionState() {
   tagStatsSort = { field: "", direction: "" };
   documentTypesSort = { field: "", direction: "" };
+}
+
+export function getSortStateForTable(tableName) {
+  if (tableName === "tags") {
+    return tagStatsSort;
+  }
+  if (tableName === "document-types") {
+    return documentTypesSort;
+  }
+  return { field: "", direction: "" };
 }
 
 function applyTagsPartial(payload) {
@@ -146,7 +167,7 @@ function bindCatalogSortHeaders() {
   }
 }
 
-window.initializePaperwisePage = async ({ authenticated, initialData }) => {
+export async function initializePage({ authenticated, initialData }) {
   if (authenticated !== true) {
     return;
   }
@@ -161,4 +182,4 @@ window.initializePaperwisePage = async ({ authenticated, initialData }) => {
   if (documentTypesTableBody && !hydrateInitialDocumentTypes(initialData || {})) {
     await loadDocumentTypeStats();
   }
-};
+}

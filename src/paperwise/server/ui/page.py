@@ -92,7 +92,7 @@ def render_ui_page(
         "authenticated": bool(initial_data and initial_data.get("authenticated") is True),
         "default_ui_theme": DEFAULT_UI_THEME,
         "initial_data_json": initial_data_json,
-        "page_script_names": script_names[2:],
+        "page_module_name": script_names[2] if len(script_names) > 2 else "",
         "page_template": _PAGE_PARTIAL_BY_NAME[page_name],
         "supported_ui_themes": list(SUPPORTED_UI_THEMES),
         "ui_theme_storage_key": UI_THEME_STORAGE_KEY,

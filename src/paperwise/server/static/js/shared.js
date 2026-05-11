@@ -1,4 +1,4 @@
-async function apiFetch(url, options = {}) {
+export async function apiFetch(url, options = {}) {
   const headers = new Headers(options.headers || {});
   const allowUnauthorized = options.allowUnauthorized === true;
   const { allowUnauthorized: _allowUnauthorized, ...fetchOptions } = options;
@@ -10,7 +10,7 @@ async function apiFetch(url, options = {}) {
   return response;
 }
 
-async function fetchHtmlPartial(url) {
+export async function fetchHtmlPartial(url) {
   const response = await apiFetch(url, { headers: { Accept: "text/html" } });
   const html = await response.text();
   if (!response.ok) {
@@ -19,33 +19,33 @@ async function fetchHtmlPartial(url) {
   return parseHtmlPartial(html);
 }
 
-function parseHtmlPartial(html) {
+export function parseHtmlPartial(html) {
   const template = document.createElement("template");
   template.innerHTML = String(html || "").trim();
   const root = template.content.firstElementChild;
   return root instanceof HTMLElement ? root : document.createElement("div");
 }
 
-function replaceElementHtml(element, html) {
+export function replaceElementHtml(element, html) {
   if (!element) {
     return;
   }
   element.innerHTML = String(html || "");
 }
 
-function renderTableLoading(tbody, colspan, message) {
+export function renderTableLoading(tbody, colspan, message) {
   if (!tbody) {
     return;
   }
   tbody.innerHTML = `<tr><td colspan="${colspan}">${message}</td></tr>`;
 }
 
-async function loadTablePartial({ url, tbody, loadingColspan, loadingMessage }) {
+export async function loadTablePartial({ url, tbody, loadingColspan, loadingMessage }) {
   renderTableLoading(tbody, loadingColspan, loadingMessage);
   return fetchHtmlPartial(url);
 }
 
-function getPartialTemplate(partialRoot, targetId, attribute = "data-partial-target") {
+export function getPartialTemplate(partialRoot, targetId, attribute = "data-partial-target") {
   if (!(partialRoot instanceof Element) || !targetId) {
     return null;
   }
@@ -54,7 +54,7 @@ function getPartialTemplate(partialRoot, targetId, attribute = "data-partial-tar
   ) || null;
 }
 
-function applyHtmlPartialTarget(target, partialRoot, attribute = "data-partial-target") {
+export function applyHtmlPartialTarget(target, partialRoot, attribute = "data-partial-target") {
   if (!target) {
     return;
   }
@@ -62,6 +62,6 @@ function applyHtmlPartialTarget(target, partialRoot, attribute = "data-partial-t
   replaceElementHtml(target, template ? template.innerHTML : "");
 }
 
-function applyTableBodyPartial(tbody, partialRoot) {
+export function applyTableBodyPartial(tbody, partialRoot) {
   applyHtmlPartialTarget(tbody, partialRoot);
 }

@@ -191,11 +191,21 @@
       </section>
     </main>
 
-    <script src="/static/js/shared.js{{ asset_query }}" defer></script>
-    <script src="/static/js/app.js{{ asset_query }}" defer></script>
-{% for script_name in page_script_names %}
-    <script src="/static/js/{{ script_name }}{{ asset_query }}" defer></script>
-{% endfor %}
+    <script type="importmap">
+      {
+        "imports": {
+          "paperwise/app": "/static/js/app.js{{ asset_query }}",
+          "paperwise/shared": "/static/js/shared.js{{ asset_query }}"
+        }
+      }
+    </script>
+    <script type="module">
+      import { startApp } from "paperwise/app";
+      startApp({
+        pageModuleName: {{ page_module_name|tojson }},
+        assetQuery: {{ asset_query|tojson }}
+      });
+    </script>
 {% if initial_data_json %}
     <script id="paperwiseInitialData" type="application/json">{{ initial_data_json|safe }}</script>
 {% endif %}

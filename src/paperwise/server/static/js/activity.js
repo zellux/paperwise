@@ -1,3 +1,13 @@
+import {
+  applyTableBodyPartial,
+  loadTablePartial,
+} from "paperwise/shared";
+import {
+  appState,
+  logActivity,
+  normalizePageSize,
+} from "paperwise/app";
+
 let processedActivityRequestSeq = 0;
 let initialActivityHydrated = false;
 
@@ -8,7 +18,7 @@ function getActivityElements() {
   };
 }
 
-function renderActivityTokenTotal(totalTokens) {
+export function renderActivityTokenTotal(totalTokens) {
   const { activityTokenTotal } = getActivityElements();
   if (!activityTokenTotal) {
     return;
@@ -34,7 +44,7 @@ function applyActivityPartial(payload) {
 async function loadProcessedDocumentsActivity() {
   const { processedDocsTableBody } = getActivityElements();
   const requestSeq = ++processedActivityRequestSeq;
-  const limit = Math.max(1, normalizePageSize(docsPageSize));
+  const limit = Math.max(1, normalizePageSize(appState.docsPageSize));
   renderActivityTokenLoading();
   let payload;
   try {
@@ -71,7 +81,7 @@ function hydrateInitialActivityData(initialData) {
   return true;
 }
 
-window.initializePaperwisePage = async ({ authenticated, initialData }) => {
+export async function initializePage({ authenticated, initialData }) {
   if (authenticated !== true) {
     return;
   }
@@ -79,4 +89,4 @@ window.initializePaperwisePage = async ({ authenticated, initialData }) => {
     return;
   }
   await loadProcessedDocumentsActivity();
-};
+}

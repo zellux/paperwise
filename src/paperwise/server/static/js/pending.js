@@ -1,3 +1,12 @@
+import {
+  apiFetch,
+  applyTableBodyPartial,
+  loadTablePartial,
+} from "paperwise/shared";
+import {
+  logActivity,
+} from "paperwise/app";
+
 let pendingDocsRequestSeq = 0;
 let initialPendingHydrated = false;
 let pendingEventsBound = false;
@@ -115,7 +124,7 @@ function bindPendingEvents() {
   pendingEventsBound = true;
 }
 
-window.initializePaperwisePage = async ({ authenticated, initialData }) => {
+export async function initializePage({ authenticated, initialData }) {
   if (authenticated !== true) {
     return;
   }
@@ -124,4 +133,4 @@ window.initializePaperwisePage = async ({ authenticated, initialData }) => {
     return;
   }
   await loadPendingDocuments();
-};
+}

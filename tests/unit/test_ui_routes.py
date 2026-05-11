@@ -190,17 +190,25 @@ def test_ui_routes_render_active_nav_server_side() -> None:
 def test_ui_routes_load_page_specific_scripts() -> None:
     client = TestClient(app)
 
-    assert "/static/js/documents.js" in client.get("/ui/documents").text
-    assert "/static/js/single-document.js" in client.get("/ui/document").text
-    assert "/static/js/search.js" in client.get("/ui/search").text
-    assert "/static/js/search.js" in client.get("/ui/grounded-qa").text
-    assert "/static/js/catalog.js" in client.get("/ui/tags").text
-    assert "/static/js/catalog.js" in client.get("/ui/document-types").text
-    assert "/static/js/pending.js" in client.get("/ui/pending").text
-    assert "/static/js/upload.js" in client.get("/ui/upload").text
-    assert "/static/js/activity.js" in client.get("/ui/activity").text
-    assert "/static/js/settings.js" in client.get("/ui/settings").text
-    assert "/static/js/pending.js" not in client.get("/ui/documents").text
+    expected_modules = {
+        "/ui/documents": "documents.js",
+        "/ui/document": "single-document.js",
+        "/ui/search": "search.js",
+        "/ui/grounded-qa": "search.js",
+        "/ui/tags": "catalog.js",
+        "/ui/document-types": "catalog.js",
+        "/ui/pending": "pending.js",
+        "/ui/upload": "upload.js",
+        "/ui/activity": "activity.js",
+        "/ui/settings": "settings.js",
+    }
+    for path, module_name in expected_modules.items():
+        html = client.get(path).text
+        assert '<script type="importmap">' in html
+        assert '"paperwise/app": "/static/js/app.js?v=' in html
+        assert '"paperwise/shared": "/static/js/shared.js?v=' in html
+        assert f'pageModuleName: "{module_name}"' in html
+    assert 'pageModuleName: "pending.js"' not in client.get("/ui/documents").text
 
 
 def test_settings_subroutes_are_server_selected_partials() -> None:
@@ -248,17 +256,17 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "migrateLegacyLlmPreferences" not in app_js.text
     assert "const LLM_PROVIDER_DEFAULTS" not in app_js.text
     assert "const OCR_LLM_PROVIDER_DEFAULTS" not in app_js.text
-    app_initialization = app_js.text.split("\nfunction ", 1)[0]
+    app_initialization = app_js.text.split("\nexport function ", 1)[0]
     assert "document.getElementById" not in app_initialization
     assert "document.querySelector" not in app_initialization
     assert "initializeCurrentPageData" in app_js.text
-    assert "initializePaperwisePage" in app_js.text
+    assert "initializePage" in app_js.text
     assert "refreshDocumentListAfterDelete" in app_js.text
     assert "loadDocumentsList" not in app_js.text
 
     documents_js = client.get("/static/js/documents.js")
     assert documents_js.status_code == 200
-    assert "function refreshDocumentListAfterDelete" in documents_js.text
+    assert "export async function refreshDocumentListAfterDelete" in documents_js.text
     assert "await loadDocumentsList();" in documents_js.text
 
     for script_name in [
@@ -273,7 +281,8 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     ]:
         script = client.get(f"/static/js/{script_name}")
         assert script.status_code == 200
-        assert "initializePaperwisePage" in script.text
+        assert "export async function initializePage" in script.text
+        assert "window.initializePaperwisePage" not in script.text
 
     for script_name in [
         "documents.js",
@@ -286,7 +295,11 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
         "settings.js",
     ]:
         script = client.get(f"/static/js/{script_name}")
-        top_level_statements = script.text.split("\nfunction ", 1)[0]
+        top_level_statements = re.split(
+            r"\n(?:export\s+)?(?:async\s+)?function ",
+            script.text,
+            maxsplit=1,
+        )[0]
         assert "document.getElementById" not in top_level_statements
         assert "document.querySelector" not in top_level_statements
 

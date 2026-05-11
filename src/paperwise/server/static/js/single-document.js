@@ -1,3 +1,16 @@
+import {
+  apiFetch,
+} from "paperwise/shared";
+import {
+  appState,
+  deleteDocumentById,
+  logActivity,
+  openDocumentFile,
+  openDocumentView,
+  splitTags,
+  waitForDocumentReady,
+} from "paperwise/app";
+
 let singleDocumentEventsBound = false;
 
 function getSingleDocumentElements() {
@@ -17,18 +30,7 @@ function getSingleDocumentElements() {
 }
 
 async function refreshDocumentRelatedLists(options = {}) {
-  if (typeof loadDocumentsList === "function") {
-    await loadDocumentsList();
-  }
-  if (typeof loadPendingDocuments === "function") {
-    await loadPendingDocuments();
-  }
-  if (options.catalog === true && typeof loadTagStats === "function") {
-    await loadTagStats();
-  }
-  if (options.catalog === true && typeof loadDocumentTypeStats === "function") {
-    await loadDocumentTypeStats();
-  }
+  void options;
 }
 
 function hydrateInitialDocumentData(initialData) {
@@ -37,8 +39,8 @@ function hydrateInitialDocumentData(initialData) {
   if (initialData.authenticated !== true || !documentId) {
     return false;
   }
-  currentDocumentId = documentId;
-  logActivity(`Opened document ${currentDocumentId}`);
+  appState.currentDocumentId = documentId;
+  logActivity(`Opened document ${appState.currentDocumentId}`);
   return true;
 }
 
@@ -62,12 +64,12 @@ function bindSingleDocumentEvents() {
 
   documentMetaForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!currentDocumentId) {
+    if (!appState.currentDocumentId) {
       logActivity("No document selected.");
       return;
     }
 
-    const response = await apiFetch(`/documents/${currentDocumentId}/metadata`, {
+    const response = await apiFetch(`/documents/${appState.currentDocumentId}/metadata`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -84,18 +86,18 @@ function bindSingleDocumentEvents() {
       return;
     }
 
-    logActivity(`Saved metadata for ${currentDocumentId}`);
-    await openDocumentView(currentDocumentId);
+    logActivity(`Saved metadata for ${appState.currentDocumentId}`);
+    await openDocumentView(appState.currentDocumentId);
     await refreshDocumentRelatedLists({ catalog: true });
   });
 
   reprocessDocumentBtn?.addEventListener("click", async () => {
-    if (!currentDocumentId) {
+    if (!appState.currentDocumentId) {
       logActivity("No document selected.");
       return;
     }
 
-    const response = await apiFetch(`/documents/${currentDocumentId}/reprocess`, {
+    const response = await apiFetch(`/documents/${appState.currentDocumentId}/reprocess`, {
       method: "POST",
     });
     const payload = await response.json();
@@ -105,37 +107,37 @@ function bindSingleDocumentEvents() {
     }
 
     logActivity(
-      `Reprocessing queued for ${currentDocumentId} (job ${payload.job_id}).`
+      `Reprocessing queued for ${appState.currentDocumentId} (job ${payload.job_id}).`
     );
-    await openDocumentView(currentDocumentId);
+    await openDocumentView(appState.currentDocumentId);
     await refreshDocumentRelatedLists();
-    const completed = await waitForDocumentReady(currentDocumentId);
+    const completed = await waitForDocumentReady(appState.currentDocumentId);
     if (completed) {
-      logActivity(`Reprocessing completed for ${currentDocumentId}.`);
-      await openDocumentView(currentDocumentId);
+      logActivity(`Reprocessing completed for ${appState.currentDocumentId}.`);
+      await openDocumentView(appState.currentDocumentId);
       await refreshDocumentRelatedLists({ catalog: true });
     } else {
-      logActivity(`Reprocessing still running for ${currentDocumentId}. Refresh to check later.`);
+      logActivity(`Reprocessing still running for ${appState.currentDocumentId}. Refresh to check later.`);
     }
   });
 
   deleteDocumentBtn?.addEventListener("click", async () => {
-    if (!currentDocumentId) {
+    if (!appState.currentDocumentId) {
       logActivity("No document selected.");
       return;
     }
-    await deleteDocumentById(currentDocumentId, {
-      documentLabel: metaTitleInput?.value?.trim() || detailFilename?.textContent || currentDocumentId,
+    await deleteDocumentById(appState.currentDocumentId, {
+      documentLabel: metaTitleInput?.value?.trim() || detailFilename?.textContent || appState.currentDocumentId,
     });
   });
 
   viewDocumentFileBtn?.addEventListener("click", async () => {
-    if (!currentDocumentId) {
+    if (!appState.currentDocumentId) {
       logActivity("No document selected.");
       return;
     }
     try {
-      await openDocumentFile(currentDocumentId);
+      await openDocumentFile(appState.currentDocumentId);
     } catch (error) {
       logActivity(`Failed to open file: ${error.message}`);
     }
@@ -149,7 +151,7 @@ function bindSingleDocumentEvents() {
   singleDocumentEventsBound = true;
 }
 
-window.initializePaperwisePage = async ({ authenticated, initialData }) => {
+export async function initializePage({ authenticated, initialData }) {
   if (authenticated !== true) {
     return;
   }
@@ -157,8 +159,8 @@ window.initializePaperwisePage = async ({ authenticated, initialData }) => {
   if (hydrateInitialDocumentData(initialData || {})) {
     return;
   }
-  currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";
-  if (currentDocumentId) {
-    await openDocumentView(currentDocumentId);
+  appState.currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";
+  if (appState.currentDocumentId) {
+    await openDocumentView(appState.currentDocumentId);
   }
-};
+}

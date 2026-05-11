@@ -1,3 +1,20 @@
+import {
+  apiFetch,
+  applyHtmlPartialTarget,
+  fetchHtmlPartial,
+  renderTableLoading,
+  replaceElementHtml,
+} from "paperwise/shared";
+import {
+  appState,
+  escapeHtml,
+  logActivity,
+  navigateToDocument,
+  normalizeGroundedQaMaxDocuments,
+  normalizeGroundedQaTopK,
+  readInitialData,
+} from "paperwise/app";
+
 let searchKeywordForm = null;
 let searchKeywordInput = null;
 let searchKeywordLimitSelect = null;
@@ -499,7 +516,7 @@ function renderChatCitations(message, item) {
 }
 
 function getCurrentUserInitials() {
-  const source = String(currentUser?.full_name || currentUser?.email || "You").trim();
+  const source = String(appState.currentUser?.full_name || appState.currentUser?.email || "You").trim();
   const parts = source
     .replace(/@.*/, "")
     .split(/[\s._-]+/)
@@ -584,7 +601,7 @@ function resetSearchAskChat() {
   }
 }
 
-function clearSearchStateForSession() {
+export function clearSessionState() {
   searchAskMessagesState = [];
   searchAskMessageSeq = 0;
   searchAskCurrentTokens = 0;
@@ -1016,8 +1033,8 @@ async function runAsk() {
     appendSearchAskMessage("assistant", "Enter a question.");
     return;
   }
-  const topK = normalizeGroundedQaTopK(groundedQaTopK);
-  const maxDocuments = normalizeGroundedQaMaxDocuments(groundedQaMaxDocuments);
+  const topK = normalizeGroundedQaTopK(appState.groundedQaTopK);
+  const maxDocuments = normalizeGroundedQaMaxDocuments(appState.groundedQaMaxDocuments);
   appendSearchAskMessage("user", question);
   const activityMessage = appendSearchAskActivity();
   const pendingMessage = appendSearchAskMessage("assistant", "", { pending: true });
@@ -1164,7 +1181,7 @@ function bindSearchEvents() {
   searchEventsBound = true;
 }
 
-window.initializePaperwisePage = async ({ authenticated }) => {
+export async function initializePage({ authenticated }) {
   if (authenticated !== true) {
     return;
   }
@@ -1172,4 +1189,4 @@ window.initializePaperwisePage = async ({ authenticated }) => {
   bindSearchEvents();
   await loadSearchAskThreads();
   renderSearchResultsMeta("Ready.");
-};
+}

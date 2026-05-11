@@ -1,3 +1,22 @@
+import {
+  applyHtmlPartialTarget,
+  applyTableBodyPartial,
+  loadTablePartial,
+} from "paperwise/shared";
+import {
+  appState,
+  formatStatus,
+  getNextSortState,
+  getSortableHeaders,
+  initializeCurrentPageData,
+  logActivity,
+  normalizePageSize,
+  normalizeSortState,
+  renderSortHeaders,
+  sortValues,
+  unique,
+} from "paperwise/app";
+
 const filterDropdownState = new Map();
 const DOCS_SORT_FIELDS = new Set([
   "title",
@@ -45,7 +64,7 @@ function sanitizeDocsFilters(filters) {
   return normalized;
 }
 
-function clearDocumentListStateForSession() {
+export function clearSessionState() {
   docsFilters = sanitizeDocsFilters({
     tag: [],
     correspondent: [],
@@ -59,12 +78,12 @@ function clearDocumentListStateForSession() {
   docsFilterNavigateTimer = 0;
 }
 
-function resetDocumentListPage() {
+export function resetDocumentListPage() {
   docsPage = 1;
 }
 
-function getDocumentListSortState() {
-  return docsSort;
+export function getSortStateForTable(tableName) {
+  return tableName === "docs" ? docsSort : { field: "", direction: "" };
 }
 
 function getDocumentsPageElements() {
@@ -317,7 +336,7 @@ function setupFilterDropdown(selectEl) {
   });
 }
 
-function applyDocumentListFiltersToControls() {
+export function applyDocumentListFiltersToControls() {
   const { filterTag, filterCorrespondent, filterType, filterStatus, filterQuery, filterSelects } =
     getDocumentFilterControls();
   if (filterQuery) {
@@ -438,8 +457,8 @@ function applyDocsStateToUrl(url) {
   if (docsPage > 1) {
     url.searchParams.set("page", String(docsPage));
   }
-  if (docsPageSize !== 20) {
-    url.searchParams.set("page_size", String(docsPageSize));
+  if (appState.docsPageSize !== 20) {
+    url.searchParams.set("page_size", String(appState.docsPageSize));
   }
   if (docsSort.field && docsSort.direction) {
     url.searchParams.set("sort_by", docsSort.field);
@@ -447,7 +466,7 @@ function applyDocsStateToUrl(url) {
   }
 }
 
-function buildDocumentsUrl() {
+export function buildDocumentsUrl() {
   const url = new URL("/ui/documents", window.location.origin);
   applyDocsStateToUrl(url);
   const qs = url.searchParams.toString();
@@ -464,8 +483,8 @@ function readDocumentListStateFromUrl() {
   docsFilters.status = statusValues.length ? statusValues : ["ready"];
   const pageValue = Number(params.get("page") || "1");
   docsPage = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
-  const pageSizeValue = params.get("page_size") || String(docsPageSize || 20);
-  docsPageSize = normalizePageSize(pageSizeValue);
+  const pageSizeValue = params.get("page_size") || String(appState.docsPageSize || 20);
+  appState.docsPageSize = normalizePageSize(pageSizeValue);
   docsSort = normalizeSortState(
     {
       field: params.get("sort_by") || "",
@@ -492,10 +511,10 @@ function applyDocumentsPartial(payload) {
   applyHtmlPartialTarget(documentsPaginationToolbar, payload);
   docsTotalCount = Number(payload.dataset.documentsTotal || 0);
   docsPage = Math.max(1, Number(payload.dataset.documentsPage || docsPage || 1));
-  docsPageSize = normalizePageSize(payload.dataset.documentsPageSize || docsPageSize);
+  appState.docsPageSize = normalizePageSize(payload.dataset.documentsPageSize || appState.docsPageSize);
 }
 
-function prepareDocumentListDelete() {
+export function prepareDocumentListDelete() {
   const docsTableBody = document.getElementById("docsTableBody");
   const visibleDocRows = docsTableBody?.querySelectorAll("tr[data-doc-id]").length || 0;
   if (docsTableBody && docsPage > 1 && visibleDocRows <= 1) {
@@ -503,7 +522,7 @@ function prepareDocumentListDelete() {
   }
 }
 
-async function refreshDocumentListAfterDelete() {
+export async function refreshDocumentListAfterDelete() {
   if (document.getElementById("docsTableBody")) {
     await loadDocumentsList();
     return;
@@ -517,7 +536,7 @@ async function loadDocumentsList() {
   renderSortHeaders();
   const query = new URLSearchParams({
     page: String(docsPage),
-    page_size: String(docsPageSize),
+    page_size: String(appState.docsPageSize),
   });
   if (docsSort.field && docsSort.direction) {
     query.set("sort_by", docsSort.field);
@@ -570,7 +589,7 @@ function hydrateInitialDocumentsData(initialData) {
   }
   docsTotalCount = Number(initialData.documents_total || initialData.documents.length || 0);
   docsPage = Math.max(1, Number(initialData.documents_page || docsPage || 1));
-  docsPageSize = normalizePageSize(initialData.documents_page_size || docsPageSize);
+  appState.docsPageSize = normalizePageSize(initialData.documents_page_size || appState.docsPageSize);
   if (initialData.document_filter_options) {
     refreshFilterOptions(initialData.document_filter_options);
   } else {
@@ -681,13 +700,15 @@ function bindDocumentsEvents() {
   documentsEventsBound = true;
 }
 
-window.initializePaperwisePage = async ({ authenticated, initialData }) => {
+export async function initializePage({ authenticated, initialData }) {
   if (authenticated !== true) {
     return;
   }
+  readDocumentListStateFromUrl();
   bindDocumentsEvents();
+  applyDocumentListFiltersToControls();
   if (hydrateInitialDocumentsData(initialData || {})) {
     return;
   }
   await loadDocumentsList();
-};
+}
