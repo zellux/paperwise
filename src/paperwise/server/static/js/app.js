@@ -10,13 +10,27 @@ import {
   resetLlmState,
 } from "./state/llm.js";
 import {
-  getNextSortState,
   normalizeGroundedQaMaxDocuments,
   normalizeGroundedQaTopK,
   normalizePageSize,
 } from "./state/preferences.js";
+import {
+  renderSessionState as renderAuthSessionState,
+  setActiveAuthTab,
+  setAuthMessage,
+  showAuthenticatedShell,
+} from "./ui/auth.js";
+import {
+  getSortableHeaders,
+  renderSortHeaders as renderSortHeadersForState,
+} from "./ui/sortHeaders.js";
 
 export { readInitialData } from "./state/initialData.js";
+export {
+  getAuthElements,
+  setActiveAuthTab,
+  setAuthMessage,
+} from "./ui/auth.js";
 export {
   LLM_TASK_LABELS,
   createEmptyConnection,
@@ -52,6 +66,7 @@ export {
   normalizeSortState,
 } from "./state/preferences.js";
 export { escapeHtml } from "./ui/escape.js";
+export { getSortableHeaders } from "./ui/sortHeaders.js";
 export { sortValues, splitTags, unique } from "./ui/values.js";
 
 let currentDocumentId = "";
@@ -310,25 +325,10 @@ async function hydrateUserPreferencesForSession() {
   applyUserPreferences(preferences);
 }
 
-export function getAuthElements() {
-  return {
-    authGate: document.getElementById("authGate"),
-    appShell: document.querySelector(".app-shell"),
-    authTabSignIn: document.getElementById("authTabSignIn"),
-    authTabSignUp: document.getElementById("authTabSignUp"),
-    authPanelSignIn: document.getElementById("authPanelSignIn"),
-    authPanelSignUp: document.getElementById("authPanelSignUp"),
-    authMessage: document.getElementById("authMessage"),
-    sessionUserLabel: document.getElementById("sessionUserLabel"),
-  };
-}
-
 // Avoid auth-gate flash on page load when the server rendered an authenticated shell.
 if (document.documentElement.classList.contains("has-session")) {
-  const { authGate, appShell } = getAuthElements();
   renderSortHeaders();
-  authGate?.classList.add("view-hidden");
-  appShell?.classList.remove("view-hidden");
+  showAuthenticatedShell();
 }
 
 export function formatStatus(value) {
@@ -356,41 +356,12 @@ export function delay(ms) {
   });
 }
 
-export function setAuthMessage(message, isError = false) {
-  const { authMessage } = getAuthElements();
-  if (!authMessage) {
-    return;
-  }
-  authMessage.textContent = message;
-  authMessage.style.color = isError ? "#9f3f1d" : "";
-}
-
-export function setActiveAuthTab(tab) {
-  const isSignUp = tab === "signup";
-  const { authTabSignIn, authTabSignUp, authPanelSignIn, authPanelSignUp } = getAuthElements();
-  authTabSignIn?.classList.toggle("is-active", !isSignUp);
-  authTabSignIn?.setAttribute("aria-selected", String(!isSignUp));
-  authTabSignUp?.classList.toggle("is-active", isSignUp);
-  authTabSignUp?.setAttribute("aria-selected", String(isSignUp));
-  authPanelSignIn?.classList.toggle("view-hidden", isSignUp);
-  authPanelSignUp?.classList.toggle("view-hidden", !isSignUp);
-}
-
 export function persistSession(user) {
   currentUser = user || null;
 }
 
 export function renderSessionState() {
-  const signedIn = Boolean(currentUser);
-  const { authGate, appShell, sessionUserLabel } = getAuthElements();
-  document.documentElement.classList.toggle("has-session", signedIn);
-  authGate?.classList.toggle("view-hidden", signedIn);
-  appShell?.classList.toggle("view-hidden", !signedIn);
-  if (sessionUserLabel) {
-    sessionUserLabel.textContent = signedIn
-      ? `${currentUser.full_name} (${currentUser.email})`
-      : "Not signed in";
-  }
+  renderAuthSessionState(currentUser);
 }
 
 export function clearSession() {
@@ -423,31 +394,8 @@ export function getSortStateForTable(tableName) {
   return { field: "", direction: "" };
 }
 
-export function getSortableHeaders() {
-  return [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
-}
-
 export function renderSortHeaders() {
-  for (const header of getSortableHeaders()) {
-    const tableName = header.dataset.sortTable || "";
-    const field = header.dataset.sortField || "";
-    const sortState = getSortStateForTable(tableName);
-    const direction = sortState.field === field ? sortState.direction : "";
-    const button = header.querySelector(".table-sort-button");
-    const indicator = header.querySelector(".table-sort-indicator");
-    header.setAttribute(
-      "aria-sort",
-      direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"
-    );
-    if (indicator) {
-      indicator.textContent = direction === "asc" ? "▲" : direction === "desc" ? "▼" : "⇅";
-    }
-    if (button) {
-      const label = button.querySelector("span")?.textContent?.trim() || field;
-      const nextDirection = getNextSortState(sortState, field).direction || "none";
-      button.title = `Sort ${label} (${nextDirection})`;
-    }
-  }
+  renderSortHeadersForState(getSortStateForTable);
 }
 
 export function navigateToDocument(documentId) {
