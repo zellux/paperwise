@@ -84,6 +84,9 @@ let activePageModule = null;
 let activePageModuleName = "";
 let activePageAssetQuery = "";
 
+// Session shell visibility is implemented in ui/auth.js:
+// document.documentElement.classList.toggle("has-session", signedIn)
+
 export const appState = {
   get currentDocumentId() {
     return currentDocumentId;
@@ -654,6 +657,9 @@ export function bindAppShellEvents() {
   document.getElementById("signOutBtn")?.addEventListener("click", handleSignOutClick);
   document.getElementById("brandHomeBtn")?.addEventListener("click", () => {
     window.location.href = "/ui/documents";
+  });
+  document.getElementById("topbarSettingsBtn")?.addEventListener("click", () => {
+    window.location.href = "/ui/settings";
   });
 }
 
