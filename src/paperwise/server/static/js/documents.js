@@ -42,6 +42,7 @@ let docsTotalCount = 0;
 let docsListRequestSeq = 0;
 let initialDocumentsHydrated = false;
 let documentsEventsBound = false;
+const selectedDocIds = new Set();
 
 function cloneDocsFilters(filters) {
   return {
@@ -77,6 +78,8 @@ export function clearSessionState() {
   docsTotalCount = 0;
   docsListRequestSeq = 0;
   docsFilterNavigateTimer = 0;
+  selectedDocIds.clear();
+  renderDocSelectionState();
 }
 
 export function resetDocumentListPage() {
@@ -513,6 +516,79 @@ function applyDocumentsPartial(payload) {
   docsTotalCount = Number(payload.dataset.documentsTotal || 0);
   docsPage = Math.max(1, Number(payload.dataset.documentsPage || docsPage || 1));
   appState.docsPageSize = normalizePageSize(payload.dataset.documentsPageSize || appState.docsPageSize);
+  syncSelectionToVisibleRows();
+}
+
+function getVisibleDocRows() {
+  return [...document.querySelectorAll("#docsTableBody tr[data-doc-id]")];
+}
+
+function getVisibleDocIds() {
+  return getVisibleDocRows().map((row) => row.dataset.docId || "").filter(Boolean);
+}
+
+function renderDocSelectionState() {
+  const visibleRows = getVisibleDocRows();
+  const visibleIds = visibleRows.map((row) => row.dataset.docId || "").filter(Boolean);
+  const visibleSelectedCount = visibleIds.filter((id) => selectedDocIds.has(id)).length;
+
+  for (const row of visibleRows) {
+    const documentId = row.dataset.docId || "";
+    const checked = selectedDocIds.has(documentId);
+    row.classList.toggle("is-selected", checked);
+    const checkbox = row.querySelector('input[data-doc-select]');
+    if (checkbox instanceof HTMLInputElement) {
+      checkbox.checked = checked;
+    }
+  }
+
+  const selectAll = document.getElementById("docsSelectAll");
+  if (selectAll instanceof HTMLInputElement) {
+    selectAll.checked = visibleIds.length > 0 && visibleSelectedCount === visibleIds.length;
+    selectAll.indeterminate = visibleSelectedCount > 0 && visibleSelectedCount < visibleIds.length;
+  }
+
+  const bulkBar = document.getElementById("docsBulkBar");
+  const selectedCount = document.getElementById("docsSelectedCount");
+  if (selectedCount) {
+    selectedCount.textContent = String(selectedDocIds.size);
+  }
+  if (bulkBar) {
+    bulkBar.hidden = selectedDocIds.size === 0;
+  }
+}
+
+function syncSelectionToVisibleRows() {
+  const visibleIds = new Set(getVisibleDocIds());
+  for (const documentId of [...selectedDocIds]) {
+    if (!visibleIds.has(documentId)) {
+      selectedDocIds.delete(documentId);
+    }
+  }
+  renderDocSelectionState();
+}
+
+function setVisibleRowsSelected(selected) {
+  for (const documentId of getVisibleDocIds()) {
+    if (selected) {
+      selectedDocIds.add(documentId);
+    } else {
+      selectedDocIds.delete(documentId);
+    }
+  }
+  renderDocSelectionState();
+}
+
+function toggleDocumentSelection(documentId, selected) {
+  if (!documentId) {
+    return;
+  }
+  if (selected) {
+    selectedDocIds.add(documentId);
+  } else {
+    selectedDocIds.delete(documentId);
+  }
+  renderDocSelectionState();
 }
 
 export function prepareDocumentListDelete() {
@@ -596,6 +672,7 @@ function hydrateInitialDocumentsData(initialData) {
   } else {
     refreshFilterOptionsFromDocuments(initialData.documents);
   }
+  syncSelectionToVisibleRows();
   logActivity(`Loaded ${initialData.documents.length} document(s) of ${docsTotalCount} total`);
   initialDocumentsHydrated = true;
   return true;
@@ -643,6 +720,38 @@ function bindDocumentsEvents() {
   }
 
   document.addEventListener("click", (event) => {
+    const selectionControl =
+      event.target instanceof Element ? event.target.closest("input[data-doc-select], #docsSelectAll") : null;
+    if (selectionControl instanceof HTMLInputElement) {
+      if (selectionControl.id === "docsSelectAll") {
+        setVisibleRowsSelected(selectionControl.checked);
+        return;
+      }
+      toggleDocumentSelection(selectionControl.dataset.docSelect || "", selectionControl.checked);
+      return;
+    }
+
+    const clearSelection =
+      event.target instanceof Element ? event.target.closest("#docsClearSelection") : null;
+    if (clearSelection instanceof HTMLButtonElement) {
+      selectedDocIds.clear();
+      renderDocSelectionState();
+      return;
+    }
+
+    const row = event.target instanceof Element ? event.target.closest("#docsTableBody tr[data-doc-id]") : null;
+    const interactive =
+      event.target instanceof Element
+        ? event.target.closest("a, button, input, select, textarea, label, .filter-dropdown")
+        : null;
+    if (row instanceof HTMLTableRowElement && !interactive) {
+      const documentId = row.dataset.docId || "";
+      if (documentId) {
+        window.location.href = `/ui/document?id=${encodeURIComponent(documentId)}`;
+      }
+      return;
+    }
+
     if (!activeFilterDropdown) {
       return;
     }

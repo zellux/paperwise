@@ -295,3 +295,27 @@
     min-width: 1060px;
   }
 }
+
+.docs-table.docs-design-table {
+  min-width: 0;
+}
+
+.docs-table.docs-design-table th,
+.docs-table.docs-design-table td {
+  border-bottom: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.docs-table.docs-design-table .doc-thead {
+  border-bottom: 1px solid var(--stroke-soft);
+}
+
+.docs-table.docs-design-table .doc-row,
+.docs-table.docs-design-table .docs-empty-row {
+  border-bottom: 1px solid var(--stroke-soft);
+}
+
+.docs-table.docs-design-table td[colspan] {
+  padding: 0;
+}
