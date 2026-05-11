@@ -621,6 +621,14 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         documents_payload = _initial_data_from_response(documents_html)
         assert documents_payload["documents_total"] == 2
         assert documents_payload["documents_processing_count"] == 0
+        assert documents_payload["documents_all_count"] == 2
+        assert documents_payload["document_sidebar_tags"] == [
+            {"tag": "Finance", "document_count": 2},
+            {"tag": "Tax", "document_count": 1},
+        ]
+        assert documents_payload["document_sidebar_correspondents"] == [
+            {"correspondent": "Paperwise", "document_count": 2}
+        ]
         assert documents_payload["document_filter_options"] == {
             "tags": ["Finance", "Tax"],
             "correspondents": ["Paperwise"],
@@ -635,9 +643,16 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         }
         assert "Total documents: 2" in documents_html
         assert "Processing: 0" in documents_html
+        assert '<a class="docs-side-row docs-tag-row" href="/ui/documents?tag=Finance">' in documents_html
+        assert '<span>Finance</span>' in documents_html
+        assert '<span class="docs-side-count">2</span>' in documents_html
+        assert (
+            '<a class="docs-side-row docs-corr-row" href="/ui/documents?correspondent=Paperwise">'
+            in documents_html
+        )
+        assert '<span>Paperwise</span>' in documents_html
         assert 'data-doc-id="doc-tax"' in documents_html
         assert "Tax Notice" in documents_html
-        assert '<span class="status-badge status-ready">READY</span>' in documents_html
         assert '<a class="btn" href="/ui/document?id=doc-tax" title="View document details">Details</a>' in documents_html
         assert (
             '<a class="btn btn-muted" href="/documents/doc-tax/file" target="_blank" '

@@ -77,6 +77,125 @@ def _format_bytes(value: int | None) -> str:
     return f"{mb:.2f} MB"
 
 
+def _format_document_size(value: int | None) -> str:
+    bytes_value = int(value or 0)
+    if bytes_value <= 0:
+        return "-"
+    if bytes_value < 1024 * 1024:
+        kb = bytes_value / 1024
+        return f"{kb:.1f} KB"
+    mb = bytes_value / (1024 * 1024)
+    return f"{mb:.1f} MB"
+
+
+def _short_date(value: str | None) -> str:
+    text = str(value or "").strip()
+    if not text or text == "-":
+        return "-"
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        return parsed.strftime("%b %-d")
+    except ValueError:
+        pass
+    try:
+        parsed = datetime.strptime(text[:10], "%Y-%m-%d")
+        return parsed.strftime("%b %-d")
+    except ValueError:
+        return text
+
+
+def _document_type_icon_class(content_type: str, filename: str) -> str:
+    value = f"{content_type} {filename}".lower()
+    if "pdf" in value:
+        return "type-pdf"
+    if "image" in value or value.endswith((".png", ".jpg", ".jpeg", ".webp", ".tif", ".tiff")):
+        return "type-image"
+    if "spreadsheet" in value or value.endswith((".csv", ".xls", ".xlsx")):
+        return "type-spreadsheet"
+    if "message" in value or value.endswith((".eml", ".msg")):
+        return "type-email"
+    return "type-file"
+
+
+def _format_page_count(value: object) -> str:
+    try:
+        page_count = int(value or 0)
+    except (TypeError, ValueError):
+        page_count = 0
+    if page_count <= 0:
+        return ""
+    return f"{page_count} page" if page_count == 1 else f"{page_count} pages"
+
+
+def _initials(value: str) -> str:
+    cleaned = str(value or "").strip()
+    if not cleaned or cleaned == "-":
+        return "-"
+    parts = [part for part in cleaned.replace("-", " ").split() if part]
+    if len(parts) >= 2:
+        return f"{parts[0][0]}{parts[1][0]}".upper()
+    return cleaned[:2].upper()
+
+
+def _tag_slug(value: str) -> str:
+    lowered = str(value or "").strip().lower()
+    if not lowered:
+        return "misc"
+    if lowered.startswith("identity"):
+        return "identity"
+    if lowered.startswith("finance"):
+        return "finance"
+    if lowered.startswith("health"):
+        return "health"
+    if lowered.startswith("home"):
+        return "home"
+    if lowered.startswith("work"):
+        return "work"
+    return "misc"
+
+
+def document_sidebar_tags_html(tag_stats: list[dict], *, limit: int = 12) -> str:
+    if not tag_stats:
+        return '<span class="docs-side-empty">No tags yet</span>'
+    rows: list[str] = []
+    for stat in tag_stats[:limit]:
+        raw_tag = str(stat.get("tag") or "").strip()
+        if not raw_tag:
+            continue
+        tag = escape(raw_tag)
+        tag_query = quote(raw_tag, safe="")
+        count = int(stat.get("document_count") or 0)
+        rows.append(
+            f'<a class="docs-side-row docs-tag-row" href="/ui/documents?tag={tag_query}">'
+            f'<span class="tag-swatch tag-{escape(_tag_slug(raw_tag), quote=True)}" aria-hidden="true"></span>'
+            f"<span>{tag}</span>"
+            f'<span class="docs-side-count">{count:,}</span>'
+            "</a>"
+        )
+    return "\n".join(rows) if rows else '<span class="docs-side-empty">No tags yet</span>'
+
+
+def document_sidebar_correspondents_html(correspondent_stats: list[dict], *, limit: int = 10) -> str:
+    if not correspondent_stats:
+        return '<span class="docs-side-empty">No correspondents yet</span>'
+    rows: list[str] = []
+    for stat in correspondent_stats[:limit]:
+        raw_correspondent = str(stat.get("correspondent") or "").strip()
+        if not raw_correspondent:
+            continue
+        correspondent = escape(raw_correspondent)
+        correspondent_query = quote(raw_correspondent, safe="")
+        count = int(stat.get("document_count") or 0)
+        rows.append(
+            f'<a class="docs-side-row docs-corr-row" href="/ui/documents?correspondent={correspondent_query}">'
+            f'<span class="corr-avatar corr-avatar-sm" aria-hidden="true">{escape(_initials(raw_correspondent))}</span>'
+            f"<span>{correspondent}</span>"
+            f'<span class="docs-side-count">{count:,}</span>'
+            "</a>"
+        )
+    return "\n".join(rows) if rows else '<span class="docs-side-empty">No correspondents yet</span>'
+
+
 def _relative_blob_path(blob_uri: str | None) -> str:
     value = str(blob_uri or "").strip()
     if not value:
@@ -271,38 +390,96 @@ def pending_rows_html(documents: list[dict]) -> str:
 
 def document_rows_html(documents: list[dict]) -> str:
     if not documents:
-        return '                <tr><td colspan="7">No documents found.</td></tr>'
+        return (
+            '                <tr class="docs-empty-row"><td colspan="7">'
+            '<div class="doc-empty"><div class="doc-empty-mark" aria-hidden="true">'
+            '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+            '<polyline points="14 2 14 8 20 8"/></svg></div>'
+            "<p>No documents found.</p></div></td></tr>"
+        )
     rows: list[str] = []
     for item in documents:
         raw_document_id = str(item.get("id") or "")
         document_id = escape(raw_document_id)
         document_id_query = quote(raw_document_id, safe="")
         title = escape(_document_title(item))
+        filename = escape(str(item.get("filename") or "Untitled document"))
         metadata = item.get("llm_metadata") if isinstance(item.get("llm_metadata"), dict) else {}
-        document_type = escape(str(metadata.get("document_type") or "-"))
-        correspondent = escape(str(metadata.get("correspondent") or "-"))
+        document_type = str(metadata.get("document_type") or "-")
+        correspondent_raw = str(metadata.get("correspondent") or "-")
+        correspondent = escape(correspondent_raw)
         tags = metadata.get("tags") if isinstance(metadata.get("tags"), list) else []
-        tags_text = escape(", ".join(str(tag) for tag in tags) if tags else "-")
-        document_date = escape(str(metadata.get("document_date") or "-"))
+        tag_pills = "".join(
+            '<span class="tag-pill">'
+            f'<span class="tag-swatch tag-swatch-xs tag-{escape(_tag_slug(str(tag)), quote=True)}" aria-hidden="true"></span>'
+            f"{escape(str(tag))}</span>"
+            for tag in tags[:3]
+        )
+        if len(tags) > 3:
+            tag_pills += f'<span class="tag-pill tag-more">+{len(tags) - 3}</span>'
+        if not tag_pills:
+            tag_pills = '<span class="muted">-</span>'
+        document_date_raw = str(metadata.get("document_date") or "")
+        document_date = escape(document_date_raw or "-")
+        display_date = escape(_short_date(document_date_raw))
         status_html = _status_badge_html(str(item.get("status") or ""))
+        size = escape(_format_document_size(item.get("size_bytes")))
+        created_at = escape(str(item.get("created_at") or "-")[:10] or "-")
+        page_count = escape(_format_page_count(item.get("page_count")))
+        type_icon_class = escape(
+            _document_type_icon_class(str(item.get("content_type") or ""), str(item.get("filename") or "")),
+            quote=True,
+        )
+        title_meta_parts = [f'<span class="filename">{filename}</span>']
+        if page_count:
+            title_meta_parts.append(f'<span class="dot" aria-hidden="true"></span><span>{page_count}</span>')
         rows.append(
-            f'                <tr data-doc-id="{document_id}">'
-            f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id_query}">{title}</a></td>'
-            f'<td data-label="Type">{document_type}</td>'
-            f'<td data-label="Correspondent">{correspondent}</td>'
-            f'<td data-label="Tags">{tags_text}</td>'
-            f'<td data-label="Date">{document_date}</td>'
-            f'<td data-label="Status">{status_html}</td>'
-            '<td data-label="Action"><div class="table-actions">'
-            f'<a class="btn" href="/ui/document?id={document_id_query}" title="View document details">'
-            "Details"
-            "</a>"
+            f'                <tr class="doc-row" data-doc-id="{document_id}">'
+            '<td class="td td-check" data-label="Select">'
+            f'<input type="checkbox" data-doc-select="{document_id}" aria-label="Select {title}" /></td>'
+            '<td class="td td-title" data-label="Document">'
+            f'<span class="type-icon {type_icon_class}" aria-hidden="true">'
+            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+            '<polyline points="14 2 14 8 20 8"/></svg></span>'
+            '<span class="title-stack">'
+            '<span class="title-row">'
+            f'<a class="title-link" href="/ui/document?id={document_id_query}">{title}</a>'
+            f"{status_html}"
+            "</span>"
+            f'<span class="title-meta">{"".join(title_meta_parts)}</span>'
+            "</span></td>"
+            '<td class="td td-corr" data-label="Correspondent">'
+            f'<span class="corr-cell"><span class="corr-avatar corr-avatar-sm">{escape(_initials(correspondent_raw))}</span>'
+            f"<span>{correspondent}</span></span></td>"
+            f'<td class="td td-tags" data-label="Tags">{tag_pills}</td>'
+            f'<td class="td td-date" data-label="Date"><span>{display_date}</span>'
+            f'<span class="td-meta">{document_date}</span></td>'
+            f'<td class="td td-size right" data-label="Size">{size}<span class="td-meta">{created_at}</span></td>'
+            '<td class="td td-actions" data-label="Action"><div class="table-actions">'
+            f'<a class="row-act" href="/ui/document?id={document_id_query}" title="View document details" aria-label="View document details">'
+            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>'
+            '<circle cx="12" cy="12" r="3"/></svg></a>'
+            f'<a class="row-act" href="/documents/{document_id_query}/file" '
+            'target="_blank" rel="noopener noreferrer" title="View file" aria-label="View file">'
+            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'
+            '<polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>'
+            f'<button class="row-act row-act-danger" type="button" data-delete-doc-id="{document_id}" '
+            f'data-delete-doc-title="{title}" title="Delete document" aria-label="Delete document">'
+            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'
+            '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
+            f'<a class="btn" href="/ui/document?id={document_id_query}" title="View document details">Details</a>'
             f'<a class="btn btn-muted" href="/documents/{document_id_query}/file" '
-            'target="_blank" rel="noopener noreferrer" title="View file">'
-            "View"
-            "</a>"
-            f'<button class="btn btn-muted" type="button" data-delete-doc-id="{document_id}" '
-            f'data-delete-doc-title="{title}" title="Delete document">Delete</button>'
+            'target="_blank" rel="noopener noreferrer" title="View file">View</a>'
             "</div></td>"
             "</tr>"
         )

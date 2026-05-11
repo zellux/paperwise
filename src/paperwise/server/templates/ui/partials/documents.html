@@ -1,111 +1,161 @@
-<article id="section-docs" class="panel panel-section view">
-          <h2>Documents</h2>
-          <form id="docsFilterForm" class="filters-toolbar">
-            <div class="filter-chip filter-chip-search">
-              <span class="chip-prefix">Search</span>
-              <input
-                id="filterQuery"
-                name="filterQuery"
-                type="text"
-                placeholder="Title, correspondent, type, tags..."
-              />
-            </div>
-            <div class="filter-chip">
-              <span class="chip-prefix">Tags</span>
-              <select
-                id="filterTag"
-                name="filterTag"
-                class="filter-select"
-                multiple
-                title="Select one or more tags"
-              >
-              </select>
-            </div>
-            <div class="filter-chip">
-              <span class="chip-prefix">Correspondent</span>
-              <select
-                id="filterCorrespondent"
-                name="filterCorrespondent"
-                class="filter-select"
-                multiple
-                title="Select one or more correspondents"
-              >
-              </select>
-            </div>
-            <div class="filter-chip">
-              <span class="chip-prefix">Document Type</span>
-              <select
-                id="filterType"
-                name="filterType"
-                class="filter-select"
-                multiple
-                title="Select one or more document types"
-              >
-              </select>
-            </div>
-            <div class="filter-chip">
-              <span class="chip-prefix">Status</span>
-              <select
-                id="filterStatus"
-                name="filterStatus"
-                class="filter-select"
-                multiple
-                title="Select one or more statuses"
-              >
-                <option value="received">Received</option>
-                <option value="processing">Processing</option>
-                <option value="ready">Ready</option>
-              </select>
-            </div>
-            <button id="clearFiltersBtn" type="button" class="btn btn-muted">Reset Filters</button>
-          </form>
-          <div id="documentsPaginationToolbar" class="pagination-toolbar">{{ documents_pagination_toolbar_html|safe }}</div>
-          <div class="docs-table-wrap">
-            <table class="docs-table">
-              <thead>
-                <tr>
-                  <th data-sort-table="docs" data-sort-field="title" aria-sort="none">
-                    <button type="button" class="table-sort-button">
-                      <span>Title</span>
-                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
-                    </button>
-                  </th>
-                  <th data-sort-table="docs" data-sort-field="document_type" aria-sort="none">
-                    <button type="button" class="table-sort-button">
-                      <span>Type</span>
-                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
-                    </button>
-                  </th>
-                  <th data-sort-table="docs" data-sort-field="correspondent" aria-sort="none">
-                    <button type="button" class="table-sort-button">
-                      <span>Correspondent</span>
-                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
-                    </button>
-                  </th>
-                  <th data-sort-table="docs" data-sort-field="tags" aria-sort="none">
-                    <button type="button" class="table-sort-button">
-                      <span>Tags</span>
-                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
-                    </button>
-                  </th>
-                  <th data-sort-table="docs" data-sort-field="document_date" aria-sort="none">
-                    <button type="button" class="table-sort-button">
-                      <span>Date</span>
-                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
-                    </button>
-                  </th>
-                  <th data-sort-table="docs" data-sort-field="status" aria-sort="none">
-                    <button type="button" class="table-sort-button">
-                      <span>Status</span>
-                      <span class="table-sort-indicator" aria-hidden="true">⇅</span>
-                    </button>
-                  </th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="docsTableBody">
+<article id="section-docs" class="documents-workbench view">
+  <aside class="docs-nav-panel" aria-label="Document collections">
+    <a class="docs-upload-primary" href="/ui/upload">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span>Upload documents</span>
+      <kbd>⌘U</kbd>
+    </a>
+    <nav class="docs-side-section">
+      <a class="docs-side-row active" href="/ui/documents?status=received&amp;status=processing&amp;status=failed&amp;status=ready">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg>
+        <span>All documents</span>
+        <span class="docs-side-count">{{ documents_all_count|format_number }}</span>
+      </a>
+      <a class="docs-side-row" href="/ui/pending">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18"/><path d="M5 7l1 12h12l1-12"/><path d="M9 11h6"/></svg>
+        <span>Inbox</span>
+        <span class="docs-side-count accent">{{ documents_processing_count|format_number }}</span>
+      </a>
+      <a class="docs-side-row" href="/ui/documents?status=failed">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+        <span>Needs attention</span>
+        <span class="docs-side-count">{{ documents_failed_count|format_number }}</span>
+      </a>
+    </nav>
+    <section class="docs-side-section">
+      <div class="docs-side-head">
+        <span>Tags</span>
+        <a href="/ui/tags" aria-label="Manage tags">+</a>
+      </div>
+{{ documents_sidebar_tags_html|safe }}
+    </section>
+    <section class="docs-side-section docs-side-section-last">
+      <div class="docs-side-head">
+        <span>Correspondents</span>
+        <span aria-hidden="true">•••</span>
+      </div>
+{{ documents_sidebar_correspondents_html|safe }}
+    </section>
+  </aside>
+
+  <section class="docs-main-panel">
+    <header class="docs-page-head">
+      <div>
+        <p class="page-eyebrow">Workspace · Personal</p>
+        <h1>All documents</h1>
+      </div>
+      <div class="docs-head-actions">
+        <a class="btn btn-ghost" href="/ui/documents" title="Sync document list">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/></svg>
+          <span>Sync</span>
+        </a>
+        <button id="clearFiltersBtn" type="button" class="btn">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.5 10 19 14 21 14 12.5 22 3"/></svg>
+          <span>Filters</span>
+        </button>
+        <a class="btn btn-primary" href="/ui/upload">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Upload</span>
+        </a>
+      </div>
+    </header>
+
+    <form id="docsFilterForm" class="filters-toolbar docs-filter-bar">
+      <div class="filter-chip filter-chip-search">
+        <span class="chip-prefix">Search</span>
+        <input
+          id="filterQuery"
+          name="filterQuery"
+          type="text"
+          placeholder="Title, correspondent, type, tags..."
+        />
+      </div>
+      <div class="filter-chip">
+        <span class="chip-prefix">Tags</span>
+        <select id="filterTag" name="filterTag" class="filter-select" multiple title="Select one or more tags"></select>
+      </div>
+      <div class="filter-chip">
+        <span class="chip-prefix">Correspondent</span>
+        <select id="filterCorrespondent" name="filterCorrespondent" class="filter-select" multiple title="Select one or more correspondents"></select>
+      </div>
+      <div class="filter-chip">
+        <span class="chip-prefix">Document Type</span>
+        <select id="filterType" name="filterType" class="filter-select" multiple title="Select one or more document types"></select>
+      </div>
+      <div class="filter-chip">
+        <span class="chip-prefix">Status</span>
+        <select id="filterStatus" name="filterStatus" class="filter-select" multiple title="Select one or more statuses">
+          <option value="received">Received</option>
+          <option value="processing">Processing</option>
+          <option value="ready">Ready</option>
+        </select>
+      </div>
+    </form>
+
+    <div class="inflight-strip" {% if documents_processing_count == 0 %}hidden{% endif %}>
+      <div class="inflight-head">
+        <span class="inflight-spin" aria-hidden="true"><span></span></span>
+        <span>{{ documents_processing_count|format_number }} document{% if documents_processing_count != 1 %}s{% endif %} processing</span>
+        <a class="btn-icon-xs" href="/ui/pending" aria-label="View processing queue">
+          <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div id="documentsPaginationToolbar" class="pagination-toolbar docs-list-toolbar">{{ documents_pagination_toolbar_html|safe }}</div>
+    <div class="docs-table-wrap doc-table">
+      <table class="docs-table docs-design-table">
+        <thead>
+          <tr class="doc-thead">
+            <th class="td-check"><input id="docsSelectAll" type="checkbox" aria-label="Select all visible documents" /></th>
+            <th class="th" data-sort-table="docs" data-sort-field="title" aria-sort="none">
+              <button type="button" class="table-sort-button th-btn"><span>Document</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+            </th>
+            <th class="th th-corr" data-sort-table="docs" data-sort-field="correspondent" aria-sort="none">
+              <button type="button" class="table-sort-button th-btn"><span>Correspondent</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+            </th>
+            <th class="th th-tags" data-sort-table="docs" data-sort-field="tags" aria-sort="none">
+              <button type="button" class="table-sort-button th-btn"><span>Tags</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+            </th>
+            <th class="th" data-sort-table="docs" data-sort-field="document_date" aria-sort="none">
+              <button type="button" class="table-sort-button th-btn"><span>Date</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+            </th>
+            <th class="th right">Size</th>
+            <th class="th" aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody id="docsTableBody" class="doc-tbody">
 {{ documents_table_body_html|safe }}
-              </tbody>
-            </table>
-          </div>
-        </article>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <div id="docsBulkBar" class="docs-bulk-bar" hidden>
+    <button id="docsClearSelection" type="button" class="bulk-action bulk-action-icon" aria-label="Clear selection">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <span class="bulk-count"><strong id="docsSelectedCount">0</strong> selected</span>
+    <span class="bulk-divider" aria-hidden="true"></span>
+    <button type="button" class="bulk-action">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+      <span>Tag</span>
+    </button>
+    <button type="button" class="bulk-action">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg>
+      <span>Move</span>
+    </button>
+    <button type="button" class="bulk-action">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span>Download</span>
+    </button>
+    <button type="button" class="bulk-action bulk-action-accent">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9L12 3z"/></svg>
+      <span>Ask across</span>
+    </button>
+    <span class="bulk-divider" aria-hidden="true"></span>
+    <button type="button" class="bulk-action bulk-action-danger">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+      <span>Trash</span>
+    </button>
+  </div>
+</article>

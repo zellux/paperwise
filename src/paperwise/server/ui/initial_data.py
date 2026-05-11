@@ -21,7 +21,7 @@ from paperwise.application.services.pending_documents import (
     list_pending_documents,
 )
 from paperwise.application.services.user_preferences import load_normalized_user_preferences
-from paperwise.domain.models import User
+from paperwise.domain.models import DocumentStatus, User
 from paperwise.server.document_access import get_owned_document_or_404
 from paperwise.server.ui.page import DEFAULT_UI_THEME, SUPPORTED_UI_THEMES
 from paperwise.server.ui.payloads import document_list_item, history_event_item
@@ -157,6 +157,34 @@ def document_filter_options(repository: TaxonomyRepository, current_user: User) 
     }
 
 
+def document_sidebar_data(repository: DocumentsInitialDataRepository, current_user: User | None) -> dict:
+    if current_user is None:
+        return {
+            "documents_all_count": 0,
+            "documents_failed_count": 0,
+            "document_sidebar_tags": [],
+            "document_sidebar_correspondents": [],
+        }
+    return {
+        "documents_all_count": repository.count_owner_documents_by_statuses(
+            owner_id=current_user.id,
+            statuses=set(DocumentStatus),
+        ),
+        "documents_failed_count": repository.count_owner_documents_by_statuses(
+            owner_id=current_user.id,
+            statuses={DocumentStatus.FAILED},
+        ),
+        "document_sidebar_tags": [
+            {"tag": tag, "document_count": count}
+            for tag, count in repository.list_owner_tag_stats(current_user.id)
+        ],
+        "document_sidebar_correspondents": [
+            {"correspondent": correspondent, "document_count": count}
+            for correspondent, count in repository.list_owner_correspondent_stats(current_user.id)
+        ],
+    }
+
+
 def documents_initial_data(
     repository: DocumentsInitialDataRepository,
     current_user: User | None,
@@ -173,6 +201,7 @@ def documents_initial_data(
     include_filter_options: bool = False,
 ) -> dict:
     data = page_initial_data(current_user, repository)
+    data.update(document_sidebar_data(repository, current_user))
     normalized_page_size = max(1, min(100, int(page_size or 20)))
     requested_page = max(1, int(page or 1))
     if current_user is None:
@@ -183,6 +212,10 @@ def documents_initial_data(
                 "documents_page_size": normalized_page_size,
                 "documents_total": 0,
                 "documents_processing_count": 0,
+                "documents_all_count": 0,
+                "documents_failed_count": 0,
+                "document_sidebar_tags": [],
+                "document_sidebar_correspondents": [],
             }
         )
         if include_filter_options:
@@ -230,7 +263,7 @@ def documents_initial_data(
     data.update(
         {
             "documents": [
-                document_list_item(document, llm_result)
+                document_list_item(document, llm_result, repository.get_parse_result(document.id))
                 for document, llm_result in listing.rows
             ],
             "documents_page": current_page,
@@ -246,7 +279,7 @@ def documents_initial_data(
 
 def pending_documents(repository: DocumentStore, current_user: User) -> list[dict]:
     return [
-        document_list_item(document, llm_result)
+        document_list_item(document, llm_result, repository.get_parse_result(document.id))
         for document, llm_result in list_pending_documents(
             repository=repository,
             owner_id=current_user.id,
