@@ -40,7 +40,7 @@ from paperwise.server.dependencies import (
     document_repository_dependency,
     llm_provider_dependency,
 )
-from paperwise.server.llm_provider import resolve_http_llm_provider_for_user
+from paperwise.server.http_llm_provider import resolve_http_llm_provider_for_user
 
 router = APIRouter(prefix="/query", tags=["query"])
 

@@ -12,14 +12,14 @@ from paperwise.application.services.llm_preferences import (
     LLM_TASK_OCR,
 )
 from paperwise.application.services.llm_provider_factory import (
-    resolve_llm_provider_from_preferences as resolve_configured_llm_provider,
+    resolve_llm_provider_for_user,
+    resolve_ocr_llm_provider_for_user,
 )
 from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.ocr_preferences import (
     resolve_owner_ocr_auto_switch,
     resolve_owner_ocr_provider,
 )
-from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.application.services.parsing import parse_document_blob
 from paperwise.application.services.chunk_indexing import index_document_chunks
 from paperwise.domain.models import DocumentStatus, HistoryActorType
@@ -31,32 +31,20 @@ logger = get_task_logger(__name__)
 settings = get_settings()
 
 
-def _resolve_llm_provider_from_preferences(
-    *,
-    preferences: dict[str, str],
-    provider_override: LLMProvider | None,
-    task: str = LLM_TASK_METADATA,
-) -> LLMProvider:
-    return resolve_configured_llm_provider(
-        preferences=preferences,
-        provider_override=provider_override,
-        task=task,
-        missing_provider_detail=f"missing provider setting for task: {task}",
-        missing_api_key_detail=f"missing API key setting for task: {task}",
-        missing_base_url_detail=f"missing base URL setting for task: {task}",
-        error_factory=RuntimeError,
-    )
-
-
 def _resolve_metadata_llm_provider_for_owner(
     repository: DocumentRepository,
     owner_id: str,
     provider_override: LLMProvider | None,
 ) -> LLMProvider:
-    return _resolve_llm_provider_from_preferences(
-        preferences=load_user_preferences(repository=repository, user_id=owner_id),
+    return resolve_llm_provider_for_user(
+        repository=repository,
+        user_id=owner_id,
         provider_override=provider_override,
         task=LLM_TASK_METADATA,
+        missing_provider_detail=f"missing provider setting for task: {LLM_TASK_METADATA}",
+        missing_api_key_detail=f"missing API key setting for task: {LLM_TASK_METADATA}",
+        missing_base_url_detail=f"missing base URL setting for task: {LLM_TASK_METADATA}",
+        error_factory=RuntimeError,
     )
 
 
@@ -66,12 +54,15 @@ def _resolve_ocr_llm_provider_for_owner(
     provider_override: LLMProvider | None,
     ocr_provider: str,
 ) -> LLMProvider | None:
-    if ocr_provider == "tesseract":
-        return None
-    return _resolve_llm_provider_from_preferences(
-        preferences=load_user_preferences(repository=repository, user_id=owner_id),
+    return resolve_ocr_llm_provider_for_user(
+        repository=repository,
+        user_id=owner_id,
         provider_override=provider_override,
-        task=LLM_TASK_OCR,
+        ocr_provider=ocr_provider,
+        missing_provider_detail=f"missing provider setting for task: {LLM_TASK_OCR}",
+        missing_api_key_detail=f"missing API key setting for task: {LLM_TASK_OCR}",
+        missing_base_url_detail=f"missing base URL setting for task: {LLM_TASK_OCR}",
+        error_factory=RuntimeError,
     )
 
 

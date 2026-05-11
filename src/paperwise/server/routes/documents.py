@@ -15,7 +15,7 @@ from paperwise.server.dependencies import (
     settings_dependency,
     storage_dependency,
 )
-from paperwise.server.llm_provider import (
+from paperwise.server.http_llm_provider import (
     resolve_http_metadata_llm_provider_for_user,
     resolve_http_ocr_llm_provider_for_user,
 )
@@ -524,24 +524,15 @@ def parse_document_endpoint(
     ocr_provider = resolve_owner_ocr_provider(repository, current_user.id)
     ocr_auto_switch = resolve_owner_ocr_auto_switch(repository, current_user.id)
     ocr_llm_provider: LLMProvider | None = None
-    if ocr_provider == "llm":
-        try:
-            ocr_llm_provider = resolve_http_metadata_llm_provider_for_user(
-                repository=repository,
-                user_id=current_user.id,
-                provider_override=provider_override,
-            )
-        except HTTPException:
-            ocr_llm_provider = None
-    elif ocr_provider == "llm_separate":
-        try:
-            ocr_llm_provider = resolve_http_ocr_llm_provider_for_user(
-                repository=repository,
-                user_id=current_user.id,
-                provider_override=provider_override,
-            )
-        except HTTPException:
-            ocr_llm_provider = None
+    try:
+        ocr_llm_provider = resolve_http_ocr_llm_provider_for_user(
+            repository=repository,
+            user_id=current_user.id,
+            provider_override=provider_override,
+            ocr_provider=ocr_provider,
+        )
+    except HTTPException:
+        ocr_llm_provider = None
     result = _run_parse_document_blob_or_400(
         document_id=document.id,
         blob_uri=document.blob_uri,
@@ -599,18 +590,12 @@ def llm_parse_document_endpoint(
     )
     ocr_provider = resolve_owner_ocr_provider(repository, current_user.id)
     ocr_auto_switch = resolve_owner_ocr_auto_switch(repository, current_user.id)
-    ocr_llm_provider: LLMProvider | None = None
-    if ocr_provider == "llm":
-        ocr_llm_provider = llm_provider
-    elif ocr_provider == "llm_separate":
-        try:
-            ocr_llm_provider = resolve_http_ocr_llm_provider_for_user(
-                repository=repository,
-                user_id=current_user.id,
-                provider_override=provider_override,
-            )
-        except HTTPException:
-            ocr_llm_provider = None
+    ocr_llm_provider = resolve_http_ocr_llm_provider_for_user(
+        repository=repository,
+        user_id=current_user.id,
+        provider_override=provider_override,
+        ocr_provider=ocr_provider,
+    )
     try:
         parse_result = repository.get_parse_result(document_id)
         if parse_result is None:

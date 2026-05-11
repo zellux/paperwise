@@ -1,15 +1,17 @@
 from collections.abc import Callable
 from typing import Any
 
-from paperwise.application.interfaces import LLMProvider
+from paperwise.application.interfaces import LLMProvider, PreferenceRepository
 from paperwise.application.services.llm_preferences import (
     LLM_TASK_METADATA,
+    LLM_TASK_OCR,
     ResolvedLLMTaskConfig,
     default_base_url_for_provider,
     default_model_for_task,
     resolve_task_config,
     validate_api_key_for_provider,
 )
+from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 
@@ -36,6 +38,81 @@ def resolve_llm_provider_from_preferences(
         provider_override=provider_override,
         task=task,
         ocr_image_detail=ocr_image_detail,
+        missing_provider_detail=missing_provider_detail,
+        missing_api_key_detail=missing_api_key_detail,
+        missing_base_url_detail=missing_base_url_detail,
+        custom_response_format_type=custom_response_format_type,
+        error_factory=error_factory,
+    )
+
+
+def resolve_llm_provider_for_user(
+    *,
+    repository: PreferenceRepository,
+    user_id: str,
+    provider_override: LLMProvider | None = None,
+    task: str = LLM_TASK_METADATA,
+    missing_provider_detail: str = "Configure an LLM provider in Settings before running LLM parse.",
+    missing_api_key_detail: str = "Selected LLM provider requires your API key in Settings.",
+    missing_base_url_detail: str = "Custom LLM provider requires a base URL in Settings.",
+    custom_response_format_type: str | None = None,
+    error_factory: ProviderErrorFactory = RuntimeError,
+) -> LLMProvider:
+    return resolve_llm_provider_from_preferences(
+        preferences=load_user_preferences(repository=repository, user_id=user_id),
+        provider_override=provider_override,
+        task=task,
+        missing_provider_detail=missing_provider_detail,
+        missing_api_key_detail=missing_api_key_detail,
+        missing_base_url_detail=missing_base_url_detail,
+        custom_response_format_type=custom_response_format_type,
+        error_factory=error_factory,
+    )
+
+
+def resolve_metadata_llm_provider_for_user(
+    *,
+    repository: PreferenceRepository,
+    user_id: str,
+    provider_override: LLMProvider | None = None,
+    missing_provider_detail: str = "Configure an LLM provider in Settings before running LLM parse.",
+    missing_api_key_detail: str = "Selected LLM provider requires your API key in Settings.",
+    missing_base_url_detail: str = "Custom LLM provider requires a base URL in Settings.",
+    custom_response_format_type: str | None = None,
+    error_factory: ProviderErrorFactory = RuntimeError,
+) -> LLMProvider:
+    return resolve_llm_provider_for_user(
+        repository=repository,
+        user_id=user_id,
+        provider_override=provider_override,
+        task=LLM_TASK_METADATA,
+        missing_provider_detail=missing_provider_detail,
+        missing_api_key_detail=missing_api_key_detail,
+        missing_base_url_detail=missing_base_url_detail,
+        custom_response_format_type=custom_response_format_type,
+        error_factory=error_factory,
+    )
+
+
+def resolve_ocr_llm_provider_for_user(
+    *,
+    repository: PreferenceRepository,
+    user_id: str,
+    provider_override: LLMProvider | None = None,
+    ocr_provider: str,
+    missing_provider_detail: str = "Configure an OCR LLM connection in Settings before OCR parsing.",
+    missing_api_key_detail: str = "Selected OCR LLM connection requires an API key in Settings.",
+    missing_base_url_detail: str = "Custom OCR LLM connection requires a base URL in Settings.",
+    custom_response_format_type: str | None = None,
+    error_factory: ProviderErrorFactory = RuntimeError,
+) -> LLMProvider | None:
+    if ocr_provider == "tesseract":
+        return None
+    return resolve_llm_provider_for_user(
+        repository=repository,
+        user_id=user_id,
+        provider_override=provider_override,
+        task=LLM_TASK_OCR,
         missing_provider_detail=missing_provider_detail,
         missing_api_key_detail=missing_api_key_detail,
         missing_base_url_detail=missing_base_url_detail,

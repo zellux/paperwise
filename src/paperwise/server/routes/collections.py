@@ -34,7 +34,7 @@ from paperwise.server.presenters.collections import (
     present_collection_from_repository,
     present_search_response,
 )
-from paperwise.server.llm_provider import resolve_http_llm_provider_for_user
+from paperwise.server.http_llm_provider import resolve_http_llm_provider_for_user
 
 router = APIRouter(prefix="/collections", tags=["collections"])
 
