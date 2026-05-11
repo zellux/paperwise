@@ -10,13 +10,20 @@ async function apiFetch(url, options = {}) {
   return response;
 }
 
-async function fetchUiPartial(url) {
-  const response = await apiFetch(url);
-  const payload = await response.json();
+async function fetchHtmlPartial(url) {
+  const response = await apiFetch(url, { headers: { Accept: "text/html" } });
+  const html = await response.text();
   if (!response.ok) {
-    throw new Error(payload.detail || response.statusText);
+    throw new Error(html.trim() || response.statusText);
   }
-  return payload;
+  return parseHtmlPartial(html);
+}
+
+function parseHtmlPartial(html) {
+  const template = document.createElement("template");
+  template.innerHTML = String(html || "").trim();
+  const root = template.content.firstElementChild;
+  return root instanceof HTMLElement ? root : document.createElement("div");
 }
 
 function replaceElementHtml(element, html) {
@@ -35,9 +42,26 @@ function renderTableLoading(tbody, colspan, message) {
 
 async function loadTablePartial({ url, tbody, loadingColspan, loadingMessage }) {
   renderTableLoading(tbody, loadingColspan, loadingMessage);
-  return fetchUiPartial(url);
+  return fetchHtmlPartial(url);
 }
 
-function applyTableBodyPartial(tbody, payload) {
-  replaceElementHtml(tbody, payload?.table_body_html);
+function getPartialTemplate(partialRoot, targetId, attribute = "data-partial-target") {
+  if (!(partialRoot instanceof Element) || !targetId) {
+    return null;
+  }
+  return Array.from(partialRoot.querySelectorAll(`template[${attribute}]`)).find(
+    (template) => template.getAttribute(attribute) === targetId,
+  ) || null;
+}
+
+function applyHtmlPartialTarget(target, partialRoot, attribute = "data-partial-target") {
+  if (!target) {
+    return;
+  }
+  const template = getPartialTemplate(partialRoot, target.id, attribute);
+  replaceElementHtml(target, template ? template.innerHTML : "");
+}
+
+function applyTableBodyPartial(tbody, partialRoot) {
+  applyHtmlPartialTarget(tbody, partialRoot);
 }

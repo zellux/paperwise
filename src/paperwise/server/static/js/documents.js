@@ -489,10 +489,10 @@ function applyDocumentsPartial(payload) {
   const docsTableBody = document.getElementById("docsTableBody");
   const documentsPaginationToolbar = document.getElementById("documentsPaginationToolbar");
   applyTableBodyPartial(docsTableBody, payload);
-  replaceElementHtml(documentsPaginationToolbar, payload.pagination_toolbar_html);
-  docsTotalCount = Number(payload.documents_total || 0);
-  docsPage = Math.max(1, Number(payload.documents_page || docsPage || 1));
-  docsPageSize = normalizePageSize(payload.documents_page_size || docsPageSize);
+  applyHtmlPartialTarget(documentsPaginationToolbar, payload);
+  docsTotalCount = Number(payload.dataset.documentsTotal || 0);
+  docsPage = Math.max(1, Number(payload.dataset.documentsPage || docsPage || 1));
+  docsPageSize = normalizePageSize(payload.dataset.documentsPageSize || docsPageSize);
 }
 
 function prepareDocumentListDelete() {
@@ -555,7 +555,7 @@ async function loadDocumentsList() {
     return;
   }
   applyDocumentsPartial(payload);
-  logActivity(`Loaded ${Number(payload.documents_returned || 0)} document(s) of ${docsTotalCount} total`);
+  logActivity(`Loaded ${Number(payload.dataset.documentsReturned || 0)} document(s) of ${docsTotalCount} total`);
 }
 
 function hydrateInitialDocumentsData(initialData) {

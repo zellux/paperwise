@@ -17,7 +17,6 @@ let searchAskMessageSeq = 0;
 let searchAskCurrentTokens = 0;
 let searchAskTimerId = 0;
 let searchAskThreadId = "";
-let searchAskThreads = [];
 let initialChatThreadsConsumed = false;
 let searchEventsBound = false;
 
@@ -34,16 +33,6 @@ function bindSearchElements() {
   searchAskThreadList = document.getElementById("searchAskThreadList");
   searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
   searchAskMessages = document.getElementById("searchAskMessages");
-}
-
-function normalizeChatThreadSummary(thread) {
-  return {
-    id: String(thread?.id || ""),
-    title: String(thread?.title || "Untitled chat"),
-    message_count: Number(thread?.message_count || 0),
-    created_at: String(thread?.created_at || ""),
-    updated_at: String(thread?.updated_at || ""),
-  };
 }
 
 function renderSearchResultsMeta(message) {
@@ -269,15 +258,21 @@ function syncSearchAskThreadSelect() {
   }
 }
 
+function getSearchAskThreadTitle(threadId) {
+  for (const button of searchAskThreadList?.querySelectorAll("[data-thread-id]") || []) {
+    if (button.dataset.threadId === threadId) {
+      return button.querySelector(".thread-title")?.textContent?.trim() || "";
+    }
+  }
+  return "";
+}
+
 function renderSearchAskThreadSelect() {
   syncSearchAskThreadSelect();
 }
 
 function applySearchAskThreadsPartial(payload) {
-  searchAskThreads = Array.isArray(payload.chat_threads)
-    ? payload.chat_threads.map(normalizeChatThreadSummary).filter((thread) => thread.id)
-    : [];
-  replaceElementHtml(searchAskThreadList, payload.thread_list_html);
+  applyHtmlPartialTarget(searchAskThreadList, payload);
   syncSearchAskThreadSelect();
 }
 
@@ -292,9 +287,6 @@ async function loadSearchAskThreads() {
     Array.isArray(initialData.chat_threads)
   ) {
     initialChatThreadsConsumed = true;
-    searchAskThreads = initialData.chat_threads
-      .map(normalizeChatThreadSummary)
-      .filter((thread) => thread.id);
     syncSearchAskThreadSelect();
     return;
   }
@@ -309,7 +301,7 @@ async function loadSearchAskThreads() {
   const suffix = query.toString() ? `?${query.toString()}` : "";
   let payload;
   try {
-    payload = await fetchUiPartial(`/ui/partials/chat-threads${suffix}`);
+    payload = await fetchHtmlPartial(`/ui/partials/chat-threads${suffix}`);
   } catch (error) {
     logActivity(`Chat history failed: ${error.message}`);
     return;
@@ -368,8 +360,7 @@ async function deleteSearchAskThread(threadId) {
   if (!id || searchAskInFlight) {
     return;
   }
-  const thread = searchAskThreads.find((item) => item.id === id);
-  const title = thread?.title || "this chat";
+  const title = getSearchAskThreadTitle(id) || "this chat";
   const confirmed = window.confirm(`Delete "${title}" from chat history?`);
   if (!confirmed) {
     return;
@@ -598,7 +589,6 @@ function clearSearchStateForSession() {
   searchAskMessageSeq = 0;
   searchAskCurrentTokens = 0;
   searchAskThreadId = "";
-  searchAskThreads = [];
   initialChatThreadsConsumed = false;
   syncSearchAskTimer();
   renderSearchAskTokenUsage();

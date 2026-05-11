@@ -882,27 +882,29 @@ function hydrateSettingsFormFromInitialPreferences() {
   return true;
 }
 
-function applyDocumentDetailPartial(payload) {
-  currentDocumentId = String(payload.document_id || "");
-  for (const [elementId, value] of Object.entries(payload.text || {})) {
-    const element = document.getElementById(elementId);
+function applyDocumentDetailPartial(partialRoot) {
+  currentDocumentId = String(partialRoot?.dataset?.documentId || "");
+  partialRoot?.querySelectorAll("template[data-text-target]").forEach((template) => {
+    const element = document.getElementById(template.dataset.textTarget || "");
     if (element) {
-      element.textContent = value;
+      element.textContent = template.content.textContent || "";
     }
-  }
-  for (const [elementId, value] of Object.entries(payload.html || {})) {
-    replaceElementHtml(document.getElementById(elementId), value);
-  }
-  for (const [elementId, value] of Object.entries(payload.inputs || {})) {
-    const element = document.getElementById(elementId);
+  });
+  partialRoot?.querySelectorAll("template[data-html-target]").forEach((template) => {
+    replaceElementHtml(
+      document.getElementById(template.dataset.htmlTarget || ""),
+      template.innerHTML,
+    );
+  });
+  partialRoot?.querySelectorAll("template[data-input-target]").forEach((template) => {
+    const element = document.getElementById(template.dataset.inputTarget || "");
     if (element instanceof HTMLInputElement) {
-      element.value = value;
+      element.value = template.content.textContent || "";
     }
-  }
-  replaceElementHtml(document.getElementById("documentHistoryList"), payload.history_html);
+  });
   const detailBlobUri = document.getElementById("detailBlobUri");
-  if (detailBlobUri && payload.blob_uri) {
-    detailBlobUri.title = payload.blob_uri;
+  if (detailBlobUri && partialRoot?.dataset?.blobUri) {
+    detailBlobUri.title = partialRoot.dataset.blobUri;
   }
 }
 
@@ -918,7 +920,7 @@ async function initializeCurrentPageData() {
 
 async function openDocumentView(documentId) {
   const query = new URLSearchParams({ id: documentId });
-  const payload = await fetchUiPartial(`/ui/partials/document?${query.toString()}`);
+  const payload = await fetchHtmlPartial(`/ui/partials/document?${query.toString()}`);
   applyDocumentDetailPartial(payload);
   logActivity(`Opened document ${documentId}`);
 }

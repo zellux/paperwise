@@ -28,7 +28,7 @@ function renderActivityTokenLoading() {
 function applyActivityPartial(payload) {
   const { processedDocsTableBody } = getActivityElements();
   applyTableBodyPartial(processedDocsTableBody, payload);
-  renderActivityTokenTotal(Number(payload.activity_total_tokens || 0));
+  renderActivityTokenTotal(Number(payload.dataset.activityTotalTokens || 0));
 }
 
 async function loadProcessedDocumentsActivity() {
@@ -52,7 +52,7 @@ async function loadProcessedDocumentsActivity() {
     return;
   }
   applyActivityPartial(payload);
-  logActivity(`Loaded ${Number(payload.activity_document_count || 0)} latest processed document(s).`);
+  logActivity(`Loaded ${Number(payload.dataset.activityDocumentCount || 0)} latest processed document(s).`);
 }
 
 function hydrateInitialActivityData(initialData) {

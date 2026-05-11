@@ -517,10 +517,11 @@ def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> No
 
         threads_partial = client.get("/ui/partials/chat-threads?active_thread_id=thread-ui&q=server")
         assert threads_partial.status_code == 200
-        threads_partial_payload = threads_partial.json()
-        assert threads_partial_payload["chat_threads"][0]["id"] == "thread-ui"
-        assert '<li class="thread-item active">' in threads_partial_payload["thread_list_html"]
-        assert "Server rendered chat" in threads_partial_payload["thread_list_html"]
+        assert "text/html" in threads_partial.headers["content-type"]
+        assert 'data-chat-thread-count="1"' in threads_partial.text
+        assert '<template data-partial-target="searchAskThreadList">' in threads_partial.text
+        assert '<li class="thread-item active">' in threads_partial.text
+        assert "Server rendered chat" in threads_partial.text
 
         search_payload = _initial_data_from_response(client.get("/ui/search").text)
         assert "chat_threads" not in search_payload
@@ -719,64 +720,63 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
 
         documents_partial = client.get("/ui/partials/documents?page_size=1&page=1")
         assert documents_partial.status_code == 200
-        documents_partial_payload = documents_partial.json()
-        assert documents_partial_payload["documents_total"] == 2
-        assert documents_partial_payload["documents_processing_count"] == 1
-        assert documents_partial_payload["documents_returned"] == 1
-        assert "documents" not in documents_partial_payload
-        assert 'data-doc-id="doc-tax"' in documents_partial_payload["table_body_html"]
-        assert '<a class="btn" href="/ui/document?id=doc-tax" title="View document details">Details</a>' in documents_partial_payload["table_body_html"]
-        assert "Total documents: 2" in documents_partial_payload["pagination_toolbar_html"]
-        assert "Processing: 1" in documents_partial_payload["pagination_toolbar_html"]
-        assert "Page 1 / 2" in documents_partial_payload["pagination_toolbar_html"]
-        assert 'data-docs-page-action="next"' in documents_partial_payload["pagination_toolbar_html"]
+        assert "text/html" in documents_partial.headers["content-type"]
+        assert 'data-documents-total="2"' in documents_partial.text
+        assert 'data-documents-processing-count="1"' in documents_partial.text
+        assert 'data-documents-returned="1"' in documents_partial.text
+        assert '<template data-partial-target="docsTableBody">' in documents_partial.text
+        assert '<template data-partial-target="documentsPaginationToolbar">' in documents_partial.text
+        assert 'data-doc-id="doc-tax"' in documents_partial.text
+        assert '<a class="btn" href="/ui/document?id=doc-tax" title="View document details">Details</a>' in documents_partial.text
+        assert "Total documents: 2" in documents_partial.text
+        assert "Processing: 1" in documents_partial.text
+        assert "Page 1 / 2" in documents_partial.text
+        assert 'data-docs-page-action="next"' in documents_partial.text
 
         overlarge_documents_partial = client.get("/ui/partials/documents?page_size=1&page=99")
         assert overlarge_documents_partial.status_code == 200
-        overlarge_documents_partial_payload = overlarge_documents_partial.json()
-        assert overlarge_documents_partial_payload["documents_page"] == 2
-        assert "Page 2 / 2" in overlarge_documents_partial_payload["pagination_toolbar_html"]
+        assert 'data-documents-page="2"' in overlarge_documents_partial.text
+        assert "Page 2 / 2" in overlarge_documents_partial.text
 
         tags_partial = client.get("/ui/partials/tags?sort_by=tag&sort_dir=desc")
         assert tags_partial.status_code == 200
-        tags_partial_payload = tags_partial.json()
-        assert tags_partial_payload["tag_count"] == 2
-        assert "tag_stats" not in tags_partial_payload
-        assert tags_partial_payload["table_body_html"].index("Tax") < tags_partial_payload[
-            "table_body_html"
-        ].index("Finance")
-        assert '<a class="btn" href="/ui/documents?tag=Tax" ' in tags_partial_payload["table_body_html"]
+        assert "text/html" in tags_partial.headers["content-type"]
+        assert 'data-tag-count="2"' in tags_partial.text
+        assert '<template data-partial-target="tagsTableBody">' in tags_partial.text
+        assert tags_partial.text.index("Tax") < tags_partial.text.index("Finance")
+        assert '<a class="btn" href="/ui/documents?tag=Tax" ' in tags_partial.text
 
         types_partial = client.get("/ui/partials/document-types?sort_by=document_type&sort_dir=asc")
         assert types_partial.status_code == 200
-        types_partial_payload = types_partial.json()
-        assert types_partial_payload["document_type_count"] == 2
-        assert "document_type_stats" not in types_partial_payload
-        assert '<td data-label="Document Type">Invoice</td>' in types_partial_payload["table_body_html"]
+        assert "text/html" in types_partial.headers["content-type"]
+        assert 'data-document-type-count="2"' in types_partial.text
+        assert '<template data-partial-target="documentTypesTableBody">' in types_partial.text
+        assert '<td data-label="Document Type">Invoice</td>' in types_partial.text
 
         activity_partial = client.get("/ui/partials/activity?limit=1")
         assert activity_partial.status_code == 200
-        activity_partial_payload = activity_partial.json()
-        assert activity_partial_payload["activity_total_tokens"] == 42
-        assert activity_partial_payload["activity_document_count"] == 1
-        assert "activity_documents" not in activity_partial_payload
-        assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in activity_partial_payload["table_body_html"]
+        assert "text/html" in activity_partial.headers["content-type"]
+        assert 'data-activity-total-tokens="42"' in activity_partial.text
+        assert 'data-activity-document-count="1"' in activity_partial.text
+        assert '<template data-partial-target="processedDocsTableBody">' in activity_partial.text
+        assert '<a class="btn" href="/ui/document?id=doc-tax" title="Open document">Open</a>' in activity_partial.text
 
         pending_partial = client.get("/ui/partials/pending")
         assert pending_partial.status_code == 200
-        pending_partial_payload = pending_partial.json()
-        assert pending_partial_payload["pending_count"] == 1
-        assert pending_partial_payload["has_restartable_pending_documents"] is True
-        assert "pending_documents" not in pending_partial_payload
-        assert 'data-pending-doc-id="doc-pending"' in pending_partial_payload["table_body_html"]
+        assert "text/html" in pending_partial.headers["content-type"]
+        assert 'data-pending-count="1"' in pending_partial.text
+        assert 'data-has-restartable-pending-documents="true"' in pending_partial.text
+        assert '<template data-partial-target="pendingTableBody">' in pending_partial.text
+        assert 'data-pending-doc-id="doc-pending"' in pending_partial.text
 
         document_partial = client.get("/ui/partials/document?id=doc-tax")
         assert document_partial.status_code == 200
-        document_partial_payload = document_partial.json()
-        assert document_partial_payload["document_id"] == "doc-tax"
-        assert document_partial_payload["text"]["detailSizeBytes"] == "100 B (100 bytes)"
-        assert document_partial_payload["inputs"]["metaTitle"] == "Tax Notice"
-        assert "suggested_title: (empty) -&gt; Tax Notice" in document_partial_payload["history_html"]
+        assert "text/html" in document_partial.headers["content-type"]
+        assert 'data-document-id="doc-tax"' in document_partial.text
+        assert '<template data-text-target="detailSizeBytes">100 B (100 bytes)</template>' in document_partial.text
+        assert '<template data-input-target="metaTitle">Tax Notice</template>' in document_partial.text
+        assert '<template data-html-target="documentHistoryList">' in document_partial.text
+        assert "suggested_title: (empty) -&gt; Tax Notice" in document_partial.text
 
         settings_payload = _initial_data_from_response(client.get("/ui/settings/models").text)
         assert settings_payload["current_user"]["email"] == "catalog-ui@example.com"

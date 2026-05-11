@@ -33,7 +33,7 @@ function getVisiblePendingRowCount() {
 function applyPendingPartial(payload) {
   const { pendingTableBody } = getPendingElements();
   applyTableBodyPartial(pendingTableBody, payload);
-  setRestartPendingButtonEnabled(Boolean(payload.has_restartable_pending_documents));
+  setRestartPendingButtonEnabled(payload.dataset.hasRestartablePendingDocuments === "true");
 }
 
 async function loadPendingDocuments() {
@@ -57,7 +57,7 @@ async function loadPendingDocuments() {
     return;
   }
   applyPendingPartial(payload);
-  logActivity(`Loaded ${Number(payload.pending_count || 0)} pending document(s)`);
+  logActivity(`Loaded ${Number(payload.dataset.pendingCount || 0)} pending document(s)`);
 }
 
 function hydrateInitialPendingData(initialData) {

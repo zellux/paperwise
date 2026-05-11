@@ -338,6 +338,75 @@ def documents_pagination_toolbar_html(
     )
 
 
+def _fragment_data_attrs(attrs: dict[str, object]) -> str:
+    parts: list[str] = []
+    for key, value in attrs.items():
+        attr_name = key.replace("_", "-")
+        if isinstance(value, bool):
+            attr_value = "true" if value else "false"
+        else:
+            attr_value = str(value)
+        parts.append(f'data-{escape(attr_name)}="{escape(attr_value, quote=True)}"')
+    return (" " + " ".join(parts)) if parts else ""
+
+
+def _partial_template(
+    target_id: str,
+    html: str,
+    *,
+    attr: str = "data-partial-target",
+) -> str:
+    return f'<template {attr}="{escape(target_id, quote=True)}">{html}</template>'
+
+
+def ui_partial_fragment_html(
+    *,
+    templates: dict[str, str],
+    data_attrs: dict[str, object] | None = None,
+) -> str:
+    body = "\n".join(
+        _partial_template(target_id, html) for target_id, html in templates.items()
+    )
+    return (
+        f'<div class="ui-partial-fragment"'
+        f"{_fragment_data_attrs(data_attrs or {})}>{body}</div>"
+    )
+
+
+def documents_partial_html(data: dict) -> str:
+    documents = data["documents"]
+    return ui_partial_fragment_html(
+        templates={
+            "docsTableBody": document_rows_html(documents),
+            "documentsPaginationToolbar": documents_pagination_toolbar_html(
+                total=data["documents_total"],
+                processing_count=data["documents_processing_count"],
+                page=data["documents_page"],
+                page_size=data["documents_page_size"],
+            ),
+        },
+        data_attrs={
+            "documents_returned": len(documents),
+            "documents_total": data["documents_total"],
+            "documents_processing_count": data["documents_processing_count"],
+            "documents_page": data["documents_page"],
+            "documents_page_size": data["documents_page_size"],
+        },
+    )
+
+
+def table_body_partial_html(
+    *,
+    target_id: str,
+    rows_html: str,
+    data_attrs: dict[str, object] | None = None,
+) -> str:
+    return ui_partial_fragment_html(
+        templates={target_id: rows_html},
+        data_attrs=data_attrs or {},
+    )
+
+
 def _status_badge_html(status_value: str) -> str:
     status = str(status_value or "").lower()
     label = escape(_format_status(status))
@@ -390,6 +459,40 @@ def document_detail_fragments(initial_data: dict) -> dict:
         },
         "history_html": _history_html(history),
     }
+
+
+def document_detail_partial_html(initial_data: dict) -> str:
+    fragments = document_detail_fragments(initial_data)
+    templates: list[str] = []
+    for element_id, value in fragments.get("text", {}).items():
+        templates.append(
+            _partial_template(element_id, escape(str(value)), attr="data-text-target")
+        )
+    for element_id, value in fragments.get("html", {}).items():
+        templates.append(
+            _partial_template(element_id, str(value), attr="data-html-target")
+        )
+    for element_id, value in fragments.get("inputs", {}).items():
+        templates.append(
+            _partial_template(element_id, escape(str(value)), attr="data-input-target")
+        )
+    templates.append(
+        _partial_template(
+            "documentHistoryList",
+            str(fragments.get("history_html") or ""),
+            attr="data-html-target",
+        )
+    )
+    data_attrs = {
+        "document_id": fragments.get("document_id", ""),
+        "document_label": fragments.get("document_label", ""),
+        "blob_uri": fragments.get("blob_uri", ""),
+    }
+    return (
+        f'<div class="ui-partial-fragment"{_fragment_data_attrs(data_attrs)}>'
+        + "\n".join(templates)
+        + "</div>"
+    )
 
 
 def _chat_thread_time_label(value: str) -> str:

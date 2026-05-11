@@ -1,7 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
-from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 
 from paperwise.application.interfaces import DocumentRepository
@@ -30,11 +29,11 @@ from paperwise.server.ui.initial_data import (
 from paperwise.server.ui.page import STATIC_DIR, render_ui_page
 from paperwise.server.ui.fragments import (
     activity_rows_html,
-    document_detail_fragments,
-    document_rows_html,
+    document_detail_partial_html,
     document_type_rows_html,
-    documents_pagination_toolbar_html,
+    documents_partial_html,
     pending_rows_html,
+    table_body_partial_html,
     tag_rows_html,
 )
 
@@ -239,7 +238,7 @@ def documents_partial(
     status: list[str] | None = Query(None),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
-) -> JSONResponse:
+) -> HTMLResponse:
     data = documents_initial_data(
         repository,
         current_user,
@@ -253,21 +252,8 @@ def documents_partial(
         document_type=document_type,
         status=status,
     )
-    return JSONResponse(
-        {
-            "table_body_html": document_rows_html(data["documents"]),
-            "pagination_toolbar_html": documents_pagination_toolbar_html(
-                total=data["documents_total"],
-                processing_count=data["documents_processing_count"],
-                page=data["documents_page"],
-                page_size=data["documents_page_size"],
-            ),
-            "documents_returned": len(data["documents"]),
-            "documents_total": data["documents_total"],
-            "documents_processing_count": data["documents_processing_count"],
-            "documents_page": data["documents_page"],
-            "documents_page_size": data["documents_page_size"],
-        },
+    return HTMLResponse(
+        documents_partial_html(data),
         headers={"Cache-Control": "no-store"},
     )
 
@@ -278,17 +264,18 @@ def tags_partial(
     sort_dir: str | None = Query(None),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
-) -> JSONResponse:
+) -> HTMLResponse:
     tag_stats = sort_stat_rows(
         build_tag_stats(repository, current_user),
         sort_by=sort_by,
         sort_dir=sort_dir,
     )
-    return JSONResponse(
-        {
-            "table_body_html": tag_rows_html(tag_stats),
-            "tag_count": len(tag_stats),
-        },
+    return HTMLResponse(
+        table_body_partial_html(
+            target_id="tagsTableBody",
+            rows_html=tag_rows_html(tag_stats),
+            data_attrs={"tag_count": len(tag_stats)},
+        ),
         headers={"Cache-Control": "no-store"},
     )
 
@@ -299,17 +286,18 @@ def document_types_partial(
     sort_dir: str | None = Query(None),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
-) -> JSONResponse:
+) -> HTMLResponse:
     document_type_stats = sort_stat_rows(
         build_document_type_stats(repository, current_user),
         sort_by=sort_by,
         sort_dir=sort_dir,
     )
-    return JSONResponse(
-        {
-            "table_body_html": document_type_rows_html(document_type_stats),
-            "document_type_count": len(document_type_stats),
-        },
+    return HTMLResponse(
+        table_body_partial_html(
+            target_id="documentTypesTableBody",
+            rows_html=document_type_rows_html(document_type_stats),
+            data_attrs={"document_type_count": len(document_type_stats)},
+        ),
         headers={"Cache-Control": "no-store"},
     )
 
@@ -318,17 +306,21 @@ def document_types_partial(
 def pending_partial(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
-) -> JSONResponse:
+) -> HTMLResponse:
     pending_documents = build_pending_documents(repository, current_user)
-    return JSONResponse(
-        {
-            "table_body_html": pending_rows_html(pending_documents),
-            "pending_count": len(pending_documents),
-            "has_restartable_pending_documents": any(
-                str(document.get("status") or "").strip().lower() not in {"", "ready"}
-                for document in pending_documents
-            ),
-        },
+    return HTMLResponse(
+        table_body_partial_html(
+            target_id="pendingTableBody",
+            rows_html=pending_rows_html(pending_documents),
+            data_attrs={
+                "pending_count": len(pending_documents),
+                "has_restartable_pending_documents": any(
+                    str(document.get("status") or "").strip().lower()
+                    not in {"", "ready"}
+                    for document in pending_documents
+                ),
+            },
+        ),
         headers={"Cache-Control": "no-store"},
     )
 
@@ -338,15 +330,18 @@ def activity_partial(
     limit: int = Query(20, ge=1, le=100),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
-) -> JSONResponse:
+) -> HTMLResponse:
     data = activity_partial_data(repository, current_user, limit=limit)
     activity_documents = data["activity_documents"]
-    return JSONResponse(
-        {
-            "table_body_html": activity_rows_html(activity_documents),
-            "activity_document_count": len(activity_documents),
-            "activity_total_tokens": data["activity_total_tokens"],
-        },
+    return HTMLResponse(
+        table_body_partial_html(
+            target_id="processedDocsTableBody",
+            rows_html=activity_rows_html(activity_documents),
+            data_attrs={
+                "activity_document_count": len(activity_documents),
+                "activity_total_tokens": data["activity_total_tokens"],
+            },
+        ),
         headers={"Cache-Control": "no-store"},
     )
 
@@ -356,10 +351,10 @@ def document_partial(
     id: str = Query(...),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
-) -> JSONResponse:
+) -> HTMLResponse:
     data = document_detail_initial_data(repository, current_user, id)
-    return JSONResponse(
-        document_detail_fragments(data),
+    return HTMLResponse(
+        document_detail_partial_html(data),
         headers={"Cache-Control": "no-store"},
     )
 
@@ -370,13 +365,18 @@ def chat_threads_partial(
     q: str = Query(""),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
-) -> JSONResponse:
-    return JSONResponse(
-        chat_threads_partial_data(
-            repository,
-            current_user,
-            active_thread_id=active_thread_id,
-            query=q,
+) -> HTMLResponse:
+    data = chat_threads_partial_data(
+        repository,
+        current_user,
+        active_thread_id=active_thread_id,
+        query=q,
+    )
+    return HTMLResponse(
+        table_body_partial_html(
+            target_id="searchAskThreadList",
+            rows_html=str(data.get("thread_list_html") or ""),
+            data_attrs={"chat_thread_count": len(data.get("chat_threads") or [])},
         ),
         headers={"Cache-Control": "no-store"},
     )
