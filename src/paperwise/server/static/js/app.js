@@ -3,6 +3,30 @@ import {
   fetchHtmlPartial,
   replaceElementHtml,
 } from "paperwise/shared";
+import { readInitialData } from "./state/initialData.js";
+import {
+  getNextSortState,
+  normalizeGroundedQaMaxDocuments,
+  normalizeGroundedQaTopK,
+  normalizeOcrAutoSwitch,
+  normalizeOcrImageDetail,
+  normalizePageSize,
+} from "./state/preferences.js";
+
+export { readInitialData } from "./state/initialData.js";
+export {
+  getNextSortState,
+  normalizeGroundedQaMaxDocuments,
+  normalizeGroundedQaTopK,
+  normalizeOcrAutoSwitch,
+  normalizeOcrImageDetail,
+  normalizePageSize,
+  normalizeSortDirection,
+  normalizeSortField,
+  normalizeSortState,
+} from "./state/preferences.js";
+export { escapeHtml } from "./ui/escape.js";
+export { sortValues, splitTags, unique } from "./ui/values.js";
 
 let currentDocumentId = "";
 let currentUser = null;
@@ -25,7 +49,6 @@ let ocrStatusRequestSeq = 0;
 let docsPageSize = 20;
 let groundedQaTopK = 18;
 let groundedQaMaxDocuments = 12;
-let initialDataCache;
 let initialUserPreferencesConsumed = false;
 let supportedThemesCache;
 let supportedLlmProvidersCache;
@@ -113,65 +136,6 @@ export const appState = {
     ocrStatusRequestSeq = Number(value) || 0;
   },
 };
-
-export function normalizePageSize(value) {
-  const size = Number(value);
-  if (!Number.isInteger(size) || size <= 0) {
-    return 20;
-  }
-  return size;
-}
-
-export function normalizeSortDirection(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (normalized === "asc" || normalized === "desc") {
-    return normalized;
-  }
-  return "";
-}
-
-export function normalizeSortField(value, allowedFields) {
-  const normalized = String(value || "").trim();
-  if (allowedFields.has(normalized)) {
-    return normalized;
-  }
-  return "";
-}
-
-export function normalizeSortState(value, allowedFields) {
-  const field = normalizeSortField(value?.field, allowedFields);
-  const direction = normalizeSortDirection(value?.direction);
-  if (!field || !direction) {
-    return { field: "", direction: "" };
-  }
-  return { field, direction };
-}
-
-export function getNextSortState(currentState, field) {
-  if (currentState.field !== field || !currentState.direction) {
-    return { field, direction: "asc" };
-  }
-  if (currentState.direction === "asc") {
-    return { field, direction: "desc" };
-  }
-  return { field: "", direction: "" };
-}
-
-export function normalizeGroundedQaTopK(value) {
-  const size = Number(value);
-  if (!Number.isInteger(size)) {
-    return 18;
-  }
-  return Math.max(3, Math.min(60, size));
-}
-
-export function normalizeGroundedQaMaxDocuments(value) {
-  const size = Number(value);
-  if (!Number.isInteger(size)) {
-    return 12;
-  }
-  return Math.max(1, Math.min(50, size));
-}
 
 export function normalizeThemeName(value) {
   const normalized = String(value || "").trim().toLowerCase();
@@ -369,22 +333,6 @@ export function normalizeOcrProvider(value) {
     return normalized;
   }
   return "llm";
-}
-
-export function normalizeOcrImageDetail(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (["auto", "low", "high"].includes(normalized)) {
-    return normalized;
-  }
-  return "auto";
-}
-
-export function normalizeOcrAutoSwitch(value) {
-  if (typeof value === "boolean") {
-    return value;
-  }
-  const normalized = String(value || "").trim().toLowerCase();
-  return normalized === "true" || normalized === "1" || normalized === "on" || normalized === "yes";
 }
 
 export function applyTheme(themeName) {
@@ -708,15 +656,6 @@ export function delay(ms) {
   });
 }
 
-export function escapeHtml(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
 export function setAuthMessage(message, isError = false) {
   const { authMessage } = getAuthElements();
   if (!authMessage) {
@@ -735,23 +674,6 @@ export function setActiveAuthTab(tab) {
   authTabSignUp?.setAttribute("aria-selected", String(isSignUp));
   authPanelSignIn?.classList.toggle("view-hidden", isSignUp);
   authPanelSignUp?.classList.toggle("view-hidden", !isSignUp);
-}
-
-export function readInitialData() {
-  if (initialDataCache !== undefined) {
-    return initialDataCache;
-  }
-  const element = document.getElementById("paperwiseInitialData");
-  if (!element) {
-    initialDataCache = {};
-    return initialDataCache;
-  }
-  try {
-    initialDataCache = JSON.parse(element.textContent || "{}") || {};
-  } catch {
-    initialDataCache = {};
-  }
-  return initialDataCache;
 }
 
 export function persistSession(user) {
@@ -797,21 +719,6 @@ export function restoreSession() {
     return;
   }
   clearSession();
-}
-
-export function splitTags(value) {
-  return value
-    .split(",")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-}
-
-export function unique(values) {
-  return [...new Set(values.filter((item) => item && item.trim()))];
-}
-
-export function sortValues(values) {
-  return [...values].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
 }
 
 export function getSortStateForTable(tableName) {

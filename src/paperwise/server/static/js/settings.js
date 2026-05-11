@@ -6,7 +6,6 @@ import {
   appState,
   applyTheme,
   createEmptyConnection,
-  escapeHtml,
   formatApiErrorDetail,
   getConnectionApiKeyPlaceholder,
   getConnectionBaseUrlHelpText,
@@ -18,12 +17,8 @@ import {
   hydrateSettingsFormFromInitialPreferences,
   logActivity,
   normalizeConnection,
-  normalizeGroundedQaMaxDocuments,
-  normalizeGroundedQaTopK,
   normalizeLlmProvider,
-  normalizeOcrImageDetail,
   normalizeOcrProvider,
-  normalizePageSize,
   normalizeThemeName,
   providerShowsBaseUrlField,
   providerUsesManagedBaseUrl,
@@ -31,6 +26,13 @@ import {
   sanitizeLlmRouting,
   saveUserPreferences,
 } from "paperwise/app";
+import {
+  normalizeGroundedQaMaxDocuments,
+  normalizeGroundedQaTopK,
+  normalizeOcrImageDetail,
+  normalizePageSize,
+} from "./state/preferences.js";
+import { escapeHtml } from "./ui/escape.js";
 
 let settingsForm = null;
 let settingsThemeSelect = null;

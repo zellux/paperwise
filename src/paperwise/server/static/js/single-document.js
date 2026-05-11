@@ -7,9 +7,9 @@ import {
   logActivity,
   openDocumentFile,
   openDocumentView,
-  splitTags,
   waitForDocumentReady,
 } from "paperwise/app";
+import { splitTags } from "./ui/values.js";
 
 let singleDocumentEventsBound = false;
 

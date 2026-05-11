@@ -5,8 +5,8 @@ import {
 import {
   appState,
   logActivity,
-  normalizePageSize,
 } from "paperwise/app";
+import { normalizePageSize } from "./state/preferences.js";
 
 let processedActivityRequestSeq = 0;
 let initialActivityHydrated = false;

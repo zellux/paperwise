@@ -7,13 +7,15 @@ import {
 } from "paperwise/shared";
 import {
   appState,
-  escapeHtml,
   logActivity,
   navigateToDocument,
+} from "paperwise/app";
+import { readInitialData } from "./state/initialData.js";
+import {
   normalizeGroundedQaMaxDocuments,
   normalizeGroundedQaTopK,
-  readInitialData,
-} from "paperwise/app";
+} from "./state/preferences.js";
+import { escapeHtml } from "./ui/escape.js";
 
 let searchKeywordForm = null;
 let searchKeywordInput = null;

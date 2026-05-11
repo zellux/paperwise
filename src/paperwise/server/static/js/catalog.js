@@ -3,11 +3,11 @@ import {
   loadTablePartial,
 } from "paperwise/shared";
 import {
-  getNextSortState,
   getSortableHeaders,
   logActivity,
   renderSortHeaders,
 } from "paperwise/app";
+import { getNextSortState } from "./state/preferences.js";
 
 let tagStatsSort = { field: "", direction: "" };
 let documentTypesSort = { field: "", direction: "" };

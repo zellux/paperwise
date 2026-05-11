@@ -6,16 +6,17 @@ import {
 import {
   appState,
   formatStatus,
-  getNextSortState,
   getSortableHeaders,
   initializeCurrentPageData,
   logActivity,
+  renderSortHeaders,
+} from "paperwise/app";
+import {
+  getNextSortState,
   normalizePageSize,
   normalizeSortState,
-  renderSortHeaders,
-  sortValues,
-  unique,
-} from "paperwise/app";
+} from "./state/preferences.js";
+import { sortValues, unique } from "./ui/values.js";
 
 const filterDropdownState = new Map();
 const DOCS_SORT_FIELDS = new Set([
