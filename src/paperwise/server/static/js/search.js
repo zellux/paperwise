@@ -16,6 +16,10 @@ import {
   normalizeGroundedQaTopK,
 } from "./state/preferences.js";
 import { renderMarkdown } from "./chat/markdown.js";
+import {
+  formatChatEventDetail,
+  parseChatStreamEvent,
+} from "./chat/streamEvents.js";
 import { renderSearchResultsTable as renderSearchResultsTableInto } from "./search/resultsTable.js";
 
 let searchKeywordForm = null;
@@ -355,14 +359,6 @@ async function deleteSearchAskThread(threadId) {
   logActivity(`Deleted chat: ${title}`);
 }
 
-function formatSearchAskJsonDetail(value) {
-  try {
-    return JSON.stringify(value || {}, null, 2);
-  } catch {
-    return String(value || "");
-  }
-}
-
 function renderSearchAskStatusMessage(message, item) {
   const summaryButton = document.createElement("button");
   summaryButton.type = "button";
@@ -620,31 +616,6 @@ async function runKeywordSearch() {
   }
 }
 
-function parseSearchAskStreamEvent(rawEvent) {
-  const lines = String(rawEvent || "").split(/\r?\n/);
-  let eventType = "message";
-  const dataLines = [];
-  for (const line of lines) {
-    if (line.startsWith("event:")) {
-      eventType = line.slice("event:".length).trim() || "message";
-      continue;
-    }
-    if (line.startsWith("data:")) {
-      dataLines.push(line.slice("data:".length).trimStart());
-    }
-  }
-  const dataText = dataLines.join("\n");
-  let data = {};
-  if (dataText) {
-    try {
-      data = JSON.parse(dataText);
-    } catch {
-      data = { detail: dataText };
-    }
-  }
-  return { eventType, data };
-}
-
 function getSearchAskActivityRound(activityMessage) {
   if (!activityMessage) {
     return null;
@@ -721,7 +692,7 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMes
         round.endedAt = Date.now();
         syncSearchAskTimer();
       }
-      appendSearchAskRoundDetail(round, "LLM response", formatSearchAskJsonDetail(data));
+      appendSearchAskRoundDetail(round, "LLM response", formatChatEventDetail(data));
       renderSearchAskMessages();
     }
     return null;
@@ -735,7 +706,7 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMes
     if (round) {
       round.toolCallCount = Math.max(Number(round.toolCallCount || 0), Number(round.toolCalls?.length || 0) + 1);
       round.toolCalls = [...(round.toolCalls || []), data.name || "tool"];
-      appendSearchAskRoundDetail(round, `Tool call: ${data.name || "tool"}`, formatSearchAskJsonDetail(data.arguments || {}));
+      appendSearchAskRoundDetail(round, `Tool call: ${data.name || "tool"}`, formatChatEventDetail(data.arguments || {}));
       renderSearchAskMessages();
     }
     return null;
@@ -745,7 +716,7 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMes
     const round = getSearchAskActivityRound(activityMessage);
     if (round) {
       round.resultCount = Number(round.resultCount || 0) + resultCount;
-      appendSearchAskRoundDetail(round, `Tool result: ${data.name || "tool"}`, formatSearchAskJsonDetail(data));
+      appendSearchAskRoundDetail(round, `Tool result: ${data.name || "tool"}`, formatChatEventDetail(data));
       renderSearchAskMessages();
     }
     return null;
@@ -791,7 +762,7 @@ async function runSearchAskStream(requestBody, pendingMessage, activityMessage) 
       if (!rawEvent.trim()) {
         continue;
       }
-      const { eventType, data } = parseSearchAskStreamEvent(rawEvent);
+      const { eventType, data } = parseChatStreamEvent(rawEvent);
       const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMessage);
       if (handled?.error) {
         throw new Error(handled.error);
@@ -805,7 +776,7 @@ async function runSearchAskStream(requestBody, pendingMessage, activityMessage) 
     }
   }
   if (buffer.trim()) {
-    const { eventType, data } = parseSearchAskStreamEvent(buffer);
+    const { eventType, data } = parseChatStreamEvent(buffer);
     const handled = handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMessage);
     if (handled?.error) {
       throw new Error(handled.error);
