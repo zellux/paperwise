@@ -93,6 +93,7 @@ def render_ui_page(
         "asset_query": asset_query,
         "authenticated": bool(initial_data and initial_data.get("authenticated") is True),
         "default_ui_theme": DEFAULT_UI_THEME,
+        "grounded_qa_model_label": _grounded_qa_model_label(initial_data or {}),
         "initial_data_json": initial_data_json,
         "page_module_name": script_names[2] if len(script_names) > 2 else "",
         "page_template": _PAGE_PARTIAL_BY_NAME[page_name],
@@ -105,6 +106,39 @@ def render_ui_page(
         html,
         headers={"Cache-Control": "no-store"},
     )
+
+
+def _grounded_qa_model_label(initial_data: dict) -> str:
+    preferences = initial_data.get("user_preferences")
+    if not isinstance(preferences, dict):
+        return "Default model"
+    routing = preferences.get("llm_routing")
+    connections = preferences.get("llm_connections")
+    if not isinstance(routing, dict) or not isinstance(connections, list):
+        return "Default model"
+    grounded_route = routing.get("grounded_qa")
+    if not isinstance(grounded_route, dict):
+        return "Default model"
+    connection_id = str(grounded_route.get("connection_id") or "").strip()
+    connection = next(
+        (
+            item
+            for item in connections
+            if isinstance(item, dict) and str(item.get("id") or "").strip() == connection_id
+        ),
+        None,
+    )
+    if not connection:
+        return "Default model"
+    provider = str(connection.get("provider") or "").strip()
+    route_model = str(grounded_route.get("model") or "").strip()
+    connection_model = str(connection.get("default_model") or "").strip()
+    defaults = initial_data.get("llm_provider_defaults")
+    default_model = ""
+    if isinstance(defaults, dict) and provider in defaults and isinstance(defaults[provider], dict):
+        default_model = str(defaults[provider].get("model") or "").strip()
+    parts = [part for part in (provider, route_model or connection_model or default_model) if part]
+    return " · ".join(parts) if parts else "Default model"
 
 
 def _initial_render_context(initial_data: dict) -> dict:

@@ -209,7 +209,7 @@ function renderSearchAskHeader() {
   if (searchAskModelLabel) {
     const settings = getResolvedTaskSettings("grounded_qa");
     const parts = [settings?.provider, settings?.model].filter(Boolean);
-    searchAskModelLabel.textContent = parts.length ? parts.join(" · ") : "Model not configured";
+    searchAskModelLabel.textContent = parts.length ? parts.join(" · ") : "Default model";
   }
   renderSearchAskTokenUsage();
 }

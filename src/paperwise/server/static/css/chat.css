@@ -18,7 +18,7 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  min-height: calc(100vh - 106px);
+  min-height: calc(100dvh - 106px);
 }
 
 .grounded-qa-workbench.view-hidden {
@@ -47,13 +47,15 @@
   display: flex;
   flex-direction: column;
   flex: 1;
-  min-height: calc(100vh - 106px);
+  height: calc(100dvh - 106px);
+  min-height: 0;
 }
 
 #search-section-ask .grounded-qa-card {
   flex: 1;
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-height: 0;
 }
 
@@ -67,7 +69,8 @@
   display: grid;
   grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
   flex: 1;
-  min-height: calc(100vh - 106px);
+  height: 100%;
+  min-height: 0;
 }
 
 .qa-sidebar,
@@ -813,6 +816,8 @@
   display: grid;
   gap: 6px;
   flex: 0 0 auto;
+  position: relative;
+  z-index: 3;
   border: 1.5px solid var(--stroke);
   border-radius: 12px;
   padding: 10px 12px;
@@ -859,6 +864,7 @@
 @media (max-width: 960px) {
   .grounded-qa-layout {
     grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
 
   .qa-sidebar {

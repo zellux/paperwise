@@ -535,6 +535,31 @@ def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> No
                 updated_at=datetime(2026, 5, 2, 1, tzinfo=UTC),
             )
         )
+        repository.save_user_preference(
+            UserPreference(
+                user_id=user_id,
+                preferences={
+                    "llm_connections": [
+                        {
+                            "id": "grounded-qa-connection",
+                            "name": "Ask Docs Model",
+                            "provider": "openai",
+                            "base_url": "https://api.openai.com/v1",
+                            "api_key": "sk-test",
+                            "default_model": "gpt-4.1-mini",
+                        }
+                    ],
+                    "llm_routing": {
+                        "metadata": {"connection_id": "grounded-qa-connection", "model": ""},
+                        "grounded_qa": {
+                            "connection_id": "grounded-qa-connection",
+                            "model": "gpt-4.1-mini",
+                        },
+                        "ocr": {"engine": "llm", "connection_id": "grounded-qa-connection", "model": ""},
+                    },
+                },
+            )
+        )
 
         login_response = client.post(
             "/users/login",
@@ -556,6 +581,7 @@ def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> No
         assert payload["current_user"]["email"] == "chat-ui@example.com"
         assert payload["chat_threads"][0]["id"] == "thread-ui"
         assert payload["chat_threads"][0]["title"] == "Server rendered chat"
+        assert "openai · gpt-4.1-mini" in response.text
         assert '<button type="button" class="thread-button" data-thread-id="thread-ui">' in response.text
         assert '<span class="thread-title">Server rendered chat</span>' in response.text
 
