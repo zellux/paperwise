@@ -136,7 +136,6 @@ def _initial_render_context(initial_data: dict) -> dict:
         "document_detail_preview_url": fragments.get("preview_url", ""),
         "document_detail_inputs": fragments["inputs"],
         "document_detail_status_html": fragments["html"].get("detailStatus", "-"),
-        "document_detail_summary": fragments.get("summary", ""),
         "document_detail_tags_html": fragments.get("tags_html", ""),
         "document_detail_text": fragments["text"],
         "document_detail_title": fragments["text"].get("detailTitle", "Untitled document"),

@@ -803,9 +803,10 @@
 .tag-editor-wrap {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  min-height: 44px;
-  padding: 6px 8px;
+  align-content: flex-start;
+  gap: 8px;
+  min-height: 86px;
+  padding: 8px 10px;
   background: var(--paper);
   border: 1px solid var(--stroke-soft);
   border-radius: 8px;
@@ -821,7 +822,8 @@
 }
 
 .tag-pill-removable {
-  padding: 3px 6px 3px 8px;
+  min-height: 29px;
+  padding: 4px 7px 4px 9px;
   background: color-mix(in srgb, var(--accent) 8%, var(--paper));
   border-color: color-mix(in srgb, var(--accent) 22%, var(--stroke-soft));
 }
@@ -846,9 +848,10 @@
 }
 
 .tag-editor-input {
-  flex: 1;
-  min-width: 100px;
-  padding: 3px 4px;
+  flex: 1 0 100%;
+  min-width: 100%;
+  min-height: 34px;
+  padding: 6px 4px;
   border: 0;
   background: transparent;
   color: var(--ink);
@@ -1026,11 +1029,19 @@
   background: transparent;
   border: 0;
   color: var(--ink-soft);
-  cursor: default;
+  cursor: pointer;
   font-family: var(--mono);
   font-size: 0.7rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+}
+
+.card-collapse:hover {
+  color: var(--ink);
+}
+
+.card-collapse[aria-expanded="true"] .system-toggle-icon {
+  transform: rotate(180deg);
 }
 
 .sys-grid {

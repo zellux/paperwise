@@ -12,6 +12,36 @@ import {
 import { splitTags } from "./ui/values.js";
 
 let singleDocumentEventsBound = false;
+const TAG_COLOR_SET = [
+  "#8e5bcb",
+  "#1d6a55",
+  "#b0552f",
+  "#c47a2a",
+  "#2c6488",
+  "#7a5c2e",
+  "#8b4778",
+  "#3d7a66",
+  "#9f4a28",
+  "#4f6f9f",
+  "#6b5b95",
+  "#2f7a8a",
+];
+const TAG_SUGGESTIONS = [
+  "Finance",
+  "Credit Reports",
+  "Identity",
+  "Statements",
+  "Investments",
+  "Tax docs",
+  "Insurance",
+  "Medical records",
+  "Utilities",
+  "Lease & deeds",
+  "Repairs & receipts",
+  "Contracts",
+  "Payslips",
+  "Passport & ID",
+];
 
 function getSingleDocumentElements() {
   return {
@@ -25,6 +55,14 @@ function getSingleDocumentElements() {
     metaCorrespondentInput: document.getElementById("metaCorrespondent"),
     metaTypeInput: document.getElementById("metaType"),
     metaTagsInput: document.getElementById("metaTags"),
+    metaTagEditor: document.getElementById("metaTagEditor"),
+    metaTagChips: document.getElementById("metaTagChips"),
+    metaTagQuery: document.getElementById("metaTagQuery"),
+    metaTagSuggestions: document.getElementById("metaTagSuggestions"),
+    detailOcrContent: document.getElementById("detailOcrContent"),
+    detailOcrLines: document.getElementById("detailOcrLines"),
+    detailOcrSearch: document.getElementById("detailOcrSearch"),
+    detailOcrCopyBtn: document.getElementById("detailOcrCopyBtn"),
     detailFilename: document.getElementById("detailFilename"),
   };
 }
@@ -42,6 +80,223 @@ function hydrateInitialDocumentData(initialData) {
   appState.currentDocumentId = documentId;
   logActivity(`Opened document ${appState.currentDocumentId}`);
   return true;
+}
+
+function stableTagColor(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return "#7c8783";
+  }
+  let hash = 0;
+  for (const char of normalized) {
+    hash = (hash * 33 + char.charCodeAt(0)) % 2147483647;
+  }
+  return TAG_COLOR_SET[hash % TAG_COLOR_SET.length];
+}
+
+function getDetailTags() {
+  const { metaTagsInput } = getSingleDocumentElements();
+  return splitTags(metaTagsInput?.value || "");
+}
+
+function setDetailTags(tags) {
+  const { metaTagsInput } = getSingleDocumentElements();
+  if (metaTagsInput instanceof HTMLInputElement) {
+    metaTagsInput.value = tags.join(", ");
+  }
+  renderTagEditor();
+}
+
+function hideTagSuggestions() {
+  const { metaTagEditor, metaTagSuggestions } = getSingleDocumentElements();
+  metaTagEditor?.classList.remove("is-open");
+  if (metaTagSuggestions instanceof HTMLElement) {
+    metaTagSuggestions.hidden = true;
+    metaTagSuggestions.replaceChildren();
+  }
+}
+
+function renderTagEditor() {
+  const { metaTagEditor, metaTagChips, metaTagQuery, metaTagSuggestions } = getSingleDocumentElements();
+  if (!(metaTagEditor instanceof HTMLElement) || !(metaTagChips instanceof HTMLElement)) {
+    return;
+  }
+  const tags = getDetailTags();
+  metaTagChips.replaceChildren();
+  for (const tag of tags) {
+    const chip = document.createElement("span");
+    chip.className = "tag-pill tag-pill-removable";
+    chip.style.setProperty("--tag-color", stableTagColor(tag));
+
+    const swatch = document.createElement("span");
+    swatch.className = "tag-swatch tag-swatch-xs";
+    swatch.setAttribute("aria-hidden", "true");
+    chip.append(swatch, document.createTextNode(tag));
+
+    const removeButton = document.createElement("button");
+    removeButton.type = "button";
+    removeButton.className = "tag-pill-x";
+    removeButton.setAttribute("aria-label", `Remove ${tag}`);
+    removeButton.textContent = "x";
+    removeButton.addEventListener("click", () => {
+      setDetailTags(tags.filter((candidate) => candidate !== tag));
+      metaTagQuery?.focus();
+    });
+    chip.append(removeButton);
+    metaTagChips.append(chip);
+  }
+  if (document.activeElement === metaTagQuery || metaTagEditor.classList.contains("is-open")) {
+    renderTagSuggestions();
+  } else {
+    hideTagSuggestions();
+  }
+}
+
+function renderTagSuggestions() {
+  const { metaTagEditor, metaTagQuery, metaTagSuggestions } = getSingleDocumentElements();
+  if (
+    !(metaTagEditor instanceof HTMLElement) ||
+    !(metaTagQuery instanceof HTMLInputElement) ||
+    !(metaTagSuggestions instanceof HTMLElement)
+  ) {
+    return;
+  }
+  const tags = getDetailTags();
+  const query = metaTagQuery.value.trim().toLowerCase();
+  const suggestions = TAG_SUGGESTIONS.filter(
+    (tag) => !tags.includes(tag) && (!query || tag.toLowerCase().includes(query))
+  ).slice(0, 8);
+  metaTagSuggestions.replaceChildren();
+  if (!suggestions.length) {
+    metaTagEditor.classList.remove("is-open");
+    metaTagSuggestions.hidden = true;
+    return;
+  }
+  for (const suggestion of suggestions) {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      setDetailTags([...tags, suggestion]);
+      metaTagQuery.value = "";
+      metaTagQuery.focus();
+    });
+    const swatch = document.createElement("span");
+    swatch.className = "tag-swatch tag-swatch-xs";
+    swatch.style.setProperty("--tag-color", stableTagColor(suggestion));
+    swatch.setAttribute("aria-hidden", "true");
+    button.append(swatch, document.createTextNode(suggestion));
+    item.append(button);
+    metaTagSuggestions.append(item);
+  }
+  metaTagEditor.classList.add("is-open");
+  metaTagSuggestions.hidden = false;
+}
+
+function bindTagEditorEvents() {
+  const { metaTagEditor, metaTagQuery } = getSingleDocumentElements();
+  if (!(metaTagEditor instanceof HTMLElement) || !(metaTagQuery instanceof HTMLInputElement)) {
+    return;
+  }
+  metaTagQuery.addEventListener("focus", renderTagSuggestions);
+  metaTagQuery.addEventListener("input", renderTagSuggestions);
+  metaTagQuery.addEventListener("keydown", (event) => {
+    const query = metaTagQuery.value.trim();
+    if (event.key === "Enter" && query) {
+      event.preventDefault();
+      const tags = getDetailTags();
+      if (!tags.includes(query)) {
+        setDetailTags([...tags, query]);
+      }
+      metaTagQuery.value = "";
+    }
+    if (event.key === "Backspace" && !query) {
+      const tags = getDetailTags();
+      if (tags.length) {
+        setDetailTags(tags.slice(0, -1));
+      }
+    }
+  });
+  metaTagQuery.addEventListener("blur", () => {
+    window.setTimeout(() => {
+      const { metaTagSuggestions } = getSingleDocumentElements();
+      metaTagEditor.classList.remove("is-open");
+      if (metaTagSuggestions instanceof HTMLElement) {
+        metaTagSuggestions.hidden = true;
+      }
+    }, 150);
+  });
+}
+
+function renderOcrText() {
+  const { detailOcrContent, detailOcrLines, detailOcrSearch } = getSingleDocumentElements();
+  if (!(detailOcrContent instanceof HTMLElement) || !(detailOcrLines instanceof HTMLElement)) {
+    return;
+  }
+  const query = String(detailOcrSearch?.value || "").trim();
+  const lines = detailOcrContent.textContent?.split("\n") || [];
+  detailOcrLines.replaceChildren();
+  for (const [index, line] of lines.entries()) {
+    const row = document.createElement("div");
+    row.className = "ocr-line";
+    if (query && line.toLowerCase().includes(query.toLowerCase())) {
+      row.classList.add("hit");
+    }
+    const num = document.createElement("span");
+    num.className = "ocr-num";
+    num.textContent = String(index + 1).padStart(3, "0");
+    const content = document.createElement("span");
+    content.className = "ocr-content";
+    content.textContent = line;
+    row.append(num, content);
+    detailOcrLines.append(row);
+  }
+}
+
+function bindDetailTabs() {
+  document.querySelectorAll("[data-detail-tab]").forEach((tab) => {
+    tab.addEventListener("click", () => {
+      const target = tab instanceof HTMLElement ? tab.dataset.detailTab || "details" : "details";
+      document.querySelectorAll("[data-detail-tab]").forEach((candidate) => {
+        const active = candidate === tab;
+        candidate.classList.toggle("active", active);
+        candidate.setAttribute("aria-selected", active ? "true" : "false");
+      });
+      document.querySelectorAll("[data-detail-pane]").forEach((pane) => {
+        pane.hidden = !(pane instanceof HTMLElement && pane.dataset.detailPane === target);
+      });
+      if (target === "ocr") {
+        renderOcrText();
+      }
+    });
+  });
+}
+
+function bindOcrEvents() {
+  const { detailOcrSearch, detailOcrCopyBtn, detailOcrContent } = getSingleDocumentElements();
+  detailOcrSearch?.addEventListener("input", renderOcrText);
+  detailOcrCopyBtn?.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(detailOcrContent?.textContent || "");
+      logActivity("Copied OCR text.");
+    } catch (error) {
+      logActivity(`Failed to copy OCR text: ${error.message}`);
+    }
+  });
+}
+
+function bindSystemInformationToggle() {
+  const toggle = document.getElementById("systemInformationToggle");
+  const body = document.getElementById("systemInformationBody");
+  toggle?.addEventListener("click", () => {
+    if (!(toggle instanceof HTMLButtonElement) || !(body instanceof HTMLElement)) {
+      return;
+    }
+    const expanded = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", expanded ? "false" : "true");
+    body.hidden = expanded;
+  });
 }
 
 function bindSingleDocumentEvents() {
@@ -148,6 +403,15 @@ function bindSingleDocumentEvents() {
     window.location.href = url.pathname;
   });
 
+  bindDetailTabs();
+  bindTagEditorEvents();
+  bindOcrEvents();
+  bindSystemInformationToggle();
+  document.addEventListener("paperwise:document-detail-updated", () => {
+    renderTagEditor();
+    renderOcrText();
+  });
+
   singleDocumentEventsBound = true;
 }
 
@@ -157,6 +421,8 @@ export async function initializePage({ authenticated, initialData }) {
   }
   bindSingleDocumentEvents();
   if (hydrateInitialDocumentData(initialData || {})) {
+    renderTagEditor();
+    renderOcrText();
     return;
   }
   appState.currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";

@@ -109,16 +109,6 @@
     </section>
 
     <aside class="doc-detail-rail">
-      <section class="detail-card summary-card">
-        <header class="card-head">
-          <span class="card-eyebrow">
-            <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg>
-            <span>Paperwise summary</span>
-          </span>
-        </header>
-        <p id="detailSummary" class="summary-text">{{ document_detail_summary|default("OCR text is available for review. Save metadata changes from the details panel.") }}</p>
-      </section>
-
       <nav class="rail-tabs" aria-label="Document detail sections">
         <button type="button" class="rail-tab active" data-detail-tab="details" aria-selected="true">Details</button>
         <button type="button" class="rail-tab" data-detail-tab="ocr" aria-selected="false">OCR text</button>
@@ -186,11 +176,11 @@
         </form>
 
         <section id="systemInformation" class="detail-card">
-          <button type="button" class="card-collapse" aria-expanded="true">
+          <button id="systemInformationToggle" type="button" class="card-collapse" aria-expanded="false" aria-controls="systemInformationBody">
             <span>System information</span>
-            <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 15 12 9 18 15"/></svg>
+            <svg class="icon-xs system-toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
           </button>
-          <dl class="sys-grid">
+          <dl id="systemInformationBody" class="sys-grid" hidden>
             <div class="sys-item">
               <dt>Document ID</dt>
               <dd><code id="detailDocId" class="document-detail-value">{{ document_detail_text.detailDocId|default("-") }}</code></dd>

@@ -515,6 +515,11 @@ export function applyDocumentDetailPartial(partialRoot) {
   if (detailBlobUri && partialRoot?.dataset?.blobUri) {
     detailBlobUri.title = partialRoot.dataset.blobUri;
   }
+  const detailFilePreview = document.getElementById("detailFilePreview");
+  if (detailFilePreview instanceof HTMLIFrameElement && partialRoot?.dataset?.previewUrl) {
+    detailFilePreview.src = partialRoot.dataset.previewUrl;
+  }
+  document.dispatchEvent(new CustomEvent("paperwise:document-detail-updated"));
 }
 
 export async function initializeCurrentPageData() {

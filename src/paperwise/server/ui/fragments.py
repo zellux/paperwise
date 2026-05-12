@@ -615,15 +615,6 @@ def _document_detail_tags_html(tags: list[object]) -> str:
     )
 
 
-def _document_summary_preview(text: str) -> str:
-    normalized = " ".join(str(text or "").split())
-    if not normalized:
-        return "OCR text is not available yet. Reprocess this document after the source file is ready."
-    if len(normalized) <= 220:
-        return normalized
-    return f"{normalized[:217].rstrip()}..."
-
-
 def _short_date_label(value: object) -> str:
     raw_value = str(value or "")
     if not raw_value or raw_value == "-":
@@ -699,7 +690,6 @@ def document_detail_fragments(initial_data: dict) -> dict:
             "detailCorrespondent": correspondent or "-",
             "detailDocumentDate": document_date or "-",
             "detailDocumentType": document_type or "-",
-            "detailSummary": _document_summary_preview(ocr_preview),
             "documentHistoryCount": f"{len(history)} event{'s' if len(history) != 1 else ''}",
             "documentHistoryTabCount": str(len(history)),
             "detailOcrCharCount": f"{len(ocr_preview):,} chars",
@@ -727,7 +717,6 @@ def document_detail_fragments(initial_data: dict) -> dict:
             "metaTags": ", ".join(str(tag) for tag in tags),
         },
         "tags_html": _document_detail_tags_html(tags),
-        "summary": _document_summary_preview(ocr_preview),
         "file_meta": file_meta or "-",
         "history_count": f"{len(history)} event{'s' if len(history) != 1 else ''}",
         "history_count_short": str(len(history)),
