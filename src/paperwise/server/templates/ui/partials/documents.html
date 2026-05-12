@@ -103,7 +103,8 @@
       <button id="clearAllFiltersBtn" type="button" class="docs-filter-clear" disabled>Clear all filters</button>
     </div>
 
-    <div class="inflight-strip" {% if documents_processing_count == 0 %}hidden{% endif %}>
+    {% if documents_processing_count > 0 %}
+    <div class="inflight-strip">
       <div class="inflight-copy">
         <div class="inflight-head">
           <span class="inflight-spin" aria-hidden="true"><span></span></span>
@@ -127,6 +128,7 @@
         <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </a>
     </div>
+    {% endif %}
 
     <div id="documentsPaginationToolbar" class="pagination-toolbar docs-list-toolbar">{{ documents_pagination_toolbar_html|safe }}</div>
     <div class="docs-table-wrap doc-table">
@@ -171,6 +173,14 @@
     <button id="docsBulkCorrespondentBtn" type="button" class="bulk-action">
       <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
       <span>Correspondent</span>
+    </button>
+    <button id="docsBulkTypeBtn" type="button" class="bulk-action">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="M8 8h8"/><path d="M8 12h8"/><path d="M8 16h5"/></svg>
+      <span>Type</span>
+    </button>
+    <button id="docsBulkReprocessBtn" type="button" class="bulk-action">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      <span>Reprocess</span>
     </button>
     <button id="docsBulkDownloadBtn" type="button" class="bulk-action">
       <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>

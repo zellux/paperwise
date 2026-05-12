@@ -828,6 +828,9 @@ function applyRowMetadataChanges(row, changes) {
     row.dataset.docCorrespondent = correspondent;
     renderRowCorrespondent(row, correspondent);
   }
+  if (Object.prototype.hasOwnProperty.call(changes, "document_type")) {
+    row.dataset.docType = String(changes.document_type || "").trim();
+  }
   animateRowInlineUpdate(row);
 }
 
@@ -860,6 +863,7 @@ function getBulkEditorElements() {
     modeButtons: [
       document.getElementById("docsBulkTagsBtn"),
       document.getElementById("docsBulkCorrespondentBtn"),
+      document.getElementById("docsBulkTypeBtn"),
     ],
   };
 }
@@ -918,7 +922,7 @@ function openBulkEditor(mode, triggerButton) {
     if (hint) {
       hint.textContent = "Comma-separated tags. Applying replaces existing tags on every selected document.";
     }
-  } else {
+  } else if (mode === "correspondent") {
     const correspondentValues = rows.map((row) => String(row.dataset.docCorrespondent || "").trim());
     input.value = getSharedValue(correspondentValues);
     input.placeholder = "Correspondent name";
@@ -930,6 +934,19 @@ function openBulkEditor(mode, triggerButton) {
     }
     if (hint) {
       hint.textContent = "Applying writes this correspondent to every selected document.";
+    }
+  } else {
+    const typeValues = rows.map((row) => String(row.dataset.docType || "").trim());
+    input.value = getSharedValue(typeValues);
+    input.placeholder = "Document type";
+    if (title) {
+      title.textContent = `Set document type for ${rows.length} selected`;
+    }
+    if (label) {
+      label.textContent = "Document type";
+    }
+    if (hint) {
+      hint.textContent = "Applying writes this document type to every selected document.";
     }
   }
 
@@ -978,22 +995,61 @@ async function handleBulkEditorSubmit() {
     return;
   }
   const value = input.value.trim();
-  const changes = mode === "tags" ? { tags: splitTags(value) } : { correspondent: value };
+  const changes =
+    mode === "tags"
+      ? { tags: splitTags(value) }
+      : mode === "document_type"
+        ? { document_type: value }
+        : { correspondent: value };
   if (save instanceof HTMLButtonElement) {
     save.disabled = true;
   }
   try {
     const savedCount = await patchSelectedDocumentsMetadata(rows, changes);
-    const label = mode === "tags" ? "tags" : "correspondent";
+    const label = mode === "tags" ? "tags" : mode === "document_type" ? "document type" : "correspondent";
     logActivity(`Updated ${label} for ${savedCount} document(s).`);
     closeBulkEditor();
   } catch (error) {
-    const label = mode === "tags" ? "tag" : "correspondent";
+    const label = mode === "tags" ? "tag" : mode === "document_type" ? "document type" : "correspondent";
     logActivity(`Bulk ${label} update failed: ${error.message}`);
   } finally {
     if (save instanceof HTMLButtonElement) {
       save.disabled = false;
     }
+  }
+}
+
+async function handleBulkTypeClick(button) {
+  openBulkEditor("document_type", button);
+}
+
+async function handleBulkReprocessClick(button) {
+  const rows = getSelectedRowsOrLog();
+  if (!rows.length) {
+    return;
+  }
+  if (!window.confirm(`Reprocess ${rows.length} selected document(s)?`)) {
+    return;
+  }
+  button.disabled = true;
+  try {
+    let reprocessedCount = 0;
+    for (const row of rows) {
+      const documentId = row.dataset.docId || "";
+      const response = await apiFetch(`/documents/${documentId}/reprocess`, { method: "POST" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.detail || response.statusText);
+      }
+      reprocessedCount += 1;
+    }
+    selectedDocIds.clear();
+    await loadDocumentsList();
+    logActivity(`Reprocessing queued for ${reprocessedCount} document(s).`);
+  } catch (error) {
+    logActivity(`Bulk reprocess failed: ${error.message}`);
+  } finally {
+    button.disabled = false;
   }
 }
 
@@ -1246,6 +1302,20 @@ function bindDocumentsEvents() {
       event.target instanceof Element ? event.target.closest("#docsBulkCorrespondentBtn") : null;
     if (bulkCorrespondent instanceof HTMLButtonElement) {
       await handleBulkCorrespondentClick(bulkCorrespondent);
+      return;
+    }
+
+    const bulkType = event.target instanceof Element ? event.target.closest("#docsBulkTypeBtn") : null;
+    if (bulkType instanceof HTMLButtonElement) {
+      await handleBulkTypeClick(bulkType);
+      return;
+    }
+
+    const bulkReprocess =
+      event.target instanceof Element ? event.target.closest("#docsBulkReprocessBtn") : null;
+    if (bulkReprocess instanceof HTMLButtonElement) {
+      closeBulkEditor();
+      await handleBulkReprocessClick(bulkReprocess);
       return;
     }
 

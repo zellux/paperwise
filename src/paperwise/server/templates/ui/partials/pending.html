@@ -52,7 +52,9 @@
 
     <div class="pagination-toolbar docs-list-toolbar pending-list-toolbar">
       <div class="docs-summary">
+        {% if documents_processing_count > 0 %}
         <span class="docs-total-label">Processing documents: {{ documents_processing_count|format_number }}</span>
+        {% endif %}
       </div>
     </div>
     <div class="docs-table-wrap doc-table">

@@ -767,6 +767,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "Total documents: 2" in documents_html
         assert "Processing: 0" not in documents_html
         assert 'id="docsProcessingLabel"' not in documents_html
+        assert 'class="inflight-strip"' not in documents_html
         assert '<span class="docs-side-count">0</span>' in documents_html
         assert '<span class="docs-side-count accent">0</span>' not in documents_html
         assert '<a class="docs-side-row active" href="/ui/documents">' in documents_html
@@ -800,6 +801,8 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         ) in documents_html
         assert 'id="docsBulkTagsBtn"' in documents_html
         assert 'id="docsBulkCorrespondentBtn"' in documents_html
+        assert 'id="docsBulkTypeBtn"' in documents_html
+        assert 'id="docsBulkReprocessBtn"' in documents_html
         assert 'id="docsBulkDownloadBtn"' in documents_html
         assert 'id="docsBulkDeleteBtn"' in documents_html
         assert 'id="docsBulkEditor"' in documents_html
@@ -914,6 +917,9 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         ) in activity_html
         assert "icon-action-button" not in activity_html
 
+        empty_pending_html = client.get("/ui/pending").text
+        assert "Processing documents: 0" not in empty_pending_html
+
         _save_pending_document(repository, doc_id="doc-pending", owner_id=user_id, title="Pending File")
         documents_with_pending_html = client.get("/ui/documents").text
         documents_with_pending_payload = _initial_data_from_response(documents_with_pending_html)
@@ -924,6 +930,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             "key": "ocr",
         }
         assert "Processing: 1" in documents_with_pending_html
+        assert 'class="inflight-strip"' in documents_with_pending_html
         assert '<div class="inflight-progress-row">' in documents_with_pending_html
         assert "OCR" in documents_with_pending_html
         assert "Classifying" not in documents_with_pending_html
