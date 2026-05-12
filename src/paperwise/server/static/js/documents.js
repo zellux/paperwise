@@ -28,6 +28,20 @@ const DOCS_SORT_FIELDS = new Set([
   "document_date",
   "status",
 ]);
+const TAG_COLOR_SET = [
+  "#8e5bcb",
+  "#1d6a55",
+  "#b0552f",
+  "#c47a2a",
+  "#2c6488",
+  "#7a5c2e",
+  "#8b4778",
+  "#3d7a66",
+  "#9f4a28",
+  "#4f6f9f",
+  "#6b5b95",
+  "#2f7a8a",
+];
 let activeFilterDropdown = null;
 let docsFilters = {
   q: "",
@@ -609,6 +623,115 @@ function parseRowTags(row) {
   }
 }
 
+function stableTagColor(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (!normalized) {
+    return "#7c8783";
+  }
+  let hashValue = 0;
+  for (const char of normalized) {
+    hashValue = ((hashValue * 33) + char.codePointAt(0)) % 2147483647;
+  }
+  return TAG_COLOR_SET[hashValue % TAG_COLOR_SET.length];
+}
+
+function getInitials(value) {
+  const cleaned = String(value || "").trim();
+  if (!cleaned || cleaned === "-") {
+    return "-";
+  }
+  const parts = cleaned.replace(/-/g, " ").split(/\s+/).filter(Boolean);
+  if (parts.length >= 2) {
+    return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+  }
+  return cleaned.slice(0, 2).toUpperCase();
+}
+
+function renderRowTags(row, tags) {
+  const cell = row.querySelector(".td-tags");
+  if (!cell) {
+    return;
+  }
+  cell.replaceChildren();
+  if (!tags.length) {
+    const empty = document.createElement("span");
+    empty.className = "muted";
+    empty.textContent = "-";
+    cell.appendChild(empty);
+    return;
+  }
+  for (const tag of tags.slice(0, 3)) {
+    const link = document.createElement("a");
+    link.className = "tag-pill";
+    link.href = `/ui/documents?tag=${encodeURIComponent(tag)}`;
+    link.style.setProperty("--tag-color", stableTagColor(tag));
+
+    const swatch = document.createElement("span");
+    swatch.className = "tag-swatch tag-swatch-xs";
+    swatch.setAttribute("aria-hidden", "true");
+
+    link.appendChild(swatch);
+    link.append(document.createTextNode(tag));
+    cell.appendChild(link);
+  }
+  if (tags.length > 3) {
+    const more = document.createElement("span");
+    more.className = "tag-pill tag-more";
+    more.textContent = `+${tags.length - 3}`;
+    cell.appendChild(more);
+  }
+}
+
+function renderRowCorrespondent(row, correspondent) {
+  const cell = row.querySelector(".td-corr");
+  if (!cell) {
+    return;
+  }
+  const displayValue = correspondent || "-";
+  const wrapper = document.createElement("span");
+  wrapper.className = "corr-cell";
+
+  const avatar = document.createElement("span");
+  avatar.className = "corr-avatar corr-avatar-sm";
+  avatar.textContent = getInitials(displayValue);
+  wrapper.appendChild(avatar);
+
+  if (correspondent) {
+    const link = document.createElement("a");
+    link.className = "corr-link";
+    link.href = `/ui/documents?correspondent=${encodeURIComponent(correspondent)}`;
+    link.textContent = correspondent;
+    wrapper.appendChild(link);
+  } else {
+    const empty = document.createElement("span");
+    empty.textContent = "-";
+    wrapper.appendChild(empty);
+  }
+
+  cell.replaceChildren(wrapper);
+}
+
+function animateRowInlineUpdate(row) {
+  row.classList.remove("is-inline-updated");
+  void row.offsetWidth;
+  row.classList.add("is-inline-updated");
+  window.setTimeout(() => row.classList.remove("is-inline-updated"), 1100);
+}
+
+function applyRowMetadataChanges(row, changes) {
+  if (Array.isArray(changes.tags)) {
+    const tags = unique(changes.tags);
+    row.dataset.docTags = JSON.stringify(tags);
+    renderRowTags(row, tags);
+  }
+  if (Object.prototype.hasOwnProperty.call(changes, "correspondent")) {
+    const correspondent = String(changes.correspondent || "").trim();
+    row.dataset.docCorrespondent = correspondent;
+    renderRowCorrespondent(row, correspondent);
+  }
+  animateRowInlineUpdate(row);
+}
+
 function getRowMetadataPayload(row) {
   return {
     suggested_title: String(row.dataset.docTitle || "").trim(),
@@ -728,10 +851,9 @@ async function patchSelectedDocumentsMetadata(rows, changes) {
     if (!response.ok) {
       throw new Error(payload.detail || response.statusText);
     }
+    applyRowMetadataChanges(row, changes);
     savedCount += 1;
   }
-  selectedDocIds.clear();
-  await loadDocumentsList();
   return savedCount;
 }
 

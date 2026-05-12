@@ -616,6 +616,25 @@
   background: var(--row-hover);
 }
 
+.docs-design-table .doc-row.is-inline-updated {
+  animation: doc-row-inline-update 1050ms ease-out;
+}
+
+@keyframes doc-row-inline-update {
+  0% {
+    background: color-mix(in srgb, var(--accent) 18%, white);
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+  65% {
+    background: color-mix(in srgb, var(--accent) 8%, white);
+    box-shadow: inset 3px 0 0 color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  100% {
+    background: color-mix(in srgb, var(--paper) 28%, transparent);
+    box-shadow: inset 3px 0 0 transparent;
+  }
+}
+
 .docs-design-table .doc-row.is-selected {
   background: var(--row-selected);
 }
