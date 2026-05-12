@@ -5,7 +5,7 @@ from paperwise.application.interfaces import DocumentStore
 from paperwise.application.services.taxonomy import normalize_name
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, User
 
-DOCUMENT_SORT_FIELDS = {"title", "document_type", "correspondent", "tags", "document_date", "status"}
+DOCUMENT_SORT_FIELDS = {"title", "document_type", "correspondent", "tags", "document_date", "size", "status"}
 
 
 @dataclass(frozen=True)
@@ -62,8 +62,6 @@ def list_filtered_documents(
     offset: int = 0,
 ) -> FilteredDocumentListing:
     normalized_statuses = normalized_values(status)
-    if not normalized_statuses:
-        normalized_statuses = {normalize_name(DocumentStatus.READY.value)}
     normalized_tags = normalized_values(tag)
     normalized_correspondents = normalized_values(correspondent)
     normalized_document_types = normalized_values(document_type)
@@ -200,6 +198,8 @@ def _document_sort_value(document: Document, llm_result: LLMParseResult | None, 
         return " ".join(llm_result.tags) if llm_result else ""
     if sort_field == "document_date":
         return llm_result.document_date or "" if llm_result else ""
+    if sort_field == "size":
+        return f"{int(document.size_bytes or 0):020d}"
     if sort_field == "status":
         return document.status.value
     return ""

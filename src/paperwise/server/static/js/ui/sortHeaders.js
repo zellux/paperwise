@@ -1,7 +1,7 @@
 import { getNextSortState } from "../state/preferences.js";
 
 export function getSortableHeaders() {
-  return [...document.querySelectorAll("th[data-sort-table][data-sort-field]")];
+  return [...document.querySelectorAll("th[data-sort-table][data-sort-field], button[data-sort-table][data-sort-field]")];
 }
 
 export function renderSortHeaders(getSortStateForTable) {
@@ -10,7 +10,7 @@ export function renderSortHeaders(getSortStateForTable) {
     const field = header.dataset.sortField || "";
     const sortState = getSortStateForTable(tableName);
     const direction = sortState.field === field ? sortState.direction : "";
-    const button = header.querySelector(".table-sort-button");
+    const button = header.matches(".table-sort-button") ? header : header.querySelector(".table-sort-button");
     const indicator = header.querySelector(".table-sort-indicator");
     header.setAttribute(
       "aria-sort",

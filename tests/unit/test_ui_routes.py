@@ -633,7 +633,6 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             "tags": ["Finance", "Tax"],
             "correspondents": ["Paperwise"],
             "document_types": ["Invoice", "Notice"],
-            "statuses": ["received", "processing", "failed", "ready"],
         }
         assert documents_payload["user_preferences"]["llm_total_tokens_processed"] == 42
         assert documents_payload["user_preferences"]["llm_connections"][0]["provider"] == "openai"
@@ -666,6 +665,9 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'id="docsBulkDeleteBtn"' in documents_html
         assert 'id="docsBulkEditor"' in documents_html
         assert 'id="docsBulkEditorInput"' in documents_html
+        assert 'id="filterStatus"' not in documents_html
+        assert 'data-sort-field="document_date"' in documents_html
+        assert 'data-sort-field="size"' in documents_html
         assert '<span class="status-badge status-ready">READY</span>' not in documents_html
         assert 'data-delete-doc-id="doc-tax"' not in documents_html
         assert "icon-action-button" not in documents_html
@@ -759,25 +761,22 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         documents_partial = client.get("/ui/partials/documents?page_size=1&page=1")
         assert documents_partial.status_code == 200
         assert "text/html" in documents_partial.headers["content-type"]
-        assert 'data-documents-total="2"' in documents_partial.text
+        assert 'data-documents-total="3"' in documents_partial.text
         assert 'data-documents-processing-count="1"' in documents_partial.text
         assert 'data-documents-returned="1"' in documents_partial.text
         assert '<template data-partial-target="docsTableBody">' in documents_partial.text
         assert '<template data-partial-target="documentsPaginationToolbar">' in documents_partial.text
-        assert 'data-doc-id="doc-tax"' in documents_partial.text
-        assert (
-            '<a class="row-act" href="/ui/document?id=doc-tax" title="Open document" '
-            'aria-label="Open document">'
-        ) in documents_partial.text
-        assert "Total documents: 2" in documents_partial.text
+        assert 'data-doc-id="' in documents_partial.text
+        assert '<a class="row-act" href="/ui/document?id=' in documents_partial.text
+        assert "Total documents: 3" in documents_partial.text
         assert "Processing: 1" in documents_partial.text
-        assert "Page 1 / 2" in documents_partial.text
+        assert "Page 1 / 3" in documents_partial.text
         assert 'data-docs-page-action="next"' in documents_partial.text
 
         overlarge_documents_partial = client.get("/ui/partials/documents?page_size=1&page=99")
         assert overlarge_documents_partial.status_code == 200
-        assert 'data-documents-page="2"' in overlarge_documents_partial.text
-        assert "Page 2 / 2" in overlarge_documents_partial.text
+        assert 'data-documents-page="3"' in overlarge_documents_partial.text
+        assert "Page 3 / 3" in overlarge_documents_partial.text
 
         tags_partial = client.get("/ui/partials/tags?sort_by=tag&sort_dir=desc")
         assert tags_partial.status_code == 200

@@ -71,20 +71,20 @@ def test_list_filtered_documents_uses_repository_pagination_for_simple_status_li
         offset=1,
     )
 
-    assert [document.id for document, _metadata in listing.rows] == ["ready-mid"]
-    assert listing.total == 3
+    assert [document.id for document, _metadata in listing.rows] == ["ready-new"]
+    assert listing.total == 4
     assert repository.list_calls == [
         {
             "owner_id": "user-listing",
             "limit": 1,
             "offset": 1,
-            "statuses": {DocumentStatus.READY},
+            "statuses": set(DocumentStatus),
         }
     ]
     assert repository.count_calls == [
         {
             "owner_id": "user-listing",
-            "statuses": {DocumentStatus.READY},
+            "statuses": set(DocumentStatus),
         }
     ]
 

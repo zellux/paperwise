@@ -410,7 +410,7 @@ def pending_rows_html(documents: list[dict]) -> str:
 def document_rows_html(documents: list[dict]) -> str:
     if not documents:
         return (
-            '                <tr class="docs-empty-row"><td colspan="7">'
+            '                <tr class="docs-empty-row"><td colspan="6">'
             '<div class="doc-empty"><div class="doc-empty-mark" aria-hidden="true">'
             '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
             'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
@@ -485,9 +485,9 @@ def document_rows_html(documents: list[dict]) -> str:
             f'<span class="corr-cell"><span class="corr-avatar corr-avatar-sm">{escape(_initials(correspondent_raw))}</span>'
             f'<a class="corr-link" href="/ui/documents?correspondent={correspondent_query}">{correspondent}</a></span></td>'
             f'<td class="td td-tags" data-label="Tags">{tag_pills}</td>'
-            f'<td class="td td-date" data-label="Date"><span>{display_date}</span>'
-            f'<span class="td-meta">{document_date}</span></td>'
-            f'<td class="td td-size right" data-label="Size">{size}<span class="td-meta">{created_at}</span></td>'
+            f'<td class="td td-date-size" data-label="Date / Size"><span>{display_date}</span>'
+            f'<span class="td-meta">{document_date}</span><span class="td-size-line">{size}</span>'
+            f'<span class="td-meta">{created_at}</span></td>'
             '<td class="td td-actions" data-label="Action"><div class="table-actions">'
             f'<a class="row-act" href="/ui/document?id={document_id_query}" title="Open document" aria-label="Open document">'
             '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '

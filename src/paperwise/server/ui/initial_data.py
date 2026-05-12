@@ -153,7 +153,6 @@ def document_filter_options(repository: TaxonomyRepository, current_user: User) 
             document_type
             for document_type, _count in repository.list_owner_document_type_stats(current_user.id)
         ],
-        "statuses": ["received", "processing", "failed", "ready"],
     }
 
 
@@ -223,7 +222,6 @@ def documents_initial_data(
                 "tags": [],
                 "correspondents": [],
                 "document_types": [],
-                "statuses": ["received", "processing", "failed", "ready"],
             }
         return data
     requested_offset = (requested_page - 1) * normalized_page_size

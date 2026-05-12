@@ -869,11 +869,12 @@ def test_list_documents() -> None:
             )
             assert create_response.status_code == 201
 
-        # Default list is constrained to ready documents.
+        # Default list includes all statuses; callers can narrow by status when needed.
         list_response = client.get("/documents")
         assert list_response.status_code == 200
         payload = list_response.json()
-        assert payload == []
+        assert len(payload) == 2
+        assert {item["status"] for item in payload} == {"processing"}
 
         processing_list_response = client.get("/documents?status=processing")
         assert processing_list_response.status_code == 200

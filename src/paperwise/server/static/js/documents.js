@@ -6,7 +6,6 @@ import {
 } from "paperwise/shared";
 import {
   appState,
-  formatStatus,
   getSortableHeaders,
   initializeCurrentPageData,
   logActivity,
@@ -26,7 +25,7 @@ const DOCS_SORT_FIELDS = new Set([
   "correspondent",
   "tags",
   "document_date",
-  "status",
+  "size",
 ]);
 const TAG_COLOR_SET = [
   "#8e5bcb",
@@ -48,7 +47,7 @@ let docsFilters = {
   tag: [],
   correspondent: [],
   document_type: [],
-  status: ["ready"],
+  status: [],
 };
 let docsPage = 1;
 let docsSort = { field: "", direction: "" };
@@ -66,7 +65,7 @@ function cloneDocsFilters(filters) {
     tag: [...(filters?.tag || [])],
     correspondent: [...(filters?.correspondent || [])],
     document_type: [...(filters?.document_type || [])],
-    status: [...(filters?.status || ["ready"])],
+    status: [...(filters?.status || [])],
   };
 }
 
@@ -76,9 +75,6 @@ function sanitizeDocsFilters(filters) {
   normalized.correspondent = unique(normalized.correspondent);
   normalized.document_type = unique(normalized.document_type);
   normalized.status = unique(normalized.status);
-  if (!normalized.status.length) {
-    normalized.status = ["ready"];
-  }
   return normalized;
 }
 
@@ -87,7 +83,7 @@ export function clearSessionState() {
     tag: [],
     correspondent: [],
     document_type: [],
-    status: ["ready"],
+    status: [],
   });
   docsPage = 1;
   docsSort = { field: "", direction: "" };
@@ -119,14 +115,12 @@ function getDocumentFilterControls() {
   const filterTag = document.getElementById("filterTag");
   const filterCorrespondent = document.getElementById("filterCorrespondent");
   const filterType = document.getElementById("filterType");
-  const filterStatus = document.getElementById("filterStatus");
   return {
     filterTag,
     filterCorrespondent,
     filterType,
-    filterStatus,
     filterQuery: document.getElementById("filterQuery"),
-    filterSelects: [filterTag, filterCorrespondent, filterType, filterStatus],
+    filterSelects: [filterTag, filterCorrespondent, filterType],
   };
 }
 
@@ -141,7 +135,7 @@ function getFilterKey(selectEl) {
   if (selectEl === filterType) {
     return "document_type";
   }
-  return "status";
+  return "";
 }
 
 function getSelectedValues(selectEl) {
@@ -165,11 +159,8 @@ function summarizeSelectedValues(selectedValues, selectEl) {
   if (!selectedValues.length) {
     return "Any";
   }
-  const displayValues = selectedValues.map((value) =>
-    selectEl === getDocumentFilterControls().filterStatus ? formatStatus(value) : value
-  );
   if (selectedValues.length === 1) {
-    return displayValues[0];
+    return selectedValues[0];
   }
   return `${selectedValues.length} selected`;
 }
@@ -357,7 +348,7 @@ function setupFilterDropdown(selectEl) {
 }
 
 export function applyDocumentListFiltersToControls() {
-  const { filterTag, filterCorrespondent, filterType, filterStatus, filterQuery, filterSelects } =
+  const { filterTag, filterCorrespondent, filterType, filterQuery, filterSelects } =
     getDocumentFilterControls();
   if (filterQuery) {
     filterQuery.value = docsFilters.q || "";
@@ -365,7 +356,6 @@ export function applyDocumentListFiltersToControls() {
   setSelectedValues(filterTag, docsFilters.tag);
   setSelectedValues(filterCorrespondent, docsFilters.correspondent);
   setSelectedValues(filterType, docsFilters.document_type);
-  setSelectedValues(filterStatus, docsFilters.status);
   for (const selectEl of filterSelects) {
     renderFilterDropdown(selectEl);
   }
@@ -383,7 +373,7 @@ function setSelectOptions(selectEl, values) {
   for (const value of mergedValues) {
     const option = document.createElement("option");
     option.value = value;
-    option.textContent = key === "status" ? formatStatus(value) : value;
+    option.textContent = value;
     selectEl.appendChild(option);
   }
   setSelectedValues(selectEl, selectedValues);
@@ -391,37 +381,27 @@ function setSelectOptions(selectEl, values) {
 }
 
 function readFiltersFromControls() {
-  const { filterTag, filterCorrespondent, filterType, filterStatus, filterQuery } =
+  const { filterTag, filterCorrespondent, filterType, filterQuery } =
     getDocumentFilterControls();
   docsFilters.q = String(filterQuery?.value || "").trim();
   docsFilters.tag = getSelectedValues(filterTag);
   docsFilters.correspondent = getSelectedValues(filterCorrespondent);
   docsFilters.document_type = getSelectedValues(filterType);
-  docsFilters.status = getSelectedValues(filterStatus);
 }
 
 function refreshFilterOptions(options) {
-  const { filterTag, filterCorrespondent, filterType, filterStatus } = getDocumentFilterControls();
+  const { filterTag, filterCorrespondent, filterType } = getDocumentFilterControls();
   const source = options && typeof options === "object" ? options : {};
   setSelectOptions(filterTag, Array.isArray(source.tags) ? source.tags : []);
   setSelectOptions(filterCorrespondent, Array.isArray(source.correspondents) ? source.correspondents : []);
   setSelectOptions(filterType, Array.isArray(source.document_types) ? source.document_types : []);
-  setSelectOptions(
-    filterStatus,
-    Array.isArray(source.statuses) ? source.statuses : ["received", "processing", "failed", "ready"]
-  );
 }
 
 function refreshFilterOptionsFromDocuments(documents) {
   const tags = new Set();
   const correspondents = new Set();
   const documentTypes = new Set();
-  const statuses = new Set();
-
   for (const doc of documents) {
-    if (doc.status) {
-      statuses.add(doc.status);
-    }
     const metadata = doc.llm_metadata;
     if (!metadata) {
       continue;
@@ -443,7 +423,6 @@ function refreshFilterOptionsFromDocuments(documents) {
     tags: [...tags],
     correspondents: [...correspondents],
     document_types: [...documentTypes],
-    statuses: ["received", "processing", "failed", "ready", ...statuses],
   });
 }
 
@@ -499,8 +478,7 @@ function readDocumentListStateFromUrl() {
   docsFilters.tag = unique(params.getAll("tag"));
   docsFilters.correspondent = unique(params.getAll("correspondent"));
   docsFilters.document_type = unique(params.getAll("document_type"));
-  const statusValues = unique(params.getAll("status"));
-  docsFilters.status = statusValues.length ? statusValues : ["ready"];
+  docsFilters.status = unique(params.getAll("status"));
   const pageValue = Number(params.get("page") || "1");
   docsPage = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
   const pageSizeValue = params.get("page_size") || String(appState.docsPageSize || 20);
@@ -1089,7 +1067,7 @@ function bindDocumentsEvents() {
   }
 
   for (const header of getSortableHeaders()) {
-    const button = header.querySelector(".table-sort-button");
+    const button = header.matches(".table-sort-button") ? header : header.querySelector(".table-sort-button");
     button?.addEventListener("click", () => {
       const tableName = header.dataset.sortTable || "";
       const field = header.dataset.sortField || "";
@@ -1193,7 +1171,7 @@ function bindDocumentsEvents() {
     docsFilters.tag = [];
     docsFilters.correspondent = [];
     docsFilters.document_type = [];
-    docsFilters.status = ["ready"];
+    docsFilters.status = [];
     docsPage = 1;
     applyDocumentListFiltersToControls();
     navigateToDocumentsPageFromState();

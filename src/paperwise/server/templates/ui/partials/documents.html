@@ -6,7 +6,7 @@
       <kbd>⌘U</kbd>
     </a>
     <nav class="docs-side-section">
-      <a class="docs-side-row active" href="/ui/documents?status=received&amp;status=processing&amp;status=failed&amp;status=ready">
+      <a class="docs-side-row active" href="/ui/documents">
         <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg>
         <span>All documents</span>
         <span class="docs-side-count">{{ documents_all_count|format_number }}</span>
@@ -81,14 +81,6 @@
         <span class="chip-prefix">Document Type</span>
         <select id="filterType" name="filterType" class="filter-select" multiple title="Select one or more document types"></select>
       </div>
-      <div class="filter-chip">
-        <span class="chip-prefix">Status</span>
-        <select id="filterStatus" name="filterStatus" class="filter-select" multiple title="Select one or more statuses">
-          <option value="received">Received</option>
-          <option value="processing">Processing</option>
-          <option value="ready">Ready</option>
-        </select>
-      </div>
     </form>
 
     <div class="inflight-strip" {% if documents_processing_count == 0 %}hidden{% endif %}>
@@ -116,10 +108,12 @@
             <th class="th th-tags" data-sort-table="docs" data-sort-field="tags" aria-sort="none">
               <button type="button" class="table-sort-button th-btn"><span>Tags</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
             </th>
-            <th class="th" data-sort-table="docs" data-sort-field="document_date" aria-sort="none">
-              <button type="button" class="table-sort-button th-btn"><span>Date</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+            <th class="th th-date-size" aria-label="Date and size">
+              <span class="date-size-sort-group">
+                <button type="button" class="table-sort-button th-btn date-size-sort-button" data-sort-table="docs" data-sort-field="document_date" aria-sort="none"><span>Date</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+                <button type="button" class="table-sort-button th-btn date-size-sort-button" data-sort-table="docs" data-sort-field="size" aria-sort="none"><span>Size</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+              </span>
             </th>
-            <th class="th right">Size</th>
             <th class="th" aria-label="Actions"></th>
           </tr>
         </thead>
