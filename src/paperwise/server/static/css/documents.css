@@ -1431,6 +1431,48 @@
   padding-bottom: 3px;
 }
 
+.docs-filter-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 26px 11px;
+  border-bottom: 1px solid var(--stroke-soft);
+  background: color-mix(in srgb, var(--paper) 82%, var(--panel));
+}
+
+.docs-filter-count,
+.docs-filter-clear {
+  min-height: 28px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  padding: 5px 11px;
+}
+
+.docs-filter-count {
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--ink-soft);
+}
+
+.docs-filter-clear {
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, var(--stroke));
+  background: var(--paper);
+  color: var(--accent);
+  cursor: pointer;
+}
+
+.docs-filter-clear:disabled {
+  border-color: var(--stroke-soft);
+  color: var(--ink-mute);
+  cursor: default;
+  opacity: 0.68;
+}
+
+.docs-filter-clear:not(:disabled):hover {
+  background: var(--accent-soft);
+}
+
 .docs-total-label,
 .page-indicator {
   font-size: 0.76rem;

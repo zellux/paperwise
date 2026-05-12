@@ -89,6 +89,10 @@
         <select id="filterCorrespondent" name="filterCorrespondent" class="filter-select" multiple title="Select one or more correspondents"></select>
       </div>
     </form>
+    <div class="docs-filter-actions" aria-label="Applied document filters">
+      <button id="docsAppliedFiltersBtn" type="button" class="docs-filter-count" disabled>0 filters applied</button>
+      <button id="clearAllFiltersBtn" type="button" class="docs-filter-clear" disabled>Clear all filters</button>
+    </div>
 
     <div class="inflight-strip" {% if documents_processing_count == 0 %}hidden{% endif %}>
       <div class="inflight-head">

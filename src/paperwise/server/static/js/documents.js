@@ -108,6 +108,8 @@ function getDocumentsPageElements() {
   return {
     docsFilterForm: document.getElementById("docsFilterForm"),
     clearFiltersBtn: document.getElementById("clearFiltersBtn"),
+    clearAllFiltersBtn: document.getElementById("clearAllFiltersBtn"),
+    docsAppliedFiltersBtn: document.getElementById("docsAppliedFiltersBtn"),
     ...filterControls,
   };
 }
@@ -360,6 +362,49 @@ export function applyDocumentListFiltersToControls() {
   for (const selectEl of filterSelects) {
     renderFilterDropdown(selectEl);
   }
+  renderAppliedFilterSummary();
+}
+
+function activeDocumentFilterCount() {
+  let count = 0;
+  if (docsFilters.q) {
+    count += 1;
+  }
+  if (docsFilters.tag.length) {
+    count += 1;
+  }
+  if (docsFilters.document_type.length) {
+    count += 1;
+  }
+  if (docsFilters.correspondent.length) {
+    count += 1;
+  }
+  if (docsFilters.status.length) {
+    count += 1;
+  }
+  return count;
+}
+
+function renderAppliedFilterSummary() {
+  const { docsAppliedFiltersBtn, clearAllFiltersBtn } = getDocumentsPageElements();
+  const count = activeDocumentFilterCount();
+  if (docsAppliedFiltersBtn) {
+    docsAppliedFiltersBtn.textContent = `${count} filter${count === 1 ? "" : "s"} applied`;
+  }
+  if (clearAllFiltersBtn instanceof HTMLButtonElement) {
+    clearAllFiltersBtn.disabled = count === 0;
+  }
+}
+
+function clearAllDocumentFilters() {
+  docsFilters.q = "";
+  docsFilters.tag = [];
+  docsFilters.correspondent = [];
+  docsFilters.document_type = [];
+  docsFilters.status = [];
+  docsPage = 1;
+  applyDocumentListFiltersToControls();
+  navigateToDocumentsPageFromState();
 }
 
 function setSelectOptions(selectEl, values) {
@@ -1102,7 +1147,8 @@ function bindDocumentsEvents() {
   if (documentsEventsBound) {
     return;
   }
-  const { docsFilterForm, clearFiltersBtn, filterQuery, filterSelects } = getDocumentsPageElements();
+  const { docsFilterForm, clearFiltersBtn, clearAllFiltersBtn, filterQuery, filterSelects } =
+    getDocumentsPageElements();
 
   docsFilterForm?.addEventListener("submit", (event) => {
     event.preventDefault();
@@ -1242,14 +1288,11 @@ function bindDocumentsEvents() {
   });
 
   clearFiltersBtn?.addEventListener("click", () => {
-    docsFilters.q = "";
-    docsFilters.tag = [];
-    docsFilters.correspondent = [];
-    docsFilters.document_type = [];
-    docsFilters.status = [];
-    docsPage = 1;
-    applyDocumentListFiltersToControls();
-    navigateToDocumentsPageFromState();
+    clearAllDocumentFilters();
+  });
+
+  clearAllFiltersBtn?.addEventListener("click", () => {
+    clearAllDocumentFilters();
   });
 
   filterQuery?.addEventListener("input", () => {

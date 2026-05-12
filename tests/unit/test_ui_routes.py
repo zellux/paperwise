@@ -771,6 +771,11 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'id="docsBulkDeleteBtn"' in documents_html
         assert 'id="docsBulkEditor"' in documents_html
         assert 'id="docsBulkEditorInput"' in documents_html
+        assert 'id="docsAppliedFiltersBtn"' in documents_html
+        assert 'id="clearAllFiltersBtn"' in documents_html
+        assert "0 filters applied" in documents_html
+        assert "Clear all filters" in documents_html
+        assert documents_html.index('id="docsFilterForm"') < documents_html.index('id="docsAppliedFiltersBtn"')
         assert 'id="filterStatus"' not in documents_html
         assert 'data-sort-field="document_date"' in documents_html
         assert 'data-sort-field="size"' in documents_html
