@@ -1060,7 +1060,6 @@
 }
 
 .card-collapse:hover {
-  background: color-mix(in srgb, var(--accent) 5%, transparent);
   color: var(--ink);
 }
 
