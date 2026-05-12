@@ -625,7 +625,7 @@ function getInitials(value) {
   return cleaned.slice(0, 2).toUpperCase();
 }
 
-function renderRowTags(row, tags) {
+function renderRowTags(row, tags, { expanded = false } = {}) {
   const cell = row.querySelector(".td-tags");
   if (!cell) {
     return;
@@ -638,7 +638,8 @@ function renderRowTags(row, tags) {
     cell.appendChild(empty);
     return;
   }
-  for (const tag of tags.slice(0, 3)) {
+  const visibleTags = expanded ? tags : tags.slice(0, 3);
+  for (const tag of visibleTags) {
     const link = document.createElement("a");
     link.className = "tag-pill";
     link.href = `/ui/documents?tag=${encodeURIComponent(tag)}`;
@@ -652,12 +653,24 @@ function renderRowTags(row, tags) {
     link.append(document.createTextNode(tag));
     cell.appendChild(link);
   }
-  if (tags.length > 3) {
-    const more = document.createElement("span");
-    more.className = "tag-pill tag-more";
+  if (!expanded && tags.length > 3) {
+    const more = document.createElement("button");
+    more.type = "button";
+    more.className = "tag-pill tag-more tag-more-button";
+    more.dataset.tagsExpand = row.dataset.docId || "";
+    more.setAttribute("aria-label", `Show all tags for ${row.dataset.docTitle || "this document"}`);
     more.textContent = `+${tags.length - 3}`;
     cell.appendChild(more);
   }
+}
+
+function expandRowTags(row) {
+  const tags = parseRowTags(row);
+  if (!tags.length) {
+    return;
+  }
+  row.dataset.tagsExpanded = "true";
+  renderRowTags(row, tags, { expanded: true });
 }
 
 function renderRowCorrespondent(row, correspondent) {
@@ -700,7 +713,8 @@ function applyRowMetadataChanges(row, changes) {
   if (Array.isArray(changes.tags)) {
     const tags = unique(changes.tags);
     row.dataset.docTags = JSON.stringify(tags);
-    renderRowTags(row, tags);
+    const expanded = row.dataset.tagsExpanded === "true";
+    renderRowTags(row, tags, { expanded });
   }
   if (Object.prototype.hasOwnProperty.call(changes, "correspondent")) {
     const correspondent = String(changes.correspondent || "").trim();
@@ -1082,6 +1096,16 @@ function bindDocumentsEvents() {
   }
 
   document.addEventListener("click", async (event) => {
+    const tagsExpand =
+      event.target instanceof Element ? event.target.closest("[data-tags-expand]") : null;
+    if (tagsExpand instanceof HTMLButtonElement) {
+      const row = tagsExpand.closest("tr[data-doc-id]");
+      if (row instanceof HTMLTableRowElement) {
+        expandRowTags(row);
+      }
+      return;
+    }
+
     const selectionControl =
       event.target instanceof Element ? event.target.closest("input[data-doc-select], #docsSelectAll") : null;
     if (selectionControl instanceof HTMLInputElement) {

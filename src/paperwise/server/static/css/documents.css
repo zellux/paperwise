@@ -893,6 +893,15 @@
   color: var(--ink-mute);
 }
 
+.tag-more-button {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tag-more-button:hover {
+  color: var(--ink);
+}
+
 .tag-swatch {
   width: 8px;
   height: 8px;

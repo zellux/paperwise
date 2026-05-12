@@ -441,7 +441,11 @@ def document_rows_html(documents: list[dict]) -> str:
             for tag in tags[:3]
         )
         if len(tags) > 3:
-            tag_pills += f'<span class="tag-pill tag-more">+{len(tags) - 3}</span>'
+            tag_pills += (
+                f'<button type="button" class="tag-pill tag-more tag-more-button" '
+                f'data-tags-expand="{document_id}" aria-label="Show all tags for {title}">'
+                f"+{len(tags) - 3}</button>"
+            )
         if not tag_pills:
             tag_pills = '<span class="muted">-</span>'
         document_date_raw = str(metadata.get("document_date") or "")

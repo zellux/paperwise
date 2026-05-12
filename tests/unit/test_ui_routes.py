@@ -19,6 +19,7 @@ from paperwise.domain.models import (
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from paperwise.server.dependencies import document_repository_dependency
 from paperwise.server.main import app
+from paperwise.server.ui.fragments import document_rows_html
 from paperwise.server.ui.page import find_template_placeholders
 
 
@@ -29,6 +30,32 @@ def _initial_data_from_response(html: str) -> dict:
     )
     assert match is not None
     return json.loads(match.group(1))
+
+
+def test_document_rows_render_expandable_tag_overflow() -> None:
+    html = document_rows_html(
+        [
+            {
+                "id": "doc-many-tags",
+                "filename": "many-tags.pdf",
+                "status": "ready",
+                "size_bytes": 123,
+                "created_at": "2026-05-12T00:00:00Z",
+                "llm_metadata": {
+                    "suggested_title": "Many Tags",
+                    "document_date": "2026-05-12",
+                    "correspondent": "Paperwise",
+                    "document_type": "Notice",
+                    "tags": ["One", "Two", "Three", "Four", "Five"],
+                },
+            }
+        ]
+    )
+
+    assert html.count('class="tag-pill"') == 3
+    assert 'class="tag-pill tag-more tag-more-button"' in html
+    assert 'data-tags-expand="doc-many-tags"' in html
+    assert "+2</button>" in html
 
 
 def _save_ready_document(
@@ -652,6 +679,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert '<a class="corr-link" href="/ui/documents?correspondent=Paperwise">Paperwise</a>' in documents_html
         assert '<a class="tag-pill" href="/ui/documents?tag=Tax" style="--tag-color: ' in documents_html
         assert '<a class="tag-pill" href="/ui/documents?tag=Finance" style="--tag-color: ' in documents_html
+        assert 'data-tags-expand=' not in documents_html
         assert 'data-doc-id="doc-tax"' in documents_html
         assert 'data-doc-tags="[&quot;Tax&quot;, &quot;Finance&quot;]"' in documents_html
         assert "Tax Notice" in documents_html
