@@ -653,12 +653,12 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert '<span>Paperwise</span>' in documents_html
         assert 'data-doc-id="doc-tax"' in documents_html
         assert "Tax Notice" in documents_html
-        assert '<a class="btn" href="/ui/document?id=doc-tax" title="View document details">Details</a>' in documents_html
         assert (
-            '<a class="btn btn-muted" href="/documents/doc-tax/file" target="_blank" '
-            'rel="noopener noreferrer" title="View file">View</a>'
+            '<a class="row-act" href="/ui/document?id=doc-tax" title="Open document" '
+            'aria-label="Open document">'
         ) in documents_html
-        assert 'data-delete-doc-id="doc-tax"' in documents_html
+        assert '<span class="status-badge status-ready">READY</span>' not in documents_html
+        assert 'data-delete-doc-id="doc-tax"' not in documents_html
         assert "icon-action-button" not in documents_html
 
         detail_html = client.get("/ui/document?id=doc-tax").text
@@ -756,7 +756,10 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert '<template data-partial-target="docsTableBody">' in documents_partial.text
         assert '<template data-partial-target="documentsPaginationToolbar">' in documents_partial.text
         assert 'data-doc-id="doc-tax"' in documents_partial.text
-        assert '<a class="btn" href="/ui/document?id=doc-tax" title="View document details">Details</a>' in documents_partial.text
+        assert (
+            '<a class="row-act" href="/ui/document?id=doc-tax" title="Open document" '
+            'aria-label="Open document">'
+        ) in documents_partial.text
         assert "Total documents: 2" in documents_partial.text
         assert "Processing: 1" in documents_partial.text
         assert "Page 1 / 2" in documents_partial.text

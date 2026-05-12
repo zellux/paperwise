@@ -439,7 +439,7 @@ def document_rows_html(documents: list[dict]) -> str:
         document_date_raw = str(metadata.get("document_date") or "")
         document_date = escape(document_date_raw or "-")
         display_date = escape(_short_date(document_date_raw))
-        status_html = _status_badge_html(str(item.get("status") or ""))
+        status_html = _document_list_status_badge_html(str(item.get("status") or ""))
         size = escape(_format_document_size(item.get("size_bytes")))
         created_at = escape(str(item.get("created_at") or "-")[:10] or "-")
         page_count = escape(_format_page_count(item.get("page_count")))
@@ -475,26 +475,10 @@ def document_rows_html(documents: list[dict]) -> str:
             f'<span class="td-meta">{document_date}</span></td>'
             f'<td class="td td-size right" data-label="Size">{size}<span class="td-meta">{created_at}</span></td>'
             '<td class="td td-actions" data-label="Action"><div class="table-actions">'
-            f'<a class="row-act" href="/ui/document?id={document_id_query}" title="View document details" aria-label="View document details">'
+            f'<a class="row-act" href="/ui/document?id={document_id_query}" title="Open document" aria-label="Open document">'
             '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
             'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-            '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>'
-            '<circle cx="12" cy="12" r="3"/></svg></a>'
-            f'<a class="row-act" href="/documents/{document_id_query}/file" '
-            'target="_blank" rel="noopener noreferrer" title="View file" aria-label="View file">'
-            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-            '<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'
-            '<polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>'
-            f'<button class="row-act row-act-danger" type="button" data-delete-doc-id="{document_id}" '
-            f'data-delete-doc-title="{title}" title="Delete document" aria-label="Delete document">'
-            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-            '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>'
-            '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>'
-            f'<a class="btn" href="/ui/document?id={document_id_query}" title="View document details">Details</a>'
-            f'<a class="btn btn-muted" href="/documents/{document_id_query}/file" '
-            'target="_blank" rel="noopener noreferrer" title="View file">View</a>'
+            '<polyline points="9 18 15 12 9 6"/></svg></a>'
             "</div></td>"
             "</tr>"
         )
@@ -603,6 +587,13 @@ def _status_badge_html(status_value: str) -> str:
     status = str(status_value or "").lower()
     label = escape(_format_status(status))
     return f'<span class="status-badge status-{escape(status)}">{label}</span>'
+
+
+def _document_list_status_badge_html(status_value: str) -> str:
+    status = str(status_value or "").lower()
+    if status == "ready":
+        return ""
+    return _status_badge_html(status)
 
 
 def document_detail_fragments(initial_data: dict) -> dict:

@@ -805,7 +805,11 @@
 .td-tags {
   display: flex !important;
   flex-wrap: wrap;
+  align-content: center;
+  align-self: stretch;
   gap: 6px;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
 }
 
 .tag-pill {
@@ -874,10 +878,6 @@
   gap: 4px;
 }
 
-.docs-design-table .td-actions .btn {
-  display: none;
-}
-
 .row-act {
   display: inline-flex;
   align-items: center;
@@ -902,10 +902,6 @@
 .row-act:hover {
   background: rgba(0, 0, 0, 0.06);
   color: var(--ink);
-}
-
-.row-act-danger:hover {
-  color: #9f3f1d;
 }
 
 .doc-empty {
