@@ -739,19 +739,6 @@ function bindDocumentsEvents() {
       return;
     }
 
-    const row = event.target instanceof Element ? event.target.closest("#docsTableBody tr[data-doc-id]") : null;
-    const interactive =
-      event.target instanceof Element
-        ? event.target.closest("a, button, input, select, textarea, label, .filter-dropdown")
-        : null;
-    if (row instanceof HTMLTableRowElement && !interactive) {
-      const documentId = row.dataset.docId || "";
-      if (documentId) {
-        window.location.href = `/ui/document?id=${encodeURIComponent(documentId)}`;
-      }
-      return;
-    }
-
     if (!activeFilterDropdown) {
       return;
     }

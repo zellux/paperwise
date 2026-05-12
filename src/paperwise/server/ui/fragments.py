@@ -425,11 +425,12 @@ def document_rows_html(documents: list[dict]) -> str:
         document_type = str(metadata.get("document_type") or "-")
         correspondent_raw = str(metadata.get("correspondent") or "-")
         correspondent = escape(correspondent_raw)
+        correspondent_query = quote(correspondent_raw, safe="")
         tags = metadata.get("tags") if isinstance(metadata.get("tags"), list) else []
         tag_pills = "".join(
-            f'<span class="tag-pill"{_tag_color_style(str(tag))}>'
+            f'<a class="tag-pill" href="/ui/documents?tag={quote(str(tag), safe="")}"{_tag_color_style(str(tag))}>'
             '<span class="tag-swatch tag-swatch-xs" aria-hidden="true"></span>'
-            f"{escape(str(tag))}</span>"
+            f"{escape(str(tag))}</a>"
             for tag in tags[:3]
         )
         if len(tags) > 3:
@@ -469,7 +470,7 @@ def document_rows_html(documents: list[dict]) -> str:
             "</span></td>"
             '<td class="td td-corr" data-label="Correspondent">'
             f'<span class="corr-cell"><span class="corr-avatar corr-avatar-sm">{escape(_initials(correspondent_raw))}</span>'
-            f"<span>{correspondent}</span></span></td>"
+            f'<a class="corr-link" href="/ui/documents?correspondent={correspondent_query}">{correspondent}</a></span></td>'
             f'<td class="td td-tags" data-label="Tags">{tag_pills}</td>'
             f'<td class="td td-date" data-label="Date"><span>{display_date}</span>'
             f'<span class="td-meta">{document_date}</span></td>'

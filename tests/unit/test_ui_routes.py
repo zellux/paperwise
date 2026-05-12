@@ -650,7 +650,9 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             '<a class="docs-side-row docs-corr-row" href="/ui/documents?correspondent=Paperwise">'
             in documents_html
         )
-        assert '<span>Paperwise</span>' in documents_html
+        assert '<a class="corr-link" href="/ui/documents?correspondent=Paperwise">Paperwise</a>' in documents_html
+        assert '<a class="tag-pill" href="/ui/documents?tag=Tax" style="--tag-color: ' in documents_html
+        assert '<a class="tag-pill" href="/ui/documents?tag=Finance" style="--tag-color: ' in documents_html
         assert 'data-doc-id="doc-tax"' in documents_html
         assert "Tax Notice" in documents_html
         assert (
