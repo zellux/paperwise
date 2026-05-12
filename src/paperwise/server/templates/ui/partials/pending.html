@@ -1,23 +1,75 @@
-<article id="section-pending" class="panel panel-section view">
-          <h2>Processing Queue</h2>
-          <div class="actions">
-            <button id="restartPendingBtn" type="button" class="btn btn-muted" disabled>
-              Restart All Pending
-            </button>
-          </div>
-          <div class="docs-table-wrap">
-            <table class="docs-table pending-table activity-table">
-              <thead>
-                <tr>
-                  <th>Title</th>
-                  <th>Status</th>
-                  <th>Created</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody id="pendingTableBody">
+<article id="section-pending" class="documents-workbench view">
+  <aside class="docs-nav-panel" aria-label="Document collections">
+    <a class="docs-upload-primary" href="/ui/upload">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span>Upload documents</span>
+      <kbd>⌘U</kbd>
+    </a>
+    <nav class="docs-side-section">
+      <a class="docs-side-row" href="/ui/documents">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg>
+        <span>All documents</span>
+        <span class="docs-side-count">{{ documents_all_count|format_number }}</span>
+      </a>
+      <a class="docs-side-row" href="/ui/documents?starred=true">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.1 8.3 22 9.3 17 14.2 18.2 21 12 17.8 5.8 21 7 14.2 2 9.3 8.9 8.3 12 2"/></svg>
+        <span>Starred</span>
+        <span class="docs-side-count">{{ documents_starred_count|format_number }}</span>
+      </a>
+      <a class="docs-side-row active" href="/ui/pending">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18"/><path d="M5 7l1 12h12l1-12"/><path d="M9 11h6"/></svg>
+        <span>Processing</span>
+        <span class="docs-side-count{% if documents_processing_count > 0 %} accent{% endif %}">{{ documents_processing_count|format_number }}</span>
+      </a>
+      <a class="docs-side-row" href="/ui/documents?status=failed">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+        <span>Needs attention</span>
+        <span class="docs-side-count">{{ documents_failed_count|format_number }}</span>
+      </a>
+    </nav>
+  </aside>
+
+  <section class="docs-main-panel">
+    <header class="docs-page-head">
+      <div>
+        <h1>Processing queue</h1>
+      </div>
+      <div class="docs-head-actions">
+        <a class="btn btn-ghost" href="/ui/pending" title="Sync processing queue">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"/><path d="M20.49 15a9 9 0 0 1-14.85 3.36L1 14"/></svg>
+          <span>Sync</span>
+        </a>
+        <button id="restartPendingBtn" type="button" class="btn btn-muted" disabled>
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          <span>Restart</span>
+        </button>
+        <a class="btn btn-primary" href="/ui/upload">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <span>Upload</span>
+        </a>
+      </div>
+    </header>
+
+    <div class="pagination-toolbar docs-list-toolbar pending-list-toolbar">
+      <div class="docs-summary">
+        <span class="docs-total-label">Processing documents: {{ documents_processing_count|format_number }}</span>
+      </div>
+    </div>
+    <div class="docs-table-wrap doc-table">
+      <table class="docs-table docs-design-table pending-design-table">
+        <thead>
+          <tr class="doc-thead">
+            <th class="th">Document</th>
+            <th class="th">Status</th>
+            <th class="th">Queued</th>
+            <th class="th">File</th>
+            <th class="th" aria-label="Actions"></th>
+          </tr>
+        </thead>
+        <tbody id="pendingTableBody" class="doc-tbody">
 {{ pending_table_body_html|safe }}
-              </tbody>
-            </table>
-          </div>
-        </article>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</article>

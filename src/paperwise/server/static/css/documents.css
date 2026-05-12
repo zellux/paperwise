@@ -1677,6 +1677,31 @@
   background: var(--accent);
 }
 
+.pending-design-table {
+  min-width: 900px;
+}
+
+.pending-design-table .doc-thead,
+.pending-design-table .doc-row {
+  grid-template-columns: minmax(420px, 1fr) minmax(108px, 132px) minmax(116px, 140px) minmax(126px, 160px) 40px;
+}
+
+.pending-design-table .td-status {
+  align-items: center;
+}
+
+.pending-design-table .td-file {
+  display: grid !important;
+  gap: 2px;
+  align-content: center;
+}
+
+.pending-list-toolbar {
+  padding: 12px 26px;
+  margin: 0;
+  border-bottom: 1px solid var(--stroke-soft);
+}
+
 .date-size-sort-group {
   display: inline-flex;
   align-items: center;
@@ -2363,6 +2388,15 @@
   .docs-design-table .th-tags,
   .docs-design-table .td-tags,
   .docs-design-table .td-actions {
+    display: none !important;
+  }
+
+  .pending-design-table .doc-thead,
+  .pending-design-table .doc-row {
+    grid-template-columns: minmax(230px, 1fr) 96px 92px;
+  }
+
+  .pending-design-table .td-file {
     display: none !important;
   }
 

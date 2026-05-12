@@ -897,10 +897,17 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         pending_html = client.get("/ui/pending").text
         pending_payload = _initial_data_from_response(pending_html)
         assert pending_payload["pending_documents"][0]["id"] == "doc-pending"
+        assert pending_payload["documents_processing_count"] == 1
         assert pending_payload["current_user"]["email"] == "catalog-ui@example.com"
+        assert '<article id="section-pending" class="documents-workbench view">' in pending_html
+        assert '<a class="docs-side-row active" href="/ui/pending">' in pending_html
+        assert "Processing documents: 1" in pending_html
+        assert 'id="docsFilterForm"' not in pending_html
         assert 'data-pending-doc-id="doc-pending"' in pending_html
+        assert '<tr class="doc-row pending-row" data-pending-doc-id="doc-pending">' in pending_html
         assert "Pending File" in pending_html
         assert '<span class="status-badge status-processing">PROCESSING</span>' in pending_html
+        assert "icon-action-button" not in pending_html
 
         documents_partial = client.get("/ui/partials/documents?page_size=1&page=1")
         assert documents_partial.status_code == 200
@@ -952,6 +959,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'data-has-restartable-pending-documents="true"' in pending_partial.text
         assert '<template data-partial-target="pendingTableBody">' in pending_partial.text
         assert 'data-pending-doc-id="doc-pending"' in pending_partial.text
+        assert '<tr class="doc-row pending-row" data-pending-doc-id="doc-pending">' in pending_partial.text
 
         document_partial = client.get("/ui/partials/document?id=doc-tax")
         assert document_partial.status_code == 200

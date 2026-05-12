@@ -53,7 +53,7 @@ async function loadPendingDocuments() {
     payload = await loadTablePartial({
       url: "/ui/partials/pending",
       tbody: pendingTableBody,
-      loadingColspan: 4,
+      loadingColspan: 5,
       loadingMessage: "Loading pending documents...",
     });
   } catch (error) {

@@ -430,24 +430,53 @@ def activity_rows_html(documents: list[dict]) -> str:
 
 def pending_rows_html(documents: list[dict]) -> str:
     if not documents:
-        return '                <tr><td colspan="4">No pending documents.</td></tr>'
+        return (
+            '                <tr class="docs-empty-row"><td colspan="5">'
+            '<div class="doc-empty"><div class="doc-empty-mark" aria-hidden="true">'
+            '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            '<path d="M3 7h18"/><path d="M5 7l1 12h12l1-12"/><path d="M9 11h6"/>'
+            "</svg></div><p>No documents are processing.</p></div></td></tr>"
+        )
     rows: list[str] = []
     for item in documents:
         raw_document_id = str(item.get("id") or "")
         document_id = escape(raw_document_id)
         document_id_query = quote(raw_document_id, safe="")
-        title = escape(_document_title(item))
+        raw_title = _document_title(item)
+        title = escape(raw_title)
+        raw_filename = str(item.get("filename") or "Untitled document")
+        filename = escape(raw_filename)
         status_html = _status_badge_html(str(item.get("status") or ""))
-        created_at = escape(str(item.get("created_at") or "-"))
+        created_at = escape(_short_date(str(item.get("created_at") or "-")))
+        size = escape(_format_document_size(item.get("size_bytes")))
+        content_type = escape(str(item.get("content_type") or "-"))
+        type_icon_class = escape(
+            _document_type_icon_class(str(item.get("content_type") or ""), str(item.get("filename") or "")),
+            quote=True,
+        )
         rows.append(
-            f'                <tr data-pending-doc-id="{document_id}">'
-            f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id_query}">{title}</a></td>'
-            f'<td data-label="Status">{status_html}</td>'
-            f'<td data-label="Created">{created_at}</td>'
-            '<td data-label="Action"><div class="table-actions">'
-            f'<a class="icon-action-button" href="/ui/document?id={document_id_query}" title="Open document">'
-            '<span class="icon-action-label">Open</span>'
-            "</a>"
+            f'                <tr class="doc-row pending-row" data-pending-doc-id="{document_id}">'
+            '<td class="td td-title" data-label="Document">'
+            f'<span class="type-icon {type_icon_class}" aria-hidden="true">'
+            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+            '<polyline points="14 2 14 8 20 8"/></svg></span>'
+            '<span class="title-stack">'
+            '<span class="title-row">'
+            f'<a class="title-link" href="/ui/document?id={document_id_query}">{title}</a>'
+            "</span>"
+            f'<span class="title-meta"><span class="filename">{filename}</span></span>'
+            "</span></td>"
+            f'<td class="td td-status" data-label="Status">{status_html}</td>'
+            f'<td class="td td-date-size" data-label="Queued"><span>{created_at}</span></td>'
+            f'<td class="td td-file" data-label="File"><span>{size}</span><span class="td-meta">{content_type}</span></td>'
+            '<td class="td td-actions" data-label="Action"><div class="table-actions">'
+            f'<a class="row-act" href="/ui/document?id={document_id_query}" title="Open document" aria-label="Open document">'
+            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+            '<polyline points="9 18 15 12 9 6"/></svg></a>'
             "</div></td>"
             "</tr>"
         )

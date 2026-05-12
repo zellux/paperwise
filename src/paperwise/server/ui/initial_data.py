@@ -317,11 +317,14 @@ def pending_documents(repository: DocumentStore, current_user: User) -> list[dic
 
 def pending_initial_data(repository: DocumentsInitialDataRepository, current_user: User | None) -> dict:
     initial_data = page_initial_data(current_user, repository)
+    initial_data.update(document_sidebar_data(repository, current_user))
     if current_user is None:
-        return {**initial_data, "pending_documents": []}
+        return {**initial_data, "pending_documents": [], "documents_processing_count": 0}
+    pending_items = pending_documents(repository, current_user)
     return {
         **initial_data,
-        "pending_documents": pending_documents(repository, current_user),
+        "pending_documents": pending_items,
+        "documents_processing_count": len(pending_items),
     }
 
 
