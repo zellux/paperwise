@@ -162,6 +162,7 @@ def document_sidebar_data(repository: DocumentsInitialDataRepository, current_us
             "documents_all_count": 0,
             "documents_failed_count": 0,
             "document_sidebar_tags": [],
+            "document_sidebar_document_types": [],
             "document_sidebar_correspondents": [],
         }
     return {
@@ -176,6 +177,10 @@ def document_sidebar_data(repository: DocumentsInitialDataRepository, current_us
         "document_sidebar_tags": [
             {"tag": tag, "document_count": count}
             for tag, count in repository.list_owner_tag_stats(current_user.id)
+        ],
+        "document_sidebar_document_types": [
+            {"document_type": document_type, "document_count": count}
+            for document_type, count in repository.list_owner_document_type_stats(current_user.id)
         ],
         "document_sidebar_correspondents": [
             {"correspondent": correspondent, "document_count": count}
@@ -214,6 +219,7 @@ def documents_initial_data(
                 "documents_all_count": 0,
                 "documents_failed_count": 0,
                 "document_sidebar_tags": [],
+                "document_sidebar_document_types": [],
                 "document_sidebar_correspondents": [],
             }
         )

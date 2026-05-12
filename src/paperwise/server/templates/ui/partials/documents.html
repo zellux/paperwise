@@ -29,6 +29,13 @@
       </div>
 {{ documents_sidebar_tags_html|safe }}
     </section>
+    <section class="docs-side-section">
+      <div class="docs-side-head">
+        <span>Document Types</span>
+        <a href="/ui/document-types" aria-label="Manage document types">+</a>
+      </div>
+{{ documents_sidebar_document_types_html|safe }}
+    </section>
     <section class="docs-side-section docs-side-section-last">
       <div class="docs-side-head">
         <span>Correspondents</span>
@@ -74,12 +81,12 @@
         <select id="filterTag" name="filterTag" class="filter-select" multiple title="Select one or more tags"></select>
       </div>
       <div class="filter-chip">
-        <span class="chip-prefix">Correspondent</span>
-        <select id="filterCorrespondent" name="filterCorrespondent" class="filter-select" multiple title="Select one or more correspondents"></select>
-      </div>
-      <div class="filter-chip">
         <span class="chip-prefix">Document Type</span>
         <select id="filterType" name="filterType" class="filter-select" multiple title="Select one or more document types"></select>
+      </div>
+      <div class="filter-chip">
+        <span class="chip-prefix">Correspondent</span>
+        <select id="filterCorrespondent" name="filterCorrespondent" class="filter-select" multiple title="Select one or more correspondents"></select>
       </div>
     </form>
 

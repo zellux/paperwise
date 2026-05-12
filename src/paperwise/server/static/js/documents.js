@@ -121,7 +121,7 @@ function getDocumentFilterControls() {
     filterCorrespondent,
     filterType,
     filterQuery: document.getElementById("filterQuery"),
-    filterSelects: [filterTag, filterCorrespondent, filterType],
+    filterSelects: [filterTag, filterType, filterCorrespondent],
   };
 }
 
@@ -699,6 +699,23 @@ function expandRowTags(row) {
   renderRowTags(row, tags, { expanded: true });
 }
 
+function toggleSidebarList(button) {
+  const group = button.dataset.sidebarToggle || "";
+  if (!group) {
+    return;
+  }
+  const expanded = button.getAttribute("aria-expanded") === "true";
+  const nextExpanded = !expanded;
+  const extras = document.querySelectorAll(`[data-sidebar-extra="${CSS.escape(group)}"]`);
+  for (const item of extras) {
+    item.hidden = !nextExpanded;
+  }
+  button.setAttribute("aria-expanded", nextExpanded ? "true" : "false");
+  button.textContent = nextExpanded
+    ? button.dataset.expandedLabel || "Show fewer"
+    : button.dataset.collapsedLabel || "Show all";
+}
+
 function renderRowCorrespondent(row, correspondent) {
   const cell = row.querySelector(".td-corr");
   if (!cell) {
@@ -1123,6 +1140,13 @@ function bindDocumentsEvents() {
   }
 
   document.addEventListener("click", async (event) => {
+    const sidebarToggle =
+      event.target instanceof Element ? event.target.closest("[data-sidebar-toggle]") : null;
+    if (sidebarToggle instanceof HTMLButtonElement) {
+      toggleSidebarList(sidebarToggle);
+      return;
+    }
+
     const tagsExpand =
       event.target instanceof Element ? event.target.closest("[data-tags-expand]") : null;
     if (tagsExpand instanceof HTMLButtonElement) {

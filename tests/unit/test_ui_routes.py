@@ -19,7 +19,12 @@ from paperwise.domain.models import (
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from paperwise.server.dependencies import document_repository_dependency
 from paperwise.server.main import app
-from paperwise.server.ui.fragments import document_rows_html
+from paperwise.server.ui.fragments import (
+    document_rows_html,
+    document_sidebar_correspondents_html,
+    document_sidebar_document_types_html,
+    document_sidebar_tags_html,
+)
 from paperwise.server.ui.page import find_template_placeholders
 
 
@@ -56,6 +61,37 @@ def test_document_rows_render_expandable_tag_overflow() -> None:
     assert 'class="tag-pill tag-more tag-more-button"' in html
     assert 'data-tags-expand="doc-many-tags"' in html
     assert "+2</button>" in html
+
+
+def test_document_sidebar_lists_collapse_after_ten() -> None:
+    tags_html = document_sidebar_tags_html(
+        [{"tag": f"Tag {index:02d}", "document_count": index} for index in range(1, 13)]
+    )
+    types_html = document_sidebar_document_types_html(
+        [
+            {"document_type": f"Type {index:02d}", "document_count": index}
+            for index in range(1, 12)
+        ]
+    )
+    correspondents_html = document_sidebar_correspondents_html(
+        [
+            {"correspondent": f"Sender {index:02d}", "document_count": index}
+            for index in range(1, 14)
+        ]
+    )
+
+    assert tags_html.count('class="docs-side-row docs-tag-row"') == 12
+    assert tags_html.count('hidden data-sidebar-extra="tags"') == 2
+    assert 'data-sidebar-toggle="tags"' in tags_html
+    assert "Show all (2 more)" in tags_html
+
+    assert types_html.count('hidden data-sidebar-extra="document-types"') == 1
+    assert 'data-sidebar-toggle="document-types"' in types_html
+    assert "Show all (1 more)" in types_html
+
+    assert correspondents_html.count('hidden data-sidebar-extra="correspondents"') == 3
+    assert 'data-sidebar-toggle="correspondents"' in correspondents_html
+    assert "Show all (3 more)" in correspondents_html
 
 
 def _save_ready_document(
@@ -683,6 +719,10 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             {"tag": "Finance", "document_count": 2},
             {"tag": "Tax", "document_count": 1},
         ]
+        assert documents_payload["document_sidebar_document_types"] == [
+            {"document_type": "Invoice", "document_count": 1},
+            {"document_type": "Notice", "document_count": 1},
+        ]
         assert documents_payload["document_sidebar_correspondents"] == [
             {"correspondent": "Paperwise", "document_count": 2}
         ]
@@ -700,12 +740,20 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "Total documents: 2" in documents_html
         assert "Processing: 0" in documents_html
         assert '<a class="docs-side-row docs-tag-row" href="/ui/documents?tag=Finance">' in documents_html
+        assert (
+            '<a class="docs-side-row docs-type-row" href="/ui/documents?document_type=Invoice">'
+            in documents_html
+        )
         assert '<span>Finance</span>' in documents_html
         assert '<span class="docs-side-count">2</span>' in documents_html
         assert (
             '<a class="docs-side-row docs-corr-row" href="/ui/documents?correspondent=Paperwise">'
             in documents_html
         )
+        assert documents_html.index(">Tags<") < documents_html.index(">Document Types<")
+        assert documents_html.index(">Document Types<") < documents_html.index(">Correspondents<")
+        assert documents_html.index('id="filterTag"') < documents_html.index('id="filterType"')
+        assert documents_html.index('id="filterType"') < documents_html.index('id="filterCorrespondent"')
         assert '<a class="corr-link" href="/ui/documents?correspondent=Paperwise">Paperwise</a>' in documents_html
         assert '<a class="tag-pill" href="/ui/documents?tag=Tax" style="--tag-color: ' in documents_html
         assert '<a class="tag-pill" href="/ui/documents?tag=Finance" style="--tag-color: ' in documents_html

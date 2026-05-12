@@ -11,6 +11,7 @@ from paperwise.server.ui.fragments import (
     document_detail_fragments,
     document_rows_html,
     document_sidebar_correspondents_html,
+    document_sidebar_document_types_html,
     document_sidebar_tags_html,
     document_type_rows_html,
     documents_pagination_toolbar_html,
@@ -145,6 +146,7 @@ def _initial_render_context(initial_data: dict) -> dict:
     documents = initial_data.get("documents")
     tags = initial_data.get("tag_stats")
     sidebar_tags = initial_data.get("document_sidebar_tags")
+    sidebar_document_types = initial_data.get("document_sidebar_document_types")
     sidebar_correspondents = initial_data.get("document_sidebar_correspondents")
     document_types = initial_data.get("document_type_stats")
     activity_documents = initial_data.get("activity_documents")
@@ -195,6 +197,9 @@ def _initial_render_context(initial_data: dict) -> dict:
         "documents_failed_count": int(initial_data.get("documents_failed_count") or 0),
         "documents_sidebar_correspondents_html": document_sidebar_correspondents_html(
             sidebar_correspondents if isinstance(sidebar_correspondents, list) else []
+        ),
+        "documents_sidebar_document_types_html": document_sidebar_document_types_html(
+            sidebar_document_types if isinstance(sidebar_document_types, list) else []
         ),
         "documents_sidebar_tags_html": document_sidebar_tags_html(
             sidebar_tags if isinstance(sidebar_tags, list) else []

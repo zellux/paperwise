@@ -173,46 +173,93 @@ def _initials(value: str) -> str:
     return cleaned[:2].upper()
 
 
-def document_sidebar_tags_html(tag_stats: list[dict], *, limit: int = 12) -> str:
+def _sidebar_expand_button(*, group: str, hidden_count: int) -> str:
+    group_attr = _html_attr(group)
+    collapsed_label = f"Show all ({hidden_count} more)"
+    return (
+        f'<button type="button" class="docs-side-toggle" data-sidebar-toggle="{group_attr}" '
+        f'data-collapsed-label="{_html_attr(collapsed_label)}" '
+        'data-expanded-label="Show fewer" aria-expanded="false">'
+        f"{escape(collapsed_label)}</button>"
+    )
+
+
+def document_sidebar_tags_html(tag_stats: list[dict], *, limit: int = 10) -> str:
     if not tag_stats:
         return '<span class="docs-side-empty">No tags yet</span>'
     rows: list[str] = []
-    for stat in tag_stats[:limit]:
+    for stat in tag_stats:
         raw_tag = str(stat.get("tag") or "").strip()
         if not raw_tag:
             continue
         tag = escape(raw_tag)
         tag_query = quote(raw_tag, safe="")
         count = int(stat.get("document_count") or 0)
+        hidden = ' hidden data-sidebar-extra="tags"' if len(rows) >= limit else ""
         rows.append(
-            f'<a class="docs-side-row docs-tag-row" href="/ui/documents?tag={tag_query}">'
+            f'<a class="docs-side-row docs-tag-row" href="/ui/documents?tag={tag_query}"{hidden}>'
             f'<span class="tag-swatch"{_tag_color_style(raw_tag)} aria-hidden="true"></span>'
             f"<span>{tag}</span>"
             f'<span class="docs-side-count">{count:,}</span>'
             "</a>"
         )
-    return "\n".join(rows) if rows else '<span class="docs-side-empty">No tags yet</span>'
+    if not rows:
+        return '<span class="docs-side-empty">No tags yet</span>'
+    if len(rows) > limit:
+        rows.append(_sidebar_expand_button(group="tags", hidden_count=len(rows) - limit))
+    return "\n".join(rows)
+
+
+def document_sidebar_document_types_html(type_stats: list[dict], *, limit: int = 10) -> str:
+    if not type_stats:
+        return '<span class="docs-side-empty">No document types yet</span>'
+    rows: list[str] = []
+    for stat in type_stats:
+        raw_document_type = str(stat.get("document_type") or "").strip()
+        if not raw_document_type:
+            continue
+        document_type = escape(raw_document_type)
+        document_type_query = quote(raw_document_type, safe="")
+        count = int(stat.get("document_count") or 0)
+        hidden = ' hidden data-sidebar-extra="document-types"' if len(rows) >= limit else ""
+        rows.append(
+            f'<a class="docs-side-row docs-type-row" href="/ui/documents?document_type={document_type_query}"{hidden}>'
+            '<span class="doc-type-dot" aria-hidden="true"></span>'
+            f"<span>{document_type}</span>"
+            f'<span class="docs-side-count">{count:,}</span>'
+            "</a>"
+        )
+    if not rows:
+        return '<span class="docs-side-empty">No document types yet</span>'
+    if len(rows) > limit:
+        rows.append(_sidebar_expand_button(group="document-types", hidden_count=len(rows) - limit))
+    return "\n".join(rows)
 
 
 def document_sidebar_correspondents_html(correspondent_stats: list[dict], *, limit: int = 10) -> str:
     if not correspondent_stats:
         return '<span class="docs-side-empty">No correspondents yet</span>'
     rows: list[str] = []
-    for stat in correspondent_stats[:limit]:
+    for stat in correspondent_stats:
         raw_correspondent = str(stat.get("correspondent") or "").strip()
         if not raw_correspondent:
             continue
         correspondent = escape(raw_correspondent)
         correspondent_query = quote(raw_correspondent, safe="")
         count = int(stat.get("document_count") or 0)
+        hidden = ' hidden data-sidebar-extra="correspondents"' if len(rows) >= limit else ""
         rows.append(
-            f'<a class="docs-side-row docs-corr-row" href="/ui/documents?correspondent={correspondent_query}">'
+            f'<a class="docs-side-row docs-corr-row" href="/ui/documents?correspondent={correspondent_query}"{hidden}>'
             f'<span class="corr-avatar corr-avatar-sm" aria-hidden="true">{escape(_initials(raw_correspondent))}</span>'
             f"<span>{correspondent}</span>"
             f'<span class="docs-side-count">{count:,}</span>'
             "</a>"
         )
-    return "\n".join(rows) if rows else '<span class="docs-side-empty">No correspondents yet</span>'
+    if not rows:
+        return '<span class="docs-side-empty">No correspondents yet</span>'
+    if len(rows) > limit:
+        rows.append(_sidebar_expand_button(group="correspondents", hidden_count=len(rows) - limit))
+    return "\n".join(rows)
 
 
 def _relative_blob_path(blob_uri: str | None) -> str:
