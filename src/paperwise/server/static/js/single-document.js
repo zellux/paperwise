@@ -320,13 +320,15 @@ function previewUrlForPage(src, pageNumber) {
     return "";
   }
   const [base, hash = ""] = source.split("#");
+  const url = new URL(base, window.location.origin);
+  url.searchParams.set("preview_page", String(pageNumber));
   const params = new URLSearchParams(hash);
   params.set("page", String(pageNumber));
   params.set("toolbar", "0");
   params.set("navpanes", "0");
   params.set("scrollbar", "0");
   params.set("view", "FitH");
-  return `${base}#${params.toString()}`;
+  return `${url.pathname}${url.search}#${params.toString()}`;
 }
 
 function setPreviewPage(pageNumber, options = {}) {
@@ -364,7 +366,10 @@ function setPreviewPage(pageNumber, options = {}) {
   });
 
   if (options.updateFrame !== false && detailFilePreview instanceof HTMLIFrameElement) {
-    detailFilePreview.src = previewUrlForPage(detailFilePreview.getAttribute("src") || detailFilePreview.src, nextPage);
+    const nextSrc = previewUrlForPage(detailFilePreview.getAttribute("src") || detailFilePreview.src, nextPage);
+    if (nextSrc) {
+      detailFilePreview.src = nextSrc;
+    }
   }
 }
 
