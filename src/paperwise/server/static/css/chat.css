@@ -831,7 +831,7 @@
   border: 1.5px solid var(--stroke);
   border-radius: 12px;
   padding: 10px 12px;
-  margin: 0 18px 18px;
+  margin: 0 18px 8px;
   background: #fff;
   box-shadow: 0 8px 22px rgba(31, 43, 39, 0.08);
   transition: border-color 140ms ease, box-shadow 140ms ease;
@@ -913,6 +913,6 @@
   }
 
   .chat-composer {
-    margin: 0 12px 12px;
+    margin: 0 12px 8px;
   }
 }
