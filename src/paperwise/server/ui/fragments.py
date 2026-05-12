@@ -130,12 +130,12 @@ def _short_date(value: str | None) -> str:
         return "-"
     try:
         parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
-        return parsed.strftime("%b %-d")
+        return parsed.strftime("%b %-d, %Y")
     except ValueError:
         pass
     try:
         parsed = datetime.strptime(text[:10], "%Y-%m-%d")
-        return parsed.strftime("%b %-d")
+        return parsed.strftime("%b %-d, %Y")
     except ValueError:
         return text
 
@@ -445,11 +445,9 @@ def document_rows_html(documents: list[dict]) -> str:
         if not tag_pills:
             tag_pills = '<span class="muted">-</span>'
         document_date_raw = str(metadata.get("document_date") or "")
-        document_date = escape(document_date_raw or "-")
         display_date = escape(_short_date(document_date_raw))
         status_html = _document_list_status_badge_html(str(item.get("status") or ""))
         size = escape(_format_document_size(item.get("size_bytes")))
-        created_at = escape(str(item.get("created_at") or "-")[:10] or "-")
         page_count = escape(_format_page_count(item.get("page_count")))
         type_icon_class = escape(
             _document_type_icon_class(str(item.get("content_type") or ""), str(item.get("filename") or "")),
@@ -486,8 +484,7 @@ def document_rows_html(documents: list[dict]) -> str:
             f'<a class="corr-link" href="/ui/documents?correspondent={correspondent_query}">{correspondent}</a></span></td>'
             f'<td class="td td-tags" data-label="Tags">{tag_pills}</td>'
             f'<td class="td td-date-size" data-label="Date / Size"><span>{display_date}</span>'
-            f'<span class="td-meta">{document_date}</span><span class="td-size-line">{size}</span>'
-            f'<span class="td-meta">{created_at}</span></td>'
+            f'<span class="td-size-line">{size}</span></td>'
             '<td class="td td-actions" data-label="Action"><div class="table-actions">'
             f'<a class="row-act" href="/ui/document?id={document_id_query}" title="Open document" aria-label="Open document">'
             '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '

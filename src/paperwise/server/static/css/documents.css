@@ -571,7 +571,7 @@
 .docs-design-table {
   display: block;
   width: 100%;
-  min-width: 1030px;
+  min-width: 1080px;
   border-collapse: separate;
   border-spacing: 0;
 }
@@ -587,7 +587,7 @@
   display: grid;
   width: 100%;
   box-sizing: border-box;
-  grid-template-columns: 36px minmax(300px, 2.4fr) minmax(150px, 200px) minmax(160px, 220px) minmax(132px, 156px) 44px;
+  grid-template-columns: 36px minmax(500px, 1fr) minmax(126px, 154px) minmax(132px, 168px) 112px;
   align-items: center;
   gap: 12px;
   padding: 0 26px;
@@ -614,6 +614,10 @@
   font-size: 0.62rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
+}
+
+.docs-design-table .doc-thead th[aria-label="Actions"] {
+  display: none;
 }
 
 .docs-design-table .doc-row {
@@ -933,6 +937,16 @@
   justify-content: flex-end;
   width: 100%;
   gap: 4px;
+}
+
+.docs-design-table .td-actions {
+  position: absolute;
+  top: 0;
+  right: 18px;
+  bottom: 0;
+  width: 30px;
+  padding: 0;
+  border-bottom: 0;
 }
 
 .row-act {
