@@ -848,8 +848,8 @@
 }
 
 .tag-editor-input {
-  flex: 1 0 100%;
-  min-width: 100%;
+  flex: 1 1 140px;
+  min-width: 120px;
   min-height: 34px;
   padding: 6px 4px;
   border: 0;
@@ -897,8 +897,11 @@
   text-align: left;
 }
 
-.tag-suggest button:hover {
-  background: var(--row-hover);
+.tag-suggest button:hover,
+.tag-suggest button:focus-visible {
+  background: var(--table-row-hover);
+  color: var(--ink);
+  outline: none;
 }
 
 .ocr-tab-card {
