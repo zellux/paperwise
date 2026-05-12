@@ -435,9 +435,11 @@ def document_rows_html(documents: list[dict]) -> str:
         correspondent_query = quote(correspondent_raw, safe="")
         tags = metadata.get("tags") if isinstance(metadata.get("tags"), list) else []
         tag_pills = "".join(
-            f'<a class="tag-pill" href="/ui/documents?tag={quote(str(tag), safe="")}"{_tag_color_style(str(tag))}>'
+            f'<a class="tag-pill" href="/ui/documents?tag={quote(str(tag), safe="")}"'
+            f'{_tag_color_style(str(tag))}'
+            f' data-full-tag="{_html_attr(str(tag))}">'
             '<span class="tag-swatch tag-swatch-xs" aria-hidden="true"></span>'
-            f"{escape(str(tag))}</a>"
+            f'<span class="tag-pill-label">{escape(str(tag))}</span></a>'
             for tag in tags[:3]
         )
         if len(tags) > 3:

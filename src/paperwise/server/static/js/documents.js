@@ -57,6 +57,7 @@ let docsListRequestSeq = 0;
 let initialDocumentsHydrated = false;
 let documentsEventsBound = false;
 let activeBulkEditMode = "";
+let clippedTagResizeTimer = 0;
 const selectedDocIds = new Set();
 
 function cloneDocsFilters(filters) {
@@ -511,6 +512,7 @@ function applyDocumentsPartial(payload) {
   docsPage = Math.max(1, Number(payload.dataset.documentsPage || docsPage || 1));
   appState.docsPageSize = normalizePageSize(payload.dataset.documentsPageSize || appState.docsPageSize);
   syncSelectionToVisibleRows();
+  refreshClippedTagTooltips(docsTableBody);
 }
 
 function getVisibleDocRows() {
@@ -625,6 +627,24 @@ function getInitials(value) {
   return cleaned.slice(0, 2).toUpperCase();
 }
 
+function refreshClippedTagTooltips(root = document) {
+  window.requestAnimationFrame(() => {
+    const labels = root?.querySelectorAll?.(".td-tags .tag-pill-label") || [];
+    for (const label of labels) {
+      const pill = label.closest(".tag-pill");
+      if (!(pill instanceof HTMLElement)) {
+        continue;
+      }
+      const clipped = label.scrollWidth > label.clientWidth + 1;
+      if (clipped) {
+        pill.dataset.tagClipped = "true";
+      } else {
+        delete pill.dataset.tagClipped;
+      }
+    }
+  });
+}
+
 function renderRowTags(row, tags, { expanded = false } = {}) {
   const cell = row.querySelector(".td-tags");
   if (!cell) {
@@ -644,13 +664,18 @@ function renderRowTags(row, tags, { expanded = false } = {}) {
     link.className = "tag-pill";
     link.href = `/ui/documents?tag=${encodeURIComponent(tag)}`;
     link.style.setProperty("--tag-color", stableTagColor(tag));
+    link.dataset.fullTag = tag;
 
     const swatch = document.createElement("span");
     swatch.className = "tag-swatch tag-swatch-xs";
     swatch.setAttribute("aria-hidden", "true");
 
+    const label = document.createElement("span");
+    label.className = "tag-pill-label";
+    label.textContent = tag;
+
     link.appendChild(swatch);
-    link.append(document.createTextNode(tag));
+    link.appendChild(label);
     cell.appendChild(link);
   }
   if (!expanded && tags.length > 3) {
@@ -662,6 +687,7 @@ function renderRowTags(row, tags, { expanded = false } = {}) {
     more.textContent = `+${tags.length - 3}`;
     cell.appendChild(more);
   }
+  refreshClippedTagTooltips(cell);
 }
 
 function expandRowTags(row) {
@@ -1049,6 +1075,7 @@ function hydrateInitialDocumentsData(initialData) {
     refreshFilterOptionsFromDocuments(initialData.documents);
   }
   syncSelectionToVisibleRows();
+  refreshClippedTagTooltips();
   logActivity(`Loaded ${initialData.documents.length} document(s) of ${docsTotalCount} total`);
   initialDocumentsHydrated = true;
   return true;
@@ -1209,6 +1236,16 @@ function bindDocumentsEvents() {
       docsFilterNavigateTimer = 0;
       applyFiltersFromControls();
     }, 350);
+  });
+
+  window.addEventListener("resize", () => {
+    if (clippedTagResizeTimer) {
+      window.clearTimeout(clippedTagResizeTimer);
+    }
+    clippedTagResizeTimer = window.setTimeout(() => {
+      clippedTagResizeTimer = 0;
+      refreshClippedTagTooltips();
+    }, 120);
   });
 
   document.addEventListener("click", (event) => {
