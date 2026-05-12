@@ -12,6 +12,7 @@ import {
 import { splitTags } from "./ui/values.js";
 
 let singleDocumentEventsBound = false;
+let documentMetadataDirty = false;
 const TAG_COLOR_SET = [
   "#8e5bcb",
   "#1d6a55",
@@ -110,7 +111,33 @@ function setDetailTags(tags) {
   if (metaTagsInput instanceof HTMLInputElement) {
     metaTagsInput.value = tags.join(", ");
   }
+  setDocumentMetadataDirty(true);
   renderTagEditor();
+}
+
+function setDocumentMetadataDirty(isDirty) {
+  documentMetadataDirty = Boolean(isDirty);
+}
+
+function handleDocumentBeforeUnload(event) {
+  if (!documentMetadataDirty) {
+    return;
+  }
+  event.preventDefault();
+  event.returnValue = "";
+}
+
+function bindDocumentDirtyState() {
+  const { documentMetaForm } = getSingleDocumentElements();
+  const markDirtyFromFormEvent = (event) => {
+    if (event.target === document.getElementById("metaTagQuery")) {
+      return;
+    }
+    setDocumentMetadataDirty(true);
+  };
+  documentMetaForm?.addEventListener("input", markDirtyFromFormEvent);
+  documentMetaForm?.addEventListener("change", markDirtyFromFormEvent);
+  window.addEventListener("beforeunload", handleDocumentBeforeUnload);
 }
 
 function hideTagSuggestions() {
@@ -436,6 +463,7 @@ function bindSingleDocumentEvents() {
     }
 
     logActivity(`Saved metadata for ${appState.currentDocumentId}`);
+    setDocumentMetadataDirty(false);
     await openDocumentView(appState.currentDocumentId);
     await refreshDocumentRelatedLists({ catalog: true });
   });
@@ -502,7 +530,9 @@ function bindSingleDocumentEvents() {
   bindOcrEvents();
   bindSystemInformationToggle();
   bindPreviewPager();
+  bindDocumentDirtyState();
   document.addEventListener("paperwise:document-detail-updated", () => {
+    setDocumentMetadataDirty(false);
     renderTagEditor();
     renderOcrText();
     setPreviewPage(1, { updateFrame: false });
@@ -517,6 +547,7 @@ export async function initializePage({ authenticated, initialData }) {
   }
   bindSingleDocumentEvents();
   if (hydrateInitialDocumentData(initialData || {})) {
+    setDocumentMetadataDirty(false);
     renderTagEditor();
     renderOcrText();
     return;
