@@ -11,6 +11,7 @@ import {
   navigateToDocument,
 } from "paperwise/app";
 import { readInitialData } from "./state/initialData.js";
+import { getResolvedTaskSettings } from "./state/llm.js";
 import {
   normalizeGroundedQaMaxDocuments,
   normalizeGroundedQaTopK,
@@ -32,8 +33,11 @@ let searchAskQuestion = null;
 let searchAskNewChatBtn = null;
 let searchAskThreadSearch = null;
 let searchAskThreadList = null;
+let searchAskThreadTitle = null;
+let searchAskModelLabel = null;
 let searchAskTokenUsage = null;
 let searchAskMessages = null;
+let searchAskHints = null;
 
 let searchAskMessagesState = [];
 let searchAskInFlight = false;
@@ -55,8 +59,11 @@ function bindSearchElements() {
   searchAskNewChatBtn = document.getElementById("searchAskNewChatBtn");
   searchAskThreadSearch = document.getElementById("searchAskThreadSearch");
   searchAskThreadList = document.getElementById("searchAskThreadList");
+  searchAskThreadTitle = document.getElementById("searchAskThreadTitle");
+  searchAskModelLabel = document.getElementById("searchAskModelLabel");
   searchAskTokenUsage = document.getElementById("searchAskTokenUsage");
   searchAskMessages = document.getElementById("searchAskMessages");
+  searchAskHints = document.getElementById("searchAskHints");
 }
 
 function renderSearchResultsMeta(message) {
@@ -191,7 +198,20 @@ function renderSearchAskTokenUsage() {
   if (!searchAskTokenUsage) {
     return;
   }
-  searchAskTokenUsage.textContent = `Tokens: ${formatTokenCount(searchAskCurrentTokens)}`;
+  const tokenLabel = searchAskCurrentTokens === 1 ? "token" : "tokens";
+  searchAskTokenUsage.textContent = `${formatTokenCount(searchAskCurrentTokens)} ${tokenLabel}`;
+}
+
+function renderSearchAskHeader() {
+  if (searchAskThreadTitle) {
+    searchAskThreadTitle.textContent = getSearchAskThreadTitle(searchAskThreadId) || "Ask Your Docs";
+  }
+  if (searchAskModelLabel) {
+    const settings = getResolvedTaskSettings("grounded_qa");
+    const parts = [settings?.provider, settings?.model].filter(Boolean);
+    searchAskModelLabel.textContent = parts.length ? parts.join(" · ") : "Model not configured";
+  }
+  renderSearchAskTokenUsage();
 }
 
 function updateSearchAskTokenUsage(tokenUsage) {
@@ -227,6 +247,7 @@ function getSearchAskThreadTitle(threadId) {
 
 function renderSearchAskThreadSelect() {
   syncSearchAskThreadSelect();
+  renderSearchAskHeader();
 }
 
 function applySearchAskThreadsPartial(payload) {
@@ -342,6 +363,15 @@ async function deleteSearchAskThread(threadId) {
 }
 
 function renderSearchAskMessages() {
+  renderSearchAskHeader();
+  const hasChatMessages = searchAskMessagesState.some((message) => ["user", "assistant"].includes(message.role));
+  if (searchAskHints instanceof HTMLElement) {
+    searchAskHints.hidden = hasChatMessages;
+  }
+  if (!hasChatMessages && searchAskHints instanceof HTMLElement && searchAskMessages instanceof HTMLElement) {
+    searchAskMessages.replaceChildren();
+    return;
+  }
   renderChatTranscript({
     container: searchAskMessages,
     messages: searchAskMessagesState,
@@ -733,6 +763,17 @@ function bindSearchEvents() {
   });
 
   searchAskQuestion?.addEventListener("input", () => autoResizeChatTextarea(searchAskQuestion));
+
+  searchAskHints?.addEventListener("click", async (event) => {
+    const hint = event.target instanceof Element ? event.target.closest("[data-ask-hint]") : null;
+    if (!(hint instanceof HTMLElement) || !(searchAskQuestion instanceof HTMLTextAreaElement) || searchAskInFlight) {
+      return;
+    }
+    searchAskQuestion.value = hint.dataset.askHint || "";
+    autoResizeChatTextarea(searchAskQuestion);
+    searchAskQuestion.focus();
+    await runAsk();
+  });
 
   searchAskMessages?.addEventListener("click", (event) => {
     const button = event.target instanceof Element ? event.target.closest(".chat-status-summary") : null;

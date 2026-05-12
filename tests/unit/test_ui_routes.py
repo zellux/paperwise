@@ -488,6 +488,10 @@ def test_grounded_qa_ui_does_not_include_keyword_search_shell() -> None:
     assert response.status_code == 200
     assert 'id="section-search"' in response.text
     assert 'id="search-section-ask"' in response.text
+    assert 'id="searchAskHints"' in response.text
+    assert 'id="searchAskThreadTitle"' in response.text
+    assert "Workspace" not in response.text
+    assert "Search and Ask Your Docs" not in response.text
     assert 'id="search-section-keyword"' not in response.text
     assert "Keyword Search" not in response.text
 

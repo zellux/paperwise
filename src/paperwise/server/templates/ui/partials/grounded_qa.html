@@ -1,11 +1,6 @@
 <article id="section-search" class="grounded-qa-workbench view">
-  <header class="qa-page-header">
-    <div>
-      <p class="qa-eyebrow">Grounded Q&amp;A</p>
-      <h1 id="searchSectionHeading">Ask Your Docs</h1>
-    </div>
-    <p id="searchResultsMeta" class="qa-page-status">Ready.</p>
-  </header>
+  <h1 id="searchSectionHeading" class="visually-hidden">Ask Your Docs</h1>
+  <p id="searchResultsMeta" class="visually-hidden">Ready.</p>
 
   <section id="search-section-ask" class="search-subsection">
     <section class="grounded-qa-card">
@@ -24,20 +19,55 @@
         </aside>
 
         <div class="qa-conversation">
-          <div class="chat-header-row">
+          <header class="chat-header-row">
             <div>
-              <p class="qa-eyebrow">Workspace</p>
-              <h2>Search and Ask Your Docs</h2>
+              <h2 id="searchAskThreadTitle">Ask Your Docs</h2>
+              <div class="chat-header-meta">
+                <span class="chat-model-dot" aria-hidden="true"></span>
+                <span id="searchAskModelLabel">Model not configured</span>
+                <span aria-hidden="true">·</span>
+                <span id="searchAskTokenUsage">0 tokens</span>
+              </div>
             </div>
-            <div class="chat-header-actions">
-              <span id="searchAskTokenUsage" class="chat-token-usage">Tokens: 0</span>
-            </div>
-          </div>
-          <div id="searchAskMessages" class="chat-messages" aria-live="polite">
-            <div class="chat-message chat-message-assistant">
-              <div class="chat-message-role">Paperwise</div>
-              <div class="chat-message-body markdown-output">Ask a question to begin.</div>
-            </div>
+          </header>
+          <div class="qa-conversation-body">
+            <section id="searchAskHints" class="ask-hints" aria-label="Suggested Ask Your Docs prompts">
+              <div class="ask-hints-mark" aria-hidden="true">P</div>
+              <h2>Ask anything that lives in your documents.</h2>
+              <p>Paperwise reads your OCR'd documents, your tags, types, correspondents, and dates — and grounds every answer in citations you can open.</p>
+              <div class="ask-hint-cards">
+                <button type="button" class="ask-hint-card" data-ask-hint="When did I last update my Experian dispute?">
+                  <span class="ask-hint-icon" aria-hidden="true">⌕</span>
+                  <span>
+                    <strong>Find specific evidence</strong>
+                    <small>"When did I last update my Experian dispute?"</small>
+                  </span>
+                  <span class="ask-hint-arrow" aria-hidden="true">›</span>
+                </button>
+                <button type="button" class="ask-hint-card" data-ask-hint="Compare PG&E bills for Jan, Feb, Mar 2026.">
+                  <span class="ask-hint-icon" aria-hidden="true">▦</span>
+                  <span>
+                    <strong>Compare across documents</strong>
+                    <small>"Compare PG&amp;E bills for Jan, Feb, Mar 2026."</small>
+                  </span>
+                  <span class="ask-hint-arrow" aria-hidden="true">›</span>
+                </button>
+                <button type="button" class="ask-hint-card" data-ask-hint="Summarize my medical bills from Q1 by provider and total amount.">
+                  <span class="ask-hint-icon" aria-hidden="true">≡</span>
+                  <span>
+                    <strong>Summarize a topic</strong>
+                    <small>"Summarize my medical bills from Q1 by provider."</small>
+                  </span>
+                  <span class="ask-hint-arrow" aria-hidden="true">›</span>
+                </button>
+              </div>
+              <div class="ask-hint-chips" aria-label="Quick prompts">
+                <button type="button" data-ask-hint="Show the most recent document for each tag.">Most recent doc per tag</button>
+                <button type="button" data-ask-hint="Find PG&E documents from 2026.">PG&amp;E docs · 2026</button>
+                <button type="button" data-ask-hint="Total medical bills for Q1.">Total medical bills · Q1</button>
+              </div>
+            </section>
+            <div id="searchAskMessages" class="chat-messages" aria-live="polite"></div>
           </div>
           <form id="searchAskForm" class="chat-composer">
             <textarea
