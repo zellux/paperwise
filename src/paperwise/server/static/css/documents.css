@@ -1032,10 +1032,13 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  width: 100%;
-  padding: 0;
+  width: calc(100% + 32px);
+  min-height: 46px;
+  margin: -14px -16px 0;
+  padding: 0 16px;
   background: transparent;
   border: 0;
+  border-radius: 12px 12px 0 0;
   color: var(--ink-soft);
   cursor: pointer;
   font-family: var(--mono);
@@ -1045,6 +1048,7 @@
 }
 
 .card-collapse:hover {
+  background: color-mix(in srgb, var(--accent) 5%, transparent);
   color: var(--ink);
 }
 
