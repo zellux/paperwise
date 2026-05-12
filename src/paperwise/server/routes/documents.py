@@ -27,6 +27,7 @@ from paperwise.server.schemas.documents import (
     DocumentHistoryEventResponse,
     DocumentListItemResponse,
     DocumentResponse,
+    DocumentStarredRequest,
     DocumentTypeStatResponse,
     LLMConnectionTestResponse,
     LLMParseResultResponse,
@@ -227,6 +228,7 @@ def list_documents_endpoint(
     correspondent: list[str] | None = Query(None),
     document_type: list[str] | None = Query(None),
     status: list[str] | None = Query(None),
+    starred: bool = Query(False),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentListItemResponse]:
@@ -238,6 +240,7 @@ def list_documents_endpoint(
         correspondent=correspondent,
         document_type=document_type,
         status=status,
+        starred=starred,
         sort_by=sort_by,
         sort_dir=sort_dir,
         limit=limit,
@@ -256,6 +259,7 @@ def count_documents_endpoint(
     correspondent: list[str] | None = Query(None),
     document_type: list[str] | None = Query(None),
     status: list[str] | None = Query(None),
+    starred: bool = Query(False),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> CountResponse:
@@ -268,6 +272,7 @@ def count_documents_endpoint(
             correspondent=correspondent,
             document_type=document_type,
             status=status,
+            starred=starred,
         )
     )
 
@@ -402,6 +407,27 @@ def get_document_detail_endpoint(
         document=document,
         llm_result=llm_result,
         parse_result=parse_result,
+    )
+
+
+@router.patch("/{document_id}/starred", response_model=DocumentDetailResponse)
+def update_document_starred_endpoint(
+    document_id: str,
+    payload: DocumentStarredRequest,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> DocumentDetailResponse:
+    document = get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
+    document.starred = bool(payload.starred)
+    repository.save(document)
+    return present_document_detail(
+        document=document,
+        llm_result=repository.get_llm_parse_result(document.id),
+        parse_result=repository.get_parse_result(document.id),
     )
 
 

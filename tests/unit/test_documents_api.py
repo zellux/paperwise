@@ -995,6 +995,53 @@ def test_list_documents_supports_metadata_filters() -> None:
         app.dependency_overrides.clear()
 
 
+def test_update_document_starred_and_filter_starred_documents() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeLLMProvider()
+
+    try:
+        client = TestClient(app)
+        first_response = client.post(
+            "/documents",
+            data={"owner_id": "user-starred"},
+            files={"file": ("first.pdf", b"%PDF-1.7\nfirst", "application/pdf")},
+        )
+        second_response = client.post(
+            "/documents",
+            data={"owner_id": "user-starred"},
+            files={"file": ("second.pdf", b"%PDF-1.7\nsecond", "application/pdf")},
+        )
+        assert first_response.status_code == 201
+        assert second_response.status_code == 201
+        first_id = first_response.json()["id"]
+        second_id = second_response.json()["id"]
+
+        star_response = client.patch(f"/documents/{first_id}/starred", json={"starred": True})
+        assert star_response.status_code == 200
+        assert star_response.json()["document"]["starred"] is True
+        assert repository.get(first_id).starred is True
+
+        starred_response = client.get("/documents?starred=true")
+        assert starred_response.status_code == 200
+        starred_ids = {item["id"] for item in starred_response.json()}
+        assert starred_ids == {first_id}
+        assert second_id not in starred_ids
+
+        unstar_response = client.patch(f"/documents/{first_id}/starred", json={"starred": False})
+        assert unstar_response.status_code == 200
+        assert unstar_response.json()["document"]["starred"] is False
+        assert client.get("/documents?starred=true").json() == []
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_list_pending_documents_excludes_ready() -> None:
     store_dir = Path("local/test-object-store")
     repository = InMemoryDocumentRepository()

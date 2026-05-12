@@ -26,4 +26,5 @@ def document_from_row(row: DocumentRow) -> Document:
         size_bytes=row.size_bytes,
         status=coerce_document_status(row.status),
         created_at=row.created_at,
+        starred=bool(getattr(row, "starred", False)),
     )

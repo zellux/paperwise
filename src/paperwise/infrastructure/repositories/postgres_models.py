@@ -1,4 +1,4 @@
-from sqlalchemy import JSON, DateTime, Integer, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Integer, String, Text, text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from paperwise.infrastructure.db import Base
@@ -16,6 +16,7 @@ class DocumentRow(Base):
     size_bytes: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(32), index=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True))
+    starred: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"), default=False)
 
 
 class ParseResultRow(Base):

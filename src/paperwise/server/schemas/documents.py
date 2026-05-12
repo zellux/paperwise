@@ -12,6 +12,10 @@ class MetadataUpdateRequest(BaseModel):
     tags: list[str]
 
 
+class DocumentStarredRequest(BaseModel):
+    starred: bool
+
+
 class LLMConnectionTestRequest(BaseModel):
     task: str | None = None
     connection_name: str | None = None
@@ -39,6 +43,7 @@ class DocumentResponse(BaseModel):
     size_bytes: int
     status: str
     created_at: datetime
+    starred: bool = False
 
 
 class DocumentListMetadata(BaseModel):

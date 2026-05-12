@@ -37,6 +37,7 @@ class Document:
     size_bytes: int
     status: DocumentStatus
     created_at: datetime
+    starred: bool = False
 
 
 @dataclass(slots=True)

@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from pathlib import Path
+import sqlite3
 
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
@@ -143,3 +144,33 @@ def test_count_owner_documents_by_statuses_is_owner_scoped() -> None:
     )
 
     assert count == 1
+
+
+def test_postgres_repository_adds_starred_column_to_existing_documents_table(tmp_path: Path) -> None:
+    db_path = tmp_path / "paperwise-existing.db"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE documents (
+                id VARCHAR(64) PRIMARY KEY,
+                filename VARCHAR(1024),
+                owner_id VARCHAR(256),
+                blob_uri TEXT,
+                checksum_sha256 VARCHAR(64),
+                content_type VARCHAR(256),
+                size_bytes INTEGER,
+                status VARCHAR(32),
+                created_at DATETIME
+            )
+            """
+        )
+        connection.commit()
+
+    repository = PostgresDocumentRepository(f"sqlite:///{db_path}")
+    document = _document("star-migration", "owner-star")
+    document.starred = True
+    repository.save(document)
+
+    loaded = repository.get("star-migration")
+    assert loaded is not None
+    assert loaded.starred is True

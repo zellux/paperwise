@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, inspect, select, text
 
 from paperwise.application.interfaces import DocumentRepository
 from paperwise.domain.models import (
@@ -51,7 +51,21 @@ class PostgresDocumentRepository(
     def __init__(self, database_url: str) -> None:
         self._engine = build_engine(database_url)
         Base.metadata.create_all(self._engine)
+        self._ensure_document_schema()
         self._session_factory: Callable = build_session_factory(self._engine)
+
+    def _ensure_document_schema(self) -> None:
+        inspector = inspect(self._engine)
+        if "documents" not in inspector.get_table_names():
+            return
+        column_names = {column["name"] for column in inspector.get_columns("documents")}
+        if "starred" in column_names:
+            return
+        default_value = "0" if self._engine.dialect.name == "sqlite" else "false"
+        with self._engine.begin() as connection:
+            connection.execute(
+                text(f"ALTER TABLE documents ADD COLUMN starred BOOLEAN NOT NULL DEFAULT {default_value}")
+            )
 
     def save(self, document: Document) -> None:
         with self._session_factory() as session:
@@ -67,6 +81,7 @@ class PostgresDocumentRepository(
             row.size_bytes = document.size_bytes
             row.status = document.status.value
             row.created_at = document.created_at
+            row.starred = bool(document.starred)
             session.commit()
 
     def get(self, document_id: str) -> Document | None:

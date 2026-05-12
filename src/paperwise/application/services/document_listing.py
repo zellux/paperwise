@@ -56,6 +56,7 @@ def list_filtered_documents(
     correspondent: list[str] | None,
     document_type: list[str] | None,
     status: list[str] | None,
+    starred: bool | None = None,
     sort_by: str | None = None,
     sort_dir: str | None = None,
     limit: int,
@@ -74,6 +75,7 @@ def list_filtered_documents(
         not normalized_tags
         and not normalized_correspondents
         and not normalized_document_types
+        and starred is not True
         and not _normalized_text_query(query)
         and not (sort_field and sort_direction)
     ):
@@ -101,6 +103,7 @@ def list_filtered_documents(
             normalized_correspondents=normalized_correspondents,
             normalized_document_types=normalized_document_types,
             normalized_statuses=normalized_statuses,
+            starred=starred,
         )
     )
     if sort_field and sort_direction:
@@ -123,6 +126,7 @@ def count_filtered_documents(
     correspondent: list[str] | None,
     document_type: list[str] | None,
     status: list[str] | None,
+    starred: bool | None = None,
 ) -> int:
     return list_filtered_documents(
         repository=repository,
@@ -132,6 +136,7 @@ def count_filtered_documents(
         correspondent=correspondent,
         document_type=document_type,
         status=status,
+        starred=starred,
         limit=0,
     ).total
 
@@ -145,6 +150,7 @@ def iter_filtered_documents(
     normalized_correspondents: set[str],
     normalized_document_types: set[str],
     normalized_statuses: set[str],
+    starred: bool | None,
 ) -> Iterator[tuple[Document, LLMParseResult | None]]:
     batch_size = 1000
     scan_offset = 0
@@ -166,6 +172,7 @@ def iter_filtered_documents(
                 normalized_correspondents=normalized_correspondents,
                 normalized_document_types=normalized_document_types,
                 normalized_statuses=normalized_statuses,
+                starred=starred,
                 query=query,
             ):
                 continue
@@ -243,8 +250,11 @@ def _matches_document_filters(
     normalized_correspondents: set[str],
     normalized_document_types: set[str],
     normalized_statuses: set[str],
+    starred: bool | None,
     query: str | None,
 ) -> bool:
+    if starred is True and not document.starred:
+        return False
     if normalized_statuses and normalize_name(document.status.value) not in normalized_statuses:
         return False
     if normalized_tags:
