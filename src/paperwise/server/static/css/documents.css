@@ -591,6 +591,14 @@
   padding: 14px 16px;
 }
 
+#systemInformation {
+  padding-bottom: 2px;
+}
+
+#systemInformation:has(.card-collapse[aria-expanded="true"]) {
+  padding-bottom: 14px;
+}
+
 .card-head {
   display: flex;
   align-items: center;
