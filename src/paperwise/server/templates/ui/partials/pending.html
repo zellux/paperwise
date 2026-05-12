@@ -19,7 +19,7 @@
       <a class="docs-side-row active" href="/ui/pending">
         <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18"/><path d="M5 7l1 12h12l1-12"/><path d="M9 11h6"/></svg>
         <span>Processing</span>
-        <span class="docs-side-count{% if documents_processing_count > 0 %} accent{% endif %}">{{ documents_processing_count|format_number }}</span>
+        <span id="pendingProcessingSideCount" class="docs-side-count{% if documents_processing_count > 0 %} accent{% endif %}">{{ documents_processing_count|format_number }}</span>
       </a>
       <a class="docs-side-row" href="/ui/documents?status=failed">
         <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
@@ -50,7 +50,7 @@
       </div>
     </header>
 
-    <div class="pagination-toolbar docs-list-toolbar pending-list-toolbar">
+    <div id="pendingSummaryToolbar" class="pagination-toolbar docs-list-toolbar pending-list-toolbar">
       <div class="docs-summary">
         {% if documents_processing_count > 0 %}
         <span class="docs-total-label">Processing documents: {{ documents_processing_count|format_number }}</span>

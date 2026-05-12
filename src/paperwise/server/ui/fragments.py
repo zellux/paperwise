@@ -448,6 +448,19 @@ def pending_rows_html(documents: list[dict]) -> str:
         raw_filename = str(item.get("filename") or "Untitled document")
         filename = escape(raw_filename)
         status_html = _status_badge_html(str(item.get("status") or ""))
+        stage = item.get("processing_stage") if isinstance(item.get("processing_stage"), dict) else {}
+        stage_label = escape(str(stage.get("label") or "Processing"))
+        stage_key = escape(str(stage.get("key") or "processing"), quote=True)
+        try:
+            stage_progress = max(0, min(100, int(stage.get("progress") or 0)))
+        except (TypeError, ValueError):
+            stage_progress = 0
+        progress_html = (
+            '<span class="pending-stage">'
+            f'<span class="pending-stage-row"><span>{stage_label}</span><span>{stage_progress}%</span></span>'
+            f'<span class="pending-stage-track" data-stage="{stage_key}">'
+            f'<span style="width: {stage_progress}%"></span></span></span>'
+        )
         created_at = escape(_short_date(str(item.get("created_at") or "-")))
         size = escape(_format_document_size(item.get("size_bytes")))
         content_type = escape(str(item.get("content_type") or "-"))
@@ -469,7 +482,7 @@ def pending_rows_html(documents: list[dict]) -> str:
             "</span>"
             f'<span class="title-meta"><span class="filename">{filename}</span></span>'
             "</span></td>"
-            f'<td class="td td-status" data-label="Status">{status_html}</td>'
+            f'<td class="td td-status" data-label="Status">{status_html}{progress_html}</td>'
             f'<td class="td td-date-size" data-label="Queued"><span>{created_at}</span></td>'
             f'<td class="td td-file" data-label="File"><span>{size}</span><span class="td-meta">{content_type}</span></td>'
             '<td class="td td-actions" data-label="Action"><div class="table-actions">'
@@ -481,6 +494,70 @@ def pending_rows_html(documents: list[dict]) -> str:
             "</tr>"
         )
     return "\n".join(rows)
+
+
+def processing_strip_html(documents: list[dict], *, processing_count: int) -> str:
+    normalized_count = max(0, int(processing_count or 0))
+    if normalized_count <= 0:
+        return ""
+    items: list[dict[str, object]] = []
+    for item in documents[:3]:
+        if not isinstance(item, dict):
+            continue
+        stage = item.get("processing_stage") if isinstance(item.get("processing_stage"), dict) else {}
+        filename = str(item.get("filename") or item.get("id") or "").strip()
+        if not filename:
+            continue
+        try:
+            progress = max(0, min(100, int(stage.get("progress") or 0)))
+        except (TypeError, ValueError):
+            progress = 0
+        items.append(
+            {
+                "filename": filename,
+                "stage_label": str(stage.get("label") or "Processing"),
+                "stage_key": str(stage.get("key") or "processing"),
+                "stage_progress": progress,
+            }
+        )
+    if not items:
+        items.append(
+            {
+                "filename": f"{normalized_count:,} document{'s' if normalized_count != 1 else ''}",
+                "stage_label": "Processing",
+                "stage_key": "processing",
+                "stage_progress": 25,
+            }
+        )
+    plural = "s" if normalized_count != 1 else ""
+    files_html = "".join(f"<span>{escape(str(item['filename']))}</span>" for item in items)
+    progress_rows = "".join(
+        '<div class="inflight-progress-row">'
+        f"<span>{escape(str(item['stage_label']))}</span>"
+        f'<span class="inflight-progress-track" data-stage="{escape(str(item["stage_key"]), quote=True)}">'
+        f'<span style="width: {int(item["stage_progress"])}%"></span></span>'
+        "</div>"
+        for item in items
+    )
+    return (
+        '<div class="inflight-strip" data-processing-count="'
+        f'{normalized_count}">'
+        '<div class="inflight-copy">'
+        '<div class="inflight-head">'
+        '<span class="inflight-spin" aria-hidden="true"><span></span></span>'
+        f'<a class="inflight-title" href="/ui/pending">{normalized_count:,} document{plural} processing</a>'
+        "</div>"
+        f'<div class="inflight-files">{files_html}</div>'
+        "</div>"
+        '<div class="inflight-progress" aria-label="Processing stages">'
+        f"{progress_rows}"
+        "</div>"
+        '<a class="inflight-close" href="/ui/pending" aria-label="View processing queue">'
+        '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></a>'
+        "</div>"
+    )
 
 
 def document_rows_html(documents: list[dict]) -> str:
@@ -661,6 +738,10 @@ def documents_partial_html(data: dict) -> str:
                 processing_count=data["documents_processing_count"],
                 page=data["documents_page"],
                 page_size=data["documents_page_size"],
+            ),
+            "docsInflightRegion": processing_strip_html(
+                data.get("pending_documents") if isinstance(data.get("pending_documents"), list) else [],
+                processing_count=data["documents_processing_count"],
             ),
         },
         data_attrs={

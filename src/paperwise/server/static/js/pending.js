@@ -1,6 +1,8 @@
 import {
   apiFetch,
+  applyHtmlPartialTarget,
   applyTableBodyPartial,
+  fetchHtmlPartial,
   loadTablePartial,
 } from "paperwise/shared";
 import {
@@ -10,11 +12,14 @@ import {
 let pendingDocsRequestSeq = 0;
 let initialPendingHydrated = false;
 let pendingEventsBound = false;
+let pendingPollTimer = 0;
 
 function getPendingElements() {
   return {
     restartPendingBtn: document.getElementById("restartPendingBtn"),
     pendingTableBody: document.getElementById("pendingTableBody"),
+    pendingSummaryToolbar: document.getElementById("pendingSummaryToolbar"),
+    pendingProcessingSideCount: document.getElementById("pendingProcessingSideCount"),
   };
 }
 
@@ -40,22 +45,55 @@ function getVisiblePendingRowCount() {
 }
 
 function applyPendingPartial(payload) {
-  const { pendingTableBody } = getPendingElements();
+  const { pendingTableBody, pendingSummaryToolbar } = getPendingElements();
   applyTableBodyPartial(pendingTableBody, payload);
+  applyHtmlPartialTarget(pendingSummaryToolbar, payload);
+  setPendingProcessingCount(Number(payload.dataset.processingCount || 0));
   setRestartPendingButtonEnabled(payload.dataset.hasRestartablePendingDocuments === "true");
 }
 
-async function loadPendingDocuments() {
+function setPendingProcessingCount(count) {
+  const normalizedCount = Math.max(0, Number(count || 0));
+  const { pendingProcessingSideCount } = getPendingElements();
+  if (pendingProcessingSideCount) {
+    pendingProcessingSideCount.textContent = normalizedCount.toLocaleString();
+    pendingProcessingSideCount.classList.toggle("accent", normalizedCount > 0);
+  }
+  syncPendingPolling(normalizedCount);
+}
+
+function syncPendingPolling(processingCount) {
+  const shouldPoll = processingCount > 0 && document.getElementById("pendingTableBody");
+  if (!shouldPoll) {
+    if (pendingPollTimer) {
+      window.clearInterval(pendingPollTimer);
+      pendingPollTimer = 0;
+    }
+    return;
+  }
+  if (pendingPollTimer) {
+    return;
+  }
+  pendingPollTimer = window.setInterval(() => {
+    void loadPendingDocuments({ showLoading: false, logResult: false });
+  }, 2000);
+}
+
+async function loadPendingDocuments({ showLoading = true, logResult = true } = {}) {
   const { pendingTableBody } = getPendingElements();
   const requestSeq = ++pendingDocsRequestSeq;
   let payload;
   try {
-    payload = await loadTablePartial({
-      url: "/ui/partials/pending",
-      tbody: pendingTableBody,
-      loadingColspan: 5,
-      loadingMessage: "Loading pending documents...",
-    });
+    if (showLoading) {
+      payload = await loadTablePartial({
+        url: "/ui/partials/pending",
+        tbody: pendingTableBody,
+        loadingColspan: 5,
+        loadingMessage: "Loading pending documents...",
+      });
+    } else {
+      payload = await fetchHtmlPartial("/ui/partials/pending");
+    }
   } catch (error) {
     // Keep restart enabled if the UI still has visible pending rows.
     setRestartPendingButtonEnabled(getVisiblePendingRowCount() > 0);
@@ -66,7 +104,9 @@ async function loadPendingDocuments() {
     return;
   }
   applyPendingPartial(payload);
-  logActivity(`Loaded ${Number(payload.dataset.pendingCount || 0)} pending document(s)`);
+  if (logResult) {
+    logActivity(`Loaded ${Number(payload.dataset.pendingCount || 0)} pending document(s)`);
+  }
 }
 
 function hydrateInitialPendingData(initialData) {
@@ -82,6 +122,7 @@ function hydrateInitialPendingData(initialData) {
   setRestartPendingButtonEnabled(
     initialData.pending_documents.some((doc) => isRestartablePendingDocument(doc))
   );
+  setPendingProcessingCount(Number(initialData.documents_processing_count || 0));
   logActivity(`Loaded ${initialData.pending_documents.length} pending document(s)`);
   initialPendingHydrated = true;
   return true;

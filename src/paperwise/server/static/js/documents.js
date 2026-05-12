@@ -2,6 +2,7 @@ import {
   apiFetch,
   applyHtmlPartialTarget,
   applyTableBodyPartial,
+  fetchHtmlPartial,
   loadTablePartial,
 } from "paperwise/shared";
 import {
@@ -57,6 +58,7 @@ let docsTotalCount = 0;
 let docsListRequestSeq = 0;
 let initialDocumentsHydrated = false;
 let documentsEventsBound = false;
+let documentsProcessingPollTimer = 0;
 let activeBulkEditMode = "";
 let clippedTagResizeTimer = 0;
 const selectedDocIds = new Set();
@@ -94,6 +96,10 @@ export function clearSessionState() {
   docsTotalCount = 0;
   docsListRequestSeq = 0;
   docsFilterNavigateTimer = 0;
+  if (documentsProcessingPollTimer) {
+    window.clearInterval(documentsProcessingPollTimer);
+    documentsProcessingPollTimer = 0;
+  }
   selectedDocIds.clear();
   renderDocSelectionState();
 }
@@ -570,13 +576,43 @@ function applyFiltersFromControls() {
 function applyDocumentsPartial(payload) {
   const docsTableBody = document.getElementById("docsTableBody");
   const documentsPaginationToolbar = document.getElementById("documentsPaginationToolbar");
+  const docsInflightRegion = document.getElementById("docsInflightRegion");
   applyTableBodyPartial(docsTableBody, payload);
   applyHtmlPartialTarget(documentsPaginationToolbar, payload);
+  applyHtmlPartialTarget(docsInflightRegion, payload);
   docsTotalCount = Number(payload.dataset.documentsTotal || 0);
   docsPage = Math.max(1, Number(payload.dataset.documentsPage || docsPage || 1));
   appState.docsPageSize = normalizePageSize(payload.dataset.documentsPageSize || appState.docsPageSize);
+  setDocumentsProcessingCount(Number(payload.dataset.documentsProcessingCount || 0));
   syncSelectionToVisibleRows();
   refreshClippedTagTooltips(docsTableBody);
+}
+
+function setDocumentsProcessingCount(count) {
+  const normalizedCount = Math.max(0, Number(count || 0));
+  const sideCount = document.getElementById("docsProcessingSideCount");
+  if (sideCount) {
+    sideCount.textContent = normalizedCount.toLocaleString();
+    sideCount.classList.toggle("accent", normalizedCount > 0);
+  }
+  syncDocumentsProcessingPoll(normalizedCount);
+}
+
+function syncDocumentsProcessingPoll(processingCount) {
+  const shouldPoll = processingCount > 0 && document.getElementById("docsTableBody");
+  if (!shouldPoll) {
+    if (documentsProcessingPollTimer) {
+      window.clearInterval(documentsProcessingPollTimer);
+      documentsProcessingPollTimer = 0;
+    }
+    return;
+  }
+  if (documentsProcessingPollTimer) {
+    return;
+  }
+  documentsProcessingPollTimer = window.setInterval(() => {
+    void loadDocumentsList({ showLoading: false, logResult: false });
+  }, 2000);
 }
 
 function getVisibleDocRows() {
@@ -1146,7 +1182,7 @@ export async function refreshDocumentListAfterDelete() {
   await initializeCurrentPageData();
 }
 
-async function loadDocumentsList() {
+async function loadDocumentsList({ showLoading = true, logResult = true } = {}) {
   const requestSeq = ++docsListRequestSeq;
   const docsTableBody = document.getElementById("docsTableBody");
   renderSortHeaders();
@@ -1179,12 +1215,16 @@ async function loadDocumentsList() {
 
   let payload;
   try {
-    payload = await loadTablePartial({
-      url: `/ui/partials/documents?${query.toString()}`,
-      tbody: docsTableBody,
-      loadingColspan: 7,
-      loadingMessage: "Loading documents...",
-    });
+    if (showLoading) {
+      payload = await loadTablePartial({
+        url: `/ui/partials/documents?${query.toString()}`,
+        tbody: docsTableBody,
+        loadingColspan: 7,
+        loadingMessage: "Loading documents...",
+      });
+    } else {
+      payload = await fetchHtmlPartial(`/ui/partials/documents?${query.toString()}`);
+    }
   } catch (error) {
     logActivity(`Document list failed: ${error.message}`);
     return;
@@ -1193,7 +1233,9 @@ async function loadDocumentsList() {
     return;
   }
   applyDocumentsPartial(payload);
-  logActivity(`Loaded ${Number(payload.dataset.documentsReturned || 0)} document(s) of ${docsTotalCount} total`);
+  if (logResult) {
+    logActivity(`Loaded ${Number(payload.dataset.documentsReturned || 0)} document(s) of ${docsTotalCount} total`);
+  }
 }
 
 function hydrateInitialDocumentsData(initialData) {
@@ -1216,6 +1258,7 @@ function hydrateInitialDocumentsData(initialData) {
   }
   syncSelectionToVisibleRows();
   refreshClippedTagTooltips();
+  setDocumentsProcessingCount(Number(initialData.documents_processing_count || 0));
   logActivity(`Loaded ${initialData.documents.length} document(s) of ${docsTotalCount} total`);
   initialDocumentsHydrated = true;
   return true;

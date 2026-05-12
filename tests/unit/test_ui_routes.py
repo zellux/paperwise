@@ -638,6 +638,22 @@ def test_static_assets_serve_upload_progress_ui() -> None:
     assert ".upload-progress" in upload_css.text
 
 
+def test_static_assets_poll_processing_state_without_page_refresh() -> None:
+    client = TestClient(app)
+
+    documents_js = client.get("/static/js/documents.js")
+    assert documents_js.status_code == 200
+    assert "docsInflightRegion" in documents_js.text
+    assert "documentsProcessingPollTimer" in documents_js.text
+    assert "loadDocumentsList({ showLoading: false, logResult: false })" in documents_js.text
+
+    pending_js = client.get("/static/js/pending.js")
+    assert pending_js.status_code == 200
+    assert "pendingPollTimer" in pending_js.text
+    assert "loadPendingDocuments({ showLoading: false, logResult: false })" in pending_js.text
+    assert "pendingSummaryToolbar" in pending_js.text
+
+
 def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository
@@ -1000,6 +1016,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             "key": "ocr",
         }
         assert "Processing: 1" in documents_with_pending_html
+        assert 'id="docsInflightRegion"' in documents_with_pending_html
         assert 'class="inflight-strip"' in documents_with_pending_html
         assert '<div class="inflight-progress-row">' in documents_with_pending_html
         assert "OCR" in documents_with_pending_html
@@ -1041,6 +1058,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'data-documents-returned="1"' in documents_partial.text
         assert '<template data-partial-target="docsTableBody">' in documents_partial.text
         assert '<template data-partial-target="documentsPaginationToolbar">' in documents_partial.text
+        assert '<template data-partial-target="docsInflightRegion">' in documents_partial.text
         assert 'data-doc-id="' in documents_partial.text
         assert '<a class="row-act" href="/ui/document?id=' in documents_partial.text
         assert "Total documents: 4" in documents_partial.text
@@ -1080,11 +1098,14 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert pending_partial.status_code == 200
         assert "text/html" in pending_partial.headers["content-type"]
         assert 'data-pending-count="2"' in pending_partial.text
+        assert 'data-processing-count="1"' in pending_partial.text
         assert 'data-has-restartable-pending-documents="true"' in pending_partial.text
         assert '<template data-partial-target="pendingTableBody">' in pending_partial.text
+        assert '<template data-partial-target="pendingSummaryToolbar">' in pending_partial.text
         assert 'data-pending-doc-id="doc-failed"' in pending_partial.text
         assert 'data-pending-doc-id="doc-pending"' in pending_partial.text
         assert '<tr class="doc-row pending-row" data-pending-doc-id="doc-pending">' in pending_partial.text
+        assert 'class="pending-stage-track" data-stage="ocr"' in pending_partial.text
 
         document_partial = client.get("/ui/partials/document?id=doc-tax")
         assert document_partial.status_code == 200

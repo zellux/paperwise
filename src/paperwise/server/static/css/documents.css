@@ -1766,12 +1766,53 @@
 
 .pending-design-table .td-status {
   align-items: center;
+  gap: 7px;
 }
 
 .pending-design-table .td-file {
   display: grid !important;
   gap: 2px;
   align-content: center;
+}
+
+.pending-stage {
+  display: grid;
+  gap: 4px;
+  width: min(100%, 112px);
+}
+
+.pending-stage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  line-height: 1;
+}
+
+.pending-stage-track {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--stroke) 64%, transparent);
+  overflow: hidden;
+}
+
+.pending-stage-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.pending-stage-track[data-stage="failed"] span {
+  background: #8f2f2f;
+}
+
+.pending-stage-track[data-stage="queued"] span {
+  background: var(--ink-mute);
 }
 
 .pending-list-toolbar {

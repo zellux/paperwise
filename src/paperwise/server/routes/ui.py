@@ -36,6 +36,7 @@ from paperwise.server.ui.fragments import (
     pending_rows_html,
     table_body_partial_html,
     tag_rows_html,
+    ui_partial_fragment_html,
 )
 
 router = APIRouter(tags=["ui"])
@@ -313,12 +314,27 @@ def pending_partial(
     current_user: User = Depends(current_user_dependency),
 ) -> HTMLResponse:
     pending_documents = build_pending_documents(repository, current_user)
+    processing_count = sum(
+        1
+        for document in pending_documents
+        if str(document.get("status") or "").strip().lower() in {"received", "processing"}
+    )
+    summary_html = (
+        '<div class="docs-summary">'
+        f'<span class="docs-total-label">Processing documents: {processing_count:,}</span>'
+        "</div>"
+        if processing_count > 0
+        else '<div class="docs-summary"></div>'
+    )
     return HTMLResponse(
-        table_body_partial_html(
-            target_id="pendingTableBody",
-            rows_html=pending_rows_html(pending_documents),
+        ui_partial_fragment_html(
+            templates={
+                "pendingTableBody": pending_rows_html(pending_documents),
+                "pendingSummaryToolbar": summary_html,
+            },
             data_attrs={
                 "pending_count": len(pending_documents),
+                "processing_count": processing_count,
                 "has_restartable_pending_documents": any(
                     str(document.get("status") or "").strip().lower()
                     not in {"", "ready"}
