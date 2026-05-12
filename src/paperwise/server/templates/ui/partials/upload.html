@@ -1,42 +1,99 @@
-<article id="section-upload" class="panel panel-section view">
-          <h2>Upload Documents</h2>
-          <form id="uploadForm" class="stack">
-            <label class="label" for="fileInput">Document and image files</label>
-            <div id="uploadDropzone" class="upload-dropzone" role="button" tabindex="0">
-              <p class="upload-dropzone-title">Drag and drop documents or images here</p>
-              <p id="uploadSelectionLabel" class="upload-dropzone-subtitle">
-                Supports: PDF, TXT, MD, DOCX, DOC, PNG, JPG, WEBP, GIF
-              </p>
-              <input
-                id="fileInput"
-                name="fileInput"
-                type="file"
-                accept=".pdf,.txt,.md,.markdown,.doc,.docx,.png,.jpg,.jpeg,.webp,.gif,text/plain,text/markdown,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp,image/gif,application/octet-stream"
-                multiple
-                required
-              />
-              <input
-                id="folderInput"
-                name="folderInput"
-                type="file"
-                webkitdirectory
-                directory
-                multiple
-                hidden
-                tabindex="-1"
-              />
-            </div>
+<article id="section-upload" class="documents-workbench view">
+  <aside class="docs-nav-panel" aria-label="Document collections">
+    <a class="docs-upload-primary active" href="/ui/upload">
+      <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <span>Upload documents</span>
+      <kbd>⌘U</kbd>
+    </a>
+    <nav class="docs-side-section">
+      <a class="docs-side-row" href="/ui/documents">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg>
+        <span>All documents</span>
+        <span class="docs-side-count">{{ documents_all_count|format_number }}</span>
+      </a>
+      <a class="docs-side-row" href="/ui/documents?starred=true">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.1 8.3 22 9.3 17 14.2 18.2 21 12 17.8 5.8 21 7 14.2 2 9.3 8.9 8.3 12 2"/></svg>
+        <span>Starred</span>
+        <span class="docs-side-count">{{ documents_starred_count|format_number }}</span>
+      </a>
+      <a class="docs-side-row" href="/ui/pending">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18"/><path d="M5 7l1 12h12l1-12"/><path d="M9 11h6"/></svg>
+        <span>Processing</span>
+        <span class="docs-side-count{% if documents_processing_count > 0 %} accent{% endif %}">{{ documents_processing_count|format_number }}</span>
+      </a>
+      <a class="docs-side-row" href="/ui/documents?status=failed">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
+        <span>Needs attention</span>
+        <span class="docs-side-count">{{ documents_failed_count|format_number }}</span>
+      </a>
+    </nav>
+  </aside>
 
-            <div class="actions">
-              <button id="uploadFolderBtn" type="button" class="btn btn-muted">Choose Folder</button>
-              <button id="uploadSubmitBtn" type="submit" class="btn btn-primary">Upload Selected Files</button>
-            </div>
-            <div id="uploadProgressWrap" class="upload-progress" hidden>
-              <div class="upload-progress-header">
-                <span class="upload-progress-label">Batch upload progress</span>
-                <span id="uploadProgressStatus" class="upload-progress-status">Ready.</span>
-              </div>
-              <progress id="uploadProgressBar" class="upload-progress-bar" value="0" max="1"></progress>
-            </div>
-          </form>
-        </article>
+  <section class="docs-main-panel upload-main-panel">
+    <header class="docs-page-head">
+      <div>
+        <h1>Upload documents</h1>
+      </div>
+      <div class="docs-head-actions">
+        <a class="btn btn-ghost" href="/ui/documents">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg>
+          <span>All documents</span>
+        </a>
+        <a class="btn btn-muted" href="/ui/pending">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18"/><path d="M5 7l1 12h12l1-12"/><path d="M9 11h6"/></svg>
+          <span>Processing</span>
+        </a>
+      </div>
+    </header>
+
+    <div class="upload-workspace">
+      <form id="uploadForm" class="upload-form">
+        <label class="upload-field-label" for="fileInput">Document and image files</label>
+        <div id="uploadDropzone" class="upload-dropzone" role="button" tabindex="0">
+          <svg class="upload-dropzone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <p class="upload-dropzone-title">Drag and drop documents or images here</p>
+          <p id="uploadSelectionLabel" class="upload-dropzone-subtitle">
+            Supports: PDF, TXT, MD, DOCX, DOC, PNG, JPG, WEBP, GIF
+          </p>
+          <input
+            id="fileInput"
+            name="fileInput"
+            type="file"
+            accept=".pdf,.txt,.md,.markdown,.doc,.docx,.png,.jpg,.jpeg,.webp,.gif,text/plain,text/markdown,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/png,image/jpeg,image/webp,image/gif,application/octet-stream"
+            multiple
+            required
+          />
+          <input
+            id="folderInput"
+            name="folderInput"
+            type="file"
+            webkitdirectory
+            directory
+            multiple
+            hidden
+            tabindex="-1"
+          />
+        </div>
+
+        <div class="upload-actions">
+          <button id="uploadFolderBtn" type="button" class="btn btn-muted">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg>
+            <span>Choose Folder</span>
+          </button>
+          <button id="uploadSubmitBtn" type="submit" class="btn btn-primary">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <span>Upload Selected Files</span>
+          </button>
+        </div>
+
+        <div id="uploadProgressWrap" class="upload-progress" hidden>
+          <div class="upload-progress-header">
+            <span class="upload-progress-label">Batch upload progress</span>
+            <span id="uploadProgressStatus" class="upload-progress-status">Ready.</span>
+          </div>
+          <progress id="uploadProgressBar" class="upload-progress-bar" value="0" max="1"></progress>
+        </div>
+      </form>
+    </div>
+  </section>
+</article>

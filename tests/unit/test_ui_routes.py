@@ -274,6 +274,18 @@ def test_ui_routes_render_active_nav_server_side() -> None:
         assert active_links == [active_href]
 
 
+def test_top_nav_links_upload_instead_of_processing() -> None:
+    client = TestClient(app)
+    response = client.get("/ui/upload")
+
+    assert response.status_code == 200
+    topnav_match = re.search(r'<nav class="topnav"[^>]*>.*?</nav>', response.text, re.S)
+    assert topnav_match is not None
+    topnav = topnav_match.group(0)
+    assert '<a class="topnav-link active" href="/ui/upload">Upload</a>' in topnav
+    assert 'href="/ui/pending">Processing</a>' not in topnav
+
+
 def test_ui_routes_load_page_specific_scripts() -> None:
     client = TestClient(app)
 
@@ -521,9 +533,12 @@ def test_upload_ui_includes_batch_progress_shell() -> None:
     response = client.get("/ui/upload")
 
     assert response.status_code == 200
-    assert 'id="section-upload"' in response.text
+    assert '<article id="section-upload" class="documents-workbench view">' in response.text
+    assert '<section class="docs-main-panel upload-main-panel">' in response.text
+    assert "<h1>Upload documents</h1>" in response.text
     assert 'id="section-search"' not in response.text
     assert 'id="section-docs"' not in response.text
+    assert 'class="docs-nav-panel"' in response.text
     assert 'id="uploadProgressWrap"' in response.text
     assert 'id="uploadProgressBar"' in response.text
     assert 'id="uploadProgressStatus"' in response.text

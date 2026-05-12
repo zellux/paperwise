@@ -363,6 +363,20 @@ def pending_initial_data(repository: DocumentsInitialDataRepository, current_use
     }
 
 
+def upload_initial_data(repository: DocumentsInitialDataRepository, current_user: User | None) -> dict:
+    initial_data = page_initial_data(current_user, repository)
+    initial_data.update(document_sidebar_data(repository, current_user))
+    if current_user is None:
+        return {**initial_data, "documents_processing_count": 0}
+    return {
+        **initial_data,
+        "documents_processing_count": repository.count_owner_documents_by_statuses(
+            owner_id=current_user.id,
+            statuses=ACTIVE_PROCESSING_DOCUMENT_STATUSES,
+        ),
+    }
+
+
 def document_detail_initial_data(
     repository: DocumentDetailInitialDataRepository,
     current_user: User | None,

@@ -25,6 +25,7 @@ from paperwise.server.ui.initial_data import (
     pending_initial_data,
     tag_stats as build_tag_stats,
     tag_stats_initial_data,
+    upload_initial_data,
 )
 from paperwise.server.ui.page import STATIC_DIR, render_ui_page
 from paperwise.server.ui.fragments import (
@@ -163,7 +164,7 @@ def upload_page(
     return render_ui_page(
         "section-upload",
         page_name="upload",
-        initial_data=page_initial_data(current_user, repository),
+        initial_data=upload_initial_data(repository, current_user),
     )
 
 
