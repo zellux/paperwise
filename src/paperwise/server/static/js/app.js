@@ -519,6 +519,10 @@ export function applyDocumentDetailPartial(partialRoot) {
   if (detailFilePreview instanceof HTMLIFrameElement && partialRoot?.dataset?.previewUrl) {
     detailFilePreview.src = partialRoot.dataset.previewUrl;
   }
+  const pageStrip = document.getElementById("pageStrip");
+  if (pageStrip instanceof HTMLElement && partialRoot?.dataset?.pageCount) {
+    pageStrip.dataset.pageCount = partialRoot.dataset.pageCount;
+  }
   document.dispatchEvent(new CustomEvent("paperwise:document-detail-updated"));
 }
 

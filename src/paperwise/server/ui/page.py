@@ -134,6 +134,8 @@ def _initial_render_context(initial_data: dict) -> dict:
         "document_detail_file_meta": fragments.get("file_meta", "-"),
         "document_detail_file_url": fragments.get("file_url", ""),
         "document_detail_preview_url": fragments.get("preview_url", ""),
+        "document_detail_page_count": fragments.get("page_count", 1),
+        "document_detail_page_thumbnails_html": fragments.get("page_thumbnails_html", ""),
         "document_detail_inputs": fragments["inputs"],
         "document_detail_status_html": fragments["html"].get("detailStatus", "-"),
         "document_detail_tags_html": fragments.get("tags_html", ""),

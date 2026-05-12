@@ -633,6 +633,37 @@ def _pdf_preview_url(value: object) -> str:
     return f"{url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH"
 
 
+def _normalize_detail_page_count(value: object) -> int:
+    try:
+        page_count = int(value or 0)
+    except (TypeError, ValueError):
+        page_count = 0
+    return max(1, page_count)
+
+
+def _document_page_thumbnails_html(page_count: int) -> str:
+    normalized_count = _normalize_detail_page_count(page_count)
+    lines = (
+        '<span class="strip-line" style="width: 70%"></span>'
+        '<span class="strip-line" style="width: 85%"></span>'
+        '<span class="strip-line" style="width: 60%"></span>'
+        '<span class="strip-line" style="width: 78%"></span>'
+        '<span class="strip-line" style="width: 55%"></span>'
+    )
+    items = []
+    for page_number in range(1, normalized_count + 1):
+        active = " active" if page_number == 1 else ""
+        current = ' aria-current="page"' if page_number == 1 else ""
+        items.append(
+            f'<button type="button" class="strip-thumb{active}" data-preview-page="{page_number}" '
+            f'aria-label="Go to page {page_number}"{current}>'
+            f'<span class="strip-thumb-page">{lines}</span>'
+            f'<span class="strip-num">{page_number}</span>'
+            "</button>"
+        )
+    return "\n".join(items)
+
+
 def _initials(value: str) -> str:
     words = [word for word in str(value or "").replace("_", " ").split() if word]
     if not words:
@@ -672,6 +703,7 @@ def document_detail_fragments(initial_data: dict) -> dict:
     document_date = str(metadata.get("document_date") or "")
     document_type = str(metadata.get("document_type") or "")
     content_type = str(document.get("content_type") or "-")
+    page_count = _normalize_detail_page_count(document.get("page_count"))
     size_label = _format_bytes(size_bytes)
     ocr_preview = str(detail.get("ocr_text_preview") or "").strip()
     ocr_parsed_at = str(detail.get("ocr_parsed_at") or "-")
@@ -704,10 +736,13 @@ def document_detail_fragments(initial_data: dict) -> dict:
             "detailChecksum": str(document.get("checksum_sha256") or "-"),
             "detailBlobUri": _relative_blob_path(str(document.get("blob_uri") or "")),
             "detailOcrContent": ocr_preview or "-",
+            "previewCurrentPage": "1",
+            "previewTotalPages": str(page_count),
         },
         "html": {
             "detailStatus": _status_badge_html(str(document.get("status") or "")),
             "detailTagPills": _document_detail_tags_html(tags),
+            "pageStrip": _document_page_thumbnails_html(page_count),
         },
         "inputs": {
             "metaTitle": title,
@@ -722,6 +757,8 @@ def document_detail_fragments(initial_data: dict) -> dict:
         "history_count_short": str(len(history)),
         "ocr_char_count": f"{len(ocr_preview):,}",
         "ocr_parsed_short": _short_date_label(ocr_parsed_at),
+        "page_count": page_count,
+        "page_thumbnails_html": _document_page_thumbnails_html(page_count),
         "correspondent_initials": _initials(correspondent or title),
         "history_html": _history_html(history),
     }
@@ -755,6 +792,7 @@ def document_detail_partial_html(initial_data: dict) -> str:
         "blob_uri": fragments.get("blob_uri", ""),
         "file_url": fragments.get("file_url", ""),
         "preview_url": fragments.get("preview_url", ""),
+        "page_count": str(fragments.get("page_count", 1)),
     }
     return (
         f'<div class="ui-partial-fragment"{_fragment_data_attrs(data_attrs)}>'

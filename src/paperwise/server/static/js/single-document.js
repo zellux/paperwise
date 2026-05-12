@@ -64,6 +64,12 @@ function getSingleDocumentElements() {
     detailOcrSearch: document.getElementById("detailOcrSearch"),
     detailOcrCopyBtn: document.getElementById("detailOcrCopyBtn"),
     detailFilename: document.getElementById("detailFilename"),
+    detailFilePreview: document.getElementById("detailFilePreview"),
+    pageStrip: document.getElementById("pageStrip"),
+    previewCurrentPage: document.getElementById("previewCurrentPage"),
+    previewTotalPages: document.getElementById("previewTotalPages"),
+    previewPrevPageBtn: document.getElementById("previewPrevPageBtn"),
+    previewNextPageBtn: document.getElementById("previewNextPageBtn"),
   };
 }
 
@@ -299,6 +305,89 @@ function bindSystemInformationToggle() {
   });
 }
 
+function getPreviewPageCount() {
+  const { pageStrip, previewTotalPages } = getSingleDocumentElements();
+  const rawCount = pageStrip instanceof HTMLElement
+    ? pageStrip.dataset.pageCount
+    : previewTotalPages?.textContent;
+  const pageCount = Number.parseInt(rawCount || "1", 10);
+  return Number.isFinite(pageCount) && pageCount > 0 ? pageCount : 1;
+}
+
+function previewUrlForPage(src, pageNumber) {
+  const source = String(src || "");
+  if (!source) {
+    return "";
+  }
+  const [base, hash = ""] = source.split("#");
+  const params = new URLSearchParams(hash);
+  params.set("page", String(pageNumber));
+  params.set("toolbar", "0");
+  params.set("navpanes", "0");
+  params.set("scrollbar", "0");
+  params.set("view", "FitH");
+  return `${base}#${params.toString()}`;
+}
+
+function setPreviewPage(pageNumber, options = {}) {
+  const {
+    detailFilePreview,
+    pageStrip,
+    previewCurrentPage,
+    previewPrevPageBtn,
+    previewNextPageBtn,
+  } = getSingleDocumentElements();
+  const pageCount = getPreviewPageCount();
+  const nextPage = Math.min(Math.max(1, Number.parseInt(String(pageNumber || 1), 10) || 1), pageCount);
+
+  if (previewCurrentPage instanceof HTMLElement) {
+    previewCurrentPage.textContent = String(nextPage);
+  }
+  if (previewPrevPageBtn instanceof HTMLButtonElement) {
+    previewPrevPageBtn.disabled = nextPage <= 1;
+  }
+  if (previewNextPageBtn instanceof HTMLButtonElement) {
+    previewNextPageBtn.disabled = nextPage >= pageCount;
+  }
+  pageStrip?.querySelectorAll("[data-preview-page]").forEach((candidate) => {
+    if (!(candidate instanceof HTMLElement)) {
+      return;
+    }
+    const active = Number.parseInt(candidate.dataset.previewPage || "1", 10) === nextPage;
+    candidate.classList.toggle("active", active);
+    if (active) {
+      candidate.setAttribute("aria-current", "page");
+      candidate.scrollIntoView({ block: "nearest" });
+    } else {
+      candidate.removeAttribute("aria-current");
+    }
+  });
+
+  if (options.updateFrame !== false && detailFilePreview instanceof HTMLIFrameElement) {
+    detailFilePreview.src = previewUrlForPage(detailFilePreview.getAttribute("src") || detailFilePreview.src, nextPage);
+  }
+}
+
+function bindPreviewPager() {
+  const { pageStrip, previewPrevPageBtn, previewNextPageBtn } = getSingleDocumentElements();
+  pageStrip?.addEventListener("click", (event) => {
+    const target = event.target instanceof Element ? event.target.closest("[data-preview-page]") : null;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    setPreviewPage(Number.parseInt(target.dataset.previewPage || "1", 10));
+  });
+  [previewPrevPageBtn, previewNextPageBtn].forEach((button) => {
+    button?.addEventListener("click", () => {
+      const { previewCurrentPage } = getSingleDocumentElements();
+      const currentPage = Number.parseInt(previewCurrentPage?.textContent || "1", 10) || 1;
+      const step = Number.parseInt(button.dataset.previewPageStep || "0", 10) || 0;
+      setPreviewPage(currentPage + step);
+    });
+  });
+  setPreviewPage(1, { updateFrame: false });
+}
+
 function bindSingleDocumentEvents() {
   if (singleDocumentEventsBound) {
     return;
@@ -407,9 +496,11 @@ function bindSingleDocumentEvents() {
   bindTagEditorEvents();
   bindOcrEvents();
   bindSystemInformationToggle();
+  bindPreviewPager();
   document.addEventListener("paperwise:document-detail-updated", () => {
     renderTagEditor();
     renderOcrText();
+    setPreviewPage(1, { updateFrame: false });
   });
 
   singleDocumentEventsBound = true;

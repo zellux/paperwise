@@ -599,7 +599,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
                 parser="test-parser",
                 status="success",
                 size_bytes=123,
-                page_count=1,
+                page_count=22,
                 text_preview="OCR preview for the tax notice.",
                 created_at=datetime(2026, 5, 2, 1, 2, 3, tzinfo=UTC),
             )
@@ -703,8 +703,15 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         detail_html = client.get("/ui/document?id=doc-tax").text
         detail_payload = _initial_data_from_response(detail_html)
         assert detail_payload["document_detail"]["document"]["id"] == "doc-tax"
+        assert detail_payload["document_detail"]["document"]["page_count"] == 22
         assert detail_payload["document_detail"]["ocr_text_preview"] == "OCR preview for the tax notice."
         assert detail_payload["document_history"][0]["id"] == "history-tax"
+        assert (
+            '<span class="pager-text">Page <span id="previewCurrentPage">1</span> / '
+            '<span id="previewTotalPages">22</span></span>'
+        ) in detail_html
+        assert 'data-page-count="22"' in detail_html
+        assert 'data-preview-page="22"' in detail_html
         assert '<code id="detailDocId" class="document-detail-value">doc-tax</code>' in detail_html
         assert re.search(r'<input\b[^>]*id="metaTitle"[^>]*value="Tax Notice"', detail_html)
         assert "OCR preview for the tax notice." in detail_html

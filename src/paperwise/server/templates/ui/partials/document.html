@@ -50,11 +50,11 @@
     <section class="doc-preview-panel">
       <div class="doc-preview-toolbar">
         <div class="preview-pager">
-          <button type="button" class="icon-btn" aria-label="Previous page">
+          <button id="previewPrevPageBtn" type="button" class="icon-btn" aria-label="Previous page" data-preview-page-step="-1" disabled>
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
-          <span class="pager-text">Page <span>1</span> / <span>1</span></span>
-          <button type="button" class="icon-btn" aria-label="Next page">
+          <span class="pager-text">Page <span id="previewCurrentPage">1</span> / <span id="previewTotalPages">{{ document_detail_page_count|default(1) }}</span></span>
+          <button id="previewNextPageBtn" type="button" class="icon-btn" aria-label="Next page" data-preview-page-step="1"{% if document_detail_page_count|default(1) <= 1 %} disabled{% endif %}>
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
@@ -73,17 +73,8 @@
         </div>
       </div>
       <div class="doc-preview-stage">
-        <aside class="page-strip" aria-label="Page thumbnails">
-          <button type="button" class="strip-thumb active" aria-label="Go to page 1">
-            <span class="strip-thumb-page">
-              <span class="strip-line" style="width: 70%"></span>
-              <span class="strip-line" style="width: 85%"></span>
-              <span class="strip-line" style="width: 60%"></span>
-              <span class="strip-line" style="width: 78%"></span>
-              <span class="strip-line" style="width: 55%"></span>
-            </span>
-            <span class="strip-num">1</span>
-          </button>
+        <aside id="pageStrip" class="page-strip" aria-label="Page thumbnails" data-page-count="{{ document_detail_page_count|default(1) }}">
+          {{ document_detail_page_thumbnails_html|safe }}
         </aside>
         <div class="page-canvas">
           <div class="pdf-preview-frame">

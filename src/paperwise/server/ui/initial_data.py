@@ -310,7 +310,7 @@ def document_detail_initial_data(
         current_user=current_user,
     )
     parse_result = repository.get_parse_result(document.id)
-    item = document_list_item(document, repository.get_llm_parse_result(document.id))
+    item = document_list_item(document, repository.get_llm_parse_result(document.id), parse_result)
     return {
         **initial_data,
         "document_detail": {
