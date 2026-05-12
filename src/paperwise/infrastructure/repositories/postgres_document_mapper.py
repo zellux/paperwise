@@ -7,7 +7,6 @@ def coerce_document_status(value: str) -> DocumentStatus:
         "parsing": DocumentStatus.PROCESSING,
         "parsed": DocumentStatus.PROCESSING,
         "enriching": DocumentStatus.PROCESSING,
-        "failed": DocumentStatus.PROCESSING,
     }
     normalized = (value or "").strip().lower()
     if normalized in legacy_map:

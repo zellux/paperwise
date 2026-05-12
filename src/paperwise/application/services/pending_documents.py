@@ -10,6 +10,10 @@ PENDING_DOCUMENT_STATUSES = {
     DocumentStatus.PROCESSING,
     DocumentStatus.FAILED,
 }
+ACTIVE_PROCESSING_DOCUMENT_STATUSES = {
+    DocumentStatus.RECEIVED,
+    DocumentStatus.PROCESSING,
+}
 
 
 class PendingDocumentRepository(DocumentStore, HistoryRepository, Protocol):

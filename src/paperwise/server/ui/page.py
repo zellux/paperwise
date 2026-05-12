@@ -109,6 +109,41 @@ def render_ui_page(
     )
 
 
+def _processing_filenames(documents: object, *, limit: int = 3) -> list[str]:
+    if not isinstance(documents, list):
+        return []
+    filenames: list[str] = []
+    for item in documents[:limit]:
+        if not isinstance(item, dict):
+            continue
+        filename = str(item.get("filename") or item.get("id") or "").strip()
+        if filename:
+            filenames.append(filename)
+    return filenames
+
+
+def _processing_items(documents: object, *, limit: int = 3) -> list[dict[str, object]]:
+    if not isinstance(documents, list):
+        return []
+    items: list[dict[str, object]] = []
+    for item in documents[:limit]:
+        if not isinstance(item, dict):
+            continue
+        stage = item.get("processing_stage") if isinstance(item.get("processing_stage"), dict) else {}
+        filename = str(item.get("filename") or item.get("id") or "").strip()
+        if not filename:
+            continue
+        items.append(
+            {
+                "filename": filename,
+                "stage_label": str(stage.get("label") or "Processing"),
+                "stage_key": str(stage.get("key") or "processing"),
+                "stage_progress": max(0, min(100, int(stage.get("progress") or 0))),
+            }
+        )
+    return items
+
+
 def _grounded_qa_model_label(initial_data: dict) -> str:
     preferences = initial_data.get("user_preferences")
     if not isinstance(preferences, dict):
@@ -196,6 +231,9 @@ def _initial_render_context(initial_data: dict) -> dict:
         "documents_processing_count": processing_count,
         "documents_all_count": int(initial_data.get("documents_all_count") or total),
         "documents_failed_count": int(initial_data.get("documents_failed_count") or 0),
+        "documents_failed_filter": bool(initial_data.get("documents_failed_filter")),
+        "documents_processing_filenames": _processing_filenames(pending_documents),
+        "documents_processing_items": _processing_items(pending_documents),
         "documents_starred_count": int(initial_data.get("documents_starred_count") or 0),
         "documents_starred_filter": bool(initial_data.get("documents_starred_filter")),
         "documents_sidebar_correspondents_html": document_sidebar_correspondents_html(

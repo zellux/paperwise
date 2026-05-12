@@ -9,7 +9,7 @@ from paperwise.application.interfaces import (
 )
 from paperwise.application.services.activity import ActivityRepository, owner_activity_summary
 from paperwise.application.services.chat_threads import LegacyChatThreadRepository, migrate_legacy_chat_threads
-from paperwise.application.services.document_listing import list_filtered_documents
+from paperwise.application.services.document_listing import list_filtered_documents, normalized_values
 from paperwise.application.services.llm_preferences import (
     llm_provider_defaults_payload,
     llm_supported_providers_payload,
@@ -17,8 +17,8 @@ from paperwise.application.services.llm_preferences import (
     ocr_supported_providers_payload,
 )
 from paperwise.application.services.pending_documents import (
+    ACTIVE_PROCESSING_DOCUMENT_STATUSES,
     PENDING_DOCUMENT_STATUSES,
-    list_pending_documents,
 )
 from paperwise.application.services.user_preferences import load_normalized_user_preferences
 from paperwise.domain.models import DocumentStatus, User
@@ -233,14 +233,15 @@ def documents_initial_data(
                 "documents": [],
                 "documents_page": requested_page,
                 "documents_page_size": normalized_page_size,
-                "documents_total": 0,
-                "documents_processing_count": 0,
-                "documents_all_count": 0,
-                "documents_failed_count": 0,
-                "documents_starred_count": 0,
-                "document_sidebar_tags": [],
-                "document_sidebar_document_types": [],
-                "document_sidebar_correspondents": [],
+            "documents_total": 0,
+            "documents_processing_count": 0,
+            "documents_all_count": 0,
+            "documents_failed_count": 0,
+            "documents_starred_count": 0,
+            "documents_failed_filter": False,
+            "document_sidebar_tags": [],
+            "document_sidebar_document_types": [],
+            "document_sidebar_correspondents": [],
             }
         )
         if include_filter_options:
@@ -284,18 +285,21 @@ def documents_initial_data(
         )
     processing_count = repository.count_owner_documents_by_statuses(
         owner_id=current_user.id,
-        statuses=PENDING_DOCUMENT_STATUSES,
+        statuses=ACTIVE_PROCESSING_DOCUMENT_STATUSES,
     )
+    pending_items = active_processing_documents(repository, current_user) if processing_count > 0 else []
     data.update(
         {
             "documents": [
                 document_list_item(document, llm_result, repository.get_parse_result(document.id))
                 for document, llm_result in listing.rows
             ],
+            "pending_documents": pending_items,
             "documents_page": current_page,
             "documents_page_size": normalized_page_size,
             "documents_total": listing.total,
             "documents_processing_count": processing_count,
+            "documents_failed_filter": normalized_values(status) == {DocumentStatus.FAILED.value},
             "documents_starred_filter": bool(starred),
         }
     )
@@ -304,15 +308,42 @@ def documents_initial_data(
     return data
 
 
+def _processing_stage_payload(document_status: str, parse_result: object | None, llm_result: object | None) -> dict:
+    if document_status == DocumentStatus.FAILED.value:
+        return {"label": "Failed", "progress": 100, "key": "failed"}
+    if document_status == DocumentStatus.RECEIVED.value:
+        return {"label": "Queued", "progress": 12, "key": "queued"}
+    if parse_result is None:
+        return {"label": "OCR", "progress": 38, "key": "ocr"}
+    if llm_result is None:
+        return {"label": "Classifying", "progress": 72, "key": "classifying"}
+    return {"label": "Finalizing", "progress": 92, "key": "finalizing"}
+
+
+def _document_items_by_statuses(
+    repository: DocumentStore,
+    current_user: User,
+    statuses: set[DocumentStatus],
+) -> list[dict]:
+    items: list[dict] = []
+    for document, llm_result in repository.list_owner_documents_with_llm_results(
+        owner_id=current_user.id,
+        limit=200,
+        statuses=statuses,
+    ):
+        parse_result = repository.get_parse_result(document.id)
+        item = document_list_item(document, llm_result, parse_result)
+        item["processing_stage"] = _processing_stage_payload(document.status.value, parse_result, llm_result)
+        items.append(item)
+    return items
+
+
+def active_processing_documents(repository: DocumentStore, current_user: User) -> list[dict]:
+    return _document_items_by_statuses(repository, current_user, ACTIVE_PROCESSING_DOCUMENT_STATUSES)
+
+
 def pending_documents(repository: DocumentStore, current_user: User) -> list[dict]:
-    return [
-        document_list_item(document, llm_result, repository.get_parse_result(document.id))
-        for document, llm_result in list_pending_documents(
-            repository=repository,
-            owner_id=current_user.id,
-            limit=200,
-        )
-    ]
+    return _document_items_by_statuses(repository, current_user, PENDING_DOCUMENT_STATUSES)
 
 
 def pending_initial_data(repository: DocumentsInitialDataRepository, current_user: User | None) -> dict:
@@ -321,10 +352,14 @@ def pending_initial_data(repository: DocumentsInitialDataRepository, current_use
     if current_user is None:
         return {**initial_data, "pending_documents": [], "documents_processing_count": 0}
     pending_items = pending_documents(repository, current_user)
+    processing_count = repository.count_owner_documents_by_statuses(
+        owner_id=current_user.id,
+        statuses=ACTIVE_PROCESSING_DOCUMENT_STATUSES,
+    )
     return {
         **initial_data,
         "pending_documents": pending_items,
-        "documents_processing_count": len(pending_items),
+        "documents_processing_count": processing_count,
     }
 
 

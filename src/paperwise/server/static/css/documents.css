@@ -1518,19 +1518,32 @@
 }
 
 .inflight-strip {
-  margin: 14px 26px 0;
-  padding: 12px 14px;
-  border: 1px dashed color-mix(in srgb, var(--accent) 38%, var(--stroke));
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--accent) 5%, var(--paper));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 360px) 28px;
+  align-items: center;
+  gap: 22px;
+  margin: 16px 26px 0;
+  padding: 18px 18px 16px 20px;
+  border: 1px dashed color-mix(in srgb, var(--accent) 46%, var(--stroke));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--accent) 4%, var(--paper));
 }
 
 .inflight-head {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 0.82rem;
+  font-size: 0.88rem;
   font-weight: 700;
+}
+
+.inflight-title {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.inflight-title:hover {
+  color: var(--accent);
 }
 
 .inflight-spin span {
@@ -1541,6 +1554,78 @@
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: docs-spin 1s linear infinite;
+}
+
+.inflight-files {
+  display: grid;
+  gap: 5px;
+  margin-top: 12px;
+  color: var(--ink);
+  font-size: 0.82rem;
+  line-height: 1.25;
+}
+
+.inflight-files span {
+  min-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inflight-progress {
+  display: grid;
+  gap: 5px;
+  padding-top: 31px;
+}
+
+.inflight-progress-row {
+  display: grid;
+  grid-template-columns: 88px minmax(110px, 1fr);
+  align-items: center;
+  gap: 12px;
+  min-height: 18px;
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+}
+
+.inflight-progress-track {
+  display: block;
+  height: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--stroke) 60%, transparent);
+  overflow: hidden;
+}
+
+.inflight-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.inflight-progress-track[data-stage="failed"] span {
+  background: #8f2f2f;
+}
+
+.inflight-progress-track[data-stage="queued"] span {
+  background: var(--ink-mute);
+}
+
+.inflight-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--ink-soft);
+  text-decoration: none;
+}
+
+.inflight-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink);
 }
 
 @keyframes docs-spin {
@@ -2376,6 +2461,18 @@
   .docs-page-head {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .inflight-strip {
+    grid-template-columns: minmax(0, 1fr) 28px;
+    align-items: start;
+    margin-left: 16px;
+    margin-right: 16px;
+  }
+
+  .inflight-progress {
+    grid-column: 1 / -1;
+    padding-top: 0;
   }
 
   .docs-design-table .doc-thead,

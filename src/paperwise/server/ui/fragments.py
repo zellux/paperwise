@@ -596,10 +596,15 @@ def documents_pagination_toolbar_html(
     normalized_page = min(max(1, int(page or 1)), total_pages)
     prev_disabled = " disabled" if normalized_page <= 1 else ""
     next_disabled = " disabled" if normalized_page >= total_pages else ""
+    processing_label = (
+        f'              <span id="docsProcessingLabel" class="docs-total-label">Processing: {normalized_processing_count:,}</span>\n'
+        if normalized_processing_count > 0
+        else ""
+    )
     return (
         '            <div class="docs-summary">\n'
         f'              <span id="docsTotalLabel" class="docs-total-label">Total documents: {normalized_total:,}</span>\n'
-        f'              <span id="docsProcessingLabel" class="docs-total-label">Processing: {normalized_processing_count:,}</span>\n'
+        f"{processing_label}"
         "            </div>\n"
         '            <div class="pagination-controls">\n'
         f'              <button id="pagePrevBtn" type="button" class="btn btn-muted" '

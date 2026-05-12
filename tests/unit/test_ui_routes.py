@@ -172,6 +172,28 @@ def _save_pending_document(
     )
 
 
+def _save_failed_document(
+    repository: InMemoryDocumentRepository,
+    *,
+    doc_id: str,
+    owner_id: str,
+) -> None:
+    created_at = datetime(2026, 5, 4, tzinfo=UTC)
+    repository.save(
+        Document(
+            id=doc_id,
+            filename=f"{doc_id}.pdf",
+            owner_id=owner_id,
+            blob_uri=f"local://{doc_id}.pdf",
+            checksum_sha256=f"{doc_id:0<64}"[:64],
+            content_type="application/pdf",
+            size_bytes=100,
+            status=DocumentStatus.FAILED,
+            created_at=created_at,
+        )
+    )
+
+
 def test_ui_routes_serve_page_html() -> None:
     client = TestClient(app)
     routes = (
@@ -743,7 +765,8 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             "model": "gpt-4.1-mini",
         }
         assert "Total documents: 2" in documents_html
-        assert "Processing: 0" in documents_html
+        assert "Processing: 0" not in documents_html
+        assert 'id="docsProcessingLabel"' not in documents_html
         assert '<span class="docs-side-count">0</span>' in documents_html
         assert '<span class="docs-side-count accent">0</span>' not in documents_html
         assert '<a class="docs-side-row active" href="/ui/documents">' in documents_html
@@ -893,10 +916,34 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
 
         _save_pending_document(repository, doc_id="doc-pending", owner_id=user_id, title="Pending File")
         documents_with_pending_html = client.get("/ui/documents").text
+        documents_with_pending_payload = _initial_data_from_response(documents_with_pending_html)
+        assert documents_with_pending_payload["pending_documents"][0]["id"] == "doc-pending"
+        assert documents_with_pending_payload["pending_documents"][0]["processing_stage"] == {
+            "label": "OCR",
+            "progress": 38,
+            "key": "ocr",
+        }
         assert "Processing: 1" in documents_with_pending_html
+        assert '<div class="inflight-progress-row">' in documents_with_pending_html
+        assert "OCR" in documents_with_pending_html
+        assert "Classifying" not in documents_with_pending_html
+        assert 'data-stage="ocr"' in documents_with_pending_html
+        assert "doc-pending.pdf" in documents_with_pending_html
+        _save_failed_document(repository, doc_id="doc-failed", owner_id=user_id)
+        documents_with_failed_html = client.get("/ui/documents").text
+        documents_with_failed_payload = _initial_data_from_response(documents_with_failed_html)
+        assert documents_with_failed_payload["documents_processing_count"] == 1
+        assert documents_with_failed_payload["documents_failed_count"] == 1
+        assert [item["id"] for item in documents_with_failed_payload["pending_documents"]] == ["doc-pending"]
+        failed_documents_html = client.get("/ui/documents?status=failed").text
+        failed_documents_payload = _initial_data_from_response(failed_documents_html)
+        assert failed_documents_payload["documents_failed_filter"] is True
+        assert [item["id"] for item in failed_documents_payload["documents"]] == ["doc-failed"]
+        assert '<a class="docs-side-row active" href="/ui/documents?status=failed">' in failed_documents_html
+        assert '<a class="docs-side-row" href="/ui/documents">' in failed_documents_html
         pending_html = client.get("/ui/pending").text
         pending_payload = _initial_data_from_response(pending_html)
-        assert pending_payload["pending_documents"][0]["id"] == "doc-pending"
+        assert [item["id"] for item in pending_payload["pending_documents"]] == ["doc-failed", "doc-pending"]
         assert pending_payload["documents_processing_count"] == 1
         assert pending_payload["current_user"]["email"] == "catalog-ui@example.com"
         assert '<article id="section-pending" class="documents-workbench view">' in pending_html
@@ -912,22 +959,22 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         documents_partial = client.get("/ui/partials/documents?page_size=1&page=1")
         assert documents_partial.status_code == 200
         assert "text/html" in documents_partial.headers["content-type"]
-        assert 'data-documents-total="3"' in documents_partial.text
+        assert 'data-documents-total="4"' in documents_partial.text
         assert 'data-documents-processing-count="1"' in documents_partial.text
         assert 'data-documents-returned="1"' in documents_partial.text
         assert '<template data-partial-target="docsTableBody">' in documents_partial.text
         assert '<template data-partial-target="documentsPaginationToolbar">' in documents_partial.text
         assert 'data-doc-id="' in documents_partial.text
         assert '<a class="row-act" href="/ui/document?id=' in documents_partial.text
-        assert "Total documents: 3" in documents_partial.text
+        assert "Total documents: 4" in documents_partial.text
         assert "Processing: 1" in documents_partial.text
-        assert "Page 1 / 3" in documents_partial.text
+        assert "Page 1 / 4" in documents_partial.text
         assert 'data-docs-page-action="next"' in documents_partial.text
 
         overlarge_documents_partial = client.get("/ui/partials/documents?page_size=1&page=99")
         assert overlarge_documents_partial.status_code == 200
-        assert 'data-documents-page="3"' in overlarge_documents_partial.text
-        assert "Page 3 / 3" in overlarge_documents_partial.text
+        assert 'data-documents-page="4"' in overlarge_documents_partial.text
+        assert "Page 4 / 4" in overlarge_documents_partial.text
 
         tags_partial = client.get("/ui/partials/tags?sort_by=tag&sort_dir=desc")
         assert tags_partial.status_code == 200
@@ -955,9 +1002,10 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         pending_partial = client.get("/ui/partials/pending")
         assert pending_partial.status_code == 200
         assert "text/html" in pending_partial.headers["content-type"]
-        assert 'data-pending-count="1"' in pending_partial.text
+        assert 'data-pending-count="2"' in pending_partial.text
         assert 'data-has-restartable-pending-documents="true"' in pending_partial.text
         assert '<template data-partial-target="pendingTableBody">' in pending_partial.text
+        assert 'data-pending-doc-id="doc-failed"' in pending_partial.text
         assert 'data-pending-doc-id="doc-pending"' in pending_partial.text
         assert '<tr class="doc-row pending-row" data-pending-doc-id="doc-pending">' in pending_partial.text
 

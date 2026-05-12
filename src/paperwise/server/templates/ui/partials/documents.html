@@ -6,7 +6,7 @@
       <kbd>⌘U</kbd>
     </a>
     <nav class="docs-side-section">
-      <a class="docs-side-row{% if not documents_starred_filter %} active{% endif %}" href="/ui/documents">
+      <a class="docs-side-row{% if not documents_starred_filter and not documents_failed_filter %} active{% endif %}" href="/ui/documents">
         <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg>
         <span>All documents</span>
         <span class="docs-side-count">{{ documents_all_count|format_number }}</span>
@@ -21,7 +21,7 @@
         <span>Processing</span>
         <span class="docs-side-count{% if documents_processing_count > 0 %} accent{% endif %}">{{ documents_processing_count|format_number }}</span>
       </a>
-      <a class="docs-side-row" href="/ui/documents?status=failed">
+      <a class="docs-side-row{% if documents_failed_filter %} active{% endif %}" href="/ui/documents?status=failed">
         <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
         <span>Needs attention</span>
         <span class="docs-side-count">{{ documents_failed_count|format_number }}</span>
@@ -104,13 +104,28 @@
     </div>
 
     <div class="inflight-strip" {% if documents_processing_count == 0 %}hidden{% endif %}>
-      <div class="inflight-head">
-        <span class="inflight-spin" aria-hidden="true"><span></span></span>
-        <span>{{ documents_processing_count|format_number }} document{% if documents_processing_count != 1 %}s{% endif %} processing</span>
-        <a class="btn-icon-xs" href="/ui/pending" aria-label="View processing queue">
-          <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
-        </a>
+      <div class="inflight-copy">
+        <div class="inflight-head">
+          <span class="inflight-spin" aria-hidden="true"><span></span></span>
+          <a class="inflight-title" href="/ui/pending">{{ documents_processing_count|format_number }} document{% if documents_processing_count != 1 %}s{% endif %} processing</a>
+        </div>
+        <div class="inflight-files">
+          {% for item in documents_processing_items %}
+          <span>{{ item.filename }}</span>
+          {% endfor %}
+        </div>
       </div>
+      <div class="inflight-progress" aria-label="Processing stages">
+        {% for item in documents_processing_items %}
+        <div class="inflight-progress-row">
+          <span>{{ item.stage_label }}</span>
+          <span class="inflight-progress-track" data-stage="{{ item.stage_key }}"><span style="width: {{ item.stage_progress }}%"></span></span>
+        </div>
+        {% endfor %}
+      </div>
+      <a class="inflight-close" href="/ui/pending" aria-label="View processing queue">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </a>
     </div>
 
     <div id="documentsPaginationToolbar" class="pagination-toolbar docs-list-toolbar">{{ documents_pagination_toolbar_html|safe }}</div>

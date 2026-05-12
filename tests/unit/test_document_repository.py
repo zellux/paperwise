@@ -9,6 +9,7 @@ from paperwise.infrastructure.repositories.in_memory_document_repository import 
 from paperwise.infrastructure.repositories.postgres_document_repository import (
     PostgresDocumentRepository,
 )
+from paperwise.infrastructure.repositories.postgres_document_mapper import coerce_document_status
 
 
 def _document(document_id: str, owner_id: str) -> Document:
@@ -28,6 +29,12 @@ def _document(document_id: str, owner_id: str) -> Document:
 def _processing_document(document_id: str, owner_id: str) -> Document:
     document = _document(document_id, owner_id)
     document.status = DocumentStatus.PROCESSING
+    return document
+
+
+def _failed_document(document_id: str, owner_id: str) -> Document:
+    document = _document(document_id, owner_id)
+    document.status = DocumentStatus.FAILED
     return document
 
 
@@ -144,6 +151,20 @@ def test_count_owner_documents_by_statuses_is_owner_scoped() -> None:
     )
 
     assert count == 1
+
+
+def test_postgres_document_mapper_preserves_failed_status() -> None:
+    assert coerce_document_status("failed") == DocumentStatus.FAILED
+
+
+def test_postgres_repository_round_trips_failed_status(tmp_path: Path) -> None:
+    repository = PostgresDocumentRepository(f"sqlite:///{tmp_path / 'paperwise.db'}")
+    repository.save(_failed_document("owner-a-failed", "owner-a"))
+
+    loaded = repository.get("owner-a-failed")
+
+    assert loaded is not None
+    assert loaded.status == DocumentStatus.FAILED
 
 
 def test_postgres_repository_adds_starred_column_to_existing_documents_table(tmp_path: Path) -> None:
