@@ -171,6 +171,7 @@ def _initial_render_context(initial_data: dict) -> dict:
         "document_detail_file_url": fragments.get("file_url", ""),
         "document_detail_preview_url": fragments.get("preview_url", ""),
         "document_detail_page_count": fragments.get("page_count", 1),
+        "document_detail_starred": bool((initial_data.get("document_detail") or {}).get("document", {}).get("starred")),
         "document_detail_page_thumbnails_html": fragments.get("page_thumbnails_html", ""),
         "document_detail_inputs": fragments["inputs"],
         "document_detail_status_html": fragments["html"].get("detailStatus", "-"),
@@ -195,6 +196,8 @@ def _initial_render_context(initial_data: dict) -> dict:
         "documents_processing_count": processing_count,
         "documents_all_count": int(initial_data.get("documents_all_count") or total),
         "documents_failed_count": int(initial_data.get("documents_failed_count") or 0),
+        "documents_starred_count": int(initial_data.get("documents_starred_count") or 0),
+        "documents_starred_filter": bool(initial_data.get("documents_starred_filter")),
         "documents_sidebar_correspondents_html": document_sidebar_correspondents_html(
             sidebar_correspondents if isinstance(sidebar_correspondents, list) else []
         ),

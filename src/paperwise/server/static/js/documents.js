@@ -48,6 +48,7 @@ let docsFilters = {
   correspondent: [],
   document_type: [],
   status: [],
+  starred: false,
 };
 let docsPage = 1;
 let docsSort = { field: "", direction: "" };
@@ -67,6 +68,7 @@ function cloneDocsFilters(filters) {
     correspondent: [...(filters?.correspondent || [])],
     document_type: [...(filters?.document_type || [])],
     status: [...(filters?.status || [])],
+    starred: Boolean(filters?.starred),
   };
 }
 
@@ -85,6 +87,7 @@ export function clearSessionState() {
     correspondent: [],
     document_type: [],
     status: [],
+    starred: false,
   });
   docsPage = 1;
   docsSort = { field: "", direction: "" };
@@ -110,6 +113,7 @@ function getDocumentsPageElements() {
     clearFiltersBtn: document.getElementById("clearFiltersBtn"),
     clearAllFiltersBtn: document.getElementById("clearAllFiltersBtn"),
     docsAppliedFiltersBtn: document.getElementById("docsAppliedFiltersBtn"),
+    showStarredBtn: document.getElementById("showStarredBtn"),
     ...filterControls,
   };
 }
@@ -382,17 +386,24 @@ function activeDocumentFilterCount() {
   if (docsFilters.status.length) {
     count += 1;
   }
+  if (docsFilters.starred) {
+    count += 1;
+  }
   return count;
 }
 
 function renderAppliedFilterSummary() {
-  const { docsAppliedFiltersBtn, clearAllFiltersBtn } = getDocumentsPageElements();
+  const { docsAppliedFiltersBtn, clearAllFiltersBtn, showStarredBtn } = getDocumentsPageElements();
   const count = activeDocumentFilterCount();
   if (docsAppliedFiltersBtn) {
     docsAppliedFiltersBtn.textContent = `${count} filter${count === 1 ? "" : "s"} applied`;
   }
   if (clearAllFiltersBtn instanceof HTMLButtonElement) {
     clearAllFiltersBtn.disabled = count === 0;
+  }
+  if (showStarredBtn instanceof HTMLButtonElement) {
+    showStarredBtn.setAttribute("aria-pressed", docsFilters.starred ? "true" : "false");
+    showStarredBtn.classList.toggle("is-active", docsFilters.starred);
   }
 }
 
@@ -402,6 +413,7 @@ function clearAllDocumentFilters() {
   docsFilters.correspondent = [];
   docsFilters.document_type = [];
   docsFilters.status = [];
+  docsFilters.starred = false;
   docsPage = 1;
   applyDocumentListFiltersToControls();
   navigateToDocumentsPageFromState();
@@ -478,6 +490,7 @@ function applyDocsStateToUrl(url) {
   url.searchParams.delete("correspondent");
   url.searchParams.delete("document_type");
   url.searchParams.delete("status");
+  url.searchParams.delete("starred");
   url.searchParams.delete("view");
   url.searchParams.delete("page");
   url.searchParams.delete("page_size");
@@ -498,6 +511,9 @@ function applyDocsStateToUrl(url) {
   }
   for (const value of docsFilters.status) {
     url.searchParams.append("status", value);
+  }
+  if (docsFilters.starred) {
+    url.searchParams.set("starred", "true");
   }
   if (docsPage > 1) {
     url.searchParams.set("page", String(docsPage));
@@ -525,6 +541,9 @@ function readDocumentListStateFromUrl() {
   docsFilters.correspondent = unique(params.getAll("correspondent"));
   docsFilters.document_type = unique(params.getAll("document_type"));
   docsFilters.status = unique(params.getAll("status"));
+  docsFilters.starred = ["1", "true", "yes", "on"].includes(
+    String(params.get("starred") || "").trim().toLowerCase()
+  );
   const pageValue = Number(params.get("page") || "1");
   docsPage = Number.isInteger(pageValue) && pageValue > 0 ? pageValue : 1;
   const pageSizeValue = params.get("page_size") || String(appState.docsPageSize || 20);
@@ -1098,6 +1117,9 @@ async function loadDocumentsList() {
   for (const value of docsFilters.status) {
     query.append("status", value);
   }
+  if (docsFilters.starred) {
+    query.set("starred", "true");
+  }
 
   let payload;
   try {
@@ -1147,7 +1169,7 @@ function bindDocumentsEvents() {
   if (documentsEventsBound) {
     return;
   }
-  const { docsFilterForm, clearFiltersBtn, clearAllFiltersBtn, filterQuery, filterSelects } =
+  const { docsFilterForm, clearFiltersBtn, clearAllFiltersBtn, showStarredBtn, filterQuery, filterSelects } =
     getDocumentsPageElements();
 
   docsFilterForm?.addEventListener("submit", (event) => {
@@ -1293,6 +1315,13 @@ function bindDocumentsEvents() {
 
   clearAllFiltersBtn?.addEventListener("click", () => {
     clearAllDocumentFilters();
+  });
+
+  showStarredBtn?.addEventListener("click", () => {
+    docsFilters.starred = !docsFilters.starred;
+    docsPage = 1;
+    renderAppliedFilterSummary();
+    navigateToDocumentsPageFromState();
   });
 
   filterQuery?.addEventListener("input", () => {

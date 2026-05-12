@@ -50,6 +50,7 @@ function getSingleDocumentElements() {
     backToDocsBtn: document.getElementById("backToDocsBtn"),
     reprocessDocumentBtn: document.getElementById("reprocessDocumentBtn"),
     deleteDocumentBtn: document.getElementById("deleteDocumentBtn"),
+    starDocumentBtn: document.getElementById("starDocumentBtn"),
     viewDocumentFileBtn: document.getElementById("viewDocumentFileBtn"),
     metaTitleInput: document.getElementById("metaTitle"),
     metaDateInput: document.getElementById("metaDate"),
@@ -87,6 +88,25 @@ function hydrateInitialDocumentData(initialData) {
   appState.currentDocumentId = documentId;
   logActivity(`Opened document ${appState.currentDocumentId}`);
   return true;
+}
+
+function renderDocumentStarButton(starred) {
+  const { starDocumentBtn } = getSingleDocumentElements();
+  if (!(starDocumentBtn instanceof HTMLButtonElement)) {
+    return;
+  }
+  const isStarred = Boolean(starred);
+  starDocumentBtn.classList.toggle("is-starred", isStarred);
+  starDocumentBtn.setAttribute("aria-pressed", isStarred ? "true" : "false");
+  starDocumentBtn.title = isStarred ? "Unstar document" : "Star document";
+  const label = starDocumentBtn.querySelector("span");
+  if (label) {
+    label.textContent = isStarred ? "Starred" : "Star";
+  }
+  const icon = starDocumentBtn.querySelector("svg");
+  if (icon) {
+    icon.setAttribute("fill", isStarred ? "currentColor" : "none");
+  }
 }
 
 function stableTagColor(value) {
@@ -429,6 +449,7 @@ function bindSingleDocumentEvents() {
     backToDocsBtn,
     reprocessDocumentBtn,
     deleteDocumentBtn,
+    starDocumentBtn,
     viewDocumentFileBtn,
     metaTitleInput,
     metaDateInput,
@@ -437,6 +458,29 @@ function bindSingleDocumentEvents() {
     metaTagsInput,
     detailFilename,
   } = getSingleDocumentElements();
+
+  starDocumentBtn?.addEventListener("click", async () => {
+    if (!appState.currentDocumentId) {
+      logActivity("No document selected.");
+      return;
+    }
+    const nextStarred = starDocumentBtn.getAttribute("aria-pressed") !== "true";
+    starDocumentBtn.disabled = true;
+    const response = await apiFetch(`/documents/${appState.currentDocumentId}/starred`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ starred: nextStarred }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    starDocumentBtn.disabled = false;
+    if (!response.ok) {
+      logActivity(`Star update failed: ${payload.detail || response.statusText}`);
+      return;
+    }
+    const starred = Boolean(payload?.document?.starred);
+    renderDocumentStarButton(starred);
+    logActivity(`${starred ? "Starred" : "Unstarred"} document ${appState.currentDocumentId}.`);
+  });
 
   documentMetaForm?.addEventListener("submit", async (event) => {
     event.preventDefault();
@@ -548,6 +592,7 @@ export async function initializePage({ authenticated, initialData }) {
   bindSingleDocumentEvents();
   if (hydrateInitialDocumentData(initialData || {})) {
     setDocumentMetadataDirty(false);
+    renderDocumentStarButton(Boolean(initialData?.document_detail?.document?.starred));
     renderTagEditor();
     renderOcrText();
     return;

@@ -6,15 +6,20 @@
       <kbd>⌘U</kbd>
     </a>
     <nav class="docs-side-section">
-      <a class="docs-side-row active" href="/ui/documents">
+      <a class="docs-side-row{% if not documents_starred_filter %} active{% endif %}" href="/ui/documents">
         <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h5l2 2h11v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M3 7V5a2 2 0 0 1 2-2h4l2 2h4"/></svg>
         <span>All documents</span>
         <span class="docs-side-count">{{ documents_all_count|format_number }}</span>
       </a>
+      <a class="docs-side-row{% if documents_starred_filter %} active{% endif %}" href="/ui/documents?starred=true">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="12 2 15.1 8.3 22 9.3 17 14.2 18.2 21 12 17.8 5.8 21 7 14.2 2 9.3 8.9 8.3 12 2"/></svg>
+        <span>Starred</span>
+        <span class="docs-side-count">{{ documents_starred_count|format_number }}</span>
+      </a>
       <a class="docs-side-row" href="/ui/pending">
         <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18"/><path d="M5 7l1 12h12l1-12"/><path d="M9 11h6"/></svg>
         <span>Processing</span>
-        <span class="docs-side-count accent">{{ documents_processing_count|format_number }}</span>
+        <span class="docs-side-count{% if documents_processing_count > 0 %} accent{% endif %}">{{ documents_processing_count|format_number }}</span>
       </a>
       <a class="docs-side-row" href="/ui/documents?status=failed">
         <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
@@ -90,6 +95,10 @@
       </div>
     </form>
     <div class="docs-filter-actions" aria-label="Applied document filters">
+      <button id="showStarredBtn" type="button" class="docs-filter-star" aria-pressed="false">
+        <span aria-hidden="true">★</span>
+        <span>Starred</span>
+      </button>
       <button id="docsAppliedFiltersBtn" type="button" class="docs-filter-count" disabled>0 filters applied</button>
       <button id="clearAllFiltersBtn" type="button" class="docs-filter-clear" disabled>Clear all filters</button>
     </div>

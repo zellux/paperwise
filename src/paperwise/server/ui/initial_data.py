@@ -161,10 +161,27 @@ def document_sidebar_data(repository: DocumentsInitialDataRepository, current_us
         return {
             "documents_all_count": 0,
             "documents_failed_count": 0,
+            "documents_starred_count": 0,
             "document_sidebar_tags": [],
             "document_sidebar_document_types": [],
             "document_sidebar_correspondents": [],
         }
+    starred_count = 0
+    offset = 0
+    batch_size = 1000
+    while True:
+        rows = repository.list_owner_documents_with_llm_results(
+            owner_id=current_user.id,
+            limit=batch_size,
+            offset=offset,
+            statuses=set(DocumentStatus),
+        )
+        if not rows:
+            break
+        starred_count += sum(1 for document, _llm_result in rows if document.starred)
+        if len(rows) < batch_size:
+            break
+        offset += batch_size
     return {
         "documents_all_count": repository.count_owner_documents_by_statuses(
             owner_id=current_user.id,
@@ -174,6 +191,7 @@ def document_sidebar_data(repository: DocumentsInitialDataRepository, current_us
             owner_id=current_user.id,
             statuses={DocumentStatus.FAILED},
         ),
+        "documents_starred_count": starred_count,
         "document_sidebar_tags": [
             {"tag": tag, "document_count": count}
             for tag, count in repository.list_owner_tag_stats(current_user.id)
@@ -202,6 +220,7 @@ def documents_initial_data(
     correspondent: list[str] | None = None,
     document_type: list[str] | None = None,
     status: list[str] | None = None,
+    starred: bool | None = None,
     include_filter_options: bool = False,
 ) -> dict:
     data = page_initial_data(current_user, repository)
@@ -218,6 +237,7 @@ def documents_initial_data(
                 "documents_processing_count": 0,
                 "documents_all_count": 0,
                 "documents_failed_count": 0,
+                "documents_starred_count": 0,
                 "document_sidebar_tags": [],
                 "document_sidebar_document_types": [],
                 "document_sidebar_correspondents": [],
@@ -239,6 +259,7 @@ def documents_initial_data(
         correspondent=correspondent,
         document_type=document_type,
         status=status,
+        starred=starred,
         sort_by=sort_by,
         sort_dir=sort_dir,
         limit=normalized_page_size,
@@ -255,6 +276,7 @@ def documents_initial_data(
             correspondent=correspondent,
             document_type=document_type,
             status=status,
+            starred=starred,
             sort_by=sort_by,
             sort_dir=sort_dir,
             limit=normalized_page_size,
@@ -274,6 +296,7 @@ def documents_initial_data(
             "documents_page_size": normalized_page_size,
             "documents_total": listing.total,
             "documents_processing_count": processing_count,
+            "documents_starred_filter": bool(starred),
         }
     )
     if include_filter_options:

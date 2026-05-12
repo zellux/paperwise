@@ -102,6 +102,7 @@ def _save_ready_document(
     title: str,
     document_type: str,
     tags: list[str],
+    starred: bool = False,
 ) -> None:
     created_at = datetime(2026, 5, 2, tzinfo=UTC)
     repository.save(
@@ -115,6 +116,7 @@ def _save_ready_document(
             size_bytes=100,
             status=DocumentStatus.READY,
             created_at=created_at,
+            starred=starred,
         )
     )
     repository.save_llm_parse_result(
@@ -658,6 +660,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             title="Tax Notice",
             document_type="Notice",
             tags=["Tax", "Finance"],
+            starred=True,
         )
         repository.save_parse_result(
             ParseResult(
@@ -713,8 +716,10 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         documents_html = client.get("/ui/documents").text
         documents_payload = _initial_data_from_response(documents_html)
         assert documents_payload["documents_total"] == 2
+        assert next(item for item in documents_payload["documents"] if item["id"] == "doc-tax")["starred"] is True
         assert documents_payload["documents_processing_count"] == 0
         assert documents_payload["documents_all_count"] == 2
+        assert documents_payload["documents_starred_count"] == 1
         assert documents_payload["document_sidebar_tags"] == [
             {"tag": "Finance", "document_count": 2},
             {"tag": "Tax", "document_count": 1},
@@ -739,6 +744,11 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         }
         assert "Total documents: 2" in documents_html
         assert "Processing: 0" in documents_html
+        assert '<span class="docs-side-count">0</span>' in documents_html
+        assert '<span class="docs-side-count accent">0</span>' not in documents_html
+        assert '<a class="docs-side-row active" href="/ui/documents">' in documents_html
+        assert '<a class="docs-side-row" href="/ui/documents?starred=true">' in documents_html
+        assert ">Starred</span>" in documents_html
         assert '<a class="docs-side-row docs-tag-row" href="/ui/documents?tag=Finance">' in documents_html
         assert (
             '<a class="docs-side-row docs-type-row" href="/ui/documents?document_type=Invoice">'
@@ -773,8 +783,10 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'id="docsBulkEditorInput"' in documents_html
         assert 'id="docsAppliedFiltersBtn"' in documents_html
         assert 'id="clearAllFiltersBtn"' in documents_html
+        assert 'id="showStarredBtn"' in documents_html
         assert "0 filters applied" in documents_html
         assert "Clear all filters" in documents_html
+        assert '<span class="row-star" aria-label="Starred document">★</span>' in documents_html
         assert documents_html.index('id="docsFilterForm"') < documents_html.index('id="docsAppliedFiltersBtn"')
         assert 'id="filterStatus"' not in documents_html
         assert 'data-sort-field="document_date"' in documents_html
@@ -786,6 +798,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         detail_html = client.get("/ui/document?id=doc-tax").text
         detail_payload = _initial_data_from_response(detail_html)
         assert detail_payload["document_detail"]["document"]["id"] == "doc-tax"
+        assert detail_payload["document_detail"]["document"]["starred"] is True
         assert detail_payload["document_detail"]["document"]["page_count"] == 22
         assert detail_payload["document_detail"]["ocr_text_preview"] == "OCR preview for the tax notice."
         assert detail_payload["document_history"][0]["id"] == "history-tax"
@@ -800,6 +813,9 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "OCR preview for the tax notice." in detail_html
         assert "Metadata changed" in detail_html
         assert "suggested_title: (empty) -&gt; Tax Notice" in detail_html
+        assert 'id="starDocumentBtn"' in detail_html
+        assert 'aria-pressed="true"' in detail_html
+        assert ">Starred</span>" in detail_html
 
         filtered_documents_html = client.get("/ui/documents?tag=Tax").text
         filtered_documents_payload = _initial_data_from_response(filtered_documents_html)
@@ -807,6 +823,16 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert [item["id"] for item in filtered_documents_payload["documents"]] == ["doc-tax"]
         assert "Tax Notice" in filtered_documents_html
         assert "Utility Bill" not in filtered_documents_html
+
+        starred_documents_html = client.get("/ui/documents?starred=true").text
+        starred_documents_payload = _initial_data_from_response(starred_documents_html)
+        assert starred_documents_payload["documents_total"] == 1
+        assert starred_documents_payload["documents_starred_filter"] is True
+        assert [item["id"] for item in starred_documents_payload["documents"]] == ["doc-tax"]
+        assert '<a class="docs-side-row active" href="/ui/documents?starred=true">' in starred_documents_html
+        assert '<a class="docs-side-row" href="/ui/documents">' in starred_documents_html
+        assert "Tax Notice" in starred_documents_html
+        assert "Utility Bill" not in starred_documents_html
 
         paged_documents_html = client.get("/ui/documents?page_size=1&page=2").text
         paged_documents_payload = _initial_data_from_response(paged_documents_html)

@@ -500,6 +500,7 @@ def document_rows_html(documents: list[dict]) -> str:
         document_date_raw = str(metadata.get("document_date") or "")
         display_date = escape(_short_date(document_date_raw))
         status_html = _document_list_status_badge_html(str(item.get("status") or ""))
+        starred = bool(item.get("starred"))
         size = escape(_format_document_size(item.get("size_bytes")))
         page_count = escape(_format_page_count(item.get("page_count")))
         type_icon_class = escape(
@@ -509,6 +510,7 @@ def document_rows_html(documents: list[dict]) -> str:
         title_meta_parts = [f'<span class="filename">{filename}</span>']
         if page_count:
             title_meta_parts.append(f'<span class="dot" aria-hidden="true"></span><span>{page_count}</span>')
+        row_star = '<span class="row-star" aria-label="Starred document">★</span>' if starred else ""
         rows.append(
             f'                <tr class="doc-row" data-doc-id="{document_id}"'
             f' data-doc-title="{_html_attr(raw_title)}"'
@@ -516,6 +518,7 @@ def document_rows_html(documents: list[dict]) -> str:
             f' data-doc-date="{_html_attr(document_date_raw)}"'
             f' data-doc-correspondent="{_html_attr(correspondent_raw)}"'
             f' data-doc-type="{_html_attr(document_type_raw)}"'
+            f' data-doc-starred="{"true" if starred else "false"}"'
             f' data-doc-tags="{_html_attr(json.dumps([str(tag) for tag in tags], ensure_ascii=True))}">'
             '<td class="td td-check" data-label="Select">'
             f'<input type="checkbox" data-doc-select="{document_id}" aria-label="Select {title}" /></td>'
@@ -528,6 +531,7 @@ def document_rows_html(documents: list[dict]) -> str:
             '<span class="title-stack">'
             '<span class="title-row">'
             f'<a class="title-link" href="/ui/document?id={document_id_query}">{title}</a>'
+            f"{row_star}"
             f"{status_html}"
             "</span>"
             f'<span class="title-meta">{"".join(title_meta_parts)}</span>'

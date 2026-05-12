@@ -56,6 +56,7 @@ def documents_page(
     correspondent: list[str] | None = Query(None),
     document_type: list[str] | None = Query(None),
     status: list[str] | None = Query(None),
+    starred: bool = Query(False),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
 ) -> HTMLResponse:
@@ -74,6 +75,7 @@ def documents_page(
             correspondent=correspondent,
             document_type=document_type,
             status=status,
+            starred=starred,
             include_filter_options=True,
         ),
     )
@@ -236,6 +238,7 @@ def documents_partial(
     correspondent: list[str] | None = Query(None),
     document_type: list[str] | None = Query(None),
     status: list[str] | None = Query(None),
+    starred: bool = Query(False),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> HTMLResponse:
@@ -251,6 +254,7 @@ def documents_partial(
         correspondent=correspondent,
         document_type=document_type,
         status=status,
+        starred=starred,
     )
     return HTMLResponse(
         documents_partial_html(data),
