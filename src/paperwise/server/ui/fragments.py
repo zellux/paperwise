@@ -604,6 +604,53 @@ def _status_badge_html(status_value: str) -> str:
     return f'<span class="status-badge status-{escape(status)}">{label}</span>'
 
 
+def _document_detail_tags_html(tags: list[object]) -> str:
+    if not tags:
+        return '<span class="tag-pill tag-empty">No tags</span>'
+    return "".join(
+        f'<a class="tag-pill" href="/ui/documents?tag={quote(str(tag), safe="")}"{_tag_color_style(str(tag))}>'
+        '<span class="tag-swatch tag-swatch-xs" aria-hidden="true"></span>'
+        f"{escape(str(tag))}</a>"
+        for tag in tags
+    )
+
+
+def _document_summary_preview(text: str) -> str:
+    normalized = " ".join(str(text or "").split())
+    if not normalized:
+        return "OCR text is not available yet. Reprocess this document after the source file is ready."
+    if len(normalized) <= 220:
+        return normalized
+    return f"{normalized[:217].rstrip()}..."
+
+
+def _short_date_label(value: object) -> str:
+    raw_value = str(value or "")
+    if not raw_value or raw_value == "-":
+        return "-"
+    try:
+        parsed = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
+    except ValueError:
+        return raw_value[:10] if len(raw_value) >= 10 else raw_value
+    return parsed.strftime("%b %d")
+
+
+def _pdf_preview_url(value: object) -> str:
+    url = str(value or "")
+    if not url:
+        return ""
+    return f"{url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH"
+
+
+def _initials(value: str) -> str:
+    words = [word for word in str(value or "").replace("_", " ").split() if word]
+    if not words:
+        return "PW"
+    if len(words) == 1:
+        return words[0][:2].upper()
+    return "".join(word[0] for word in words[:2]).upper()
+
+
 def _document_list_status_badge_html(status_value: str) -> str:
     status = str(status_value or "").lower()
     if status == "ready":
@@ -629,32 +676,64 @@ def document_detail_fragments(initial_data: dict) -> dict:
     document_id = str(document.get("id") or "")
     size_bytes = int(document.get("size_bytes") or 0)
     history = initial_data.get("document_history") if isinstance(initial_data.get("document_history"), list) else []
+    title = str(metadata.get("suggested_title") or document.get("filename") or document_id or "Untitled document")
+    correspondent = str(metadata.get("correspondent") or "")
+    document_date = str(metadata.get("document_date") or "")
+    document_type = str(metadata.get("document_type") or "")
+    content_type = str(document.get("content_type") or "-")
+    size_label = _format_bytes(size_bytes)
+    ocr_preview = str(detail.get("ocr_text_preview") or "").strip()
+    ocr_parsed_at = str(detail.get("ocr_parsed_at") or "-")
+    file_meta = " · ".join(part for part in [content_type, size_label] if part and part != "-")
+    file_url = f"/documents/{quote(document_id, safe='')}/file" if document_id else ""
     return {
         "document_id": document_id,
-        "document_label": str(metadata.get("suggested_title") or document.get("filename") or document_id),
+        "document_label": title,
         "blob_uri": str(document.get("blob_uri") or ""),
+        "file_url": file_url,
+        "preview_url": _pdf_preview_url(file_url),
         "text": {
+            "detailTitle": title,
+            "detailBreadcrumbTitle": title,
+            "detailHeaderFileMeta": file_meta or "-",
+            "detailCorrespondent": correspondent or "-",
+            "detailDocumentDate": document_date or "-",
+            "detailDocumentType": document_type or "-",
+            "detailSummary": _document_summary_preview(ocr_preview),
+            "documentHistoryCount": f"{len(history)} event{'s' if len(history) != 1 else ''}",
+            "documentHistoryTabCount": str(len(history)),
+            "detailOcrCharCount": f"{len(ocr_preview):,} chars",
+            "detailOcrParsedShort": _short_date_label(ocr_parsed_at),
             "detailDocId": document_id or "-",
             "detailOwnerId": str(document.get("owner_id") or "-"),
             "detailFilename": str(document.get("filename") or "-"),
             "detailCreatedAt": str(document.get("created_at") or "-"),
-            "detailOcrParsedAt": str(detail.get("ocr_parsed_at") or "-"),
-            "detailContentType": str(document.get("content_type") or "-"),
+            "detailOcrParsedAt": ocr_parsed_at,
+            "detailContentType": content_type,
             "detailSizeBytes": f"{_format_bytes(size_bytes)} ({size_bytes} bytes)",
             "detailChecksum": str(document.get("checksum_sha256") or "-"),
             "detailBlobUri": _relative_blob_path(str(document.get("blob_uri") or "")),
-            "detailOcrContent": str(detail.get("ocr_text_preview") or "").strip() or "-",
+            "detailOcrContent": ocr_preview or "-",
         },
         "html": {
             "detailStatus": _status_badge_html(str(document.get("status") or "")),
+            "detailTagPills": _document_detail_tags_html(tags),
         },
         "inputs": {
-            "metaTitle": str(metadata.get("suggested_title") or document.get("filename") or ""),
-            "metaDate": str(metadata.get("document_date") or ""),
-            "metaCorrespondent": str(metadata.get("correspondent") or ""),
-            "metaType": str(metadata.get("document_type") or ""),
+            "metaTitle": title,
+            "metaDate": document_date,
+            "metaCorrespondent": correspondent,
+            "metaType": document_type,
             "metaTags": ", ".join(str(tag) for tag in tags),
         },
+        "tags_html": _document_detail_tags_html(tags),
+        "summary": _document_summary_preview(ocr_preview),
+        "file_meta": file_meta or "-",
+        "history_count": f"{len(history)} event{'s' if len(history) != 1 else ''}",
+        "history_count_short": str(len(history)),
+        "ocr_char_count": f"{len(ocr_preview):,}",
+        "ocr_parsed_short": _short_date_label(ocr_parsed_at),
+        "correspondent_initials": _initials(correspondent or title),
         "history_html": _history_html(history),
     }
 
@@ -685,6 +764,8 @@ def document_detail_partial_html(initial_data: dict) -> str:
         "document_id": fragments.get("document_id", ""),
         "document_label": fragments.get("document_label", ""),
         "blob_uri": fragments.get("blob_uri", ""),
+        "file_url": fragments.get("file_url", ""),
+        "preview_url": fragments.get("preview_url", ""),
     }
     return (
         f'<div class="ui-partial-fragment"{_fragment_data_attrs(data_attrs)}>'

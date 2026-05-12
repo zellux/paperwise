@@ -130,9 +130,20 @@ def _initial_render_context(initial_data: dict) -> dict:
             chat_threads if isinstance(chat_threads, list) else []
         ),
         "document_detail_blob_uri": fragments["blob_uri"],
+        "document_detail_correspondent_initials": fragments.get("correspondent_initials", "PW"),
+        "document_detail_file_meta": fragments.get("file_meta", "-"),
+        "document_detail_file_url": fragments.get("file_url", ""),
+        "document_detail_preview_url": fragments.get("preview_url", ""),
         "document_detail_inputs": fragments["inputs"],
         "document_detail_status_html": fragments["html"].get("detailStatus", "-"),
+        "document_detail_summary": fragments.get("summary", ""),
+        "document_detail_tags_html": fragments.get("tags_html", ""),
         "document_detail_text": fragments["text"],
+        "document_detail_title": fragments["text"].get("detailTitle", "Untitled document"),
+        "document_history_count": fragments.get("history_count", "0 events"),
+        "document_history_count_short": fragments.get("history_count_short", "0"),
+        "document_detail_ocr_char_count": fragments.get("ocr_char_count", "0"),
+        "document_detail_ocr_parsed_short": fragments.get("ocr_parsed_short", "-"),
         "document_history_html": fragments["history_html"],
         "document_types_table_body_html": document_type_rows_html(
             document_types if isinstance(document_types, list) else []

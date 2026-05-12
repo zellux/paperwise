@@ -1,87 +1,264 @@
-<article id="section-document" class="panel panel-section view">
-          <h2>Document</h2>
-          <div class="document-detail-card">
-            <div class="document-detail-grid">
-              <div class="document-detail-item">
-                <span class="document-detail-label">Document ID</span>
-                <code id="detailDocId" class="document-detail-value">{{ document_detail_text.detailDocId|default("-") }}</code>
+<article id="section-document" class="document-detail-workbench view">
+  <header class="doc-detail-header">
+    <div class="doc-detail-header-top">
+      <nav class="doc-breadcrumb" aria-label="Breadcrumb">
+        <a href="/ui/documents">Documents</a>
+        <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+        <span id="detailBreadcrumbTitle">{{ document_detail_title|default(document_detail_inputs.metaTitle)|default("Document") }}</span>
+      </nav>
+      <div class="doc-detail-actions">
+        <button id="backToDocsBtn" type="button" class="btn btn-muted">Back</button>
+        <button id="viewDocumentFileBtn" type="button" class="btn">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+          <span>View File</span>
+        </button>
+        <button id="saveMetadataHeaderBtn" type="submit" form="documentMetaForm" class="btn btn-primary">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Save changes</span>
+        </button>
+      </div>
+    </div>
+    <div class="doc-detail-header-body">
+      <div class="doc-detail-titleblock">
+        <div class="doc-eyebrow">
+          <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <span id="detailHeaderFileMeta">{{ document_detail_file_meta|default("") }}</span>
+          <span class="dot" aria-hidden="true"></span>
+          <span id="detailStatus" class="detail-status-wrap">{{ document_detail_status_html|safe }}</span>
+        </div>
+        <h1 id="detailTitle" class="doc-detail-title">{{ document_detail_title|default(document_detail_inputs.metaTitle)|default("Untitled document") }}</h1>
+        <div class="doc-meta-row">
+          <span class="meta-pill">
+            <span class="meta-key">Correspondent</span>
+            <span id="detailCorrespondent" class="meta-val">{{ document_detail_inputs.metaCorrespondent|default("-") }}</span>
+          </span>
+          <span class="meta-pill">
+            <span class="meta-key">Date</span>
+            <span id="detailDocumentDate" class="meta-val">{{ document_detail_inputs.metaDate|default("-") }}</span>
+          </span>
+          <span class="meta-pill">
+            <span class="meta-key">Type</span>
+            <span id="detailDocumentType" class="meta-val">{{ document_detail_inputs.metaType|default("-") }}</span>
+          </span>
+          <span id="detailTagPills" class="doc-detail-tags">{{ document_detail_tags_html|safe }}</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="doc-detail-workspace">
+    <section class="doc-preview-panel">
+      <div class="doc-preview-toolbar">
+        <div class="preview-pager">
+          <button type="button" class="icon-btn" aria-label="Previous page">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 18 9 12 15 6"/></svg>
+          </button>
+          <span class="pager-text">Page <span>1</span> / <span>1</span></span>
+          <button type="button" class="icon-btn" aria-label="Next page">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+        <div class="preview-tools">
+          <button type="button" class="icon-btn" aria-label="Zoom out">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          </button>
+          <span class="zoom-text">100%</span>
+          <button type="button" class="icon-btn" aria-label="Zoom in">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+          </button>
+          <span class="preview-divider" aria-hidden="true"></span>
+          <button type="button" class="icon-btn" aria-label="Fit to width">
+            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 21 3 21 3 15"/><polyline points="15 3 21 3 21 9"/><line x1="3" y1="21" x2="10" y2="14"/><line x1="21" y1="3" x2="14" y2="10"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="doc-preview-stage">
+        <aside class="page-strip" aria-label="Page thumbnails">
+          <button type="button" class="strip-thumb active" aria-label="Go to page 1">
+            <span class="strip-thumb-page">
+              <span class="strip-line" style="width: 70%"></span>
+              <span class="strip-line" style="width: 85%"></span>
+              <span class="strip-line" style="width: 60%"></span>
+              <span class="strip-line" style="width: 78%"></span>
+              <span class="strip-line" style="width: 55%"></span>
+            </span>
+            <span class="strip-num">1</span>
+          </button>
+        </aside>
+        <div class="page-canvas">
+          <div class="pdf-preview-frame">
+            <iframe
+              id="detailFilePreview"
+              class="document-file-preview"
+              src="{{ document_detail_preview_url|default("") }}"
+              title="Document preview"
+            ></iframe>
+          </div>
+          <div class="document-file-meta" hidden>
+            <span id="detailFilename">{{ document_detail_text.detailFilename|default("-") }}</span>
+            <span aria-hidden="true"> · </span>
+            <span id="detailContentType">{{ document_detail_text.detailContentType|default("-") }}</span>
+            <span aria-hidden="true"> · </span>
+            <span id="detailSizeBytes">{{ document_detail_text.detailSizeBytes|default("-") }}</span>
+            <span aria-hidden="true"> · </span>
+            <span id="detailCreatedAt">{{ document_detail_text.detailCreatedAt|default("-") }}</span>
+          </div>
+          <pre id="detailOcrContent" class="detail-ocr-source" hidden>{{ document_detail_text.detailOcrContent|default("-") }}</pre>
+        </div>
+      </div>
+    </section>
+
+    <aside class="doc-detail-rail">
+      <section class="detail-card summary-card">
+        <header class="card-head">
+          <span class="card-eyebrow">
+            <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg>
+            <span>Paperwise summary</span>
+          </span>
+        </header>
+        <p id="detailSummary" class="summary-text">{{ document_detail_summary|default("OCR text is available for review. Save metadata changes from the details panel.") }}</p>
+      </section>
+
+      <nav class="rail-tabs" aria-label="Document detail sections">
+        <button type="button" class="rail-tab active" data-detail-tab="details" aria-selected="true">Details</button>
+        <button type="button" class="rail-tab" data-detail-tab="ocr" aria-selected="false">OCR text</button>
+        <button type="button" class="rail-tab" data-detail-tab="history" aria-selected="false">
+          <span>History</span>
+          <span id="documentHistoryTabCount" class="rail-tab-count">{{ document_history_count_short|default("0") }}</span>
+        </button>
+        <button type="button" class="rail-tab" data-detail-tab="threads" aria-selected="false">
+          <span>Threads</span>
+          <span class="rail-tab-count">0</span>
+        </button>
+      </nav>
+
+      <div id="detailTabDetails" class="detail-tab-pane" data-detail-pane="details">
+        <form id="documentMetaForm" class="detail-card detail-form-card">
+          <div class="card-eyebrow">
+            <span>Metadata</span>
+            <span class="card-eyebrow-aside">
+              <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg>
+              Suggested
+            </span>
+          </div>
+          <div class="detail-form">
+            <div class="detail-field">
+              <label class="field-label" for="metaTitle">Title</label>
+              <input id="metaTitle" class="field-input" name="metaTitle" type="text" value="{{ document_detail_inputs.metaTitle|default("") }}" required />
+            </div>
+            <div class="field-row">
+              <div class="detail-field">
+                <label class="field-label" for="metaDate">Document date</label>
+                <input id="metaDate" class="field-input" name="metaDate" type="date" value="{{ document_detail_inputs.metaDate|default("") }}" />
               </div>
-              <div class="document-detail-item">
-                <span class="document-detail-label">Owner</span>
-                <span id="detailOwnerId" class="document-detail-value">{{ document_detail_text.detailOwnerId|default("-") }}</span>
-              </div>
-              <div class="document-detail-item">
-                <span class="document-detail-label">File Name</span>
-                <span id="detailFilename" class="document-detail-value">{{ document_detail_text.detailFilename|default("-") }}</span>
-              </div>
-              <div class="document-detail-item">
-                <span class="document-detail-label">Status</span>
-                <span id="detailStatus" class="document-detail-value">{{ document_detail_status_html|safe }}</span>
-              </div>
-              <div class="document-detail-item">
-                <span class="document-detail-label">Created</span>
-                <span id="detailCreatedAt" class="document-detail-value">{{ document_detail_text.detailCreatedAt|default("-") }}</span>
-              </div>
-              <div class="document-detail-item">
-                <span class="document-detail-label">OCR Parsed</span>
-                <span id="detailOcrParsedAt" class="document-detail-value">{{ document_detail_text.detailOcrParsedAt|default("-") }}</span>
-              </div>
-              <div class="document-detail-item">
-                <span class="document-detail-label">Content Type</span>
-                <span id="detailContentType" class="document-detail-value">{{ document_detail_text.detailContentType|default("-") }}</span>
-              </div>
-              <div class="document-detail-item">
-                <span class="document-detail-label">Size</span>
-                <span id="detailSizeBytes" class="document-detail-value">{{ document_detail_text.detailSizeBytes|default("-") }}</span>
-              </div>
-              <div class="document-detail-item">
-                <span class="document-detail-label">Checksum (SHA256)</span>
-                <code id="detailChecksum" class="document-detail-value">{{ document_detail_text.detailChecksum|default("-") }}</code>
+              <div class="detail-field">
+                <label class="field-label" for="metaType">Type</label>
+                <input id="metaType" class="field-input" name="metaType" type="text" value="{{ document_detail_inputs.metaType|default("") }}" required />
               </div>
             </div>
-            <div class="document-detail-item document-detail-item-full">
-              <span class="document-detail-label">File Path</span>
-              <code id="detailBlobUri" class="document-detail-value document-detail-path" title="{{ document_detail_blob_uri|default("") }}">{{ document_detail_text.detailBlobUri|default("-") }}</code>
+            <div class="detail-field">
+              <label class="field-label" for="metaCorrespondent">Correspondent</label>
+              <div class="field-with-avatar">
+                <span class="corr-avatar" aria-hidden="true">{{ document_detail_correspondent_initials|default("PW") }}</span>
+                <input id="metaCorrespondent" class="field-input" name="metaCorrespondent" type="text" value="{{ document_detail_inputs.metaCorrespondent|default("") }}" required />
+              </div>
             </div>
-            <div class="document-detail-item document-detail-item-full">
-              <span class="document-detail-label">OCR Content</span>
-              <pre id="detailOcrContent" class="document-detail-value document-ocr-preview">{{ document_detail_text.detailOcrContent|default("-") }}</pre>
+            <div class="detail-field">
+              <label class="field-label" for="metaTags">Tags</label>
+              <div id="metaTagEditor" class="tag-editor" data-tag-editor>
+                <div class="tag-editor-wrap">
+                  <div id="metaTagChips" class="tag-editor-chips" aria-label="Selected tags"></div>
+                  <input
+                    id="metaTagQuery"
+                    class="tag-editor-input"
+                    type="text"
+                    placeholder="Add tag..."
+                    autocomplete="off"
+                    aria-label="Add tag"
+                    aria-controls="metaTagSuggestions"
+                  />
+                </div>
+                <input id="metaTags" name="metaTags" type="hidden" value="{{ document_detail_inputs.metaTags|default("") }}" />
+                <ul id="metaTagSuggestions" class="tag-suggest" hidden></ul>
+              </div>
             </div>
           </div>
-          <form id="documentMetaForm" class="stack">
-            <label class="label" for="metaTitle">Title</label>
-            <input id="metaTitle" name="metaTitle" type="text" value="{{ document_detail_inputs.metaTitle|default("") }}" required />
+        </form>
 
-            <label class="label" for="metaDate">Date</label>
-            <input id="metaDate" name="metaDate" type="date" value="{{ document_detail_inputs.metaDate|default("") }}" />
-
-            <label class="label" for="metaCorrespondent">Correspondent</label>
-            <input id="metaCorrespondent" name="metaCorrespondent" type="text" value="{{ document_detail_inputs.metaCorrespondent|default("") }}" required />
-
-            <label class="label" for="metaType">Document Type</label>
-            <input id="metaType" name="metaType" type="text" value="{{ document_detail_inputs.metaType|default("") }}" required />
-
-            <label class="label" for="metaTags">Tags (comma separated)</label>
-            <input id="metaTags" name="metaTags" type="text" value="{{ document_detail_inputs.metaTags|default("") }}" />
-
-            <div class="actions document-actions">
-              <div class="document-actions-left">
-                <button id="saveMetadataBtn" type="submit" class="btn btn-primary">Save Metadata</button>
-                <button id="viewDocumentFileBtn" type="button" class="btn">View File</button>
-                <button id="backToDocsBtn" type="button" class="btn">Back to Documents</button>
-              </div>
-              <div class="document-actions-right">
-                <button id="deleteDocumentBtn" type="button" class="btn btn-muted">
-                  Delete Document
-                </button>
-                <button id="reprocessDocumentBtn" type="button" class="btn btn-muted">
-                  Reprocess Document
-                </button>
-              </div>
+        <section id="systemInformation" class="detail-card">
+          <button type="button" class="card-collapse" aria-expanded="true">
+            <span>System information</span>
+            <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 15 12 9 18 15"/></svg>
+          </button>
+          <dl class="sys-grid">
+            <div class="sys-item">
+              <dt>Document ID</dt>
+              <dd><code id="detailDocId" class="document-detail-value">{{ document_detail_text.detailDocId|default("-") }}</code></dd>
             </div>
-          </form>
-          <section class="document-history-card">
-            <h3 class="document-history-title">Edit History</h3>
-            <div id="documentHistoryList" class="document-history-list">{{ document_history_html|safe }}</div>
-          </section>
-        </article>
+            <div class="sys-item">
+              <dt>Owner</dt>
+              <dd id="detailOwnerId">{{ document_detail_text.detailOwnerId|default("-") }}</dd>
+            </div>
+            <div class="sys-item">
+              <dt>OCR parsed</dt>
+              <dd id="detailOcrParsedAt">{{ document_detail_text.detailOcrParsedAt|default("-") }}</dd>
+            </div>
+            <div class="sys-item">
+              <dt>Checksum</dt>
+              <dd><code id="detailChecksum" class="document-detail-value trunc">{{ document_detail_text.detailChecksum|default("-") }}</code></dd>
+            </div>
+            <div class="sys-item sys-item-full">
+              <dt>File path</dt>
+              <dd><code id="detailBlobUri" class="document-detail-value document-detail-path" title="{{ document_detail_blob_uri|default("") }}">{{ document_detail_text.detailBlobUri|default("-") }}</code></dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="detail-card danger-card">
+          <div class="card-eyebrow">Document actions</div>
+          <div class="action-grid">
+            <button id="reprocessDocumentBtn" type="button" class="action-btn">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span><b>Reprocess</b> · re-run OCR and metadata extraction</span>
+            </button>
+            <button id="deleteDocumentBtn" type="button" class="action-btn danger">
+              <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/></svg>
+              <span><b>Delete</b> · remove this document</span>
+            </button>
+          </div>
+        </section>
+      </div>
+
+      <section id="detailTabOcr" class="detail-tab-pane detail-card ocr-tab-card" data-detail-pane="ocr" hidden>
+        <div class="ocr-toolbar">
+          <label class="ocr-search" for="detailOcrSearch">
+            <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="detailOcrSearch" type="search" placeholder="Find in OCR text..." />
+          </label>
+          <div class="ocr-meta">
+            <span id="detailOcrCharCount">{{ document_detail_ocr_char_count|default("0") }} chars</span>
+            <span class="dot" aria-hidden="true"></span>
+            <span>parsed <span id="detailOcrParsedShort">{{ document_detail_ocr_parsed_short|default("-") }}</span></span>
+            <button id="detailOcrCopyBtn" type="button" class="card-link" title="Copy OCR text" aria-label="Copy OCR text">
+              <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            </button>
+          </div>
+        </div>
+        <pre id="detailOcrLines" class="ocr-pre"></pre>
+      </section>
+
+      <section id="detailTabHistory" class="detail-tab-pane detail-card document-history-card" data-detail-pane="history" hidden>
+        <div class="card-eyebrow">
+          <span>Edit history</span>
+          <span id="documentHistoryCount" class="card-eyebrow-aside">{{ document_history_count|default("0 events") }}</span>
+        </div>
+        <div id="documentHistoryList" class="document-history-list">{{ document_history_html|safe }}</div>
+      </section>
+
+      <section id="detailTabThreads" class="detail-tab-pane detail-card placeholder-tab" data-detail-pane="threads" hidden>
+        <div class="card-eyebrow">Chat threads referencing this document</div>
+        <p class="document-history-empty">No chat threads have referenced this document yet.</p>
+      </section>
+    </aside>
+  </div>
+</article>

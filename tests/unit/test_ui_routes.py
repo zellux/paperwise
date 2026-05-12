@@ -390,7 +390,7 @@ def test_static_assets_split_theme_css() -> None:
 
     documents = client.get("/static/css/documents.css")
     assert documents.status_code == 200
-    assert ".document-detail-card" in documents.text
+    assert ".document-detail-workbench" in documents.text
     assert ".filter-chip" in documents.text
     assert "#metaDate" in documents.text
 
