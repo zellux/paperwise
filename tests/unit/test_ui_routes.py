@@ -654,11 +654,16 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert '<a class="tag-pill" href="/ui/documents?tag=Tax" style="--tag-color: ' in documents_html
         assert '<a class="tag-pill" href="/ui/documents?tag=Finance" style="--tag-color: ' in documents_html
         assert 'data-doc-id="doc-tax"' in documents_html
+        assert 'data-doc-tags="[&quot;Tax&quot;, &quot;Finance&quot;]"' in documents_html
         assert "Tax Notice" in documents_html
         assert (
             '<a class="row-act" href="/ui/document?id=doc-tax" title="Open document" '
             'aria-label="Open document">'
         ) in documents_html
+        assert 'id="docsBulkTagsBtn"' in documents_html
+        assert 'id="docsBulkCorrespondentBtn"' in documents_html
+        assert 'id="docsBulkDownloadBtn"' in documents_html
+        assert 'id="docsBulkDeleteBtn"' in documents_html
         assert '<span class="status-badge status-ready">READY</span>' not in documents_html
         assert 'data-delete-doc-id="doc-tax"' not in documents_html
         assert "icon-action-button" not in documents_html

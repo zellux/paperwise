@@ -1008,6 +1008,13 @@
   font-size: 0.76rem;
 }
 
+.bulk-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 2px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
 .bulk-action {
   display: inline-flex;
   align-items: center;
@@ -1028,6 +1035,15 @@
 
 .bulk-action:hover {
   background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.bulk-action-danger {
+  color: #ffd6d0;
+}
+
+.bulk-action-danger:hover {
+  background: rgba(255, 92, 74, 0.18);
   color: white;
 }
 

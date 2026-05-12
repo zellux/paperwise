@@ -1,4 +1,5 @@
 import {
+  apiFetch,
   applyHtmlPartialTarget,
   applyTableBodyPartial,
   loadTablePartial,
@@ -16,7 +17,7 @@ import {
   normalizePageSize,
   normalizeSortState,
 } from "./state/preferences.js";
-import { sortValues, unique } from "./ui/values.js";
+import { sortValues, splitTags, unique } from "./ui/values.js";
 
 const filterDropdownState = new Map();
 const DOCS_SORT_FIELDS = new Set([
@@ -591,6 +592,179 @@ function toggleDocumentSelection(documentId, selected) {
   renderDocSelectionState();
 }
 
+function getSelectedDocumentRows() {
+  return getVisibleDocRows().filter((row) => selectedDocIds.has(row.dataset.docId || ""));
+}
+
+function parseRowTags(row) {
+  try {
+    const tags = JSON.parse(row.dataset.docTags || "[]");
+    return Array.isArray(tags) ? tags.map((tag) => String(tag)).filter(Boolean) : [];
+  } catch (_error) {
+    return [];
+  }
+}
+
+function getRowMetadataPayload(row) {
+  return {
+    suggested_title: String(row.dataset.docTitle || "").trim(),
+    document_date: String(row.dataset.docDate || "").trim() || null,
+    correspondent: String(row.dataset.docCorrespondent || "").trim(),
+    document_type: String(row.dataset.docType || "").trim(),
+    tags: parseRowTags(row),
+  };
+}
+
+function getSelectedRowsOrLog() {
+  const rows = getSelectedDocumentRows();
+  if (!rows.length) {
+    logActivity("No documents selected.");
+  }
+  return rows;
+}
+
+async function patchSelectedDocumentsMetadata(rows, changes) {
+  let savedCount = 0;
+  for (const row of rows) {
+    const documentId = row.dataset.docId || "";
+    const response = await apiFetch(`/documents/${documentId}/metadata`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...getRowMetadataPayload(row), ...changes }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || response.statusText);
+    }
+    savedCount += 1;
+  }
+  selectedDocIds.clear();
+  await loadDocumentsList();
+  return savedCount;
+}
+
+async function handleBulkTagsClick(button) {
+  const rows = getSelectedRowsOrLog();
+  if (!rows.length) {
+    return;
+  }
+  const defaultTags = rows.length === 1 ? parseRowTags(rows[0]).join(", ") : "";
+  const value = window.prompt(
+    `Set tags for ${rows.length} selected document(s). This replaces existing tags.`,
+    defaultTags
+  );
+  if (value === null) {
+    return;
+  }
+  button.disabled = true;
+  try {
+    const savedCount = await patchSelectedDocumentsMetadata(rows, { tags: splitTags(value) });
+    logActivity(`Updated tags for ${savedCount} document(s).`);
+  } catch (error) {
+    logActivity(`Bulk tag update failed: ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function handleBulkCorrespondentClick(button) {
+  const rows = getSelectedRowsOrLog();
+  if (!rows.length) {
+    return;
+  }
+  const defaultCorrespondent = rows.length === 1 ? String(rows[0].dataset.docCorrespondent || "") : "";
+  const value = window.prompt(`Set correspondent for ${rows.length} selected document(s).`, defaultCorrespondent);
+  if (value === null) {
+    return;
+  }
+  button.disabled = true;
+  try {
+    const savedCount = await patchSelectedDocumentsMetadata(rows, { correspondent: value.trim() });
+    logActivity(`Updated correspondent for ${savedCount} document(s).`);
+  } catch (error) {
+    logActivity(`Bulk correspondent update failed: ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function handleBulkDeleteClick(button) {
+  const rows = getSelectedRowsOrLog();
+  if (!rows.length) {
+    return;
+  }
+  if (!window.confirm(`Delete ${rows.length} selected document(s)? This permanently removes their files and metadata.`)) {
+    return;
+  }
+  button.disabled = true;
+  try {
+    let deletedCount = 0;
+    for (const row of rows) {
+      const documentId = row.dataset.docId || "";
+      const response = await apiFetch(`/documents/${documentId}`, { method: "DELETE" });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.detail || response.statusText);
+      }
+      deletedCount += 1;
+    }
+    selectedDocIds.clear();
+    await loadDocumentsList();
+    logActivity(`Deleted ${deletedCount} document(s).`);
+  } catch (error) {
+    logActivity(`Bulk delete failed: ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function sanitizeDownloadFilename(value, fallback) {
+  const cleaned = String(value || "")
+    .trim()
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ");
+  return cleaned || fallback;
+}
+
+async function downloadRowDocument(row) {
+  const documentId = row.dataset.docId || "";
+  const response = await apiFetch(`/documents/${documentId}/file`);
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(payload.detail || response.statusText);
+  }
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = sanitizeDownloadFilename(row.dataset.docFilename || row.dataset.docTitle, `${documentId}.bin`);
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => window.URL.revokeObjectURL(url), 60_000);
+}
+
+async function handleBulkDownloadClick(button) {
+  const rows = getSelectedRowsOrLog();
+  if (!rows.length) {
+    return;
+  }
+  button.disabled = true;
+  try {
+    let downloadedCount = 0;
+    for (const row of rows) {
+      await downloadRowDocument(row);
+      downloadedCount += 1;
+    }
+    logActivity(`Started download for ${downloadedCount} document(s).`);
+  } catch (error) {
+    logActivity(`Bulk download failed: ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 export function prepareDocumentListDelete() {
   const docsTableBody = document.getElementById("docsTableBody");
   const visibleDocRows = docsTableBody?.querySelectorAll("tr[data-doc-id]").length || 0;
@@ -719,7 +893,7 @@ function bindDocumentsEvents() {
     });
   }
 
-  document.addEventListener("click", (event) => {
+  document.addEventListener("click", async (event) => {
     const selectionControl =
       event.target instanceof Element ? event.target.closest("input[data-doc-select], #docsSelectAll") : null;
     if (selectionControl instanceof HTMLInputElement) {
@@ -728,6 +902,31 @@ function bindDocumentsEvents() {
         return;
       }
       toggleDocumentSelection(selectionControl.dataset.docSelect || "", selectionControl.checked);
+      return;
+    }
+
+    const bulkTags = event.target instanceof Element ? event.target.closest("#docsBulkTagsBtn") : null;
+    if (bulkTags instanceof HTMLButtonElement) {
+      await handleBulkTagsClick(bulkTags);
+      return;
+    }
+
+    const bulkCorrespondent =
+      event.target instanceof Element ? event.target.closest("#docsBulkCorrespondentBtn") : null;
+    if (bulkCorrespondent instanceof HTMLButtonElement) {
+      await handleBulkCorrespondentClick(bulkCorrespondent);
+      return;
+    }
+
+    const bulkDownload = event.target instanceof Element ? event.target.closest("#docsBulkDownloadBtn") : null;
+    if (bulkDownload instanceof HTMLButtonElement) {
+      await handleBulkDownloadClick(bulkDownload);
+      return;
+    }
+
+    const bulkDelete = event.target instanceof Element ? event.target.closest("#docsBulkDeleteBtn") : null;
+    if (bulkDelete instanceof HTMLButtonElement) {
+      await handleBulkDeleteClick(bulkDelete);
       return;
     }
 

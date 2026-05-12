@@ -34,6 +34,10 @@ def _tag_color_style(value: str) -> str:
     return f' style="--tag-color: {_stable_tag_color(value)};"'
 
 
+def _html_attr(value: object) -> str:
+    return escape(str(value or ""), quote=True)
+
+
 def tag_rows_html(tag_stats: list[dict]) -> str:
     if not tag_stats:
         return '                <tr><td colspan="3">No tags found.</td></tr>'
@@ -419,12 +423,15 @@ def document_rows_html(documents: list[dict]) -> str:
         raw_document_id = str(item.get("id") or "")
         document_id = escape(raw_document_id)
         document_id_query = quote(raw_document_id, safe="")
-        title = escape(_document_title(item))
-        filename = escape(str(item.get("filename") or "Untitled document"))
+        raw_title = _document_title(item)
+        title = escape(raw_title)
+        raw_filename = str(item.get("filename") or "Untitled document")
+        filename = escape(raw_filename)
         metadata = item.get("llm_metadata") if isinstance(item.get("llm_metadata"), dict) else {}
-        document_type = str(metadata.get("document_type") or "-")
-        correspondent_raw = str(metadata.get("correspondent") or "-")
-        correspondent = escape(correspondent_raw)
+        document_type_raw = str(metadata.get("document_type") or "")
+        document_type = str(document_type_raw or "-")
+        correspondent_raw = str(metadata.get("correspondent") or "")
+        correspondent = escape(correspondent_raw or "-")
         correspondent_query = quote(correspondent_raw, safe="")
         tags = metadata.get("tags") if isinstance(metadata.get("tags"), list) else []
         tag_pills = "".join(
@@ -452,7 +459,13 @@ def document_rows_html(documents: list[dict]) -> str:
         if page_count:
             title_meta_parts.append(f'<span class="dot" aria-hidden="true"></span><span>{page_count}</span>')
         rows.append(
-            f'                <tr class="doc-row" data-doc-id="{document_id}">'
+            f'                <tr class="doc-row" data-doc-id="{document_id}"'
+            f' data-doc-title="{_html_attr(raw_title)}"'
+            f' data-doc-filename="{_html_attr(raw_filename)}"'
+            f' data-doc-date="{_html_attr(document_date_raw)}"'
+            f' data-doc-correspondent="{_html_attr(correspondent_raw)}"'
+            f' data-doc-type="{_html_attr(document_type_raw)}"'
+            f' data-doc-tags="{_html_attr(json.dumps([str(tag) for tag in tags], ensure_ascii=True))}">'
             '<td class="td td-check" data-label="Select">'
             f'<input type="checkbox" data-doc-select="{document_id}" aria-label="Select {title}" /></td>'
             '<td class="td td-title" data-label="Document">'
