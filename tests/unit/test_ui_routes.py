@@ -664,6 +664,8 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'id="docsBulkCorrespondentBtn"' in documents_html
         assert 'id="docsBulkDownloadBtn"' in documents_html
         assert 'id="docsBulkDeleteBtn"' in documents_html
+        assert 'id="docsBulkEditor"' in documents_html
+        assert 'id="docsBulkEditorInput"' in documents_html
         assert '<span class="status-badge status-ready">READY</span>' not in documents_html
         assert 'data-delete-doc-id="doc-tax"' not in documents_html
         assert "icon-action-button" not in documents_html

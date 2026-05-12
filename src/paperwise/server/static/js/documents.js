@@ -43,6 +43,7 @@ let docsTotalCount = 0;
 let docsListRequestSeq = 0;
 let initialDocumentsHydrated = false;
 let documentsEventsBound = false;
+let activeBulkEditMode = "";
 const selectedDocIds = new Set();
 
 function cloneDocsFilters(filters) {
@@ -557,6 +558,9 @@ function renderDocSelectionState() {
   if (bulkBar) {
     bulkBar.hidden = selectedDocIds.size === 0;
   }
+  if (selectedDocIds.size === 0) {
+    closeBulkEditor();
+  }
 }
 
 function syncSelectionToVisibleRows() {
@@ -623,6 +627,94 @@ function getSelectedRowsOrLog() {
   return rows;
 }
 
+function getBulkEditorElements() {
+  return {
+    form: document.getElementById("docsBulkEditor"),
+    title: document.getElementById("docsBulkEditorTitle"),
+    label: document.getElementById("docsBulkEditorLabel"),
+    input: document.getElementById("docsBulkEditorInput"),
+    hint: document.getElementById("docsBulkEditorHint"),
+    save: document.getElementById("docsBulkEditorSave"),
+    modeButtons: [
+      document.getElementById("docsBulkTagsBtn"),
+      document.getElementById("docsBulkCorrespondentBtn"),
+    ],
+  };
+}
+
+function getSharedValue(values) {
+  if (!values.length) {
+    return "";
+  }
+  const [firstValue] = values;
+  return values.every((value) => value === firstValue) ? firstValue : "";
+}
+
+function closeBulkEditor() {
+  const { form, input, modeButtons } = getBulkEditorElements();
+  if (form) {
+    form.hidden = true;
+    delete form.dataset.mode;
+  }
+  if (input instanceof HTMLInputElement) {
+    input.value = "";
+  }
+  for (const button of modeButtons) {
+    button?.classList.remove("is-active");
+  }
+  activeBulkEditMode = "";
+}
+
+function openBulkEditor(mode, triggerButton) {
+  const rows = getSelectedRowsOrLog();
+  if (!rows.length) {
+    return;
+  }
+  const { form, title, label, input, hint, modeButtons } = getBulkEditorElements();
+  if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement)) {
+    return;
+  }
+
+  activeBulkEditMode = mode;
+  form.dataset.mode = mode;
+  form.hidden = false;
+
+  for (const button of modeButtons) {
+    button?.classList.toggle("is-active", button === triggerButton);
+  }
+
+  if (mode === "tags") {
+    const tagValues = rows.map((row) => parseRowTags(row).join(", "));
+    input.value = getSharedValue(tagValues);
+    input.placeholder = "Finance, Tax, Receipt";
+    if (title) {
+      title.textContent = `Set tags for ${rows.length} selected`;
+    }
+    if (label) {
+      label.textContent = "Tags";
+    }
+    if (hint) {
+      hint.textContent = "Comma-separated tags. Applying replaces existing tags on every selected document.";
+    }
+  } else {
+    const correspondentValues = rows.map((row) => String(row.dataset.docCorrespondent || "").trim());
+    input.value = getSharedValue(correspondentValues);
+    input.placeholder = "Correspondent name";
+    if (title) {
+      title.textContent = `Set correspondent for ${rows.length} selected`;
+    }
+    if (label) {
+      label.textContent = "Correspondent";
+    }
+    if (hint) {
+      hint.textContent = "Applying writes this correspondent to every selected document.";
+    }
+  }
+
+  input.focus();
+  input.select();
+}
+
 async function patchSelectedDocumentsMetadata(rows, changes) {
   let savedCount = 0;
   for (const row of rows) {
@@ -644,47 +736,43 @@ async function patchSelectedDocumentsMetadata(rows, changes) {
 }
 
 async function handleBulkTagsClick(button) {
-  const rows = getSelectedRowsOrLog();
-  if (!rows.length) {
-    return;
-  }
-  const defaultTags = rows.length === 1 ? parseRowTags(rows[0]).join(", ") : "";
-  const value = window.prompt(
-    `Set tags for ${rows.length} selected document(s). This replaces existing tags.`,
-    defaultTags
-  );
-  if (value === null) {
-    return;
-  }
-  button.disabled = true;
-  try {
-    const savedCount = await patchSelectedDocumentsMetadata(rows, { tags: splitTags(value) });
-    logActivity(`Updated tags for ${savedCount} document(s).`);
-  } catch (error) {
-    logActivity(`Bulk tag update failed: ${error.message}`);
-  } finally {
-    button.disabled = false;
-  }
+  openBulkEditor("tags", button);
 }
 
 async function handleBulkCorrespondentClick(button) {
+  openBulkEditor("correspondent", button);
+}
+
+async function handleBulkEditorSubmit() {
   const rows = getSelectedRowsOrLog();
   if (!rows.length) {
     return;
   }
-  const defaultCorrespondent = rows.length === 1 ? String(rows[0].dataset.docCorrespondent || "") : "";
-  const value = window.prompt(`Set correspondent for ${rows.length} selected document(s).`, defaultCorrespondent);
-  if (value === null) {
+  const { form, input, save } = getBulkEditorElements();
+  if (!(form instanceof HTMLFormElement) || !(input instanceof HTMLInputElement)) {
     return;
   }
-  button.disabled = true;
+  const mode = form.dataset.mode || activeBulkEditMode;
+  if (!mode) {
+    return;
+  }
+  const value = input.value.trim();
+  const changes = mode === "tags" ? { tags: splitTags(value) } : { correspondent: value };
+  if (save instanceof HTMLButtonElement) {
+    save.disabled = true;
+  }
   try {
-    const savedCount = await patchSelectedDocumentsMetadata(rows, { correspondent: value.trim() });
-    logActivity(`Updated correspondent for ${savedCount} document(s).`);
+    const savedCount = await patchSelectedDocumentsMetadata(rows, changes);
+    const label = mode === "tags" ? "tags" : "correspondent";
+    logActivity(`Updated ${label} for ${savedCount} document(s).`);
+    closeBulkEditor();
   } catch (error) {
-    logActivity(`Bulk correspondent update failed: ${error.message}`);
+    const label = mode === "tags" ? "tag" : "correspondent";
+    logActivity(`Bulk ${label} update failed: ${error.message}`);
   } finally {
-    button.disabled = false;
+    if (save instanceof HTMLButtonElement) {
+      save.disabled = false;
+    }
   }
 }
 
@@ -920,13 +1008,22 @@ function bindDocumentsEvents() {
 
     const bulkDownload = event.target instanceof Element ? event.target.closest("#docsBulkDownloadBtn") : null;
     if (bulkDownload instanceof HTMLButtonElement) {
+      closeBulkEditor();
       await handleBulkDownloadClick(bulkDownload);
       return;
     }
 
     const bulkDelete = event.target instanceof Element ? event.target.closest("#docsBulkDeleteBtn") : null;
     if (bulkDelete instanceof HTMLButtonElement) {
+      closeBulkEditor();
       await handleBulkDeleteClick(bulkDelete);
+      return;
+    }
+
+    const bulkEditorCancel =
+      event.target instanceof Element ? event.target.closest("#docsBulkEditorCancel, #docsBulkEditorClose") : null;
+    if (bulkEditorCancel instanceof HTMLButtonElement) {
+      closeBulkEditor();
       return;
     }
 
@@ -950,7 +1047,20 @@ function bindDocumentsEvents() {
     }
   });
 
+  document.addEventListener("submit", async (event) => {
+    const form = event.target instanceof Element ? event.target.closest("#docsBulkEditor") : null;
+    if (!(form instanceof HTMLFormElement)) {
+      return;
+    }
+    event.preventDefault();
+    await handleBulkEditorSubmit();
+  });
+
   document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && activeBulkEditMode) {
+      closeBulkEditor();
+      return;
+    }
     if (event.key === "Escape" && activeFilterDropdown) {
       closeFilterDropdown(activeFilterDropdown);
     }

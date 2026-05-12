@@ -980,6 +980,11 @@
   animation: docs-bulk-in 200ms cubic-bezier(.2, .9, .4, 1.2);
 }
 
+.docs-bulk-bar:has(.docs-bulk-editor:not([hidden])) {
+  border-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 22px 54px rgba(17, 28, 24, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
 .docs-bulk-bar[hidden] {
   display: none;
 }
@@ -1038,6 +1043,11 @@
   color: white;
 }
 
+.bulk-action.is-active {
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+}
+
 .bulk-action-danger {
   color: #ffd6d0;
 }
@@ -1050,6 +1060,141 @@
 .bulk-action-icon {
   width: 30px;
   padding: 0;
+}
+
+.docs-bulk-editor {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  width: min(420px, calc(100vw - 32px));
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--ink) 92%, black);
+  box-shadow: 0 18px 44px rgba(17, 28, 24, 0.3);
+  color: white;
+  transform: translateX(-50%);
+}
+
+.docs-bulk-editor[hidden] {
+  display: none;
+}
+
+.docs-bulk-editor::after {
+  position: absolute;
+  left: 50%;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: color-mix(in srgb, var(--ink) 92%, black);
+  border-right: 1px solid rgba(255, 255, 255, 0.14);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  content: "";
+  transform: translateX(-50%) rotate(45deg);
+}
+
+.bulk-editor-head,
+.bulk-editor-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bulk-editor-head {
+  margin-bottom: 10px;
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.bulk-editor-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+}
+
+.bulk-editor-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.bulk-editor-field {
+  display: grid;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.bulk-editor-field input {
+  width: 100%;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+  font: inherit;
+  font-size: 0.83rem;
+  outline: none;
+}
+
+.bulk-editor-field input:focus {
+  border-color: rgba(255, 255, 255, 0.38);
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.08);
+}
+
+.bulk-editor-field input::placeholder {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.bulk-editor-hint {
+  min-height: 18px;
+  margin: 8px 0 12px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.bulk-editor-actions {
+  justify-content: flex-end;
+}
+
+.bulk-editor-button {
+  min-height: 30px;
+  padding: 0 11px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.82);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.bulk-editor-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.bulk-editor-primary {
+  border-color: transparent;
+  background: white;
+  color: var(--ink);
+}
+
+.bulk-editor-primary:hover {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
 }
 
 @media (max-width: 1180px) {

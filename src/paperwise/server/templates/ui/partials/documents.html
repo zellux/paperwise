@@ -151,5 +151,22 @@
       <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
       <span>Delete</span>
     </button>
+    <form id="docsBulkEditor" class="docs-bulk-editor" hidden>
+      <div class="bulk-editor-head">
+        <span id="docsBulkEditorTitle">Update selected documents</span>
+        <button id="docsBulkEditorClose" type="button" class="bulk-editor-close" aria-label="Close bulk editor">
+          <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <label class="bulk-editor-field">
+        <span id="docsBulkEditorLabel">Value</span>
+        <input id="docsBulkEditorInput" type="text" autocomplete="off" />
+      </label>
+      <p id="docsBulkEditorHint" class="bulk-editor-hint"></p>
+      <div class="bulk-editor-actions">
+        <button id="docsBulkEditorCancel" type="button" class="bulk-editor-button">Cancel</button>
+        <button id="docsBulkEditorSave" type="submit" class="bulk-editor-button bulk-editor-primary">Apply</button>
+      </div>
+    </form>
   </div>
 </article>
