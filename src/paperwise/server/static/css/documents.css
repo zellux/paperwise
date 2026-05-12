@@ -638,9 +638,10 @@
   flex-shrink: 0;
   overflow-x: auto;
   padding: 4px;
-  background: color-mix(in srgb, var(--ink) 4%, transparent);
-  border: 1px solid var(--stroke-soft);
+  background: color-mix(in srgb, var(--ink) 8%, #fff);
+  border: 1px solid var(--stroke);
   border-radius: 10px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.65);
 }
 
 .rail-tab {
@@ -663,13 +664,14 @@
 }
 
 .rail-tab:hover {
+  background: color-mix(in srgb, var(--ink) 6%, #fff);
   color: var(--ink);
 }
 
 .rail-tab.active {
-  background: var(--paper-solid);
+  background: #fff;
   color: var(--ink);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 8px rgba(38, 53, 46, 0.12);
 }
 
 .rail-tab-count {
