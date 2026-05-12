@@ -154,6 +154,49 @@ body {
   flex: 0 0 auto;
 }
 
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--stroke-soft);
+}
+
+.page-head-stack {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.page-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.page-eyebrow {
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.page-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 600;
+  line-height: 1.05;
+}
+
+.page-sub {
+  max-width: 56ch;
+  color: var(--ink-soft);
+  line-height: 1.45;
+  margin: 0;
+}
+
 .topnav {
   display: flex;
   align-items: center;
@@ -221,25 +264,6 @@ body {
   background: transparent;
   font: inherit;
   font-size: 0.86rem;
-}
-
-.topbar-info-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: transparent;
-  color: var(--ink-soft);
-  cursor: pointer;
-}
-
-.topbar-info-btn:hover {
-  background: var(--row-hover);
-  color: var(--ink);
 }
 
 .topbar-search input:focus {

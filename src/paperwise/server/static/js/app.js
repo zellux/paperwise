@@ -677,9 +677,6 @@ export function bindAppShellEvents() {
   document.getElementById("brandHomeBtn")?.addEventListener("click", () => {
     window.location.href = "/ui/documents";
   });
-  document.getElementById("topbarSettingsBtn")?.addEventListener("click", () => {
-    window.location.href = "/ui/settings";
-  });
 }
 
 async function loadActivePageModule() {

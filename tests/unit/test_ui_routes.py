@@ -238,6 +238,7 @@ def test_ui_html_is_split_into_layout_and_partials() -> None:
         "pending.html",
         "upload.html",
         "activity.html",
+        "topbar.html",
         "settings_display.html",
         "settings_models.html",
         "settings_account.html",

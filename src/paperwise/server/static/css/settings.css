@@ -187,42 +187,12 @@
 }
 
 .settings-pane-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
   padding: 18px 24px 14px;
-  border-bottom: 1px solid var(--stroke-soft);
   flex-shrink: 0;
 }
 
-.settings-pane-head-stack {
-  display: grid;
-  gap: 5px;
-  min-width: 0;
-}
-
-.settings-pane-head-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: 0 0 auto;
-}
-
-.settings-pane-eyebrow {
-  color: var(--ink-soft);
-  font-family: var(--mono);
-  font-size: 0.68rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
 .settings-pane-title {
-  margin: 0;
-  font-family: var(--serif);
   font-size: 1.55rem;
-  font-weight: 600;
-  line-height: 1.05;
 }
 
 .settings-nav .settings-nav-title,
@@ -233,10 +203,7 @@
 }
 
 .settings-pane-sub {
-  max-width: 56ch;
-  color: var(--ink-soft);
   font-size: 0.86rem;
-  line-height: 1.45;
 }
 
 .settings-form {
@@ -1049,7 +1016,7 @@
   display: grid;
   grid-template-columns: 36px minmax(220px, 1fr) minmax(220px, 1.2fr) minmax(220px, 1.2fr);
   gap: 12px;
-  align-items: start;
+  align-items: center;
   padding: 12px 14px;
 }
 
@@ -1063,7 +1030,6 @@
   display: grid;
   gap: 2px;
   min-width: 0;
-  padding-top: 2px;
 }
 
 .settings-task-title {
@@ -1251,6 +1217,10 @@
   line-height: 1.35;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+
+.settings-inline-status:empty {
+  display: none;
 }
 
 .settings-inline-status.is-success {

@@ -1367,17 +1367,10 @@
 }
 
 .docs-page-head {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 16px;
   padding: 22px 26px 16px;
-  border-bottom: 1px solid var(--stroke-soft);
 }
 
 .docs-head-actions {
-  display: flex;
-  align-items: center;
   flex-wrap: wrap;
   gap: 9px;
 }
