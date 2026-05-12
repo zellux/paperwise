@@ -277,12 +277,11 @@
 
 .chat-header-row {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   flex: 0 0 auto;
-  min-height: 72px;
-  padding: 14px 24px;
+  padding: 22px 26px 16px;
   border-bottom: 1px solid var(--stroke-soft);
   background: rgba(255, 255, 255, 0.62);
 }
@@ -305,8 +304,8 @@
   overflow: hidden;
   color: var(--ink);
   font-family: var(--serif);
-  font-size: 1.5rem;
-  line-height: 1.1;
+  font-size: 1.42rem;
+  line-height: 1.05;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
