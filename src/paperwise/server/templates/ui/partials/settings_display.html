@@ -1,68 +1,164 @@
-<article id="section-settings" class="panel panel-section view">
-          <h2>Settings</h2>
-          <nav class="settings-subnav" aria-label="Settings sections">
-            <a class="settings-subnav-link active" data-settings-section="settings-section-display" href="/ui/settings/display">Preferences</a>
-            <a class="settings-subnav-link" data-settings-section="settings-section-models" href="/ui/settings/models">Model Config</a>
-            <a class="settings-subnav-link" data-settings-section="settings-section-account" href="/ui/settings/account">User Account</a>
-          </nav>
-          <form id="settingsForm" class="stack settings-form">
-<section id="settings-section-display" class="settings-subsection">
-              <div class="settings-column">
-                <section class="settings-group">
-                  <h3 class="settings-group-title">Display</h3>
-                  <p class="settings-group-note">Visual theme and list density.</p>
-                  <div class="settings-group-fields">
-                    <label class="label" for="settingsThemeSelect">Theme</label>
-                    <select id="settingsThemeSelect" name="settingsThemeSelect">
-{% for theme in supported_ui_themes %}
-                      <option value="{{ theme }}">{{ theme|replace("-", " ")|title }}</option>
-{% endfor %}
-                    </select>
+<article id="section-settings" class="settings-shell panel panel-section view">
+  <aside class="settings-nav" aria-label="Settings sections">
+    <div class="settings-nav-head">
+      <span class="settings-nav-eyebrow">Workspace · Personal</span>
+      <h2 class="settings-nav-title">Settings</h2>
+    </div>
+    <div class="settings-nav-divider" aria-hidden="true"></div>
+    <div class="settings-nav-section">
+      <div class="settings-nav-label">Workspace</div>
+      <nav class="settings-subnav" aria-label="Settings sections">
+        <a class="settings-subnav-link active" data-settings-section="settings-section-display" href="/ui/settings/display">
+          <svg class="settings-subnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/></svg>
+          <span>Preferences</span>
+        </a>
+        <a class="settings-subnav-link" data-settings-section="settings-section-models" href="/ui/settings/models">
+          <svg class="settings-subnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+          <span>Model Config</span>
+          <span class="settings-nav-badge">3 tasks</span>
+        </a>
+      </nav>
+    </div>
+    <div class="settings-nav-section">
+      <div class="settings-nav-label">Account</div>
+      <nav class="settings-subnav" aria-label="Account settings">
+        <a class="settings-subnav-link" data-settings-section="settings-section-account" href="/ui/settings/account">
+          <svg class="settings-subnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>User Account</span>
+        </a>
+      </nav>
+    </div>
+    <div class="settings-nav-foot">
+      <div class="settings-build-card">
+        <span><b>paperwise</b> local</span>
+        <span>Server-rendered settings</span>
+      </div>
+    </div>
+  </aside>
 
-                    <label class="label" for="settingsPageSizeSelect">Documents per page</label>
-                    <select id="settingsPageSizeSelect" name="settingsPageSizeSelect">
-                      <option value="10">10</option>
-                      <option value="20">20</option>
-                      <option value="50">50</option>
-                      <option value="100">100</option>
-                    </select>
-                  </div>
-                </section>
-
-                <section class="settings-group">
-                  <h3 class="settings-group-title">Ask Your Docs</h3>
-                  <p class="settings-group-note">Control retrieval context size and how many source documents are sent to the LLM for each answer.</p>
-                  <div class="settings-group-fields settings-compact-number-grid">
-                    <div class="settings-compact-field">
-                      <label class="label" for="settingsGroundedQaTopKInput">Context Chunks</label>
-                      <input
-                        id="settingsGroundedQaTopKInput"
-                        name="settingsGroundedQaTopKInput"
-                        type="number"
-                        min="3"
-                        max="60"
-                        value="18"
-                      />
-                    </div>
-
-                    <div class="settings-compact-field">
-                      <label class="label" for="settingsGroundedQaMaxDocsInput">Max Source Documents</label>
-                      <input
-                        id="settingsGroundedQaMaxDocsInput"
-                        name="settingsGroundedQaMaxDocsInput"
-                        type="number"
-                        min="1"
-                        max="50"
-                        value="12"
-                      />
-                    </div>
-                  </div>
-                </section>
+  <section class="settings-pane">
+    <div class="settings-pane-head">
+      <div class="settings-pane-head-stack">
+        <span class="settings-pane-eyebrow">Personal</span>
+        <h2 class="settings-pane-title">Preferences</h2>
+        <p class="settings-pane-sub">Visual theme, document list size, and how much context the LLM sees when you ask a question.</p>
+      </div>
+      <div class="settings-pane-head-actions">
+        <button type="button" class="btn btn-ghost btn-sm settings-reset-btn">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          <span>Reset to defaults</span>
+        </button>
+      </div>
+    </div>
+    <form id="settingsForm" class="settings-form">
+      <div class="settings-pane-body">
+        <section id="settings-section-display" class="settings-subsection">
+          <section class="settings-card">
+            <div class="settings-card-head">
+              <div class="settings-card-head-stack">
+                <span class="settings-card-eyebrow">01 · Display</span>
+                <h3 class="settings-card-title">Look &amp; feel</h3>
+                <p class="settings-card-sub">Paperwise ships with six paper-textured themes. Pick the one that matches your light and set how many documents load per page.</p>
               </div>
-            </section>
-
-            <div class="actions settings-form-actions">
-              <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>
             </div>
-          </form>
-        </article>
+            <div class="settings-card-body">
+              <div class="settings-hidden-select">
+                <label class="label" for="settingsThemeSelect">Theme</label>
+                <select id="settingsThemeSelect" name="settingsThemeSelect">
+{% for theme in supported_ui_themes %}
+                  <option value="{{ theme }}"{% if settings_preferences.ui_theme == theme %} selected{% endif %}>{{ theme|replace("-", " ")|title }}</option>
+{% endfor %}
+                </select>
+              </div>
+              <div class="settings-theme-grid" aria-label="Theme choices">
+{% for theme in supported_ui_themes %}
+                <button type="button" class="settings-theme-card{% if settings_preferences.ui_theme == theme %} active{% endif %}" data-theme-choice="{{ theme }}" aria-pressed="{% if settings_preferences.ui_theme == theme %}true{% else %}false{% endif %}">
+                  <span class="settings-theme-swatch theme-{{ theme }}-preview" aria-hidden="true"><span class="settings-theme-swatch-bar"></span></span>
+                  <span class="settings-theme-meta">
+                    <span class="settings-theme-name">{{ theme|replace("-", " ")|title }}</span>
+                    <span class="settings-theme-key">{{ theme }}</span>
+                  </span>
+                </button>
+{% endfor %}
+              </div>
+              <div class="settings-form-grid">
+                <div class="settings-field">
+                  <label class="settings-field-label" for="settingsPageSizeSelect">Documents per page</label>
+                  <select id="settingsPageSizeSelect" name="settingsPageSizeSelect">
+                    <option value="10"{% if settings_preferences.page_size == 10 %} selected{% endif %}>10 documents</option>
+                    <option value="20"{% if settings_preferences.page_size == 20 %} selected{% endif %}>20 documents</option>
+                    <option value="50"{% if settings_preferences.page_size == 50 %} selected{% endif %}>50 documents</option>
+                    <option value="100"{% if settings_preferences.page_size == 100 %} selected{% endif %}>100 documents</option>
+                  </select>
+                  <span class="settings-field-hint">Lower numbers load faster on slow connections.</span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-head">
+              <div class="settings-card-head-stack">
+                <span class="settings-card-eyebrow">02 · Ask Your Docs</span>
+                <h3 class="settings-card-title">Retrieval context</h3>
+                <p class="settings-card-sub">Control how many chunks the retriever pulls from your library and how many distinct source documents end up in the LLM prompt for grounded Q&amp;A.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="settings-form-grid settings-compact-number-grid">
+                <div class="settings-field">
+                  <label class="settings-field-label" for="settingsGroundedQaTopKInput">Context chunks</label>
+                  <div class="settings-range-row">
+                    <input class="settings-range-slider" type="range" min="2" max="48" value="{{ settings_preferences.grounded_qa_top_k_chunks }}" />
+                  <input
+                    id="settingsGroundedQaTopKInput"
+                    class="settings-number-input"
+                    name="settingsGroundedQaTopKInput"
+                    type="number"
+                    min="2"
+                    max="48"
+                    value="{{ settings_preferences.grounded_qa_top_k_chunks }}"
+                  />
+                  </div>
+                  <div class="settings-range-ticks"><span>2</span><span>12</span><span>24</span><span>36</span><span>48</span></div>
+                  <span class="settings-field-hint">Higher = more grounded but slower; ~1.2k tokens per chunk.</span>
+                </div>
+                <div class="settings-field">
+                  <label class="settings-field-label" for="settingsGroundedQaMaxDocsInput">Max source documents</label>
+                  <div class="settings-range-row">
+                    <input class="settings-range-slider" type="range" min="1" max="24" value="{{ settings_preferences.grounded_qa_max_documents }}" />
+                  <input
+                    id="settingsGroundedQaMaxDocsInput"
+                    class="settings-number-input"
+                    name="settingsGroundedQaMaxDocsInput"
+                    type="number"
+                    min="1"
+                    max="24"
+                    value="{{ settings_preferences.grounded_qa_max_documents }}"
+                  />
+                  </div>
+                  <div class="settings-range-ticks"><span>1</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
+                  <span class="settings-field-hint">Caps the citation list; the retriever will diversify across this many docs.</span>
+                </div>
+              </div>
+              <div class="settings-toggle-list one">
+                <div class="settings-field-row">
+                  <div>
+                    <div class="settings-field-label">Always re-rank with the LLM</div>
+                    <span class="settings-field-hint">Adds ~0.6s but typically improves citation precision on long libraries.</span>
+                  </div>
+                  <button type="button" class="settings-toggle on" role="switch" aria-checked="true"></button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+      </div>
+
+      <div class="actions settings-form-actions view-hidden">
+        <span class="settings-save-info"><span class="settings-save-dot" aria-hidden="true"></span><span>Changes apply after saving.</span></span>
+        <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>
+      </div>
+    </form>
+  </section>
+</article>

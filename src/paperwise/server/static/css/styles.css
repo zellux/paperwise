@@ -157,21 +157,21 @@ body {
 .topnav {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding-left: 14px;
-  margin-left: 2px;
+  gap: 4px;
+  padding-left: 12px;
+  margin-left: 4px;
   border-left: 1px solid var(--stroke-soft);
 }
 
 .topnav-link {
   display: inline-flex;
   align-items: center;
-  min-height: 30px;
-  padding: 6px 11px;
-  border-radius: 9px;
+  min-height: 32px;
+  padding: 7px 12px;
+  border-radius: 8px;
   color: var(--ink-soft);
-  font-size: 0.82rem;
-  font-weight: 700;
+  font-size: 0.86rem;
+  font-weight: 600;
   text-decoration: none;
   white-space: nowrap;
 }
@@ -189,23 +189,25 @@ body {
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .topbar-search {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 8px;
-  width: clamp(220px, 23vw, 380px);
-  min-height: 32px;
-  padding: 6px 11px;
+  gap: 6px;
+  width: 320px;
+  min-height: 34px;
+  padding: 6px 10px 6px 32px;
   border: 1px solid var(--stroke-soft);
   border-radius: 10px;
   background: var(--paper);
 }
 
 .topbar-search .icon-sm {
+  position: absolute;
+  left: 10px;
   color: var(--ink-soft);
   flex: 0 0 auto;
 }
@@ -218,7 +220,26 @@ body {
   color: var(--ink);
   background: transparent;
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 0.86rem;
+}
+
+.topbar-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+}
+
+.topbar-info-btn:hover {
+  background: var(--row-hover);
+  color: var(--ink);
 }
 
 .topbar-search input:focus {
@@ -228,10 +249,10 @@ body {
 .profile-chip {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   max-width: 240px;
-  min-height: 34px;
-  padding: 4px 11px 4px 4px;
+  min-height: 36px;
+  padding: 5px 12px 5px 5px;
   border: 1px solid var(--stroke-soft);
   border-radius: 999px;
   background: var(--paper);
@@ -244,13 +265,13 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent), var(--accent-2));
   color: white;
-  font-size: 0.62rem;
-  font-weight: 800;
+  font-size: 0.68rem;
+  font-weight: 700;
   flex: 0 0 auto;
 }
 
@@ -376,6 +397,14 @@ h1 {
 .content-pane {
   display: grid;
   gap: 14px;
+}
+
+.app-shell.app-shell-settings {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app-shell.app-shell-settings > .sidebar {
+  display: none;
 }
 
 .view-hidden {
@@ -522,6 +551,54 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 .btn-muted:hover:not(:disabled) {
   box-shadow: 0 8px 16px rgba(70, 78, 83, 0.14);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-soft);
+  box-shadow: none;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--row-hover);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 0.78rem;
+}
+
+.btn-icon-xs {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--ink-soft);
+}
+
+.btn-icon-xs:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--ink);
+  box-shadow: none;
+}
+
+.btn-danger-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--danger);
+  box-shadow: none;
+}
+
+.btn-danger-ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 8%, transparent);
+  color: var(--danger);
+  box-shadow: none;
 }
 
 @media (max-width: 980px) {

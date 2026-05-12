@@ -98,6 +98,7 @@ def render_ui_page(
         "initial_data_json": initial_data_json,
         "page_module_name": script_names[2] if len(script_names) > 2 else "",
         "page_template": _PAGE_PARTIAL_BY_NAME[page_name],
+        "settings_preferences": _settings_preferences_context(initial_data or {}),
         "supported_ui_themes": list(SUPPORTED_UI_THEMES),
         "ui_theme_storage_key": UI_THEME_STORAGE_KEY,
     }
@@ -175,6 +176,34 @@ def _grounded_qa_model_label(initial_data: dict) -> str:
         default_model = str(defaults[provider].get("model") or "").strip()
     parts = [part for part in (provider, route_model or connection_model or default_model) if part]
     return " · ".join(parts) if parts else "Default model"
+
+
+def _settings_preferences_context(initial_data: dict) -> dict:
+    preferences = initial_data.get("user_preferences")
+    if not isinstance(preferences, dict):
+        preferences = {}
+    ui_theme = str(preferences.get("ui_theme") or DEFAULT_UI_THEME).strip().lower()
+    if ui_theme not in SUPPORTED_UI_THEMES:
+        ui_theme = DEFAULT_UI_THEME
+
+    def bounded_int(value: object, *, default: int, minimum: int, maximum: int) -> int:
+        try:
+            number = int(value or default)
+        except (TypeError, ValueError):
+            number = default
+        return max(minimum, min(maximum, number))
+
+    page_size = bounded_int(preferences.get("page_size"), default=20, minimum=1, maximum=100)
+    if page_size not in {10, 20, 50, 100}:
+        page_size = 20
+    top_k = bounded_int(preferences.get("grounded_qa_top_k_chunks"), default=18, minimum=2, maximum=48)
+    max_documents = bounded_int(preferences.get("grounded_qa_max_documents"), default=12, minimum=1, maximum=24)
+    return {
+        "ui_theme": ui_theme,
+        "page_size": page_size,
+        "grounded_qa_top_k_chunks": top_k,
+        "grounded_qa_max_documents": max_documents,
+    }
 
 
 def _initial_render_context(initial_data: dict) -> dict:

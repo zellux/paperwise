@@ -287,6 +287,7 @@ export async function saveUserPreferences() {
   const payload = {
     preferences: {
       ui_theme: currentTheme,
+      page_size: docsPageSize,
       grounded_qa_top_k_chunks: groundedQaTopK,
       grounded_qa_max_documents: groundedQaMaxDocuments,
       llm_connections: llmState.llmConnections,
@@ -318,6 +319,7 @@ export function applyUserPreferences(preferences) {
   if (typeof preferences.ui_theme === "string") {
     applyTheme(preferences.ui_theme);
   }
+  docsPageSize = normalizePageSize(preferences.page_size);
   groundedQaTopK = normalizeGroundedQaTopK(preferences.grounded_qa_top_k_chunks);
   groundedQaMaxDocuments = normalizeGroundedQaMaxDocuments(preferences.grounded_qa_max_documents);
   applyLlmPreferences(preferences);
@@ -599,6 +601,10 @@ async function handleSignInSubmit(event) {
     persistSession(payload.user);
     renderSessionState();
     setAuthMessage(`Signed in as ${payload.user.email}.`);
+    if (activePageModule?.requiresServerSessionRender === true) {
+      window.location.reload();
+      return;
+    }
     await hydrateUserPreferencesForSession();
     await initializeCurrentPageData();
   } catch (error) {
@@ -641,6 +647,10 @@ async function handleRegisterSubmit(event) {
     persistSession(loginPayload.user);
     renderSessionState();
     setAuthMessage(`Registered ${registerPayload.email}.`);
+    if (activePageModule?.requiresServerSessionRender === true) {
+      window.location.reload();
+      return;
+    }
     await hydrateUserPreferencesForSession();
     await initializeCurrentPageData();
   } catch (error) {

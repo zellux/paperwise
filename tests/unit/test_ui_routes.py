@@ -317,22 +317,72 @@ def test_settings_subroutes_are_server_selected_partials() -> None:
     assert 'id="settings-section-account"' in account
     assert 'id="settings-section-display"' not in account
     assert 'id="settings-section-models"' not in account
-    assert (
-        '<a class="settings-subnav-link active" data-settings-section="settings-section-account" '
-        'href="/ui/settings/account">User Account</a>'
-    ) in account
+    assert '<main class="app-shell view-hidden app-shell-settings">' in account
+    assert re.search(
+        r'<a class="settings-subnav-link active" data-settings-section="settings-section-account" '
+        r'href="/ui/settings/account">.*?<span>User Account</span>',
+        account,
+        re.S,
+    )
 
     display = client.get("/ui/settings/display").text
     assert 'id="settings-section-display"' in display
     assert 'id="settings-section-account"' not in display
     assert 'id="settings-section-models"' not in display
     assert "{{theme_options}}" not in display
-    assert '<option value="forge">Forge</option>' in display
+    assert '<option value="forge" selected>Forge</option>' in display
 
     models = client.get("/ui/settings/models").text
     assert 'id="settings-section-models"' in models
     assert 'id="settings-section-account"' not in models
     assert 'id="settings-section-display"' not in models
+
+
+def test_settings_page_server_renders_authenticated_cookie_preferences() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "settings-ui@example.com",
+                "full_name": "Settings UI",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+        user_id = create_response.json()["id"]
+        repository.save_user_preference(
+            UserPreference(
+                user_id=user_id,
+                preferences={
+                    "ui_theme": "folio",
+                    "page_size": 50,
+                    "grounded_qa_top_k_chunks": 24,
+                    "grounded_qa_max_documents": 7,
+                },
+            )
+        )
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "settings-ui@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+
+        response = client.get("/ui/settings")
+        assert response.status_code == 200
+        assert '<html lang="en" class="has-session">' in response.text
+        assert '<main class="app-shell app-shell-settings">' in response.text
+        assert '<option value="folio" selected>Folio</option>' in response.text
+        assert 'class="settings-theme-card active" data-theme-choice="folio" aria-pressed="true"' in response.text
+        assert '<option value="50" selected>50 documents</option>' in response.text
+        assert 'value="24"' in response.text
+        assert 'value="7"' in response.text
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_static_assets_do_not_keep_page_selection_logic() -> None:
@@ -487,6 +537,10 @@ def test_static_assets_split_theme_css() -> None:
     assert settings.status_code == 200
     assert ".settings-form" in settings.text
     assert ".settings-form select" in settings.text
+
+    styles = client.get("/static/css/styles.css")
+    assert styles.status_code == 200
+    assert ".app-shell.app-shell-settings" in styles.text
 
     html = client.get("/ui/documents")
     assert html.status_code == 200

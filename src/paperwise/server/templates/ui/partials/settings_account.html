@@ -1,56 +1,120 @@
-<article id="section-settings" class="panel panel-section view">
-          <h2>Settings</h2>
-          <nav class="settings-subnav" aria-label="Settings sections">
-            <a class="settings-subnav-link" data-settings-section="settings-section-display" href="/ui/settings/display">Preferences</a>
-            <a class="settings-subnav-link" data-settings-section="settings-section-models" href="/ui/settings/models">Model Config</a>
-            <a class="settings-subnav-link active" data-settings-section="settings-section-account" href="/ui/settings/account">User Account</a>
-          </nav>
-          <form id="settingsForm" class="stack settings-form">
-<section id="settings-section-account" class="settings-subsection">
-              <div class="settings-column">
-                <section class="settings-group">
-                  <h3 class="settings-group-title">Security</h3>
-                  <p class="settings-group-note">Update your account password.</p>
-                  <div class="settings-group-fields">
-                    <label class="label" for="settingsCurrentPasswordInput">Current Password</label>
-                    <input
-                      id="settingsCurrentPasswordInput"
-                      name="settingsCurrentPasswordInput"
-                      type="password"
-                      autocomplete="current-password"
-                      placeholder="Current password"
-                    />
+<article id="section-settings" class="settings-shell panel panel-section view">
+  <aside class="settings-nav" aria-label="Settings sections">
+    <div class="settings-nav-head">
+      <span class="settings-nav-eyebrow">Workspace · Personal</span>
+      <h2 class="settings-nav-title">Settings</h2>
+    </div>
+    <div class="settings-nav-divider" aria-hidden="true"></div>
+    <div class="settings-nav-section">
+      <div class="settings-nav-label">Workspace</div>
+      <nav class="settings-subnav" aria-label="Settings sections">
+        <a class="settings-subnav-link" data-settings-section="settings-section-display" href="/ui/settings/display">
+          <svg class="settings-subnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/></svg>
+          <span>Preferences</span>
+        </a>
+        <a class="settings-subnav-link" data-settings-section="settings-section-models" href="/ui/settings/models">
+          <svg class="settings-subnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+          <span>Model Config</span>
+          <span class="settings-nav-badge">3 tasks</span>
+        </a>
+      </nav>
+    </div>
+    <div class="settings-nav-section">
+      <div class="settings-nav-label">Account</div>
+      <nav class="settings-subnav" aria-label="Account settings">
+        <a class="settings-subnav-link active" data-settings-section="settings-section-account" href="/ui/settings/account">
+          <svg class="settings-subnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>User Account</span>
+        </a>
+      </nav>
+    </div>
+    <div class="settings-nav-foot">
+      <div class="settings-build-card">
+        <span><b>paperwise</b> local</span>
+        <span>Server-rendered settings</span>
+      </div>
+    </div>
+  </aside>
 
-                    <label class="label" for="settingsNewPasswordInput">New Password</label>
-                    <input
-                      id="settingsNewPasswordInput"
-                      name="settingsNewPasswordInput"
-                      type="password"
-                      autocomplete="new-password"
-                      placeholder="New password (min 8 chars)"
-                    />
-
-                    <label class="label" for="settingsConfirmPasswordInput">Confirm New Password</label>
-                    <input
-                      id="settingsConfirmPasswordInput"
-                      name="settingsConfirmPasswordInput"
-                      type="password"
-                      autocomplete="new-password"
-                      placeholder="Confirm new password"
-                    />
-                  </div>
-                  <div class="actions">
-                    <button id="settingsChangePasswordBtn" type="button" class="btn btn-muted">
-                      Change Password
-                    </button>
-                    <span id="settingsPasswordStatus" class="settings-inline-status" aria-live="polite"></span>
-                  </div>
-                </section>
+  <section class="settings-pane">
+    <div class="settings-pane-head">
+      <div class="settings-pane-head-stack">
+        <span class="settings-pane-eyebrow">Identity</span>
+        <h2 class="settings-pane-title">User Account</h2>
+        <p class="settings-pane-sub">Review your local account and update the password used for this Paperwise instance.</p>
+      </div>
+    </div>
+    <form id="settingsForm" class="settings-form">
+      <div class="settings-pane-body">
+        <section id="settings-section-account" class="settings-subsection">
+          <div class="settings-account-head">
+            <div class="settings-account-avatar" aria-hidden="true">PW</div>
+            <div class="settings-account-meta">
+              <div class="settings-account-name">Paperwise User</div>
+              <div class="settings-account-mail">Signed in locally</div>
+              <div class="settings-account-chips">
+                <span class="settings-pill">Authenticated</span>
+                <span class="settings-pill">Self-hosted</span>
               </div>
-            </section>
-
-            <div class="actions settings-form-actions">
-              <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>
             </div>
-          </form>
-        </article>
+          </div>
+
+          <section class="settings-card">
+            <div class="settings-card-head">
+              <div class="settings-card-head-stack">
+                <span class="settings-card-eyebrow">Security</span>
+                <h3 class="settings-card-title">Password</h3>
+                <p class="settings-card-sub">Update the password for your current account.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="settings-form-grid cols-3">
+                <div class="settings-field">
+                  <label class="settings-field-label" for="settingsCurrentPasswordInput">Current Password</label>
+                  <input
+                    id="settingsCurrentPasswordInput"
+                    name="settingsCurrentPasswordInput"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="Current password"
+                  />
+                </div>
+                <div class="settings-field">
+                  <label class="settings-field-label" for="settingsNewPasswordInput">New Password</label>
+                  <input
+                    id="settingsNewPasswordInput"
+                    name="settingsNewPasswordInput"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder="New password (min 8 chars)"
+                  />
+                </div>
+                <div class="settings-field">
+                  <label class="settings-field-label" for="settingsConfirmPasswordInput">Confirm New Password</label>
+                  <input
+                    id="settingsConfirmPasswordInput"
+                    name="settingsConfirmPasswordInput"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder="Confirm new password"
+                  />
+                </div>
+              </div>
+              <div class="actions settings-group-actions">
+                <button id="settingsChangePasswordBtn" type="button" class="btn btn-muted">
+                  Change Password
+                </button>
+                <span id="settingsPasswordStatus" class="settings-inline-status" aria-live="polite"></span>
+              </div>
+            </div>
+          </section>
+        </section>
+      </div>
+
+      <div class="actions settings-form-actions view-hidden">
+        <span class="settings-save-info"><span class="settings-save-dot" aria-hidden="true"></span><span>Preferences save separately from password changes.</span></span>
+        <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>
+      </div>
+    </form>
+  </section>
+</article>

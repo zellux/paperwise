@@ -37,6 +37,7 @@ import {
 import { escapeHtml } from "./ui/escape.js";
 
 let settingsForm = null;
+let settingsFormActions = null;
 let settingsThemeSelect = null;
 let settingsPageSizeSelect = null;
 let settingsGroundedQaTopKInput = null;
@@ -52,7 +53,7 @@ let settingsGroundedQaConnectionSelect = null;
 let settingsGroundedQaModelInput = null;
 let settingsOcrProviderSelect = null;
 let settingsOcrStatus = null;
-let settingsOcrRouteFields = null;
+let settingsOcrRouteFields = [];
 let settingsOcrConnectionSelect = null;
 let settingsOcrModelInput = null;
 let settingsOcrAutoSwitchCheckbox = null;
@@ -64,8 +65,21 @@ let settingsChangePasswordBtn = null;
 let settingsPasswordStatus = null;
 let settingsEventsBound = false;
 
+export const requiresServerSessionRender = true;
+
+function syncThemeChoiceCards() {
+  const selectedTheme = normalizeThemeName(settingsThemeSelect?.value || appState.currentTheme);
+  document.querySelectorAll("[data-theme-choice]").forEach((buttonEl) => {
+    const theme = normalizeThemeName(buttonEl.getAttribute("data-theme-choice") || "");
+    const active = theme === selectedTheme;
+    buttonEl.classList.toggle("active", active);
+    buttonEl.setAttribute("aria-pressed", active ? "true" : "false");
+  });
+}
+
 function bindSettingsElements() {
   settingsForm = document.getElementById("settingsForm");
+  settingsFormActions = document.querySelector(".settings-form-actions");
   settingsThemeSelect = document.getElementById("settingsThemeSelect");
   settingsPageSizeSelect = document.getElementById("settingsPageSizeSelect");
   settingsGroundedQaTopKInput = document.getElementById("settingsGroundedQaTopKInput");
@@ -81,7 +95,7 @@ function bindSettingsElements() {
   settingsGroundedQaModelInput = document.getElementById("settingsGroundedQaModelInput");
   settingsOcrProviderSelect = document.getElementById("settingsOcrProviderSelect");
   settingsOcrStatus = document.getElementById("settingsOcrStatus");
-  settingsOcrRouteFields = document.getElementById("settingsOcrRouteFields");
+  settingsOcrRouteFields = Array.from(document.querySelectorAll("[data-ocr-route-field]"));
   settingsOcrConnectionSelect = document.getElementById("settingsOcrConnectionSelect");
   settingsOcrModelInput = document.getElementById("settingsOcrModelInput");
   settingsOcrAutoSwitchCheckbox = document.getElementById("settingsOcrAutoSwitchCheckbox");
@@ -93,10 +107,15 @@ function bindSettingsElements() {
   settingsPasswordStatus = document.getElementById("settingsPasswordStatus");
 }
 
+function markSettingsDirty() {
+  settingsFormActions?.classList.remove("view-hidden");
+}
+
 export function renderSettingsForm() {
   if (settingsThemeSelect && settingsThemeSelect.value !== appState.currentTheme) {
     settingsThemeSelect.value = appState.currentTheme;
   }
+  syncThemeChoiceCards();
   if (settingsPageSizeSelect && settingsPageSizeSelect.value !== String(appState.docsPageSize)) {
     settingsPageSizeSelect.value = String(appState.docsPageSize);
   }
@@ -193,6 +212,31 @@ function bindModelConfigSummaryActions() {
   });
 }
 
+async function testAllTaskConfigs(buttonEl) {
+  const tasks = ["metadata", "grounded_qa", "ocr"];
+  const labelEl = buttonEl?.querySelector("[data-task-test-all-label]");
+  const previousLabel = labelEl?.textContent || "Re-test all";
+  if (buttonEl) {
+    buttonEl.disabled = true;
+  }
+  if (labelEl) {
+    labelEl.textContent = "Testing...";
+  }
+  try {
+    for (const task of tasks) {
+      const taskButton = settingsModelSummary?.querySelector(`[data-task-test="${task}"]`);
+      await testTaskConfig(task, taskButton instanceof HTMLButtonElement ? taskButton : null);
+    }
+  } finally {
+    if (buttonEl) {
+      buttonEl.disabled = false;
+    }
+    if (labelEl) {
+      labelEl.textContent = previousLabel;
+    }
+  }
+}
+
 function setConnectionTestStatus(connectionId, message, tone = "") {
   appState.connectionTestStatuses.set(connectionId, { message, tone });
   renderConnectionsList();
@@ -218,9 +262,9 @@ function renderConnectionSelect(selectEl, selectedValue) {
 
 function syncTaskRoutingVisibility() {
   const ocrLlmMode = normalizeOcrProvider(settingsOcrProviderSelect?.value || appState.ocrProvider) === "llm";
-  if (settingsOcrRouteFields) {
-    settingsOcrRouteFields.hidden = !ocrLlmMode;
-  }
+  settingsOcrRouteFields.forEach((fieldEl) => {
+    fieldEl.hidden = !ocrLlmMode;
+  });
 }
 
 function renderTaskRoutingControls() {
@@ -431,7 +475,7 @@ function renderConnectionsList() {
     return;
   }
   if (!appState.llmConnections.length) {
-    settingsConnectionsList.innerHTML = "<p class=\"settings-group-note\">No model connections yet. Add one to configure LLM-backed tasks.</p>";
+    settingsConnectionsList.innerHTML = "<p class=\"settings-empty-note\">No model connections yet. Add one to configure LLM-backed tasks.</p>";
     return;
   }
   settingsConnectionsList.innerHTML = appState.llmConnections
@@ -443,38 +487,88 @@ function renderConnectionsList() {
       const defaultBaseUrl = getLlmProviderDefaults(connection.provider)?.base_url
         || getOcrLlmProviderDefaults(connection.provider)?.base_url
         || "";
+      const providerLabel = {
+        custom: "Custom (OpenAI-Compatible)",
+        openai: "OpenAI",
+        gemini: "Gemini",
+      }[connection.provider] || (connection.provider ? connection.provider : "No provider selected");
+      const providerInitial = (connection.name || connection.provider || "LL").slice(0, 2);
+      const providerKindClass = String(connection.name || "").toLowerCase().includes("lm studio")
+        ? " kind-lm"
+        : String(connection.name || "").toLowerCase().includes("anthropic")
+          ? " kind-anthropic"
+          : "";
+      const validationError = getConnectionValidationError(connection);
+      const statusLabel = status.tone === "error" ? "Error" : validationError ? "Untested" : "Connected";
+      const statusClass = status.tone === "error" ? "err" : validationError ? "warn" : "";
       return `
         <section class="settings-connection-card" data-connection-id="${escapeHtml(connection.id)}">
           <div class="settings-connection-header">
-            <h4 class="settings-task-title">${escapeHtml(connection.name || `Connection ${index + 1}`)}</h4>
-            <button type="button" class="btn btn-muted settings-remove-connection-btn" data-connection-remove="${escapeHtml(connection.id)}">Remove</button>
+            <div class="settings-connection-title">
+              <span class="settings-connection-logo${providerKindClass}" aria-hidden="true">${escapeHtml(providerInitial)}</span>
+              <div class="settings-connection-name-stack">
+                <h4 class="settings-connection-name">${escapeHtml(connection.name || `Connection ${index + 1}`)}</h4>
+                <span class="settings-connection-provider">${escapeHtml(providerLabel)}</span>
+              </div>
+              <span class="settings-status-pill ${statusClass}"><span class="settings-status-dot" aria-hidden="true"></span>${escapeHtml(statusLabel)}</span>
+            </div>
+            <div class="settings-connection-actions">
+              <button type="button" class="btn btn-sm settings-test-connection-btn" data-connection-test="${escapeHtml(connection.id)}">Test</button>
+              <button type="button" class="btn btn-ghost btn-icon-xs settings-connection-more-btn" aria-label="Connection settings">
+                <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06A1.65 1.65 0 0 0 15 21.4V22a2 2 0 0 1-6 0v-.6a1.65 1.65 0 0 0-1.82-.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 2.6 15H2a2 2 0 0 1 0-6h.6a1.65 1.65 0 0 0 .33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 2.6V2a2 2 0 0 1 6 0v.6a1.65 1.65 0 0 0 1.82.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 21.4 9h.6a2 2 0 0 1 0 6h-.6a1.65 1.65 0 0 0-2 0z"/></svg>
+              </button>
+              <button type="button" class="btn btn-danger-ghost btn-sm settings-remove-connection-btn" data-connection-remove="${escapeHtml(connection.id)}">Remove</button>
+            </div>
           </div>
-          <div class="settings-route-grid">
-            <label class="label" for="settingsConnectionName-${escapeHtml(connection.id)}">Name</label>
-            <input id="settingsConnectionName-${escapeHtml(connection.id)}" data-connection-field="name" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.name)}" placeholder="e.g. OpenAI main" />
-            <label class="label" for="settingsConnectionProvider-${escapeHtml(connection.id)}">Provider</label>
-            <select id="settingsConnectionProvider-${escapeHtml(connection.id)}" data-connection-field="provider" data-connection-id="${escapeHtml(connection.id)}">
-              <option value="">Select provider</option>
-              <option value="openai"${connection.provider === "openai" ? " selected" : ""}>OpenAI</option>
-              <option value="gemini"${connection.provider === "gemini" ? " selected" : ""}>Gemini</option>
-              <option value="custom"${connection.provider === "custom" ? " selected" : ""}>Custom (OpenAI-Compatible)</option>
-            </select>
+          <div class="settings-connection-body">
+            <div class="settings-form-grid">
+              <div class="settings-field">
+                <label class="settings-field-label" for="settingsConnectionName-${escapeHtml(connection.id)}">Name</label>
+                <input id="settingsConnectionName-${escapeHtml(connection.id)}" data-connection-field="name" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.name)}" placeholder="e.g. OpenAI main" />
+              </div>
+              <div class="settings-field">
+                <label class="settings-field-label" for="settingsConnectionProvider-${escapeHtml(connection.id)}">Provider</label>
+                <select id="settingsConnectionProvider-${escapeHtml(connection.id)}" data-connection-field="provider" data-connection-id="${escapeHtml(connection.id)}">
+                  <option value="">Select provider</option>
+                  <option value="openai"${connection.provider === "openai" ? " selected" : ""}>OpenAI</option>
+                  <option value="gemini"${connection.provider === "gemini" ? " selected" : ""}>Gemini</option>
+                  <option value="custom"${connection.provider === "custom" ? " selected" : ""}>Custom (OpenAI-Compatible)</option>
+                </select>
+              </div>
             ${showBaseUrlField
               ? `
-            <label class="label" for="settingsConnectionBaseUrl-${escapeHtml(connection.id)}">Base URL</label>
-            <input id="settingsConnectionBaseUrl-${escapeHtml(connection.id)}" data-connection-field="base_url" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.base_url)}" placeholder="https://api.openai.com/v1" />
+              <div class="settings-field">
+                <label class="settings-field-label" for="settingsConnectionBaseUrl-${escapeHtml(connection.id)}">Base URL</label>
+                <div class="settings-input-adorned">
+                  <span class="settings-input-prefix" aria-hidden="true">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  </span>
+                  <input id="settingsConnectionBaseUrl-${escapeHtml(connection.id)}" class="settings-input-with-prefix" data-connection-field="base_url" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.base_url)}" placeholder="https://api.openai.com/v1" />
+                </div>
+              </div>
             `
               : `
-            <span class="label">Base URL</span>
-            <div class="settings-group-note">${escapeHtml(baseUrlHelpText || defaultBaseUrl)}</div>
+              <div class="settings-field">
+                <span class="settings-field-label">Base URL</span>
+                <div class="settings-field-hint">${escapeHtml(baseUrlHelpText || defaultBaseUrl || "Managed by provider")}</div>
+              </div>
             `}
-            <label class="label" for="settingsConnectionApiKey-${escapeHtml(connection.id)}">API Key</label>
-            <input id="settingsConnectionApiKey-${escapeHtml(connection.id)}" data-connection-field="api_key" data-connection-id="${escapeHtml(connection.id)}" type="password" value="${escapeHtml(connection.api_key)}" placeholder="${escapeHtml(apiKeyPlaceholder)}" />
-            <label class="label" for="settingsConnectionDefaultModel-${escapeHtml(connection.id)}">Default Model</label>
-            <input id="settingsConnectionDefaultModel-${escapeHtml(connection.id)}" data-connection-field="default_model" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.default_model || "")}" placeholder="e.g. gpt-4.1-mini" />
-          </div>
-          <div class="actions">
-            <button type="button" class="btn btn-muted settings-test-connection-btn" data-connection-test="${escapeHtml(connection.id)}">Test</button>
+              <div class="settings-field">
+                <label class="settings-field-label" for="settingsConnectionApiKey-${escapeHtml(connection.id)}">API Key</label>
+                <div class="settings-input-adorned">
+                  <input id="settingsConnectionApiKey-${escapeHtml(connection.id)}" class="settings-input-with-suffix" data-connection-field="api_key" data-connection-id="${escapeHtml(connection.id)}" type="password" value="${escapeHtml(connection.api_key)}" placeholder="${escapeHtml(apiKeyPlaceholder)}" />
+                  <span class="settings-input-suffix" aria-hidden="true">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  </span>
+                </div>
+              </div>
+              <div class="settings-field settings-field-full">
+                <label class="settings-field-label" for="settingsConnectionDefaultModel-${escapeHtml(connection.id)}">Default model</label>
+                <input id="settingsConnectionDefaultModel-${escapeHtml(connection.id)}" data-connection-field="default_model" data-connection-id="${escapeHtml(connection.id)}" type="text" value="${escapeHtml(connection.default_model || "")}" placeholder="e.g. gpt-4.1-mini" />
+                <span class="settings-field-hint">Used as a fallback when a task doesn't specify an override.</span>
+              </div>
+            </div>
             <span class="settings-inline-status ${status.tone === "success" ? "is-success" : status.tone === "error" ? "is-error" : ""}">${escapeHtml(status.message || "")}</span>
           </div>
         </section>
@@ -633,17 +727,53 @@ function bindSettingsEvents() {
     window.location.reload();
   });
 
+  settingsForm?.addEventListener("input", (event) => {
+    if (event.target instanceof HTMLElement && event.target.closest("[data-skip-dirty]")) {
+      return;
+    }
+    markSettingsDirty();
+  });
+
+  settingsForm?.addEventListener("change", (event) => {
+    if (event.target instanceof HTMLElement && event.target.closest("[data-skip-dirty]")) {
+      return;
+    }
+    markSettingsDirty();
+  });
+
+  document.querySelectorAll("[data-theme-choice]").forEach((buttonEl) => {
+    buttonEl.addEventListener("click", () => {
+      const nextTheme = normalizeThemeName(buttonEl.getAttribute("data-theme-choice") || appState.currentTheme);
+      if (settingsThemeSelect) {
+        settingsThemeSelect.value = nextTheme;
+      }
+      syncThemeChoiceCards();
+      applyTheme(nextTheme);
+      markSettingsDirty();
+    });
+  });
+
   settingsOcrProviderSelect?.addEventListener("change", () => {
     appState.ocrProvider = normalizeOcrProvider(settingsOcrProviderSelect.value);
     appState.llmRouting.ocr.engine = appState.ocrProvider;
     syncTaskRoutingVisibility();
     refreshLocalOcrStatus().catch(() => {});
+    markSettingsDirty();
   });
 
   settingsAddConnectionBtn?.addEventListener("click", () => {
     appState.llmConnections.push(createEmptyConnection());
     appState.llmRouting = sanitizeLlmRouting(appState.llmConnections, appState.llmRouting);
     renderSettingsForm();
+    markSettingsDirty();
+  });
+
+  document.querySelector("[data-task-test-all]")?.addEventListener("click", async (event) => {
+    const buttonEl = event.currentTarget;
+    if (!(buttonEl instanceof HTMLButtonElement)) {
+      return;
+    }
+    await testAllTaskConfigs(buttonEl);
   });
 
   settingsMetadataConnectionSelect?.addEventListener("change", () => {

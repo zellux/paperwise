@@ -1,152 +1,290 @@
-<article id="section-settings" class="panel panel-section view">
-          <h2>Settings</h2>
-          <nav class="settings-subnav" aria-label="Settings sections">
-            <a class="settings-subnav-link" data-settings-section="settings-section-display" href="/ui/settings/display">Preferences</a>
-            <a class="settings-subnav-link active" data-settings-section="settings-section-models" href="/ui/settings/models">Model Config</a>
-            <a class="settings-subnav-link" data-settings-section="settings-section-account" href="/ui/settings/account">User Account</a>
-          </nav>
-          <form id="settingsForm" class="stack settings-form">
-<section id="settings-section-models" class="settings-subsection">
-              <section class="settings-group settings-group-wide">
-                <h3 class="settings-group-title">Model Config Summary</h3>
-                <div class="docs-table-wrap">
-                  <table class="docs-table settings-model-summary-table">
-                    <thead>
-                      <tr>
-                        <th>Task</th>
-                        <th>Connection</th>
-                        <th>Configuration</th>
-                        <th>Test</th>
-                      </tr>
-                    </thead>
-                    <tbody id="settingsModelSummary">
-                      <tr data-summary-task="metadata">
-                        <td>Metadata Extraction</td>
-                        <td data-summary-connection>-</td>
-                        <td data-summary-configuration>Not configured</td>
-                        <td>
-                          <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="metadata">Test</button>
+<article id="section-settings" class="settings-shell panel panel-section view">
+  <aside class="settings-nav" aria-label="Settings sections">
+    <div class="settings-nav-head">
+      <span class="settings-nav-eyebrow">Workspace · Personal</span>
+      <h2 class="settings-nav-title">Settings</h2>
+    </div>
+    <div class="settings-nav-divider" aria-hidden="true"></div>
+    <div class="settings-nav-section">
+      <div class="settings-nav-label">Workspace</div>
+      <nav class="settings-subnav" aria-label="Settings sections">
+        <a class="settings-subnav-link" data-settings-section="settings-section-display" href="/ui/settings/display">
+          <svg class="settings-subnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M2 14h4"/><path d="M10 8h4"/><path d="M18 16h4"/></svg>
+          <span>Preferences</span>
+        </a>
+        <a class="settings-subnav-link active" data-settings-section="settings-section-models" href="/ui/settings/models">
+          <svg class="settings-subnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 8V4H8"/><rect width="16" height="12" x="4" y="8" rx="2"/><path d="M2 14h2"/><path d="M20 14h2"/><path d="M15 13v2"/><path d="M9 13v2"/></svg>
+          <span>Model Config</span>
+          <span class="settings-nav-badge">3 tasks</span>
+        </a>
+      </nav>
+    </div>
+    <div class="settings-nav-section">
+      <div class="settings-nav-label">Account</div>
+      <nav class="settings-subnav" aria-label="Account settings">
+        <a class="settings-subnav-link" data-settings-section="settings-section-account" href="/ui/settings/account">
+          <svg class="settings-subnav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+          <span>User Account</span>
+        </a>
+      </nav>
+    </div>
+    <div class="settings-nav-foot">
+      <div class="settings-build-card">
+        <span><b>paperwise</b> local</span>
+        <span>Server-rendered settings</span>
+      </div>
+    </div>
+  </aside>
+
+  <section class="settings-pane">
+    <div class="settings-pane-head">
+      <div class="settings-pane-head-stack">
+        <span class="settings-pane-eyebrow">Intelligence</span>
+        <h2 class="settings-pane-title">Model Configuration</h2>
+        <p class="settings-pane-sub">Reusable provider connections, plus per-task model overrides for metadata, retrieval, and OCR.</p>
+      </div>
+      <div class="settings-pane-head-actions">
+        <button type="button" class="btn btn-sm">
+          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+          <span>Provider docs</span>
+        </button>
+      </div>
+    </div>
+    <form id="settingsForm" class="settings-form">
+      <div class="settings-pane-body">
+        <section id="settings-section-models" class="settings-subsection">
+          <section class="settings-card">
+            <div class="settings-card-head">
+              <div class="settings-card-head-stack">
+                <span class="settings-card-eyebrow">Overview</span>
+                <h3 class="settings-card-title">Model config summary</h3>
+                <p class="settings-card-sub">One-glance view of which connection and model serve each LLM-backed task.</p>
+              </div>
+              <button type="button" class="btn btn-sm settings-retest-all-btn" data-task-test-all>
+                <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                <span data-task-test-all-label>Re-test all</span>
+              </button>
+            </div>
+            <div class="settings-card-body">
+              <div class="docs-table-wrap">
+                <table class="settings-model-summary-table">
+                  <thead>
+                    <tr>
+                      <th>Task</th>
+                      <th class="settings-summary-head-connection">Connection</th>
+                      <th class="settings-summary-head-config">Configuration</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="settingsModelSummary">
+                    <tr data-summary-task="metadata">
+                      <td>
+                        <span class="settings-summary-task">
+                          <span class="settings-summary-icon" aria-hidden="true">
+                            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                          </span>
+                          Metadata Extraction
+                        </span>
+                      </td>
+                      <td class="settings-summary-cell-connection" data-summary-connection>-</td>
+                      <td class="settings-summary-cell-config settings-summary-config" data-summary-configuration>Not configured</td>
+                      <td>
+                        <span class="settings-summary-actions">
+                          <button type="button" class="btn btn-sm settings-summary-test-btn" data-task-test="metadata">Test</button>
                           <span class="settings-inline-status" data-summary-status aria-live="polite"></span>
-                        </td>
-                      </tr>
-                      <tr data-summary-task="grounded_qa">
-                        <td>Search and Ask Your Docs</td>
-                        <td data-summary-connection>-</td>
-                        <td data-summary-configuration>Not configured</td>
-                        <td>
-                          <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="grounded_qa">Test</button>
+                        </span>
+                      </td>
+                    </tr>
+                    <tr data-summary-task="grounded_qa">
+                      <td>
+                        <span class="settings-summary-task">
+                          <span class="settings-summary-icon" aria-hidden="true">
+                            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg>
+                          </span>
+                          Search and Ask Your Docs
+                        </span>
+                      </td>
+                      <td class="settings-summary-cell-connection" data-summary-connection>-</td>
+                      <td class="settings-summary-cell-config settings-summary-config" data-summary-configuration>Not configured</td>
+                      <td>
+                        <span class="settings-summary-actions">
+                          <button type="button" class="btn btn-sm settings-summary-test-btn" data-task-test="grounded_qa">Test</button>
                           <span class="settings-inline-status" data-summary-status aria-live="polite"></span>
-                        </td>
-                      </tr>
-                      <tr data-summary-task="ocr">
-                        <td>OCR</td>
-                        <td data-summary-connection>-</td>
-                        <td data-summary-configuration>Not configured</td>
-                        <td>
-                          <button type="button" class="btn btn-muted settings-summary-test-btn" data-task-test="ocr">Test</button>
+                        </span>
+                      </td>
+                    </tr>
+                    <tr data-summary-task="ocr">
+                      <td>
+                        <span class="settings-summary-task">
+                          <span class="settings-summary-icon" aria-hidden="true">
+                            <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
+                          </span>
+                          OCR
+                        </span>
+                      </td>
+                      <td class="settings-summary-cell-connection" data-summary-connection>-</td>
+                      <td class="settings-summary-cell-config settings-summary-config" data-summary-configuration>Not configured</td>
+                      <td>
+                        <span class="settings-summary-actions">
+                          <button type="button" class="btn btn-sm settings-summary-test-btn" data-task-test="ocr">Test</button>
                           <span class="settings-inline-status" data-summary-status aria-live="polite"></span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-head">
+              <div class="settings-card-head-stack">
+                <span class="settings-card-eyebrow">Providers</span>
+                <h3 class="settings-card-title">Model connections</h3>
+                <p class="settings-card-sub">Create reusable provider connections once, then assign them to specific tasks below.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div id="settingsConnectionsList" class="settings-connections-list"></div>
+              <button id="settingsAddConnectionBtn" type="button" class="settings-add-connection">
+                Add connection
+              </button>
+            </div>
+          </section>
+
+          <section class="settings-card">
+            <div class="settings-card-head">
+              <div class="settings-card-head-stack">
+                <span class="settings-card-eyebrow">Per-task assignment</span>
+                <h3 class="settings-card-title">Task models</h3>
+                <p class="settings-card-sub">Assign an explicit connection and model for each LLM-backed task. Leave the model blank to inherit the connection default.</p>
+              </div>
+            </div>
+            <div class="settings-card-body">
+              <div class="settings-task-list">
+                <section class="settings-task-card">
+                  <span class="settings-task-icon" aria-hidden="true">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                  </span>
+                  <div class="settings-task-name-stack">
+                    <h4 class="settings-task-title">Metadata Extraction</h4>
+                    <span class="settings-task-sub">Title, correspondent, dates, suggested tags.</span>
+                  </div>
+                  <div class="settings-field">
+                    <label class="settings-field-mini-label" for="settingsMetadataConnectionSelect">Connection</label>
+                    <select id="settingsMetadataConnectionSelect" name="settingsMetadataConnectionSelect"></select>
+                  </div>
+                  <div class="settings-field">
+                    <label class="settings-field-mini-label" for="settingsMetadataModelInput">Model override</label>
+                    <input
+                      id="settingsMetadataModelInput"
+                      name="settingsMetadataModelInput"
+                      type="text"
+                      placeholder="Inherits connection default"
+                    />
+                  </div>
+                </section>
+
+                <section class="settings-task-card">
+                  <span class="settings-task-icon" aria-hidden="true">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6M12 16v6M2 12h6M16 12h6M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg>
+                  </span>
+                  <div class="settings-task-name-stack">
+                    <h4 class="settings-task-title">Grounded Q&amp;A</h4>
+                    <span class="settings-task-sub">Powers Ask Your Docs answers and citations.</span>
+                  </div>
+                  <div class="settings-field">
+                    <label class="settings-field-mini-label" for="settingsGroundedQaConnectionSelect">Connection</label>
+                    <select id="settingsGroundedQaConnectionSelect" name="settingsGroundedQaConnectionSelect"></select>
+                  </div>
+                  <div class="settings-field">
+                    <label class="settings-field-mini-label" for="settingsGroundedQaModelInput">Model override</label>
+                    <input
+                      id="settingsGroundedQaModelInput"
+                      name="settingsGroundedQaModelInput"
+                      type="text"
+                      placeholder="Inherits connection default"
+                    />
+                  </div>
+                </section>
+
+                <section class="settings-task-card">
+                  <span class="settings-task-icon" aria-hidden="true">
+                    <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><line x1="3" y1="12" x2="21" y2="12"/></svg>
+                  </span>
+                  <div class="settings-task-name-stack">
+                    <h4 class="settings-task-title">OCR</h4>
+                    <span class="settings-task-sub">Reads scans, screenshots, and image PDFs.</span>
+                  </div>
+                  <div class="settings-field" data-ocr-route-field>
+                    <label class="settings-field-mini-label" for="settingsOcrConnectionSelect">Connection</label>
+                    <select id="settingsOcrConnectionSelect" name="settingsOcrConnectionSelect"></select>
+                  </div>
+                  <div class="settings-field" data-ocr-route-field>
+                    <label class="settings-field-mini-label" for="settingsOcrModelInput">Model override</label>
+                    <input
+                      id="settingsOcrModelInput"
+                      name="settingsOcrModelInput"
+                      type="text"
+                      placeholder="Inherits connection default"
+                    />
+                  </div>
+                </section>
+              </div>
+
+              <section class="settings-ocr-advanced">
+                <div class="settings-card-head-stack">
+                  <span class="settings-card-eyebrow">OCR · Advanced</span>
+                  <h3 class="settings-card-title">Image extraction settings</h3>
+                  <p class="settings-card-sub">When OCR Engine is set to LLM, Paperwise sends rendered page images to the model. Local Tesseract is faster but less accurate on handwriting and low-contrast scans.</p>
+                </div>
+                <div class="settings-form-grid settings-form-grid-cols-3">
+                  <div class="settings-field">
+                    <label class="settings-field-mini-label" for="settingsOcrProviderSelect">OCR Engine</label>
+                    <select id="settingsOcrProviderSelect" name="settingsOcrProviderSelect">
+                      <option value="llm">LLM (vision model)</option>
+                      <option value="tesseract">Local Tesseract</option>
+                    </select>
+                    <span id="settingsOcrStatus" class="settings-inline-status" aria-live="polite"></span>
+                  </div>
+                  <div class="settings-field">
+                    <label class="settings-field-mini-label" for="settingsOcrImageDetailSelect">Image detail</label>
+                    <select id="settingsOcrImageDetailSelect" name="settingsOcrImageDetailSelect">
+                      <option value="auto">Auto</option>
+                      <option value="low">Low</option>
+                      <option value="high">High</option>
+                    </select>
+                  </div>
+                  <div class="settings-field">
+                    <label class="settings-field-mini-label" for="settingsOcrPagesPerCallInput">Pages per call</label>
+                    <input id="settingsOcrPagesPerCallInput" type="number" value="2" min="1" max="10" disabled />
+                  </div>
+                </div>
+                <div class="settings-field-row">
+                  <div>
+                    <div class="settings-field-label">Auto-switch to OCR</div>
+                    <span class="settings-field-hint">Use OCR only when local text extraction returns less than 200 characters or looks like garbage.</span>
+                  </div>
+                  <label class="settings-toggle-checkbox" for="settingsOcrAutoSwitchCheckbox">
+                    <input
+                      id="settingsOcrAutoSwitchCheckbox"
+                      name="settingsOcrAutoSwitchCheckbox"
+                      type="checkbox"
+                    />
+                    <span></span>
+                  </label>
                 </div>
               </section>
-
-              <div class="settings-column">
-                <section class="settings-group">
-                  <h3 class="settings-group-title">Model Connections</h3>
-                  <p class="settings-group-note">Create reusable provider connections once, then assign different models to metadata, grounded Q&amp;A, and OCR.</p>
-                  <div id="settingsConnectionsList" class="settings-connections-list"></div>
-                  <div class="actions">
-                    <button id="settingsAddConnectionBtn" type="button" class="btn btn-muted">Add Connection</button>
-                  </div>
-                </section>
-              </div>
-
-              <div class="settings-column">
-                <section class="settings-group">
-                  <h3 class="settings-group-title">Task Models</h3>
-                  <p class="settings-group-note">Assign an explicit connection and model for each LLM-backed task.</p>
-                  <div class="settings-group-fields">
-                    <section class="settings-task-card">
-                      <h4 class="settings-task-title">Metadata Extraction</h4>
-                      <div id="settingsMetadataRouteFields" class="settings-route-grid">
-                        <label class="label" for="settingsMetadataConnectionSelect">Connection</label>
-                        <select id="settingsMetadataConnectionSelect" name="settingsMetadataConnectionSelect"></select>
-                        <label class="label" for="settingsMetadataModelInput">Model</label>
-                        <input
-                          id="settingsMetadataModelInput"
-                          name="settingsMetadataModelInput"
-                          type="text"
-                          placeholder="Optional override; defaults to the connection model"
-                        />
-                      </div>
-                    </section>
-
-                    <section class="settings-task-card">
-                      <h4 class="settings-task-title">Grounded Q&amp;A</h4>
-                      <div id="settingsGroundedQaRouteFields" class="settings-route-grid">
-                        <label class="label" for="settingsGroundedQaConnectionSelect">Connection</label>
-                        <select id="settingsGroundedQaConnectionSelect" name="settingsGroundedQaConnectionSelect"></select>
-                        <label class="label" for="settingsGroundedQaModelInput">Model</label>
-                        <input
-                          id="settingsGroundedQaModelInput"
-                          name="settingsGroundedQaModelInput"
-                          type="text"
-                          placeholder="Optional override; defaults to the connection model"
-                        />
-                      </div>
-                    </section>
-
-                    <section class="settings-task-card">
-                      <h4 class="settings-task-title">OCR</h4>
-                      <p class="settings-group-note">
-                        <code>LLM</code> sends rendered document images to the selected model.
-                        <code>Local Tesseract</code> runs OCR locally using <code>tesseract</code> and <code>pdftoppm</code>.
-                      </p>
-                      <div class="settings-route-grid">
-                        <label class="label" for="settingsOcrProviderSelect">OCR Engine</label>
-                        <select id="settingsOcrProviderSelect" name="settingsOcrProviderSelect">
-                          <option value="llm">LLM</option>
-                          <option value="tesseract">Local Tesseract</option>
-                        </select>
-                        <span id="settingsOcrStatus" class="settings-inline-status" aria-live="polite"></span>
-                      </div>
-                      <div id="settingsOcrRouteFields" class="settings-route-grid">
-                        <label class="label" for="settingsOcrConnectionSelect">Connection</label>
-                        <select id="settingsOcrConnectionSelect" name="settingsOcrConnectionSelect"></select>
-                        <label class="label" for="settingsOcrModelInput">Model</label>
-                        <input
-                          id="settingsOcrModelInput"
-                          name="settingsOcrModelInput"
-                          type="text"
-                          placeholder="Optional override; defaults to the connection model"
-                        />
-                      </div>
-                      <div class="settings-route-grid">
-                        <label class="settings-checkbox-row" for="settingsOcrAutoSwitchCheckbox">
-                          <input
-                            id="settingsOcrAutoSwitchCheckbox"
-                            name="settingsOcrAutoSwitchCheckbox"
-                            type="checkbox"
-                          />
-                          <span>Auto switch: use OCR only when local extraction looks weak</span>
-                        </label>
-                        <label class="label" for="settingsOcrImageDetailSelect">OCR Image Detail</label>
-                        <select id="settingsOcrImageDetailSelect" name="settingsOcrImageDetailSelect">
-                          <option value="auto">Auto</option>
-                          <option value="low">Low</option>
-                          <option value="high">High</option>
-                        </select>
-                      </div>
-                    </section>
-                  </div>
-                </section>
-              </div>
-            </section>
-
-            <div class="actions settings-form-actions">
-              <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>
             </div>
-          </form>
-        </article>
+          </section>
+        </section>
+      </div>
+
+      <div class="actions settings-form-actions view-hidden">
+        <span class="settings-save-info"><span class="settings-save-dot" aria-hidden="true"></span><span>Save to apply model routing.</span></span>
+        <button id="saveSettingsBtn" type="submit" class="btn btn-primary">Save Settings</button>
+      </div>
+    </form>
+  </section>
+</article>

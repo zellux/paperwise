@@ -46,7 +46,7 @@ export function normalizeGroundedQaTopK(value) {
   if (!Number.isInteger(size)) {
     return 18;
   }
-  return Math.max(3, Math.min(60, size));
+  return Math.max(2, Math.min(48, size));
 }
 
 export function normalizeGroundedQaMaxDocuments(value) {
@@ -54,7 +54,7 @@ export function normalizeGroundedQaMaxDocuments(value) {
   if (!Number.isInteger(size)) {
     return 12;
   }
-  return Math.max(1, Math.min(50, size));
+  return Math.max(1, Math.min(24, size));
 }
 
 export function normalizeOcrImageDetail(value) {
