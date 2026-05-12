@@ -217,14 +217,14 @@ function bindTagEditorEvents() {
         setDetailTags(tags.slice(0, -1));
       }
     }
+    if (event.key === "Escape") {
+      hideTagSuggestions();
+      metaTagQuery.blur();
+    }
   });
   metaTagQuery.addEventListener("blur", () => {
     window.setTimeout(() => {
-      const { metaTagSuggestions } = getSingleDocumentElements();
-      metaTagEditor.classList.remove("is-open");
-      if (metaTagSuggestions instanceof HTMLElement) {
-        metaTagSuggestions.hidden = true;
-      }
+      hideTagSuggestions();
     }, 150);
   });
 }
