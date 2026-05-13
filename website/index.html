@@ -1,453 +1,1410 @@
 <!doctype html>
 <html lang="en">
-
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Paperwise | Structured and Queryable Documents</title>
-  <meta name="description"
-    content="Paperwise is an open-source, self-hosted document intelligence platform with OCR, extraction, grounded Q&A, and task-specific AI configuration." />
-  <link rel="canonical" href="https://paperwise.dev/" />
-  <meta property="og:url" content="https://paperwise.dev/" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link
-    href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap"
-    rel="stylesheet" />
-  <link rel="icon" type="image/png" href="./paperwise-icon.png" />
-  <link rel="apple-touch-icon" href="./paperwise-icon.png" />
-  <link rel="stylesheet" href="./styles.css" />
-  <script defer src="https://cloud.umami.is/script.js" data-website-id="425d11c9-640e-4d9e-8319-3e4cd0914958"></script>
-  <script src="https://unpkg.com/lucide@0.577.0/dist/umd/lucide.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Paperwise — Documents, structured and queryable</title>
+<meta name="description" content="An open-source, self-hosted document intelligence engine. OCR, extract, organize, and query — without sending a single file off your machine." />
+<link rel="canonical" href="https://paperwise.dev/" />
+<meta property="og:url" content="https://paperwise.dev/" />
+<link rel="icon" type="image/png" href="./paperwise-icon.png" />
+<link rel="apple-touch-icon" href="./paperwise-icon.png" />
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<script defer src="https://cloud.umami.is/script.js" data-website-id="425d11c9-640e-4d9e-8319-3e4cd0914958"></script>
+
+<style>
+/* ─────────────────────────────────────────────
+   TOKENS
+   ───────────────────────────────────────────── */
+:root {
+  --paper:        #f3ede0;
+  --paper-warm:   #ece5d4;
+  --paper-deep:   #e3dbc6;
+  --paper-line:   #d6cdb5;
+  --paper-line-2: #c7bd9f;
+
+  --ink:          #1c1f1c;
+  --ink-soft:     #4b5048;
+  --ink-faint:    #8a8b7e;
+
+  --forest:       #1f5a3a;
+  --forest-deep:  #163f29;
+  --forest-pale:  #d6e3d5;
+  --forest-ink:   #0e2a1c;
+
+  --ochre:        #b3742a;
+  --rust:         #a8472a;
+
+  --display: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Paper texture — soft ledger lines */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(to right, rgba(28,31,28,0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(28,31,28,0.025) 1px, transparent 1px);
+  background-size: 56px 56px;
+  background-position: 0 0, 0 0;
+  mask-image: radial-gradient(ellipse at center top, black 0%, black 60%, transparent 100%);
+}
+
+a { color: inherit; text-decoration: none; }
+img { display: block; max-width: 100%; }
+
+.shell {
+  width: min(1240px, calc(100vw - 40px));
+  margin: 0 auto;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─────────────────────────────────────────────
+   TYPE
+   ───────────────────────────────────────────── */
+.mono  { font-family: var(--mono); }
+
+h1, h2, h3, h4 { margin: 0; font-weight: 600; font-family: var(--display); }
+h1 {
+  font-size: clamp(2.8rem, 6.2vw, 5.6rem);
+  font-weight: 600;
+  line-height: 0.98;
+  letter-spacing: -0.04em;
+}
+h2 {
+  font-size: clamp(2rem, 3.8vw, 3.2rem);
+  font-weight: 600;
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+p { margin: 0; }
+
+.accent-forest { color: var(--forest); }
+.eyebrow {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.eyebrow.forest { color: var(--forest); }
+
+/* ─────────────────────────────────────────────
+   HEADER
+   ───────────────────────────────────────────── */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(243, 237, 224, 0.85);
+  backdrop-filter: blur(14px) saturate(1.3);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border-bottom: 1px solid var(--paper-line);
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  height: 64px;
+}
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--display);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  color: var(--ink);
+}
+.brand-dot {
+  display: block;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--paper-line);
+  border-radius: 6px;
+  background: rgba(255,255,255,0.55);
+  object-fit: cover;
+}
+.nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.nav a {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  padding: 8px 12px;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.nav a:hover { color: var(--ink); background: rgba(28,31,28,0.05); }
+.nav .star {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--paper-line-2);
+  border-radius: 999px;
+  font-size: 0.85rem;
+  color: var(--ink);
+  background: rgba(255,255,255,0.5);
+}
+.nav .star:hover { background: #fff; }
+.nav .star .count { color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+
+/* ─────────────────────────────────────────────
+   BUTTONS
+   ───────────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  height: 48px;
+  padding: 0 22px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn-primary {
+  background: var(--forest);
+  color: #f4ecd8;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset, 0 4px 16px rgba(31,90,58,0.25);
+}
+.btn-primary:hover { background: var(--forest-deep); }
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--paper-line-2);
+}
+.btn-ghost:hover { background: rgba(255,255,255,0.55); }
+
+/* ─────────────────────────────────────────────
+   HERO
+   ───────────────────────────────────────────── */
+.hero {
+  padding: 72px 0 24px;
+  position: relative;
+}
+.hero-meta {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 28px;
+}
+.hero-meta .pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 8px;
+  border-radius: 999px;
+  background: rgba(31,90,58,0.08);
+  border: 1px solid rgba(31,90,58,0.18);
+  color: var(--forest-deep);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.hero-meta .pill .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--forest);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.75); }
+}
+.hero-meta .sep {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.hero h1 {
+  max-width: 14ch;
+}
+.hero h1 .accent {
+  color: var(--forest);
+}
+.hero h1 .underline {
+  position: relative;
+  white-space: nowrap;
+  color: var(--forest);
+}
+.hero h1 .underline::after {
+  content: "";
+  position: absolute;
+  left: -0.05em;
+  right: -0.05em;
+  bottom: 0.04em;
+  height: 0.14em;
+  background: var(--forest);
+  opacity: 0.16;
+  border-radius: 2px;
+  z-index: -1;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 56px;
+  align-items: end;
+  margin-top: 36px;
+}
+.hero-lede {
+  max-width: 44ch;
+  font-size: 1.18rem;
+  line-height: 1.55;
+  color: var(--ink-soft);
+}
+.hero-lede em { font-style: italic; color: var(--ink); font-weight: 500; }
+.hero-cta {
+  display: flex;
+  gap: 12px;
+  margin-top: 28px;
+  flex-wrap: wrap;
+}
+.hero-foot {
+  margin-top: 22px;
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+.hero-foot .x { color: var(--paper-line-2); }
+
+/* Index card on the right of hero */
+.hero-side {
+  position: relative;
+  align-self: end;
+}
+.hero-index {
+  background: #fbf6e9;
+  border: 1px solid var(--paper-line-2);
+  border-radius: 4px;
+  padding: 22px 24px 24px;
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.8) inset,
+    0 24px 50px -28px rgba(28,31,28,0.35),
+    0 2px 0 var(--paper-deep);
+  position: relative;
+}
+.hero-index::before {
+  /* notebook holes */
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 22px;
+  bottom: 22px;
+  width: 8px;
+  background-image: radial-gradient(circle, rgba(28,31,28,0.18) 3px, transparent 4px);
+  background-size: 8px 28px;
+  background-repeat: repeat-y;
+}
+.hero-index-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-left: 22px;
+  border-bottom: 1px solid var(--paper-line);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+.hero-index-title {
+  font-family: var(--display);
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.hero-index-meta {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+.hero-index-list {
+  padding-left: 22px;
+  display: grid;
+  gap: 2px;
+}
+.hero-index-row {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px dashed rgba(28,31,28,0.12);
+  font-size: 0.88rem;
+}
+.hero-index-row:last-child { border-bottom: 0; }
+.hero-index-num {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+}
+.hero-index-name { color: var(--ink); }
+.hero-index-name .ext {
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  margin-left: 6px;
+}
+.hero-index-tag {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--forest);
+  background: rgba(31,90,58,0.08);
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+.hero-index-tag.amber { color: var(--ochre); background: rgba(179,116,42,0.10); }
+.hero-index-tag.rust  { color: var(--rust); background: rgba(168,71,42,0.10); }
+
+.hero-index-foot {
+  margin-top: 16px;
+  padding-left: 22px;
+  padding-top: 12px;
+  border-top: 1px solid var(--paper-line);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+}
+.hero-index-foot strong { color: var(--forest); font-weight: 500; }
+
+/* Margin notes */
+.margin-note {
+  position: absolute;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--ink-faint);
+  max-width: 200px;
+  line-height: 1.3;
+}
+.margin-note .arrow {
+  display: block;
+  margin-bottom: 6px;
+  font-style: normal;
+  color: var(--forest);
+}
+
+/* ─────────────────────────────────────────────
+   PRODUCT SHOWCASE BAND
+   ───────────────────────────────────────────── */
+.showcase {
+  padding: 60px 0 90px;
+}
+.showcase-frame {
+  position: relative;
+  background: #fbf6e9;
+  border: 1px solid var(--paper-line-2);
+  border-radius: 8px;
+  padding: 14px 14px 0;
+  box-shadow: 0 40px 80px -40px rgba(28,31,28,0.35), 0 3px 0 var(--paper-deep);
+  overflow: hidden;
+}
+.showcase-frame::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent, #fbf6e9);
+  pointer-events: none;
+  z-index: 2;
+}
+.showcase-frame img {
+  width: 100%;
+  height: auto;
+  border-radius: 4px;
+  border: 1px solid var(--paper-line);
+  display: block;
+}
+.showcase-caption {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 22px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--paper-line);
+}
+.showcase-caption h2 {
+  font-size: clamp(1.6rem, 2.6vw, 2.4rem);
+  max-width: 22ch;
+}
+.showcase-caption .meta {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.04em;
+  text-align: right;
+  line-height: 1.7;
+}
+.showcase-caption .meta strong { color: var(--ink); font-weight: 500; }
+
+/* ─────────────────────────────────────────────
+   PIPELINE / FEATURES
+   ───────────────────────────────────────────── */
+.section { padding: 90px 0; position: relative; }
+.section-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 60px;
+  align-items: end;
+  margin-bottom: 60px;
+}
+.section-head h2 { max-width: 18ch; }
+.section-head .sub {
+  font-size: 1.05rem;
+  color: var(--ink-soft);
+  max-width: 42ch;
+  line-height: 1.55;
+}
+.section-head .sub em {
+  font-style: italic;
+  color: var(--forest);
+  font-weight: 500;
+}
+
+.pipeline {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 20px;
+}
+.card {
+  background: #fbf6e9;
+  border: 1px solid var(--paper-line);
+  border-radius: 6px;
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  position: relative;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+.card:hover { border-color: var(--paper-line-2); transform: translateY(-2px); }
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--paper-line);
+}
+.card-head .num {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.12em;
+}
+.card-head .badge {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--forest);
+  background: rgba(31,90,58,0.08);
+  padding: 3px 8px;
+  border-radius: 3px;
+}
+.card h3 { font-size: 1.5rem; line-height: 1.1; letter-spacing: -0.03em; }
+.card h3 .em { color: var(--forest); font-weight: 600; }
+.card-body {
+  color: var(--ink-soft);
+  font-size: 0.97rem;
+  line-height: 1.6;
+}
+
+/* Card sizes */
+.pipeline .card-1 { grid-column: span 7; }
+.pipeline .card-2 { grid-column: span 5; }
+.pipeline .card-3 { grid-column: span 5; }
+.pipeline .card-4 { grid-column: span 7; }
+
+/* Card demo zones */
+.demo {
+  margin-top: auto;
+  background: var(--paper);
+  border: 1px solid var(--paper-line);
+  border-radius: 4px;
+  padding: 18px 20px;
+}
+.demo-label {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 12px;
+}
+
+/* OCR demo */
+.ocr-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.ocr-table th, .ocr-table td {
+  text-align: left;
+  padding: 9px 6px;
+  border-bottom: 1px dashed rgba(28,31,28,0.12);
+}
+.ocr-table th {
+  font-weight: 500;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.ocr-table td:last-child { font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+.ocr-table tbody tr:last-child td { border-bottom: 0; }
+
+/* Tag chips demo */
+.chip-cloud { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--paper-line-2);
+  background: #fbf6e9;
+  font-size: 0.84rem;
+  color: var(--ink);
+}
+.chip .x { color: var(--ink-faint); margin-right: 6px; font-family: var(--mono); font-size: 0.72rem; }
+.chip.forest { color: var(--forest); border-color: rgba(31,90,58,0.3); background: rgba(31,90,58,0.06); }
+.chip.ochre  { color: var(--ochre);  border-color: rgba(179,116,42,0.3); background: rgba(179,116,42,0.06); }
+.chip.rust   { color: var(--rust);   border-color: rgba(168,71,42,0.3); background: rgba(168,71,42,0.06); }
+
+/* QA demo */
+.qa-q {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 1rem;
+  color: var(--ink);
+  letter-spacing: -0.015em;
+  margin-bottom: 10px;
+}
+.qa-a {
+  font-size: 0.9rem;
+  color: var(--ink-soft);
+  line-height: 1.6;
+}
+.qa-a mark {
+  background: rgba(31,90,58,0.14);
+  color: var(--forest-deep);
+  padding: 0 3px;
+  border-radius: 2px;
+}
+.qa-cite {
+  margin-top: 10px;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.qa-cite span {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--forest);
+  background: rgba(31,90,58,0.08);
+  padding: 3px 7px;
+  border-radius: 3px;
+}
+
+/* Model config demo */
+.model-list { display: grid; gap: 6px; }
+.model-row {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  align-items: center;
+  gap: 14px;
+  padding: 11px 14px;
+  background: #fbf6e9;
+  border: 1px solid var(--paper-line);
+  border-radius: 4px;
+  font-size: 0.88rem;
+}
+.model-row .role {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--forest);
+}
+.model-row .model {
+  font-family: var(--mono);
+  color: var(--ink);
+}
+.model-row .speed {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* ─────────────────────────────────────────────
+   EXAMPLES SECTION
+   ───────────────────────────────────────────── */
+.examples {
+  background: #14231b;
+  color: #e9e2cf;
+  padding: 100px 0 110px;
+  position: relative;
+  overflow: hidden;
+}
+.examples::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(233,226,207,0.025) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(233,226,207,0.025) 1px, transparent 1px);
+  background-size: 56px 56px;
+  pointer-events: none;
+}
+.examples > * { position: relative; }
+.examples h2 { color: #f4ecd8; }
+.examples .section-head .sub { color: rgba(233,226,207,0.6); }
+.examples .section-head .sub em { color: #b8d4be; }
+.examples .eyebrow { color: rgba(233,226,207,0.5); }
+
+.example {
+  display: grid;
+  grid-template-columns: minmax(0, 0.42fr) minmax(0, 0.58fr);
+  gap: 48px;
+  align-items: center;
+  padding: 50px 0;
+  border-top: 1px solid rgba(233,226,207,0.10);
+}
+.example:last-child { border-bottom: 1px solid rgba(233,226,207,0.10); }
+.example.flip { grid-template-columns: minmax(0, 0.58fr) minmax(0, 0.42fr); }
+.example.flip .ex-shot { order: -1; }
+
+.ex-tag-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 22px;
+}
+.ex-tag-row .t {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(233,226,207,0.7);
+  background: rgba(233,226,207,0.06);
+  border: 1px solid rgba(233,226,207,0.12);
+  padding: 4px 9px;
+  border-radius: 3px;
+}
+.ex-q {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: clamp(1.4rem, 2.2vw, 1.9rem);
+  line-height: 1.22;
+  color: #f4ecd8;
+  margin-bottom: 18px;
+  letter-spacing: -0.025em;
+}
+.ex-q::before {
+  content: "“";
+  font-family: var(--display);
+  display: block;
+  font-size: 2.6rem;
+  font-weight: 400;
+  line-height: 0.3;
+  color: rgba(184,212,190,0.55);
+  margin-bottom: 22px;
+}
+.ex-desc {
+  font-size: 0.98rem;
+  color: rgba(233,226,207,0.65);
+  line-height: 1.6;
+  max-width: 38ch;
+  margin-bottom: 18px;
+}
+.ex-foot {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(233,226,207,0.4);
+  padding-top: 14px;
+  border-top: 1px dashed rgba(233,226,207,0.15);
+}
+
+.ex-shot {
+  position: relative;
+}
+.ex-shot::before {
+  content: "";
+  position: absolute;
+  inset: -20px;
+  background: radial-gradient(ellipse at center, rgba(184,212,190,0.10), transparent 70%);
+  pointer-events: none;
+}
+.ex-shot img {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid rgba(233,226,207,0.10);
+  box-shadow: 0 24px 60px -20px rgba(0,0,0,0.6);
+}
+
+/* ─────────────────────────────────────────────
+   STEPS / WORKFLOW
+   ───────────────────────────────────────────── */
+.steps {
+  padding: 100px 0;
+}
+.steps-list {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--paper-line);
+}
+.step {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1.4fr) 180px;
+  gap: 40px;
+  align-items: center;
+  padding: 36px 0;
+  border-bottom: 1px solid var(--paper-line);
+  transition: background 0.2s ease;
+}
+.step:hover { background: rgba(31,90,58,0.025); }
+.step-num {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--forest);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding-top: 4px;
+}
+.step-title {
+  font-family: var(--display);
+  font-size: 1.5rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.step-desc {
+  color: var(--ink-soft);
+  font-size: 0.98rem;
+  line-height: 1.55;
+}
+.step-tag {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: right;
+}
+.step-tag .dot {
+  display: inline-block;
+  width: 6px; height: 6px;
+  background: var(--forest);
+  border-radius: 50%;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* ─────────────────────────────────────────────
+   CTA
+   ───────────────────────────────────────────── */
+.cta {
+  padding: 60px 0 110px;
+}
+.cta-card {
+  background: #14231b;
+  color: #f4ecd8;
+  border-radius: 10px;
+  padding: 80px 64px;
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: center;
+}
+.cta-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(to right, rgba(233,226,207,0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(233,226,207,0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+}
+.cta-card > * { position: relative; }
+.cta-card h2 {
+  font-size: clamp(2.2rem, 4vw, 3.5rem);
+  max-width: 15ch;
+  color: #f4ecd8;
+}
+.cta-card h2 .accent { color: #b8d4be; }
+.cta-card .lede {
+  color: rgba(233,226,207,0.65);
+  margin: 22px 0 32px;
+  max-width: 38ch;
+  line-height: 1.55;
+}
+.cta-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+.cta-actions .btn-primary {
+  background: #f4ecd8;
+  color: #14231b;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+}
+.cta-actions .btn-primary:hover { background: #fff; }
+.cta-actions .btn-ghost {
+  color: #f4ecd8;
+  border-color: rgba(233,226,207,0.25);
+}
+.cta-actions .btn-ghost:hover { background: rgba(233,226,207,0.06); }
+
+.cta-quote {
+  border-left: 1px solid rgba(233,226,207,0.15);
+  padding-left: 32px;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: rgba(233,226,207,0.7);
+  line-height: 1.8;
+}
+.cta-quote .row { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px dashed rgba(233,226,207,0.1); }
+.cta-quote .row:last-child { border-bottom: 0; }
+.cta-quote .row .k { color: rgba(233,226,207,0.45); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.7rem; }
+.cta-quote .row .v { color: #f4ecd8; }
+.cta-quote .check { color: #b8d4be; }
+
+/* ─────────────────────────────────────────────
+   FOOTER
+   ───────────────────────────────────────────── */
+.footer {
+  padding: 40px 0 56px;
+  border-top: 1px solid var(--paper-line);
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+.footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.footer-row .brand { font-size: 1rem; }
+.footer-meta {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+  color: var(--ink-faint);
+}
+.footer-nav { display: flex; gap: 18px; }
+.footer-nav a { color: var(--ink-soft); }
+.footer-nav a:hover { color: var(--ink); }
+
+/* ─────────────────────────────────────────────
+   RESPONSIVE
+   ───────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .pipeline .card-1, .pipeline .card-2,
+  .pipeline .card-3, .pipeline .card-4 { grid-column: span 12; }
+  .section-head { grid-template-columns: 1fr; gap: 24px; }
+  .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+  .step { grid-template-columns: 80px minmax(0, 1fr) 1.4fr; gap: 24px; }
+  .step-tag { display: none; }
+  .example, .example.flip { grid-template-columns: 1fr; gap: 28px; }
+  .example.flip .ex-shot { order: 0; }
+  .cta-card { grid-template-columns: 1fr; padding: 48px 36px; }
+  .cta-quote { border-left: 0; padding-left: 0; border-top: 1px solid rgba(233,226,207,0.15); padding-top: 24px; }
+}
+@media (max-width: 680px) {
+  .nav a:not(.star) { display: none; }
+  .hero { padding: 48px 0 16px; }
+  .showcase-caption { flex-direction: column; align-items: flex-start; }
+  .showcase-caption .meta { text-align: left; }
+  .step { grid-template-columns: 50px 1fr; gap: 16px; }
+  .step-num { font-size: 0.74rem; }
+  .step-title { font-size: 1.25rem; }
+  .cta-card { padding: 40px 24px; }
+}
+</style>
 </head>
 
-<body class="marketing-body">
-  <header class="marketing-header">
-    <div class="site-shell nav-shell">
-      <a class="brand" href="./index.html" aria-label="Paperwise home">
-        <img class="brand-mark" src="./paperwise-icon.png" alt="" aria-hidden="true" width="32" height="32" />
-        <span class="brand-name">Paperwise</span>
+<body>
+
+<header class="site-header">
+  <div class="shell header-inner">
+    <a class="brand" href="./index.html"><img class="brand-dot" src="./paperwise-icon.png" alt="" aria-hidden="true" width="24" height="24" />paperwise</a>
+    <nav class="nav">
+      <a href="#features">Features</a>
+      <a href="#examples">Examples</a>
+      <a href="#workflow">How it works</a>
+      <a href="./docs/getting-started/">Docs</a>
+      <a class="star" href="https://github.com/zellux/paperwise" target="_blank" rel="noopener">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+        <span class="count">·  2.1k</span>
       </a>
-      <button class="nav-toggle" type="button" aria-label="Toggle menu" aria-expanded="false">
-        <i data-lucide="menu" class="nav-toggle-open"></i>
-        <i data-lucide="x" class="nav-toggle-close"></i>
-      </button>
-      <nav class="marketing-nav" id="mobileNav" aria-label="Main">
-        <a class="nav-link" href="#features">Features</a>
-        <a class="nav-link" href="#steps">How it works</a>
-        <a class="nav-link" href="./docs/getting-started/">Docs</a>
-        <a class="nav-link nav-link-github" href="https://github.com/zellux/paperwise" target="_blank"
-          rel="noopener noreferrer"><i data-lucide="github"></i>GitHub</a>
-      </nav>
-    </div>
-  </header>
-
-  <main>
-    <section class="hero-section">
-      <div class="site-shell hero-layout">
-        <div class="hero-copy">
-          <div class="hero-badge">
-            <span class="badge-dot"></span>
-            Self hosted
-          </div>
-          <h1>Documents, structured and queryable.</h1>
-          <p class="hero-lead">
-            Paperwise helps you OCR, extract, organize, and query documents on your own
-            infrastructure. Run it locally or self-host it, and keep full control of your data.
-          </p>
-          <div class="hero-actions">
-            <a class="btn btn-secondary" href="./docs/getting-started/">Get started</a>
-            <a class="btn btn-primary" href="https://github.com/zellux/paperwise" target="_blank"
-              rel="noopener noreferrer"><i data-lucide="github"></i>View on GitHub</a>
-          </div>
-        </div>
-
-        <div class="hero-preview">
-          <figure class="hero-screenshot">
-            <img src="./demo-documents-library.png" alt="Paperwise document library with processed sample documents" />
-          </figure>
-        </div>
-      </div>
-    </section>
-
-    <section id="features" class="feature-section">
-      <div class="site-shell">
-        <div class="section-heading">
-          <h2>From raw files to structured answers</h2>
-          <p>Paperwise combines OCR, extraction, organization, and grounded Q&amp;A in one self-hosted workflow.</p>
-        </div>
-        <div class="feature-grid">
-          <article class="feature-card">
-            <div class="feature-text">
-              <p class="eyebrow">OCR &amp; extraction accuracy</p>
-              <h3><i data-lucide="scan-text" class="feature-icon"></i>OCR &amp; Data Extraction</h3>
-              <p>
-                Go from a 50-page PDF to structured data in seconds. Paperwise
-                can switch between local OCR and LLM-based OCR depending
-                on document quality, helping with scans, dense layouts, and messier files.
-              </p>
-            </div>
-            <div class="feature-mini">
-              <table class="mini-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Date Received</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Sonic Invoice</td>
-                    <td>March 12, 2025</td>
-                  </tr>
-                  <tr>
-                    <td>Annual Financials</td>
-                    <td>September 1, 2024</td>
-                  </tr>
-                  <tr>
-                    <td>Auto Rate</td>
-                    <td>April 5, 2025</td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </article>
-
-          <article class="feature-card feature-card-org">
-            <div class="feature-text">
-              <p class="eyebrow eyebrow-metric">
-                <span class="eyebrow-icon" aria-hidden="true"></span>
-                Flexible document categories
-              </p>
-              <h3><i data-lucide="tags" class="feature-icon"></i>Smart Organization</h3>
-              <p>
-                Auto-tag documents by type, date, entity, and custom taxonomy. Build
-                filterable views across your library and refine the structure over time.
-              </p>
-            </div>
-            <div class="feature-mini feature-mini-tags">
-              <div class="mini-tags-panel">
-                <p class="mini-tags-label">Auto-tagged categories</p>
-                <div class="mini-tags-grid">
-                  <span class="mini-tag-pill">Contract</span>
-                  <span class="mini-tag-pill">Health</span>
-                  <span class="mini-tag-pill">Invoice</span>
-                  <span class="mini-tag-pill">Amendment</span>
-                  <span class="mini-tag-pill">Tuition</span>
-                  <span class="mini-tag-pill">Housing</span>
-                  <span class="mini-tag-pill">Legal</span>
-                  <span class="mini-tag-pill">Finance</span>
-                  <span class="mini-tag-pill">Billing</span>
-                  <span class="mini-tag-pill">Insurance</span>
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <article class="feature-card">
-            <div class="feature-text">
-              <p class="eyebrow">Source-backed answers</p>
-              <h3><i data-lucide="message-circle-more" class="feature-icon"></i>Grounded Q&amp;A</h3>
-              <p>
-                Ask natural language questions and get answers grounded in
-                your documents, with source quotes you can trace back to the original files.
-              </p>
-            </div>
-            <div class="feature-mini">
-              <div class="mini-qa">
-                <p class="mini-q">"What is the billing cap in the Renfroe contract?"</p>
-                <p class="mini-a">The aggregate liability is capped at $1,000,000 as stated in Section 4, Paragraph 3 of
-                  the executed agreement.</p>
-              </div>
-            </div>
-          </article>
-
-          <article class="feature-card feature-card-models">
-            <div class="feature-text">
-              <p class="eyebrow">3 configurable model slots</p>
-              <h3><i data-lucide="cpu" class="feature-icon"></i>Task-Specific Models</h3>
-              <p>
-                Configure different AI models for OCR, extraction, and Q&amp;A. Use fast models
-                for bulk processing and premium models for high-stakes analysis.
-              </p>
-            </div>
-            <div class="feature-mini feature-mini-config">
-              <div class="mini-config">
-                <p class="mini-config-label">Example model configuration</p>
-                <div class="mini-config-list">
-                  <div class="mini-config-row">
-                    <span class="mini-config-chip">OCR</span>
-                    <strong>gemini-2.5-flash</strong>
-                    <span>Fast</span>
-                  </div>
-                  <div class="mini-config-row">
-                    <span class="mini-config-chip">Extraction</span>
-                    <strong>gpt-4.1-mini</strong>
-                    <span>Balanced</span>
-                  </div>
-                  <div class="mini-config-row">
-                    <span class="mini-config-chip">Doc Q&amp;A</span>
-                    <strong>gpt-4.1</strong>
-                    <span>Accurate</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section id="examples" class="examples-section">
-      <div class="site-shell">
-        <div class="section-heading">
-          <h2>See it in action</h2>
-          <p>Real queries. Real documents. Real answers with citations.</p>
-        </div>
-        <div class="examples-flow">
-
-          <article class="example-row">
-            <div class="example-context">
-              <div class="examples-tags">
-                <span class="examples-tag">Medical bills</span>
-                <span class="examples-tag">EOB + invoice</span>
-                <span class="examples-tag">Grounded answer</span>
-              </div>
-              <div class="example-query-block">
-                <p class="example-query-label">Query</p>
-                <p class="example-query-text">"Which medical bill still needs action, and what should I pay next?"</p>
-              </div>
-              <p class="example-desc">
-                Reconciles the insurance EOB, clinic invoice, and HSA record so the answer
-                shows what was covered, what remains, and which document proves it.
-              </p>
-              <p class="example-note">Across billing and insurance records</p>
-            </div>
-            <div class="example-shot">
-              <button class="shot-button" type="button" data-zoom-src="./demo-medical-bill.png"
-                data-zoom-alt="Grounded medical bill answer with citations"
-                aria-label="Open medical bill answer screenshot">
-                <img src="./demo-medical-bill.png" alt="Grounded medical bill answer with citations" loading="lazy" />
-              </button>
-            </div>
-          </article>
-
-          <article class="example-row example-row-reverse">
-            <div class="example-context">
-              <div class="examples-tags">
-                <span class="examples-tag">Utility bills</span>
-                <span class="examples-tag">Table extraction</span>
-                <span class="examples-tag">Monthly trend</span>
-              </div>
-              <div class="example-query-block">
-                <p class="example-query-label">Query</p>
-                <p class="example-query-text">"Summarize my PG&amp;E bills by month and show the usage and charges in a table."</p>
-              </div>
-              <p class="example-desc">
-                Builds a month-by-month table from separate statements, keeping usage,
-                delivery charges, generation charges, and totals tied back to citations.
-              </p>
-              <p class="example-note">Across multiple utility statements</p>
-            </div>
-            <div class="example-shot">
-              <button class="shot-button" type="button" data-zoom-src="./demo-utility-bills.png"
-                data-zoom-alt="Grounded utility bill answer with a monthly table"
-                aria-label="Open utility bill table screenshot">
-                <img src="./demo-utility-bills.png" alt="Grounded utility bill answer with a monthly table" loading="lazy" />
-              </button>
-            </div>
-          </article>
-
-          <article class="example-row">
-            <div class="example-context">
-              <div class="examples-tags">
-                <span class="examples-tag">Company docs</span>
-                <span class="examples-tag">Renewal prep</span>
-                <span class="examples-tag">Cross-document Q&amp;A</span>
-              </div>
-              <div class="example-query-block">
-                <p class="example-query-label">Query</p>
-                <p class="example-query-text">"What should we know before renewing Northstar Analytics?"</p>
-              </div>
-              <p class="example-desc">
-                Pulls renewal terms, vendor security notes, procurement policy, and usage
-                exports into a compact brief for a private company decision.
-              </p>
-              <p class="example-note">Across contract, policy, and usage docs</p>
-            </div>
-            <div class="example-shot">
-              <button class="shot-button" type="button" data-zoom-src="./demo-vendor-renewal.png"
-                data-zoom-alt="Grounded vendor renewal answer across company documents"
-                aria-label="Open vendor renewal answer screenshot">
-                <img src="./demo-vendor-renewal.png" alt="Grounded vendor renewal answer across company documents" loading="lazy" />
-              </button>
-            </div>
-          </article>
-
-        </div>
-      </div>
-    </section>
-
-    <section id="steps" class="steps-section">
-      <div class="site-shell">
-        <div class="section-heading">
-          <h2>Three steps. Less manual work.</h2>
-          <p>Self-host Paperwise and turn raw files into structured, answerable knowledge.</p>
-        </div>
-        <div class="steps-grid">
-          <article class="step-card">
-            <span class="step-icon step-icon-1">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M10 2v10m0-10L7 5m3-3l3 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                  stroke-linejoin="round" />
-                <path d="M3 13v3a1 1 0 001 1h12a1 1 0 001-1v-3" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round" />
-              </svg>
-            </span>
-            <h3>Upload your files in batch</h3>
-            <p>Drag and drop PDFs, scans, images, or text documents into your workspace.</p>
-          </article>
-          <article class="step-card">
-            <span class="step-icon step-icon-2">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <path d="M10 2l1.5 4h4l-3.2 2.4 1.2 4L10 10l-3.5 2.4 1.2-4L4.5 6h4L10 2z" stroke="currentColor"
-                  stroke-width="1.5" stroke-linejoin="round" />
-              </svg>
-            </span>
-            <h3>AI processes &amp; structures</h3>
-            <p>OCR runs automatically. Metadata is extracted, and documents are organized.</p>
-          </article>
-          <article class="step-card">
-            <span class="step-icon step-icon-3">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
-                <circle cx="8.5" cy="8.5" r="5.5" stroke="currentColor" stroke-width="2" />
-                <path d="M13 13l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-              </svg>
-            </span>
-            <h3>Query &amp; act</h3>
-            <p>Use grounded AI to search language across any set of documents instantly.</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <section class="cta-section">
-      <div class="site-shell">
-        <div class="cta-card cta-card-centered">
-          <h2>Ready to self-host your document stack?</h2>
-          <p>Clone the repo, run it locally or on your own infrastructure, and keep your document workflows under your
-            control.</p>
-          <div class="cta-actions">
-            <a class="btn btn-light" href="https://github.com/zellux/paperwise" target="_blank"
-              rel="noopener noreferrer"><i data-lucide="github"></i>View on GitHub</a>
-          </div>
-          <p class="cta-note">Open source and self-hosted</p>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <footer class="marketing-footer">
-    <div class="site-shell footer-row">
-      <a class="brand" href="./index.html" aria-label="Paperwise home">
-        <img class="brand-mark" src="./paperwise-icon.png" alt="" aria-hidden="true" width="32" height="32" />
-        <span class="brand-name">Paperwise</span>
-      </a>
-      <nav class="footer-nav" aria-label="Footer">
-        <a href="./index.html">Home</a>
-        <a href="./docs/getting-started/">Docs</a>
-        <a href="./docs/support/">Q&amp;A</a>
-        <a href="https://github.com/zellux/paperwise" target="_blank" rel="noopener noreferrer">GitHub</a>
-      </nav>
-    </div>
-  </footer>
-
-  <div class="lightbox" id="screenshotLightbox" aria-hidden="true" inert>
-    <div class="lightbox-backdrop" data-lightbox-close></div>
-    <div class="lightbox-dialog" role="dialog" aria-modal="true" aria-label="Expanded screenshot preview">
-      <button class="lightbox-close" type="button" aria-label="Close screenshot preview" data-lightbox-close>
-        &times;
-      </button>
-      <img id="lightboxImage" src="" alt="" />
-    </div>
+    </nav>
   </div>
+</header>
 
-  <script>
-    (() => {
-      const lightbox = document.getElementById("screenshotLightbox");
-      const lightboxImage = document.getElementById("lightboxImage");
-      const lightboxClose = lightbox?.querySelector("[data-lightbox-close]");
-      const zoomButtons = document.querySelectorAll("[data-zoom-src]");
-      const closeButtons = document.querySelectorAll("[data-lightbox-close]");
-      let lastFocusedElement = null;
+<main>
 
-      if (!lightbox || !lightboxImage) {
-        return;
-      }
+  <!-- ─── HERO ─────────────────────────────────── -->
+  <section class="hero">
+    <div class="shell">
+      <div class="hero-meta">
+        <span class="pill"><span class="dot"></span>v0.4.0 · self-hosted</span>
+        <span class="sep">— Open source · MIT</span>
+      </div>
 
-      const openLightbox = (src, alt) => {
-        lastFocusedElement = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-        lightboxImage.src = src;
-        lightboxImage.alt = alt;
-        lightbox.removeAttribute("inert");
-        lightbox.classList.add("is-open");
-        lightbox.setAttribute("aria-hidden", "false");
-        document.body.classList.add("lightbox-open");
-        if (lightboxClose instanceof HTMLElement) {
-          lightboxClose.focus();
-        }
-      };
+      <h1>
+        Documents,<br />
+        structured<br />
+        <span class="accent">and</span> <span class="underline">queryable</span>.
+      </h1>
 
-      const closeLightbox = () => {
-        if (lastFocusedElement instanceof HTMLElement) {
-          lastFocusedElement.focus({ preventScroll: true });
-        } else if (document.activeElement instanceof HTMLElement && lightbox.contains(document.activeElement)) {
-          document.activeElement.blur();
-        }
-        lightbox.classList.remove("is-open");
-        lightbox.setAttribute("aria-hidden", "true");
-        lightbox.setAttribute("inert", "");
-        lightboxImage.src = "";
-        lightboxImage.alt = "";
-        document.body.classList.remove("lightbox-open");
-      };
+      <div class="hero-grid">
+        <div>
+          <p class="hero-lede">
+            Paperwise turns the pile of PDFs, scans, and statements on your machine into a
+            <em>searchable, citation-backed</em> knowledge base. Run the whole stack locally.
+            Your files never leave the box.
+          </p>
+          <div class="hero-cta">
+            <a class="btn btn-primary" href="./docs/getting-started/">
+              Get started
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+            </a>
+            <a class="btn btn-ghost" href="https://github.com/zellux/paperwise" target="_blank" rel="noopener">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              View on GitHub
+            </a>
+          </div>
+          <div class="hero-foot">
+            <span>Local OCR</span><span class="x">·</span>
+            <span>Bring-your-own LLM</span><span class="x">·</span>
+            <span>No telemetry</span>
+          </div>
+        </div>
 
-      zoomButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-          openLightbox(button.dataset.zoomSrc || "", button.dataset.zoomAlt || "");
-        });
-      });
+        <aside class="hero-side">
+          <div class="hero-index">
+            <div class="hero-index-head">
+              <span class="hero-index-title">Document index</span>
+              <span class="hero-index-meta">248 files</span>
+            </div>
+            <div class="hero-index-list">
+              <div class="hero-index-row">
+                <span class="hero-index-num">001</span>
+                <span class="hero-index-name">2026 Property Tax Notice<span class="ext">.pdf</span></span>
+                <span class="hero-index-tag">Tax</span>
+              </div>
+              <div class="hero-index-row">
+                <span class="hero-index-num">002</span>
+                <span class="hero-index-name">Blue Shield EOB<span class="ext">.pdf</span></span>
+                <span class="hero-index-tag rust">Medical</span>
+              </div>
+              <div class="hero-index-row">
+                <span class="hero-index-num">003</span>
+                <span class="hero-index-name">PG&amp;E Statement — Apr<span class="ext">.pdf</span></span>
+                <span class="hero-index-tag amber">Utility</span>
+              </div>
+              <div class="hero-index-row">
+                <span class="hero-index-num">004</span>
+                <span class="hero-index-name">Fidelity Brokerage<span class="ext">.pdf</span></span>
+                <span class="hero-index-tag">Finance</span>
+              </div>
+              <div class="hero-index-row">
+                <span class="hero-index-num">005</span>
+                <span class="hero-index-name">Solar Install Warranty<span class="ext">.pdf</span></span>
+                <span class="hero-index-tag">Home</span>
+              </div>
+              <div class="hero-index-row">
+                <span class="hero-index-num">006</span>
+                <span class="hero-index-name">Acme Analytics Order<span class="ext">.pdf</span></span>
+                <span class="hero-index-tag">Vendor</span>
+              </div>
+            </div>
+            <div class="hero-index-foot">
+              <span>indexed locally</span>
+              <span><strong>● ready to query</strong></span>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </div>
+  </section>
 
-      closeButtons.forEach((button) => {
-        button.addEventListener("click", closeLightbox);
-      });
+  <!-- ─── PRODUCT SHOWCASE ─────────────────────── -->
+  <section class="showcase">
+    <div class="shell">
+      <div class="showcase-frame">
+        <div class="showcase-caption" style="padding: 8px 8px 22px;">
+          <h2>A library, <span class="accent-forest">not a folder</span>.</h2>
+          <div class="meta">
+            <div><strong>248</strong> documents · <strong>13</strong> tags</div>
+            <div>filtered by correspondent, type, and date</div>
+          </div>
+        </div>
+        <img src="./demo-documents-library.png" alt="Paperwise document library — sortable, filterable view across 248 documents" />
+      </div>
+    </div>
+  </section>
 
-      document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && lightbox.classList.contains("is-open")) {
-          closeLightbox();
-        }
-      });
-    })();
-  </script>
-  <script>
-    (() => {
-      const toggle = document.querySelector('.nav-toggle');
-      const nav = document.getElementById('mobileNav');
-      if (!toggle || !nav) return;
-      toggle.addEventListener('click', () => {
-        const open = toggle.getAttribute('aria-expanded') === 'true';
-        toggle.setAttribute('aria-expanded', String(!open));
-        nav.classList.toggle('is-open', !open);
-      });
-      nav.querySelectorAll('.nav-link').forEach(link => {
-        link.addEventListener('click', () => {
-          toggle.setAttribute('aria-expanded', 'false');
-          nav.classList.remove('is-open');
-        });
-      });
-    })();
-  </script>
-  <script>lucide.createIcons();</script>
+  <!-- ─── PIPELINE / FEATURES ──────────────────── -->
+  <section id="features" class="section">
+    <div class="shell">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow forest">§01 — Pipeline</p>
+          <h2 style="margin-top: 18px;">From raw files<br />to <span class="accent-forest">structured answers</span>.</h2>
+        </div>
+        <p class="sub">
+          OCR, extraction, organization, and grounded Q&amp;A — <em>four stages</em>, one self-hosted
+          binary. Swap the model behind each stage. Refine the taxonomy over time. Keep
+          everything on your own infrastructure.
+        </p>
+      </div>
+
+      <div class="pipeline">
+
+        <!-- Card 1: OCR -->
+        <article class="card card-1">
+          <div class="card-head">
+            <span class="num">01 · OCR &amp; EXTRACTION</span>
+            <span class="badge">~3s / page</span>
+          </div>
+          <h3>Read messy PDFs <span class="em">like a person would</span>.</h3>
+          <p class="card-body">
+            Switch between local OCR and an LLM model per document. Paperwise handles scans,
+            multi-column layouts, handwritten margins, and 50-page statements without
+            babysitting.
+          </p>
+          <div class="demo">
+            <div class="demo-label">Extracted · last batch</div>
+            <table class="ocr-table">
+              <thead>
+                <tr><th>Document</th><th>Type</th><th>Received</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Sonic Invoice</td><td>Invoice</td><td>Mar 12, 2026</td></tr>
+                <tr><td>Annual Financials</td><td>Statement</td><td>Sep 1, 2025</td></tr>
+                <tr><td>Auto Rate Notice</td><td>Insurance</td><td>Apr 5, 2026</td></tr>
+                <tr><td>Kindergarten Packet</td><td>Form</td><td>Mar 14, 2026</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <!-- Card 2: Smart Organization -->
+        <article class="card card-2">
+          <div class="card-head">
+            <span class="num">02 · ORGANIZATION</span>
+            <span class="badge">auto-tagged</span>
+          </div>
+          <h3>Tagged by <span class="em">type, party, date</span>.</h3>
+          <p class="card-body">
+            Auto-classify each document into a taxonomy you control. Refine the rules, merge
+            categories, and the library reorganizes itself.
+          </p>
+          <div class="demo">
+            <div class="demo-label">Active taxonomy · 13 tags</div>
+            <div class="chip-cloud">
+              <span class="chip forest"><span class="x">12</span>Contract</span>
+              <span class="chip rust"><span class="x">28</span>Medical</span>
+              <span class="chip"><span class="x">41</span>Invoice</span>
+              <span class="chip"><span class="x">7</span>Amendment</span>
+              <span class="chip"><span class="x">3</span>Tuition</span>
+              <span class="chip ochre"><span class="x">19</span>Utility</span>
+              <span class="chip"><span class="x">6</span>Legal</span>
+              <span class="chip forest"><span class="x">22</span>Finance</span>
+              <span class="chip"><span class="x">14</span>Billing</span>
+              <span class="chip rust"><span class="x">11</span>Insurance</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Card 3: Grounded Q&A -->
+        <article class="card card-3">
+          <div class="card-head">
+            <span class="num">03 · GROUNDED Q&amp;A</span>
+            <span class="badge">cited</span>
+          </div>
+          <h3>Answers that <span class="em">cite their source</span>.</h3>
+          <p class="card-body">
+            Every answer comes back with the page-level citations it was built from. Click through,
+            verify, and trust.
+          </p>
+          <div class="demo">
+            <p class="qa-q">"What is the billing cap in the Renfroe contract?"</p>
+            <p class="qa-a">
+              Aggregate liability is capped at <mark>$1,000,000</mark> in the executed
+              agreement.
+            </p>
+            <div class="qa-cite">
+              <span>renfroe-msa.pdf · p.4</span>
+              <span>amendment-2.pdf · p.1</span>
+            </div>
+          </div>
+        </article>
+
+        <!-- Card 4: Task-Specific Models -->
+        <article class="card card-4">
+          <div class="card-head">
+            <span class="num">04 · MODEL ROUTING</span>
+            <span class="badge">3 slots · BYO key</span>
+          </div>
+          <h3>The right model <span class="em">for each job</span>.</h3>
+          <p class="card-body">
+            Configure separate models for OCR, extraction, and Q&amp;A — cheap and fast where it
+            doesn't matter, slow and accurate where it does. Local, OpenAI-compatible, or hosted.
+          </p>
+          <div class="demo">
+            <div class="demo-label">Active configuration</div>
+            <div class="model-list">
+              <div class="model-row">
+                <span class="role">OCR</span>
+                <span class="model">gemini-2.5-flash</span>
+                <span class="speed">fast</span>
+              </div>
+              <div class="model-row">
+                <span class="role">Extract</span>
+                <span class="model">gpt-4.1-mini</span>
+                <span class="speed">balanced</span>
+              </div>
+              <div class="model-row">
+                <span class="role">Q&amp;A</span>
+                <span class="model">gpt-4.1</span>
+                <span class="speed">accurate</span>
+              </div>
+            </div>
+          </div>
+        </article>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── EXAMPLES ─────────────────────────────── -->
+  <section id="examples" class="examples">
+    <div class="shell">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow">§02 — In the wild</p>
+          <h2 style="margin-top: 18px;">Three demo questions,<br /><span style="color: #b8d4be;">three grounded answers</span>.</h2>
+        </div>
+        <p class="sub">
+          Each example is reconstructed from public sample documents in a demo library —
+          <em>with the page numbers to prove it</em>.
+        </p>
+      </div>
+
+      <article class="example">
+        <div>
+          <div class="ex-tag-row">
+            <span class="t">Medical bills</span>
+            <span class="t">EOB + invoice</span>
+            <span class="t">Reconciliation</span>
+          </div>
+          <p class="ex-q">Which medical bill still needs action, and what should I pay next?</p>
+          <p class="ex-desc">
+            Reconciles the insurance EOB, clinic invoice, and HSA record so the answer tells
+            you what was covered, what remains, and which document is the source of truth.
+          </p>
+          <p class="ex-foot">Across billing &amp; insurance records · 3 sources</p>
+        </div>
+        <div class="ex-shot">
+          <img src="./demo-medical-bill.png" alt="Paperwise answering a medical bill question with three cited sources" />
+        </div>
+      </article>
+
+      <article class="example flip">
+        <div>
+          <div class="ex-tag-row">
+            <span class="t">Utility bills</span>
+            <span class="t">Table extraction</span>
+            <span class="t">Monthly trend</span>
+          </div>
+          <p class="ex-q">Summarize my PG&amp;E bills by month and show usage in a table.</p>
+          <p class="ex-desc">
+            Pulls four separate monthly statements into one cross-document table — totals,
+            kWh, therms — each row linked to the statement it came from.
+          </p>
+          <p class="ex-foot">Across four utility statements · 4 sources</p>
+        </div>
+        <div class="ex-shot">
+          <img src="./demo-utility-bills.png" alt="Paperwise showing a four-month PG&E comparison table" />
+        </div>
+      </article>
+
+      <article class="example">
+        <div>
+          <div class="ex-tag-row">
+            <span class="t">Vendor renewal</span>
+            <span class="t">Contract + policy</span>
+            <span class="t">Cross-document</span>
+          </div>
+          <p class="ex-q">What should we know before renewing Acme Analytics?</p>
+          <p class="ex-desc">
+            Pulls renewal terms, expiring security review, procurement policy, and usage
+            exports into a compact brief — flagging the open issues before sign-off.
+          </p>
+          <p class="ex-foot">Across contract, policy &amp; usage docs · 4 sources</p>
+        </div>
+        <div class="ex-shot">
+          <img src="./demo-vendor-renewal.png" alt="Paperwise answering a vendor renewal question across four sources" />
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ─── WORKFLOW ─────────────────────────────── -->
+  <section id="workflow" class="steps">
+    <div class="shell">
+      <div class="section-head">
+        <div>
+          <p class="eyebrow forest">§03 — Workflow</p>
+          <h2 style="margin-top: 18px;">Three steps. <span class="accent-forest">No babysitting.</span></h2>
+        </div>
+        <p class="sub">
+          Drop files into the watch folder and walk away. Paperwise does the rest — OCR,
+          extraction, tagging, indexing — and lets you know when something needs your eyes.
+        </p>
+      </div>
+
+      <div class="steps-list">
+
+        <div class="step">
+          <span class="step-num">step / 01</span>
+          <h3 class="step-title">Drop in a stack.</h3>
+          <p class="step-desc">
+            Drag PDFs, scans, screenshots, and text dumps into the workspace. Or point Paperwise
+            at a folder and let it watch.
+          </p>
+          <p class="step-tag"><span class="dot"></span>Upload · Watch folder</p>
+        </div>
+
+        <div class="step">
+          <span class="step-num">step / 02</span>
+          <h3 class="step-title">Let it work.</h3>
+          <p class="step-desc">
+            OCR runs automatically. Metadata is extracted. Documents are tagged, dated, and
+            attached to the right correspondent. Re-indexable any time.
+          </p>
+          <p class="step-tag"><span class="dot"></span>OCR · Extract · Tag</p>
+        </div>
+
+        <div class="step">
+          <span class="step-num">step / 03</span>
+          <h3 class="step-title">Ask in plain English.</h3>
+          <p class="step-desc">
+            Search by language, ask cross-document questions, get back answers with the citations
+            attached. Trace each claim to the page that proves it.
+          </p>
+          <p class="step-tag"><span class="dot"></span>Query · Cite · Act</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ─── CTA ──────────────────────────────────── -->
+  <section id="docs" class="cta">
+    <div class="shell">
+      <div class="cta-card">
+        <div>
+          <p class="eyebrow" style="color: rgba(244,236,216,0.5);">§04 — Self-host</p>
+          <h2 style="margin-top: 18px;">Your documents<br />stay <span style="color: #b8d4be;">on your machine</span>.</h2>
+          <p class="lede">
+            Clone the repo, run a single command, and you've got a private document
+            intelligence service. No accounts. No upload limits. No outbound calls you
+            didn't authorize.
+          </p>
+          <div class="cta-actions">
+            <a class="btn btn-primary" href="https://github.com/zellux/paperwise" target="_blank" rel="noopener">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8a8 8 0 005.47 7.59c.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+              Clone the repo
+            </a>
+            <a class="btn btn-ghost" href="./docs/getting-started/">Read the docs</a>
+          </div>
+        </div>
+        <div class="cta-quote">
+          <div class="row"><span class="k">License</span><span class="v">MIT</span></div>
+          <div class="row"><span class="k">Deploy</span><span class="v">Docker Compose · localhost</span></div>
+          <div class="row"><span class="k">Storage</span><span class="v">Postgres + local object store</span></div>
+          <div class="row"><span class="k">Queue</span><span class="v">Redis + Celery worker</span></div>
+          <div class="row"><span class="k">OCR</span><span class="v">Local Tesseract or LLM OCR</span></div>
+          <div class="row"><span class="k">Models</span><span class="v check">● self-hosted or API provider</span></div>
+          <div class="row"><span class="k">Telemetry</span><span class="v check">● none in the app</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer class="footer">
+  <div class="shell footer-row">
+    <a class="brand" href="./index.html"><img class="brand-dot" src="./paperwise-icon.png" alt="" aria-hidden="true" width="24" height="24" />paperwise</a>
+    <nav class="footer-nav">
+      <a href="#features">Features</a>
+      <a href="#examples">Examples</a>
+      <a href="./docs/getting-started/">Docs</a>
+      <a href="https://github.com/zellux/paperwise" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+    <p class="footer-meta">MIT · v0.4.0 · self-hosted</p>
+  </div>
+</footer>
+
 </body>
-
 </html>
