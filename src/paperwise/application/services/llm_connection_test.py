@@ -22,7 +22,6 @@ OCR_CONNECTION_TEST_IMAGE_DATA_URL = (
     "UoJSglJQSlAKSglKQSlBqZ93AzSzyIKXc69aAAAAAElFTkSuQmCC"
 )
 OCR_CONNECTION_TEST_EXPECTED_WORDS = ("ocr", "test")
-OCR_CONNECTION_TEST_EXPECTED_DIGITS = "12"
 
 
 class LLMConnectionConfigError(RuntimeError):
@@ -195,14 +194,13 @@ def _test_llm_vision_ocr_connection(llm_provider: LLMProvider) -> None:
     normalized_result = " ".join(str(result or "").lower().split())
     if not normalized_result:
         raise RuntimeError("OCR model returned empty text for the connection test image.")
-    compact_result = "".join(character for character in normalized_result if character.isalnum())
     missing_words = [
         word for word in OCR_CONNECTION_TEST_EXPECTED_WORDS if word not in normalized_result
     ]
-    if missing_words or OCR_CONNECTION_TEST_EXPECTED_DIGITS not in compact_result:
+    if missing_words:
         raise RuntimeError(
             "OCR model did not read the connection test image. "
-            "Expected OCR text to include OCR TEST and at least part of 123. "
+            "Expected OCR text to include OCR TEST. "
             f"Received: {str(result or '').strip()[:200]}"
         )
 

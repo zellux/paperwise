@@ -1860,6 +1860,47 @@ def test_llm_connection_test_ocr_requires_reading_test_image() -> None:
         app.dependency_overrides.clear()
 
 
+def test_llm_connection_test_ocr_accepts_text_without_digits() -> None:
+    repository = InMemoryDocumentRepository()
+
+    class FakeTextOnlyOCRProvider(FakeLLMProvider):
+        def extract_ocr_text_from_images(
+            self,
+            *,
+            filename: str,
+            image_data_urls: list[str],
+        ) -> str:
+            del filename
+            del image_data_urls
+            self.image_ocr_calls += 1
+            return "OCR TEST"
+
+    fake_provider = FakeTextOnlyOCRProvider()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: fake_provider
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/documents/llm/test",
+            json={
+                "task": "ocr",
+                "provider": "custom",
+                "model": "google/gemini-3.1-flash-lite",
+                "api_key": "openrouter-test",
+                "base_url": "https://openrouter.ai/api/v1",
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["ok"] is True
+        assert payload["model"] == "google/gemini-3.1-flash-lite"
+        assert fake_provider.image_ocr_calls == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_llm_connection_test_uses_models_endpoint_for_custom_provider(monkeypatch) -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository
