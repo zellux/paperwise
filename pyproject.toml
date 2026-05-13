@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "paperwise"
-version = "0.5.0"
+version = "0.5.1"
 description = "AI-native document management platform"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -38,8 +38,14 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 paperwise = [
-  "server/static/*",
+  "server/static/*.html",
+  "server/static/css/*",
   "server/static/icons/*",
+  "server/static/js/*",
+  "server/static/js/chat/*",
+  "server/static/js/search/*",
+  "server/static/js/state/*",
+  "server/static/js/ui/*",
   "server/templates/ui/*.html",
   "server/templates/ui/partials/*.html",
 ]
