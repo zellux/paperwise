@@ -9,7 +9,7 @@ BACKEND_LOG ?= $(LOG_DIR)/backend.log
 WORKER_LOG ?= $(LOG_DIR)/worker.log
 WEBSITE_PORT ?= 8081
 
-.PHONY: setup deps-up deps-down docker-up docker-down docker-logs docker-deploy-up docker-deploy-down docker-deploy-logs backend api worker worker-bg backend-bg website dev-up dev-stop dev-restart dev-status test smoke-llm
+.PHONY: setup deps-up deps-down docker-up docker-down docker-logs docker-deploy-up docker-deploy-down docker-deploy-logs backend api worker worker-bg backend-bg website dev-up dev-stop dev-restart dev-status test smoke-llm version-check
 
 setup:
 	$(PYTHON) -m venv $(VENV)
@@ -141,3 +141,6 @@ test:
 
 smoke-llm:
 	$(VENV_PYTHON) tools/smoke_llm.py
+
+version-check:
+	python3 tools/check_version_consistency.py

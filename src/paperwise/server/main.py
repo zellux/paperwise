@@ -3,6 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from paperwise import __version__
 from paperwise.server.routes.documents import router as documents_router
 from paperwise.server.routes.collections import router as collections_router
 from paperwise.server.routes.health import router as health_router
@@ -19,7 +20,7 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title="paperwise API",
-        version="0.4.0",
+        version=__version__,
         description="AI-native document management platform API",
     )
     static_dir = Path(__file__).resolve().parent / "static"
