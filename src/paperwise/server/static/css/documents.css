@@ -1765,17 +1765,19 @@
 }
 
 .pending-design-table {
-  min-width: 900px;
+  min-width: 980px;
 }
 
 .pending-design-table .doc-thead,
 .pending-design-table .doc-row {
-  grid-template-columns: minmax(420px, 1fr) minmax(108px, 132px) minmax(116px, 140px) minmax(126px, 160px) 40px;
+  grid-template-columns: minmax(380px, 1fr) minmax(210px, 240px) minmax(116px, 140px) minmax(126px, 160px) 40px;
 }
 
 .pending-design-table .td-status {
+  display: grid !important;
+  grid-template-columns: max-content minmax(92px, 1fr);
   align-items: center;
-  gap: 7px;
+  gap: 12px;
 }
 
 .pending-design-table .td-file {
@@ -1787,7 +1789,8 @@
 .pending-stage {
   display: grid;
   gap: 4px;
-  width: min(100%, 112px);
+  min-width: 0;
+  width: 100%;
 }
 
 .pending-stage-row {
@@ -2533,7 +2536,16 @@
 
   .pending-design-table .doc-thead,
   .pending-design-table .doc-row {
-    grid-template-columns: minmax(230px, 1fr) 96px 92px;
+    grid-template-columns: minmax(230px, 1fr) 112px 92px;
+  }
+
+  .pending-design-table .td-status {
+    display: flex !important;
+    gap: 0;
+  }
+
+  .pending-stage {
+    display: none;
   }
 
   .pending-design-table .td-file {

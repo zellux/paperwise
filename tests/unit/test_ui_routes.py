@@ -682,6 +682,11 @@ def test_static_assets_poll_processing_state_without_page_refresh() -> None:
     assert "loadPendingDocuments({ showLoading: false, logResult: false })" in pending_js.text
     assert "pendingSummaryToolbar" in pending_js.text
 
+    documents_css = client.get("/static/css/documents.css")
+    assert documents_css.status_code == 200
+    assert "minmax(210px, 240px)" in documents_css.text
+    assert "grid-template-columns: max-content minmax(92px, 1fr)" in documents_css.text
+
 
 def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> None:
     repository = InMemoryDocumentRepository()
