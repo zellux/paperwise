@@ -87,13 +87,22 @@
           {{ document_detail_page_thumbnails_html|safe }}
         </aside>
         <div class="page-canvas">
-          <div class="pdf-preview-frame">
+          <div class="document-preview-frame document-preview-frame-{{ document_detail_preview_kind|default("embed") }}">
+            {% if document_detail_preview_kind == "image" %}
+            <img
+              id="detailFilePreview"
+              class="document-file-preview document-image-preview"
+              src="{{ document_detail_preview_url|default("") }}"
+              alt="Document preview"
+            />
+            {% else %}
             <iframe
               id="detailFilePreview"
-              class="document-file-preview"
+              class="document-file-preview document-embed-preview"
               src="{{ document_detail_preview_url|default("") }}"
               title="Document preview"
             ></iframe>
+            {% endif %}
           </div>
           <div class="document-file-meta" hidden>
             <span id="detailFilename">{{ document_detail_text.detailFilename|default("-") }}</span>

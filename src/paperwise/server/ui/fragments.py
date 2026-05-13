@@ -801,6 +801,15 @@ def _pdf_preview_url(value: object) -> str:
     return f"{url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH"
 
 
+def _document_preview_kind(content_type: object, filename: object) -> str:
+    value = f"{content_type or ''} {filename or ''}".strip().lower()
+    if "image/" in value or value.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
+        return "image"
+    if "pdf" in value or value.endswith(".pdf"):
+        return "pdf"
+    return "embed"
+
+
 def _normalize_detail_page_count(value: object) -> int:
     try:
         page_count = int(value or 0)
@@ -871,18 +880,22 @@ def document_detail_fragments(initial_data: dict) -> dict:
     document_date = str(metadata.get("document_date") or "")
     document_type = str(metadata.get("document_type") or "")
     content_type = str(document.get("content_type") or "-")
+    filename = str(document.get("filename") or "-")
+    preview_kind = _document_preview_kind(content_type, filename)
     page_count = _normalize_detail_page_count(document.get("page_count"))
     size_label = _format_bytes(size_bytes)
     ocr_preview = str(detail.get("ocr_text_preview") or "").strip()
     ocr_parsed_at = str(detail.get("ocr_parsed_at") or "-")
     file_meta = " · ".join(part for part in [content_type, size_label] if part and part != "-")
     file_url = f"/documents/{quote(document_id, safe='')}/file" if document_id else ""
+    preview_url = _pdf_preview_url(file_url) if preview_kind == "pdf" else file_url
     return {
         "document_id": document_id,
         "document_label": title,
         "blob_uri": str(document.get("blob_uri") or ""),
         "file_url": file_url,
-        "preview_url": _pdf_preview_url(file_url),
+        "preview_kind": preview_kind,
+        "preview_url": preview_url,
         "text": {
             "detailTitle": title,
             "detailBreadcrumbTitle": title,
@@ -896,7 +909,7 @@ def document_detail_fragments(initial_data: dict) -> dict:
             "detailOcrParsedShort": _short_date_label(ocr_parsed_at),
             "detailDocId": document_id or "-",
             "detailOwnerId": str(document.get("owner_id") or "-"),
-            "detailFilename": str(document.get("filename") or "-"),
+            "detailFilename": filename,
             "detailCreatedAt": str(document.get("created_at") or "-"),
             "detailOcrParsedAt": ocr_parsed_at,
             "detailContentType": content_type,
@@ -927,6 +940,7 @@ def document_detail_fragments(initial_data: dict) -> dict:
         "ocr_parsed_short": _short_date_label(ocr_parsed_at),
         "page_count": page_count,
         "page_thumbnails_html": _document_page_thumbnails_html(page_count),
+        "preview_kind": preview_kind,
         "correspondent_initials": _initials(correspondent or title),
         "history_html": _history_html(history),
     }
@@ -959,6 +973,7 @@ def document_detail_partial_html(initial_data: dict) -> str:
         "document_label": fragments.get("document_label", ""),
         "blob_uri": fragments.get("blob_uri", ""),
         "file_url": fragments.get("file_url", ""),
+        "preview_kind": fragments.get("preview_kind", ""),
         "preview_url": fragments.get("preview_url", ""),
         "page_count": str(fragments.get("page_count", 1)),
     }

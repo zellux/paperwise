@@ -200,6 +200,7 @@ def _initial_render_context(initial_data: dict) -> dict:
         "document_detail_file_meta": fragments.get("file_meta", "-"),
         "document_detail_file_url": fragments.get("file_url", ""),
         "document_detail_preview_url": fragments.get("preview_url", ""),
+        "document_detail_preview_kind": fragments.get("preview_kind", "embed"),
         "document_detail_page_count": fragments.get("page_count", 1),
         "document_detail_starred": bool((initial_data.get("document_detail") or {}).get("document", {}).get("starred")),
         "document_detail_page_thumbnails_html": fragments.get("page_thumbnails_html", ""),

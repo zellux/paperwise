@@ -553,10 +553,8 @@
     color-mix(in srgb, var(--ink) 5%, #eef2ef);
 }
 
-.pdf-preview-frame {
-  width: 100%;
-  max-width: 580px;
-  aspect-ratio: 8.5 / 11;
+.document-preview-frame {
+  width: min(100%, 920px);
   overflow: hidden;
   background: #fff;
   border: 0;
@@ -568,12 +566,23 @@
 
 .document-file-preview {
   display: block;
-  width: calc(100% + 8px);
-  height: calc(100% + 8px);
-  margin: -4px;
   border: 0;
   background: #fff;
   border-radius: 6px;
+}
+
+.document-embed-preview {
+  width: 100%;
+  height: min(78vh, 960px);
+  min-height: 620px;
+}
+
+.document-image-preview {
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: none;
+  margin: 0 auto;
 }
 
 .doc-detail-rail {

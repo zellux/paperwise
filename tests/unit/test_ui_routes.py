@@ -20,6 +20,7 @@ from paperwise.infrastructure.repositories.in_memory_document_repository import 
 from paperwise.server.dependencies import document_repository_dependency
 from paperwise.server.main import app
 from paperwise.server.ui.fragments import (
+    document_detail_fragments,
     document_rows_html,
     document_sidebar_correspondents_html,
     document_sidebar_document_types_html,
@@ -61,6 +62,34 @@ def test_document_rows_render_expandable_tag_overflow() -> None:
     assert 'class="tag-pill tag-more tag-more-button"' in html
     assert 'data-tags-expand="doc-many-tags"' in html
     assert "+2</button>" in html
+
+
+def test_document_detail_preview_uses_image_natural_ratio_for_images() -> None:
+    fragments = document_detail_fragments(
+        {
+            "document_detail": {
+                "document": {
+                    "id": "image-doc",
+                    "filename": "receipt-wide.png",
+                    "owner_id": "user-image",
+                    "blob_uri": "local://receipt-wide.png",
+                    "checksum_sha256": "a" * 64,
+                    "content_type": "image/png",
+                    "size_bytes": 123,
+                    "status": "ready",
+                    "created_at": "2026-05-12T00:00:00Z",
+                    "page_count": 1,
+                },
+                "llm_metadata": None,
+                "ocr_text_preview": "",
+                "ocr_parsed_at": None,
+            },
+            "document_history": [],
+        }
+    )
+
+    assert fragments["preview_kind"] == "image"
+    assert fragments["preview_url"] == "/documents/image-doc/file"
 
 
 def test_document_sidebar_lists_collapse_after_ten() -> None:
@@ -920,6 +949,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         ) in detail_html
         assert 'data-page-count="22"' in detail_html
         assert 'data-preview-page="22"' in detail_html
+        assert 'class="document-preview-frame document-preview-frame-pdf"' in detail_html
         assert '<code id="detailDocId" class="document-detail-value">doc-tax</code>' in detail_html
         assert re.search(r'<input\b[^>]*id="metaTitle"[^>]*value="Tax Notice"', detail_html)
         assert "OCR preview for the tax notice." in detail_html

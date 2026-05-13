@@ -518,7 +518,10 @@ export function applyDocumentDetailPartial(partialRoot) {
     detailBlobUri.title = partialRoot.dataset.blobUri;
   }
   const detailFilePreview = document.getElementById("detailFilePreview");
-  if (detailFilePreview instanceof HTMLIFrameElement && partialRoot?.dataset?.previewUrl) {
+  if (
+    (detailFilePreview instanceof HTMLIFrameElement || detailFilePreview instanceof HTMLImageElement) &&
+    partialRoot?.dataset?.previewUrl
+  ) {
     detailFilePreview.src = partialRoot.dataset.previewUrl;
   }
   const pageStrip = document.getElementById("pageStrip");
