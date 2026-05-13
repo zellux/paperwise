@@ -37,6 +37,11 @@ def main() -> int:
             re.escape(display_version),
             "website displayed version",
         ),
+        (
+            "Dockerfile",
+            rf'LABEL org\.opencontainers\.image\.version="{re.escape(version)}"',
+            "Docker image version label",
+        ),
     ]
 
     failures: list[str] = []
