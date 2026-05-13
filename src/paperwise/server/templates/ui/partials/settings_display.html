@@ -43,12 +43,6 @@
         <h2 class="page-title settings-pane-title">Preferences</h2>
         <p class="page-sub settings-pane-sub">Visual theme, document list size, and how much context the LLM sees when you ask a question.</p>
       </div>
-      <div class="page-head-actions settings-pane-head-actions">
-        <button type="button" class="btn btn-ghost btn-sm settings-reset-btn">
-          <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-          <span>Reset to defaults</span>
-        </button>
-      </div>
     </div>
     <form id="settingsForm" class="settings-form">
       <div class="settings-pane-body">
@@ -58,7 +52,7 @@
               <div class="settings-card-head-stack">
                 <span class="settings-card-eyebrow">01 · Display</span>
                 <h3 class="settings-card-title">Look &amp; feel</h3>
-                <p class="settings-card-sub">Paperwise ships with six paper-textured themes. Pick the one that matches your light and set how many documents load per page.</p>
+                <p class="settings-card-sub">Paperwise ships with six paper-textured themes. Each preview shows a miniature page: paper, title, body text, accent tag, and secondary highlight.</p>
               </div>
             </div>
             <div class="settings-card-body">
@@ -70,13 +64,38 @@
 {% endfor %}
                 </select>
               </div>
+              <div class="settings-theme-label">
+                <span>Theme</span>
+                <svg class="icon-xs" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+              </div>
               <div class="settings-theme-grid" aria-label="Theme choices">
 {% for theme in supported_ui_themes %}
+{% if theme == "atlas" %}
+{% set theme_key = "Paper Green" %}
+{% elif theme == "ledger" %}
+{% set theme_key = "Blue Paper" %}
+{% elif theme == "moss" %}
+{% set theme_key = "Warm Sage" %}
+{% elif theme == "ember" %}
+{% set theme_key = "Terracotta" %}
+{% elif theme == "folio" %}
+{% set theme_key = "Cream + Emerald" %}
+{% elif theme == "forge" %}
+{% set theme_key = "Slate + Amber" %}
+{% else %}
+{% set theme_key = theme|replace("-", " ")|title %}
+{% endif %}
                 <button type="button" class="settings-theme-card{% if settings_preferences.ui_theme == theme %} active{% endif %}" data-theme-choice="{{ theme }}" aria-pressed="{% if settings_preferences.ui_theme == theme %}true{% else %}false{% endif %}">
-                  <span class="settings-theme-swatch theme-{{ theme }}-preview" aria-hidden="true"><span class="settings-theme-swatch-bar"></span></span>
+                  <span class="settings-theme-swatch theme-{{ theme }}-preview" aria-hidden="true">
+                    <span class="settings-theme-swatch-title"></span>
+                    <span class="settings-theme-swatch-line"></span>
+                    <span class="settings-theme-swatch-line short"></span>
+                    <span class="settings-theme-swatch-tag"></span>
+                    <span class="settings-theme-swatch-dot"></span>
+                  </span>
                   <span class="settings-theme-meta">
                     <span class="settings-theme-name">{{ theme|replace("-", " ")|title }}</span>
-                    <span class="settings-theme-key">{{ theme }}</span>
+                    <span class="settings-theme-key">{{ theme_key }}</span>
                   </span>
                 </button>
 {% endfor %}

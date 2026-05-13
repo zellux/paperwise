@@ -1,5 +1,5 @@
 .upload-main-panel {
-  min-height: min(720px, calc(100vh - 106px));
+  min-height: calc(100vh - 106px);
 }
 
 .upload-workspace {
@@ -7,13 +7,6 @@
   align-items: start;
   justify-items: center;
   padding: 24px 26px 28px;
-  border-top: 1px solid var(--stroke-soft);
-}
-
-.upload-main-panel .docs-page-head {
-  width: min(1040px, 100%);
-  margin-inline: auto;
-  align-self: center;
 }
 
 .upload-form {

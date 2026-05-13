@@ -2,6 +2,14 @@
   box-sizing: border-box;
 }
 
+:root {
+  --app-workbench-gap: 14px;
+  --app-side-panel-width: 252px;
+  --app-panel-radius: 16px;
+  --app-page-head-padding: 22px 26px 16px;
+  --app-page-body-padding: 18px 26px 26px;
+}
+
 html,
 body {
   margin: 0;
@@ -66,6 +74,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 14px;
+  min-height: 68px;
   padding: 8px 16px;
   background: var(--bg-panel);
   border: 1px solid var(--stroke);
@@ -424,7 +433,11 @@ h1 {
 }
 
 .app-shell.app-shell-settings {
+  width: min(1980px, 98vw);
+  min-height: calc(100vh - 24px);
+  margin: 8px auto 18px;
   grid-template-columns: minmax(0, 1fr);
+  gap: var(--app-workbench-gap);
 }
 
 .app-shell.app-shell-settings > .sidebar {

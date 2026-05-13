@@ -1185,8 +1185,8 @@
 
 .documents-workbench {
   display: grid;
-  grid-template-columns: 252px minmax(0, 1fr);
-  gap: 14px;
+  grid-template-columns: var(--app-side-panel-width) minmax(0, 1fr);
+  gap: var(--app-workbench-gap);
   min-height: calc(100vh - 106px);
 }
 
@@ -1204,7 +1204,7 @@
   border: 1px solid var(--stroke);
   box-shadow: var(--shadow);
   backdrop-filter: blur(4px);
-  border-radius: 16px;
+  border-radius: var(--app-panel-radius);
 }
 
 .docs-nav-panel {
@@ -1376,7 +1376,7 @@
 }
 
 .docs-page-head {
-  padding: 22px 26px 16px;
+  padding: var(--app-page-head-padding);
 }
 
 .docs-head-actions {
