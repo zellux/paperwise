@@ -223,10 +223,10 @@ async function testAllTaskConfigs(buttonEl) {
     labelEl.textContent = "Testing...";
   }
   try {
-    for (const task of tasks) {
+    await Promise.all(tasks.map((task) => {
       const taskButton = settingsModelSummary?.querySelector(`[data-task-test="${task}"]`);
-      await testTaskConfig(task, taskButton instanceof HTMLButtonElement ? taskButton : null);
-    }
+      return testTaskConfig(task, taskButton instanceof HTMLButtonElement ? taskButton : null);
+    }));
   } finally {
     if (buttonEl) {
       buttonEl.disabled = false;
