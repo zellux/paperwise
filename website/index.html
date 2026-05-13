@@ -63,65 +63,9 @@
         </div>
 
         <div class="hero-preview">
-          <div class="hero-panel hero-panel-large">
-            <div class="panel-head">
-              <span class="panel-pill">Recent documents</span>
-              <span class="panel-meta">4 example docs</span>
-            </div>
-            <div class="panel-body">
-              <table class="panel-doc-table">
-                <thead>
-                  <tr>
-                    <th>Name</th>
-                    <th>Date</th>
-                    <th>Tags</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Sonic Internet invoice</td>
-                    <td>September 18, 2025</td>
-                    <td>
-                      <div class="table-tag-list">
-                        <span class="table-tag-pill">Billing</span>
-                        <span class="table-tag-pill">Utilities</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Children's Health - After Visit Summary</td>
-                    <td>May 15, 2024</td>
-                    <td>
-                      <div class="table-tag-list">
-                        <span class="table-tag-pill">Health</span>
-                        <span class="table-tag-pill">Pediatrics</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Rental agreement</td>
-                    <td>September 29, 2025</td>
-                    <td>
-                      <div class="table-tag-list">
-                        <span class="table-tag-pill">Housing</span>
-                        <span class="table-tag-pill">Agreement</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td>Home Plumbing invoice</td>
-                    <td>November 26, 2022</td>
-                    <td>
-                      <div class="table-tag-list">
-                        <span class="table-tag-pill">Plumbing</span>
-                        <span class="table-tag-pill">Contractor</span>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <figure class="hero-screenshot">
+            <img src="./demo-documents-library.png" alt="Paperwise document library with processed sample documents" />
+          </figure>
         </div>
       </div>
     </section>
@@ -265,25 +209,25 @@
           <article class="example-row">
             <div class="example-context">
               <div class="examples-tags">
-                <span class="examples-tag">Developer docs</span>
-                <span class="examples-tag">API authentication</span>
-                <span class="examples-tag">Docs query</span>
+                <span class="examples-tag">Medical bills</span>
+                <span class="examples-tag">EOB + invoice</span>
+                <span class="examples-tag">Grounded answer</span>
               </div>
               <div class="example-query-block">
                 <p class="example-query-label">Query</p>
-                <p class="example-query-text">"What docs do we have about API authentication?"</p>
+                <p class="example-query-text">"Which medical bill still needs action, and what should I pay next?"</p>
               </div>
               <p class="example-desc">
-                Returned a structured table of relevant API authentication resources, including
-                category, status, and source paths for each document.
+                Reconciles the insurance EOB, clinic invoice, and HSA record so the answer
+                shows what was covered, what remains, and which document proves it.
               </p>
-              <p class="example-note">Across indexed docs</p>
+              <p class="example-note">Across billing and insurance records</p>
             </div>
             <div class="example-shot">
-              <button class="shot-button" type="button" data-zoom-src="./sample-api-docs.jpg"
-                data-zoom-alt="Search results showing API authentication documents"
-                aria-label="Open API docs example">
-                <img src="./sample-api-docs.jpg" alt="API docs grounded answer" loading="lazy" />
+              <button class="shot-button" type="button" data-zoom-src="./demo-medical-bill.png"
+                data-zoom-alt="Grounded medical bill answer with citations"
+                aria-label="Open medical bill answer screenshot">
+                <img src="./demo-medical-bill.png" alt="Grounded medical bill answer with citations" loading="lazy" />
               </button>
             </div>
           </article>
@@ -291,25 +235,25 @@
           <article class="example-row example-row-reverse">
             <div class="example-context">
               <div class="examples-tags">
-                <span class="examples-tag">Billing</span>
-                <span class="examples-tag">Time series</span>
-                <span class="examples-tag">Summarization</span>
+                <span class="examples-tag">Utility bills</span>
+                <span class="examples-tag">Table extraction</span>
+                <span class="examples-tag">Monthly trend</span>
               </div>
               <div class="example-query-block">
                 <p class="example-query-label">Query</p>
-                <p class="example-query-text">"How much did I spend on Sonic internet in each month?"</p>
+                <p class="example-query-text">"Summarize my PG&amp;E bills by month and show the usage and charges in a table."</p>
               </div>
               <p class="example-desc">
-                Extracted a 10-month billing history with amounts and service periods,
-                plus a summary of the charge range. Every row cites its source invoice.
+                Builds a month-by-month table from separate statements, keeping usage,
+                delivery charges, generation charges, and totals tied back to citations.
               </p>
-              <p class="example-note">Across 10 monthly invoices</p>
+              <p class="example-note">Across multiple utility statements</p>
             </div>
             <div class="example-shot">
-              <button class="shot-button" type="button" data-zoom-src="./sample-sonic-billing.jpg"
-                data-zoom-alt="Grounded Q&A showing Sonic billing history table"
-                aria-label="Open billing answer screenshot">
-                <img src="./sample-sonic-billing.jpg" alt="Billing grounded answer screenshot" loading="lazy" />
+              <button class="shot-button" type="button" data-zoom-src="./demo-utility-bills.png"
+                data-zoom-alt="Grounded utility bill answer with a monthly table"
+                aria-label="Open utility bill table screenshot">
+                <img src="./demo-utility-bills.png" alt="Grounded utility bill answer with a monthly table" loading="lazy" />
               </button>
             </div>
           </article>
@@ -317,25 +261,25 @@
           <article class="example-row">
             <div class="example-context">
               <div class="examples-tags">
-                <span class="examples-tag">Synthetic demo data</span>
-                <span class="examples-tag">Pediatric notes</span>
-                <span class="examples-tag">Trend extraction</span>
+                <span class="examples-tag">Company docs</span>
+                <span class="examples-tag">Renewal prep</span>
+                <span class="examples-tag">Cross-document Q&amp;A</span>
               </div>
               <div class="example-query-block">
                 <p class="example-query-label">Query</p>
-                <p class="example-query-text">"How has Harry Potter's height changed over time based on pediatric clinical notes?"</p>
+                <p class="example-query-text">"What should we know before renewing Northstar Analytics?"</p>
               </div>
               <p class="example-desc">
-                Uses completely made-up pediatric notes to show how Paperwise can extract
-                dated measurements, sources, and a longitudinal trend from private records.
+                Pulls renewal terms, vendor security notes, procurement policy, and usage
+                exports into a compact brief for a private company decision.
               </p>
-              <p class="example-note">Fictional data only</p>
+              <p class="example-note">Across contract, policy, and usage docs</p>
             </div>
             <div class="example-shot">
-              <button class="shot-button" type="button" data-zoom-src="./sample-kid-height.jpg"
-                data-zoom-alt="Grounded Q&A showing fictional pediatric height trend data"
-                aria-label="Open fictional pediatric height example">
-                <img src="./sample-kid-height.jpg" alt="Fictional pediatric height grounded answer" loading="lazy" />
+              <button class="shot-button" type="button" data-zoom-src="./demo-vendor-renewal.png"
+                data-zoom-alt="Grounded vendor renewal answer across company documents"
+                aria-label="Open vendor renewal answer screenshot">
+                <img src="./demo-vendor-renewal.png" alt="Grounded vendor renewal answer across company documents" loading="lazy" />
               </button>
             </div>
           </article>

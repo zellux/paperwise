@@ -459,6 +459,22 @@ p {
   border-radius: 0;
 }
 
+.hero-screenshot {
+  position: relative;
+  margin: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.hero-screenshot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
 .hero-panel {
   background: var(--surface);
   border: 1px solid var(--line);
