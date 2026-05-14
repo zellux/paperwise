@@ -26,6 +26,7 @@ from paperwise.server.document_access import get_owned_document_or_404
 from paperwise.server.ui.page import DEFAULT_UI_THEME, SUPPORTED_UI_THEMES
 from paperwise.server.ui.payloads import document_list_item, history_event_item
 from paperwise.server.ui.fragments import chat_thread_list_html
+from paperwise.server.ui.tag_colors import TAG_COLOR_SET
 
 
 class DocumentsInitialDataRepository(DocumentStore, TaxonomyRepository, PreferenceRepository, Protocol):
@@ -58,6 +59,7 @@ def page_initial_data(
         "ocr_supported_providers": ocr_supported_providers_payload(),
         "llm_provider_defaults": llm_provider_defaults_payload(),
         "ocr_llm_provider_defaults": ocr_llm_provider_defaults_payload(),
+        "tag_color_set": list(TAG_COLOR_SET),
     }
     if current_user is None:
         return initial_data

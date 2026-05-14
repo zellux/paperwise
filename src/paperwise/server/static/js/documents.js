@@ -17,6 +17,7 @@ import {
   normalizePageSize,
   normalizeSortState,
 } from "./state/preferences.js";
+import { stableTagColor } from "./ui/tagColor.js";
 import { sortValues, splitTags, unique } from "./ui/values.js";
 
 const filterDropdownState = new Map();
@@ -28,20 +29,6 @@ const DOCS_SORT_FIELDS = new Set([
   "document_date",
   "size",
 ]);
-const TAG_COLOR_SET = [
-  "#8e5bcb",
-  "#1d6a55",
-  "#b0552f",
-  "#c47a2a",
-  "#2c6488",
-  "#7a5c2e",
-  "#8b4778",
-  "#3d7a66",
-  "#9f4a28",
-  "#4f6f9f",
-  "#6b5b95",
-  "#2f7a8a",
-];
 let activeFilterDropdown = null;
 let docsFilters = {
   q: "",
@@ -701,18 +688,6 @@ function parseRowTags(row) {
   } catch (_error) {
     return [];
   }
-}
-
-function stableTagColor(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (!normalized) {
-    return "#7c8783";
-  }
-  let hashValue = 0;
-  for (const char of normalized) {
-    hashValue = ((hashValue * 33) + char.codePointAt(0)) % 2147483647;
-  }
-  return TAG_COLOR_SET[hashValue % TAG_COLOR_SET.length];
 }
 
 function getInitials(value) {

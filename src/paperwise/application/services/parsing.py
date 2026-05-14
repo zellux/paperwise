@@ -118,6 +118,52 @@ def _extract_pdf_text(
     return "", page_count
 
 
+def _pdf_page_count(blob_path: Path) -> int:
+    if PdfReader is not None:
+        try:
+            return max(1, len(PdfReader(str(blob_path)).pages))
+        except Exception:
+            pass
+    raw = blob_path.read_bytes()
+    return raw.count(b"/Type /Page") or 1
+
+
+def _rasterize_pdf_pages(
+    *,
+    blob_path: Path,
+    max_pages: int,
+    output_dir: Path,
+) -> list[Path]:
+    pdftoppm = shutil.which("pdftoppm")
+    if pdftoppm is None:
+        raise RuntimeError("pdftoppm executable not found for PDF rasterization.")
+
+    selected_pages = _select_pdf_page_numbers(
+        page_count=_pdf_page_count(blob_path),
+        max_pages=max_pages,
+    )
+    image_paths: list[Path] = []
+    for page_number in selected_pages:
+        out_prefix = str(output_dir / f"page-{page_number}")
+        subprocess.run(
+            [
+                pdftoppm,
+                "-f",
+                str(page_number),
+                "-l",
+                str(page_number),
+                "-png",
+                str(blob_path),
+                out_prefix,
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        image_paths.extend(sorted(output_dir.glob(f"page-{page_number}-*.png")))
+    return image_paths
+
+
 def _extract_with_local_tesseract(
     *,
     blob_path,
@@ -130,39 +176,12 @@ def _extract_with_local_tesseract(
     extracted_chunks: list[str] = []
 
     if is_pdf:
-        pdftoppm = shutil.which("pdftoppm")
-        if pdftoppm is None:
-            raise RuntimeError("pdftoppm executable not found for PDF rasterization.")
-        page_count = 0
-        if PdfReader is not None:
-            try:
-                page_count = max(1, len(PdfReader(str(blob_path)).pages))
-            except Exception:
-                page_count = 0
-        if page_count <= 0:
-            raw = blob_path.read_bytes()
-            page_count = raw.count(b"/Type /Page") or 1
-        selected_pages = _select_pdf_page_numbers(page_count=page_count, max_pages=3)
         with TemporaryDirectory(prefix="paperwise-ocr-") as temp_dir:
-            image_paths: list[Path] = []
-            for page_number in selected_pages:
-                out_prefix = f"{temp_dir}/page-{page_number}"
-                subprocess.run(
-                    [
-                        pdftoppm,
-                        "-f",
-                        str(page_number),
-                        "-l",
-                        str(page_number),
-                        "-png",
-                        str(blob_path),
-                        out_prefix,
-                    ],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                image_paths.extend(sorted(Path(temp_dir).glob(f"page-{page_number}-*.png")))
+            image_paths = _rasterize_pdf_pages(
+                blob_path=Path(blob_path),
+                max_pages=3,
+                output_dir=Path(temp_dir),
+            )
             if not image_paths:
                 raise RuntimeError("No rasterized PDF pages generated for OCR.")
             for image_path in image_paths:
@@ -195,40 +214,12 @@ def _render_pdf_pages_to_data_urls(
     blob_path,
     max_pages: int = 3,
 ) -> list[str]:
-    pdftoppm = shutil.which("pdftoppm")
-    if pdftoppm is None:
-        raise RuntimeError("pdftoppm executable not found for PDF image rendering.")
-
     with TemporaryDirectory(prefix="paperwise-vision-") as temp_dir:
-        page_count = 0
-        if PdfReader is not None:
-            try:
-                page_count = max(1, len(PdfReader(str(blob_path)).pages))
-            except Exception:
-                page_count = 0
-        if page_count <= 0:
-            raw = blob_path.read_bytes()
-            page_count = raw.count(b"/Type /Page") or 1
-        selected_pages = _select_pdf_page_numbers(page_count=page_count, max_pages=max_pages)
-        image_paths: list[Path] = []
-        for page_number in selected_pages:
-            out_prefix = f"{temp_dir}/page-{page_number}"
-            subprocess.run(
-                [
-                    pdftoppm,
-                    "-f",
-                    str(page_number),
-                    "-l",
-                    str(page_number),
-                    "-png",
-                    str(blob_path),
-                    out_prefix,
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            image_paths.extend(sorted(Path(temp_dir).glob(f"page-{page_number}-*.png")))
+        image_paths = _rasterize_pdf_pages(
+            blob_path=Path(blob_path),
+            max_pages=max_pages,
+            output_dir=Path(temp_dir),
+        )
         if not image_paths:
             raise RuntimeError("No PDF pages were rendered for LLM OCR.")
         data_urls: list[str] = []

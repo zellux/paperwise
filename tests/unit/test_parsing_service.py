@@ -95,6 +95,38 @@ def test_select_pdf_page_numbers_prioritizes_front_and_back_pages() -> None:
     assert parsing_module._select_pdf_page_numbers(page_count=2, max_pages=3) == [1, 2]
 
 
+def test_rasterize_pdf_pages_reuses_selected_page_logic(monkeypatch, tmp_path) -> None:
+    class FakeReader:
+        def __init__(self, path: str) -> None:
+            del path
+            self.pages = [object(), object(), object(), object()]
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        del kwargs
+        calls.append(command)
+        Path(f"{command[-1]}-1.png").write_bytes(b"png")
+
+    monkeypatch.setattr(parsing_module, "PdfReader", FakeReader)
+    monkeypatch.setattr(parsing_module.shutil, "which", lambda name: f"/usr/bin/{name}")
+    monkeypatch.setattr(parsing_module.subprocess, "run", fake_run)
+
+    blob = tmp_path / "sample.pdf"
+    blob.write_bytes(b"%PDF-1.7\n")
+    output_dir = tmp_path / "rasterized"
+    output_dir.mkdir()
+
+    image_paths = parsing_module._rasterize_pdf_pages(
+        blob_path=blob,
+        max_pages=3,
+        output_dir=output_dir,
+    )
+
+    assert [path.name for path in image_paths] == ["page-1-1.png", "page-2-1.png", "page-4-1.png"]
+    assert [command[2] for command in calls] == ["1", "2", "4"]
+
+
 def test_extract_pdf_text_preserves_tail_dates_in_preview(monkeypatch, tmp_path) -> None:
     class FakePage:
         def __init__(self, text: str) -> None:

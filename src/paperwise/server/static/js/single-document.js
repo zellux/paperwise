@@ -9,6 +9,7 @@ import {
   openDocumentView,
   waitForDocumentReady,
 } from "paperwise/app";
+import { stableTagColor } from "./ui/tagColor.js";
 import { splitTags } from "./ui/values.js";
 
 let singleDocumentEventsBound = false;
@@ -27,20 +28,6 @@ const PDFJS_CMAP_URL = "/static/vendor/pdfjs/cmaps/";
 const PDFJS_ICC_URL = "/static/vendor/pdfjs/iccs/";
 const PDFJS_STANDARD_FONT_URL = "/static/vendor/pdfjs/standard_fonts/";
 const PDFJS_WASM_URL = "/static/vendor/pdfjs/wasm/";
-const TAG_COLOR_SET = [
-  "#8e5bcb",
-  "#1d6a55",
-  "#b0552f",
-  "#c47a2a",
-  "#2c6488",
-  "#7a5c2e",
-  "#8b4778",
-  "#3d7a66",
-  "#9f4a28",
-  "#4f6f9f",
-  "#6b5b95",
-  "#2f7a8a",
-];
 const TAG_SUGGESTIONS = [
   "Finance",
   "Credit Reports",
@@ -130,18 +117,6 @@ function renderDocumentStarButton(starred) {
   if (icon) {
     icon.setAttribute("fill", isStarred ? "currentColor" : "none");
   }
-}
-
-function stableTagColor(value) {
-  const normalized = String(value || "").trim().toLowerCase();
-  if (!normalized) {
-    return "#7c8783";
-  }
-  let hash = 0;
-  for (const char of normalized) {
-    hash = (hash * 33 + char.charCodeAt(0)) % 2147483647;
-  }
-  return TAG_COLOR_SET[hash % TAG_COLOR_SET.length];
 }
 
 function getDetailTags() {

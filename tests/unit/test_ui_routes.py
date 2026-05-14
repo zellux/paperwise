@@ -20,6 +20,7 @@ from paperwise.infrastructure.repositories.in_memory_document_repository import 
 from paperwise.server.dependencies import document_repository_dependency
 from paperwise.server.main import app
 from paperwise.server.ui.fragments import (
+    _initials,
     document_detail_fragments,
     document_rows_html,
     document_sidebar_correspondents_html,
@@ -27,6 +28,7 @@ from paperwise.server.ui.fragments import (
     document_sidebar_tags_html,
 )
 from paperwise.server.ui.page import find_template_placeholders
+from paperwise.server.ui.tag_colors import TAG_COLOR_SET, stable_tag_color
 
 
 def _initial_data_from_response(html: str) -> dict:
@@ -121,6 +123,31 @@ def test_document_sidebar_lists_collapse_after_ten() -> None:
     assert correspondents_html.count('hidden data-sidebar-extra="correspondents"') == 3
     assert 'data-sidebar-toggle="correspondents"' in correspondents_html
     assert "Show all (3 more)" in correspondents_html
+
+
+def test_ui_initials_are_dash_and_underscore_aware() -> None:
+    assert _initials("") == "-"
+    assert _initials("-") == "-"
+    assert _initials("Pacific-Gas Electric") == "PG"
+    assert _initials("King_County Treasury") == "KC"
+    assert _initials("AI") == "AI"
+
+
+def test_tag_color_palette_is_shared_with_static_helper() -> None:
+    tag_color_js = Path("src/paperwise/server/static/js/ui/tagColor.js").read_text()
+    fallback_palette_match = re.search(
+        r"const FALLBACK_TAG_COLOR_SET = \[(.*?)\];",
+        tag_color_js,
+        re.S,
+    )
+    assert fallback_palette_match is not None
+    fallback_palette = re.findall(r'"(#[0-9a-f]{6})"', fallback_palette_match.group(1))
+
+    assert fallback_palette == list(TAG_COLOR_SET)
+    assert stable_tag_color("Finance") == "#2f7a8a"
+    assert stable_tag_color("Medical") == "#b0552f"
+    assert stable_tag_color("Pacific-Gas") == "#b0552f"
+    assert stable_tag_color("") == "#7c8783"
 
 
 def _save_ready_document(
@@ -447,6 +474,12 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert documents_js.status_code == 200
     assert "export async function refreshDocumentListAfterDelete" in documents_js.text
     assert "await loadDocumentsList();" in documents_js.text
+    assert 'import { stableTagColor } from "./ui/tagColor.js";' in documents_js.text
+    assert "const TAG_COLOR_SET" not in documents_js.text
+
+    tag_color_js = client.get("/static/js/ui/tagColor.js")
+    assert tag_color_js.status_code == 200
+    assert "export function stableTagColor" in tag_color_js.text
 
     for script_name in [
         "documents.js",
@@ -754,6 +787,7 @@ def test_grounded_qa_ui_includes_initial_chat_threads_for_cookie_session() -> No
         assert payload["authenticated"] is True
         assert payload["ui_themes"] == ["atlas", "ledger", "moss", "ember", "folio", "forge"]
         assert payload["default_ui_theme"] == "forge"
+        assert payload["tag_color_set"] == list(TAG_COLOR_SET)
         assert payload["llm_supported_providers"] == ["openai", "gemini", "custom"]
         assert payload["ocr_supported_providers"] == ["tesseract", "llm"]
         assert payload["llm_provider_defaults"]["openai"]["model"] == "gpt-4.1-mini"

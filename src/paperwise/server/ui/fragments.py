@@ -3,31 +3,11 @@ from html import escape
 import json
 from urllib.parse import quote
 
-
-_TAG_COLOR_SET = (
-    "#8e5bcb",
-    "#1d6a55",
-    "#b0552f",
-    "#c47a2a",
-    "#2c6488",
-    "#7a5c2e",
-    "#8b4778",
-    "#3d7a66",
-    "#9f4a28",
-    "#4f6f9f",
-    "#6b5b95",
-    "#2f7a8a",
-)
+from paperwise.server.ui.tag_colors import stable_tag_color
 
 
 def _stable_tag_color(value: str) -> str:
-    normalized = str(value or "").strip().casefold()
-    if not normalized:
-        return "#7c8783"
-    hash_value = 0
-    for char in normalized:
-        hash_value = ((hash_value * 33) + ord(char)) % 2147483647
-    return _TAG_COLOR_SET[hash_value % len(_TAG_COLOR_SET)]
+    return stable_tag_color(value)
 
 
 def _tag_color_style(value: str) -> str:
@@ -167,7 +147,7 @@ def _initials(value: str) -> str:
     cleaned = str(value or "").strip()
     if not cleaned or cleaned == "-":
         return "-"
-    parts = [part for part in cleaned.replace("-", " ").split() if part]
+    parts = [part for part in cleaned.replace("-", " ").replace("_", " ").split() if part]
     if len(parts) >= 2:
         return f"{parts[0][0]}{parts[1][0]}".upper()
     return cleaned[:2].upper()
@@ -832,15 +812,6 @@ def _document_page_thumbnails_html(page_count: int) -> str:
             "</button>"
         )
     return "\n".join(items)
-
-
-def _initials(value: str) -> str:
-    words = [word for word in str(value or "").replace("_", " ").split() if word]
-    if not words:
-        return "PW"
-    if len(words) == 1:
-        return words[0][:2].upper()
-    return "".join(word[0] for word in words[:2]).upper()
 
 
 def _document_list_status_badge_html(status_value: str) -> str:
