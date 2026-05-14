@@ -235,6 +235,13 @@ If uploads stay stuck in `processing`:
 - inspect `docker compose logs -f api worker`
 - make sure Redis is healthy and reachable
 
+If CPU usage spikes while documents are processing:
+
+- local OCR is the most likely cause, especially when **Local Tesseract** is enabled
+- open **Settings > Model Config**
+- switch **OCR Engine** away from **Local Tesseract**, or disable OCR auto-switch if you do not want Paperwise to fall back to local OCR
+- use an LLM OCR route instead if you prefer to trade provider calls for lower local CPU load
+
 If a new image was published but your server still looks old:
 
 - run `docker compose pull`

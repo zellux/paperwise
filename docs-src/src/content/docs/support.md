@@ -34,6 +34,12 @@ If your documents are mostly clean text PDFs, start with the faster models and o
 
 Large page images can take longer to process. Paperwise logs per-page OCR progress and retries timed-out pages. Longer OCR request timeouts are enabled for vision calls.
 
+## Why is CPU usage high while processing documents?
+
+Local OCR is the most common cause. When **Local Tesseract** is enabled, Paperwise runs `tesseract` and `pdftoppm` on your machine, which can consume a lot of CPU on scans, image-heavy PDFs, and large batches.
+
+If local CPU usage is a concern, open **Settings > Model Config** and switch **OCR Engine** away from **Local Tesseract**. If OCR auto-switch is enabled, disable it when you do not want Paperwise to fall back to local OCR after direct text extraction looks weak. You can use an LLM OCR route instead if you prefer to trade provider calls for lower local CPU load.
+
 ## How are duplicate files handled?
 
 Documents are deduplicated by SHA256 checksum to prevent repeated ingestion of the same file content.
