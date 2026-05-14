@@ -517,12 +517,33 @@ export function applyDocumentDetailPartial(partialRoot) {
   if (detailBlobUri && partialRoot?.dataset?.blobUri) {
     detailBlobUri.title = partialRoot.dataset.blobUri;
   }
-  const detailFilePreview = document.getElementById("detailFilePreview");
-  if (
-    (detailFilePreview instanceof HTMLIFrameElement || detailFilePreview instanceof HTMLImageElement) &&
-    partialRoot?.dataset?.previewUrl
-  ) {
-    detailFilePreview.src = partialRoot.dataset.previewUrl;
+  const previewKind = partialRoot?.dataset?.previewKind || "";
+  const previewUrl = partialRoot?.dataset?.previewUrl || "";
+  const documentPreviewFrame = document.getElementById("documentPreviewFrame");
+  const detailImagePreview = document.getElementById("detailImagePreview");
+  const detailEmbedPreview = document.getElementById("detailEmbedPreview");
+  const detailPdfPreview = document.getElementById("detailPdfPreview");
+  if (documentPreviewFrame instanceof HTMLElement) {
+    documentPreviewFrame.dataset.previewKind = previewKind;
+    documentPreviewFrame.dataset.previewUrl = previewUrl;
+    documentPreviewFrame.classList.remove(
+      "document-preview-frame-image",
+      "document-preview-frame-pdf",
+      "document-preview-frame-embed",
+    );
+    documentPreviewFrame.classList.add(`document-preview-frame-${previewKind || "embed"}`);
+  }
+  if (detailImagePreview instanceof HTMLImageElement) {
+    detailImagePreview.src = previewKind === "image" ? previewUrl : "";
+    detailImagePreview.hidden = previewKind !== "image";
+  }
+  if (detailEmbedPreview instanceof HTMLIFrameElement) {
+    detailEmbedPreview.src = previewKind !== "image" && previewKind !== "pdf" ? previewUrl : "about:blank";
+    detailEmbedPreview.hidden = previewKind === "image" || previewKind === "pdf";
+  }
+  if (detailPdfPreview instanceof HTMLElement) {
+    detailPdfPreview.dataset.pdfUrl = previewKind === "pdf" ? previewUrl : "";
+    detailPdfPreview.hidden = previewKind !== "pdf";
   }
   const pageStrip = document.getElementById("pageStrip");
   if (pageStrip instanceof HTMLElement && partialRoot?.dataset?.pageCount) {

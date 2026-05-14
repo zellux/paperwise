@@ -794,13 +794,6 @@ def _short_date_label(value: object) -> str:
     return parsed.strftime("%b %d")
 
 
-def _pdf_preview_url(value: object) -> str:
-    url = str(value or "")
-    if not url:
-        return ""
-    return f"{url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH"
-
-
 def _document_preview_kind(content_type: object, filename: object) -> str:
     value = f"{content_type or ''} {filename or ''}".strip().lower()
     if "image/" in value or value.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
@@ -888,7 +881,7 @@ def document_detail_fragments(initial_data: dict) -> dict:
     ocr_parsed_at = str(detail.get("ocr_parsed_at") or "-")
     file_meta = " · ".join(part for part in [content_type, size_label] if part and part != "-")
     file_url = f"/documents/{quote(document_id, safe='')}/file" if document_id else ""
-    preview_url = _pdf_preview_url(file_url) if preview_kind == "pdf" else file_url
+    preview_url = file_url
     return {
         "document_id": document_id,
         "document_label": title,

@@ -46,6 +46,12 @@ paperwise = [
   "server/static/js/search/*",
   "server/static/js/state/*",
   "server/static/js/ui/*",
+  "server/static/vendor/pdfjs/*",
+  "server/static/vendor/pdfjs/cmaps/*",
+  "server/static/vendor/pdfjs/iccs/*",
+  "server/static/vendor/pdfjs/image_decoders/*",
+  "server/static/vendor/pdfjs/standard_fonts/*",
+  "server/static/vendor/pdfjs/wasm/*",
   "server/templates/ui/*.html",
   "server/templates/ui/partials/*.html",
 ]

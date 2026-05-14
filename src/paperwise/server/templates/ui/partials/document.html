@@ -69,15 +69,15 @@
           </button>
         </div>
         <div class="preview-tools">
-          <button type="button" class="icon-btn" aria-label="Zoom out">
+          <button id="previewZoomOutBtn" type="button" class="icon-btn" aria-label="Zoom out">
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
           </button>
-          <span class="zoom-text">100%</span>
-          <button type="button" class="icon-btn" aria-label="Zoom in">
+          <span id="previewZoomText" class="zoom-text">100%</span>
+          <button id="previewZoomInBtn" type="button" class="icon-btn" aria-label="Zoom in">
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
           </button>
           <span class="preview-divider" aria-hidden="true"></span>
-          <button type="button" class="icon-btn" aria-label="Fit to width">
+          <button id="previewFitWidthBtn" type="button" class="icon-btn" aria-label="Fit to width">
             <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 21 3 21 3 15"/><polyline points="15 3 21 3 21 9"/><line x1="3" y1="21" x2="10" y2="14"/><line x1="21" y1="3" x2="14" y2="10"/></svg>
           </button>
         </div>
@@ -87,22 +87,35 @@
           {{ document_detail_page_thumbnails_html|safe }}
         </aside>
         <div class="page-canvas">
-          <div class="document-preview-frame document-preview-frame-{{ document_detail_preview_kind|default("embed") }}">
-            {% if document_detail_preview_kind == "image" %}
+          <div
+            id="documentPreviewFrame"
+            class="document-preview-frame document-preview-frame-{{ document_detail_preview_kind|default("embed") }}"
+            data-preview-kind="{{ document_detail_preview_kind|default("embed") }}"
+            data-preview-url="{{ document_detail_preview_url|default("") }}"
+          >
             <img
-              id="detailFilePreview"
+              id="detailImagePreview"
               class="document-file-preview document-image-preview"
               src="{{ document_detail_preview_url|default("") }}"
               alt="Document preview"
+              {% if document_detail_preview_kind != "image" %}hidden{% endif %}
             />
-            {% else %}
             <iframe
-              id="detailFilePreview"
+              id="detailEmbedPreview"
               class="document-file-preview document-embed-preview"
-              src="{{ document_detail_preview_url|default("") }}"
+              src="{% if document_detail_preview_kind == "image" or document_detail_preview_kind == "pdf" %}about:blank{% else %}{{ document_detail_preview_url|default("") }}{% endif %}"
               title="Document preview"
+              {% if document_detail_preview_kind == "image" or document_detail_preview_kind == "pdf" %}hidden{% endif %}
             ></iframe>
-            {% endif %}
+            <div
+              id="detailPdfPreview"
+              class="document-file-preview document-pdf-preview"
+              data-pdf-url="{{ document_detail_file_url|default("") }}"
+              {% if document_detail_preview_kind != "pdf" %}hidden{% endif %}
+            >
+              <canvas id="detailPdfCanvas" class="document-pdf-canvas" aria-label="PDF page preview"></canvas>
+              <p id="detailPdfStatus" class="document-pdf-status" role="status" aria-live="polite"></p>
+            </div>
           </div>
           <div class="document-file-meta" hidden>
             <span id="detailFilename">{{ document_detail_text.detailFilename|default("-") }}</span>

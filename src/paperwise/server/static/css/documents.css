@@ -577,6 +577,35 @@
   min-height: 620px;
 }
 
+.document-pdf-preview {
+  width: 100%;
+  min-height: min(78vh, 760px);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 0;
+  background: transparent;
+}
+
+.document-pdf-preview[hidden],
+.document-file-preview[hidden] {
+  display: none;
+}
+
+.document-pdf-canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+  border-radius: 6px;
+}
+
+.document-pdf-status {
+  margin: 18px;
+  color: var(--ink-mute);
+  font-size: 0.85rem;
+}
+
 .document-image-preview {
   width: auto;
   max-width: 100%;

@@ -955,6 +955,10 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'data-page-count="22"' in detail_html
         assert 'data-preview-page="22"' in detail_html
         assert 'class="document-preview-frame document-preview-frame-pdf"' in detail_html
+        assert 'id="detailPdfCanvas"' in detail_html
+        assert 'data-pdf-url="/documents/doc-tax/file"' in detail_html
+        assert 'id="detailEmbedPreview"' in detail_html
+        assert 'src="about:blank"' in detail_html
         assert '<code id="detailDocId" class="document-detail-value">doc-tax</code>' in detail_html
         assert re.search(r'<input\b[^>]*id="metaTitle"[^>]*value="Tax Notice"', detail_html)
         assert "OCR preview for the tax notice." in detail_html
