@@ -1,6 +1,6 @@
 FROM python:3.13-slim
 
-LABEL org.opencontainers.image.version="0.5.1"
+LABEL org.opencontainers.image.version="0.6.0"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
