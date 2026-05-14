@@ -37,7 +37,7 @@ class DocumentDetailInitialDataRepository(
     DocumentStore,
     ParseResultRepository,
     HistoryRepository,
-    PreferenceRepository,
+    LegacyChatThreadRepository,
     Protocol,
 ):
     pass
@@ -365,6 +365,31 @@ def pending_initial_data(repository: DocumentsInitialDataRepository, current_use
     }
 
 
+def document_chat_threads(
+    repository: DocumentDetailInitialDataRepository,
+    current_user: User,
+    document_id: str,
+) -> list[dict]:
+    migrate_legacy_chat_threads(repository, current_user)
+    return [
+        {
+            "id": reference.thread_id,
+            "title": reference.title or "Untitled chat",
+            "message_count": reference.message_count,
+            "reference_count": reference.reference_count,
+            "question": reference.question,
+            "source_titles": reference.source_titles[:3],
+            "created_at": reference.created_at.isoformat(),
+            "updated_at": reference.updated_at.isoformat(),
+        }
+        for reference in repository.list_document_chat_thread_references(
+            current_user.id,
+            document_id,
+            limit=50,
+        )
+    ]
+
+
 def upload_initial_data(repository: DocumentsInitialDataRepository, current_user: User | None) -> dict:
     initial_data = page_initial_data(current_user, repository)
     initial_data.update(document_sidebar_data(repository, current_user))
@@ -386,7 +411,7 @@ def document_detail_initial_data(
 ) -> dict:
     initial_data = page_initial_data(current_user, repository)
     if current_user is None or not document_id:
-        return {**initial_data, "document_detail": None, "document_history": []}
+        return {**initial_data, "document_detail": None, "document_history": [], "document_chat_threads": []}
     document = get_owned_document_or_404(
         document_id=document_id,
         repository=repository,
@@ -405,6 +430,7 @@ def document_detail_initial_data(
             history_event_item(event)
             for event in repository.list_history(document_id=document.id, limit=100)
         ],
+        "document_chat_threads": document_chat_threads(repository, current_user, document.id),
     }
 
 

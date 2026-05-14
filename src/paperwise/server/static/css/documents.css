@@ -2696,6 +2696,70 @@
   word-break: break-word;
 }
 
+.document-thread-list {
+  display: grid;
+  gap: 8px;
+}
+
+.document-thread-item {
+  display: grid;
+  gap: 7px;
+  border: 1px solid var(--stroke-soft);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.84);
+  padding: 10px;
+}
+
+.document-thread-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 5px 9px;
+}
+
+.document-thread-title {
+  color: var(--ink);
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.document-thread-title:hover {
+  color: var(--accent);
+}
+
+.document-thread-meta {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+}
+
+.document-thread-question {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.document-thread-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.document-thread-sources span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--stroke-soft);
+  border-radius: 999px;
+  padding: 2px 7px;
+  background: color-mix(in srgb, var(--accent) 7%, #fff);
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
 @media (max-width: 980px) {
   .filters-toolbar {
     flex-direction: column;

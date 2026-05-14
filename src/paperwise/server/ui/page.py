@@ -211,9 +211,12 @@ def _initial_render_context(initial_data: dict) -> dict:
         "document_detail_title": fragments["text"].get("detailTitle", "Untitled document"),
         "document_history_count": fragments.get("history_count", "0 events"),
         "document_history_count_short": fragments.get("history_count_short", "0"),
+        "document_chat_thread_count": fragments.get("chat_thread_count", "0 threads"),
+        "document_chat_thread_count_short": fragments.get("chat_thread_count_short", "0"),
         "document_detail_ocr_char_count": fragments.get("ocr_char_count", "0"),
         "document_detail_ocr_parsed_short": fragments.get("ocr_parsed_short", "-"),
         "document_history_html": fragments["history_html"],
+        "document_chat_threads_html": fragments.get("chat_threads_html", ""),
         "document_types_table_body_html": document_type_rows_html(
             document_types if isinstance(document_types, list) else []
         ),

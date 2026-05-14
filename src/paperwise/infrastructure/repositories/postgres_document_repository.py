@@ -4,7 +4,9 @@ from datetime import UTC, datetime
 from sqlalchemy import func, inspect, select, text
 
 from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.services.chat_threads import chat_thread_document_references
 from paperwise.domain.models import (
+    ChatThread,
     Document,
     DocumentStatus,
     LLMParseResult,
@@ -25,10 +27,12 @@ from paperwise.infrastructure.repositories.postgres_parse_result_repository impo
 )
 from paperwise.infrastructure.repositories.postgres_search_repository import PostgresSearchRepositoryMixin
 from paperwise.infrastructure.repositories.postgres_models import (
+    ChatThreadDocumentReferenceRow,
+    ChatThreadRow,
     CollectionDocumentRow,
     CollectionRow,
-    DocumentRow,
     DocumentChunkRow,
+    DocumentRow,
     DocumentHistoryEventRow,
     LLMParseResultRow,
     ParseResultRow,
@@ -52,7 +56,9 @@ class PostgresDocumentRepository(
         self._engine = build_engine(database_url)
         Base.metadata.create_all(self._engine)
         self._ensure_document_schema()
+        self._ensure_chat_thread_schema()
         self._session_factory: Callable = build_session_factory(self._engine)
+        self._ensure_chat_thread_reference_schema()
 
     def _ensure_document_schema(self) -> None:
         inspector = inspect(self._engine)
@@ -66,6 +72,60 @@ class PostgresDocumentRepository(
             connection.execute(
                 text(f"ALTER TABLE documents ADD COLUMN starred BOOLEAN NOT NULL DEFAULT {default_value}")
             )
+
+    def _ensure_chat_thread_schema(self) -> None:
+        inspector = inspect(self._engine)
+        if "chat_threads" not in inspector.get_table_names():
+            return
+        column_names = {column["name"] for column in inspector.get_columns("chat_threads")}
+        if "document_refs_indexed_at" in column_names:
+            return
+        column_type = "TIMESTAMP" if self._engine.dialect.name == "sqlite" else "TIMESTAMP WITH TIME ZONE"
+        with self._engine.begin() as connection:
+            connection.execute(
+                text(f"ALTER TABLE chat_threads ADD COLUMN document_refs_indexed_at {column_type}")
+            )
+
+    def _ensure_chat_thread_reference_schema(self) -> None:
+        inspector = inspect(self._engine)
+        table_names = set(inspector.get_table_names())
+        if "chat_thread_document_refs" not in table_names or "chat_threads" not in table_names:
+            return
+        with self._session_factory() as session:
+            thread_rows = session.scalars(
+                select(ChatThreadRow).where(ChatThreadRow.document_refs_indexed_at.is_(None))
+            ).all()
+            indexed_at = datetime.now(UTC)
+            for row in thread_rows:
+                session.query(ChatThreadDocumentReferenceRow).filter(
+                    ChatThreadDocumentReferenceRow.thread_id == row.id
+                ).delete(synchronize_session=False)
+                thread = ChatThread(
+                    id=row.id,
+                    owner_id=row.owner_id,
+                    title=row.title,
+                    messages=[dict(message) for message in list(row.messages or []) if isinstance(message, dict)],
+                    token_usage=dict(row.token_usage or {}),
+                    created_at=row.created_at,
+                    updated_at=row.updated_at,
+                )
+                for reference in chat_thread_document_references(thread):
+                    session.add(
+                        ChatThreadDocumentReferenceRow(
+                            thread_id=reference.thread_id,
+                            document_id=reference.document_id,
+                            owner_id=reference.owner_id,
+                            title=reference.title,
+                            message_count=reference.message_count,
+                            reference_count=reference.reference_count,
+                            question=reference.question,
+                            source_titles=reference.source_titles,
+                            created_at=reference.created_at,
+                            updated_at=reference.updated_at,
+                        )
+                    )
+                row.document_refs_indexed_at = indexed_at
+            session.commit()
 
     def save(self, document: Document) -> None:
         with self._session_factory() as session:

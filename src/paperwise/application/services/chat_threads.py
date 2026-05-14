@@ -5,7 +5,7 @@ from uuid import uuid4
 
 from paperwise.application.interfaces import ChatThreadRepository, PreferenceRepository
 from paperwise.application.services.user_preferences import load_user_preferences
-from paperwise.domain.models import ChatThread, User, UserPreference
+from paperwise.domain.models import ChatThread, ChatThreadDocumentReference, User, UserPreference
 
 CHAT_THREADS_PREFERENCE_KEY = "chat_threads"
 MAX_STORED_CHAT_MESSAGES = 40
@@ -85,6 +85,78 @@ def save_chat_thread_turn(
         )
     )
     return resolved_thread_id
+
+
+def chat_thread_document_references(thread: ChatThread) -> list[ChatThreadDocumentReference]:
+    references: dict[str, dict[str, Any]] = {}
+    current_question = ""
+    for message in thread.messages:
+        if not isinstance(message, dict):
+            continue
+        role = str(message.get("role") or "").strip().lower()
+        content = " ".join(str(message.get("content") or "").split())
+        if role == "user" and content:
+            current_question = content
+
+        citations = message.get("citations") if isinstance(message.get("citations"), list) else []
+        matched_document_ids: set[str] = set()
+        for citation in citations:
+            if not isinstance(citation, dict):
+                continue
+            document_id = str(citation.get("document_id") or "").strip()
+            if not document_id:
+                continue
+            matched_document_ids.add(document_id)
+            item = references.setdefault(
+                document_id,
+                {"reference_count": 0, "question": "", "source_titles": []},
+            )
+            item["reference_count"] += 1
+            item["question"] = current_question or item["question"]
+            title = str(citation.get("title") or "").strip()
+            if title and title not in item["source_titles"]:
+                item["source_titles"].append(title)
+
+        # Future-proof tool/status payloads that persist document IDs without citation objects.
+        for document_id in _document_ids_in_message(message) - matched_document_ids:
+            item = references.setdefault(
+                document_id,
+                {"reference_count": 0, "question": "", "source_titles": []},
+            )
+            item["reference_count"] += 1
+            item["question"] = current_question or item["question"]
+
+    return [
+        ChatThreadDocumentReference(
+            thread_id=thread.id,
+            owner_id=thread.owner_id,
+            document_id=document_id,
+            title=thread.title or "Untitled chat",
+            message_count=len(thread.messages),
+            reference_count=int(item["reference_count"] or 0),
+            question=str(item["question"] or "")[:240],
+            source_titles=[str(title) for title in item["source_titles"][:3]],
+            created_at=thread.created_at,
+            updated_at=thread.updated_at,
+        )
+        for document_id, item in references.items()
+        if int(item["reference_count"] or 0) > 0
+    ]
+
+
+def _document_ids_in_message(value: object) -> set[str]:
+    ids: set[str] = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key == "document_id":
+                document_id = str(item or "").strip()
+                if document_id:
+                    ids.add(document_id)
+            ids.update(_document_ids_in_message(item))
+    elif isinstance(value, list):
+        for item in value:
+            ids.update(_document_ids_in_message(item))
+    return ids
 
 
 def migrate_legacy_chat_threads(repository: LegacyChatThreadRepository, current_user: User) -> None:

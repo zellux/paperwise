@@ -3,17 +3,18 @@ from typing import Any, Protocol
 
 from paperwise.domain.models import (
     ChatThread,
+    ChatThreadDocumentReference,
     Collection,
+    Document,
     DocumentChunk,
     DocumentChunkSearchHit,
-    Document,
-    DocumentSearchHit,
     DocumentHistoryEvent,
+    DocumentSearchHit,
     DocumentStatus,
     LLMParseResult,
     ParseResult,
-    UserPreference,
     User,
+    UserPreference,
 )
 
 
@@ -212,6 +213,14 @@ class ChatThreadRepository(Protocol):
 
     def list_chat_threads(self, owner_id: str, limit: int = 20) -> list[ChatThread]:
         """List chat threads for a user ordered newest-first."""
+
+    def list_document_chat_thread_references(
+        self,
+        owner_id: str,
+        document_id: str,
+        limit: int = 50,
+    ) -> list[ChatThreadDocumentReference]:
+        """List chat threads that reference one user-owned document."""
 
     def delete_chat_thread(self, owner_id: str, thread_id: str) -> bool:
         """Delete one user-owned chat thread if present."""

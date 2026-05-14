@@ -141,7 +141,7 @@
         </button>
         <button type="button" class="rail-tab" data-detail-tab="threads" aria-selected="false">
           <span>Threads</span>
-          <span class="rail-tab-count">0</span>
+          <span id="documentThreadsTabCount" class="rail-tab-count">{{ document_chat_thread_count_short|default("0") }}</span>
         </button>
       </nav>
 
@@ -269,8 +269,11 @@
       </section>
 
       <section id="detailTabThreads" class="detail-tab-pane detail-card placeholder-tab" data-detail-pane="threads" hidden>
-        <div class="card-eyebrow">Chat threads referencing this document</div>
-        <p class="document-history-empty">No chat threads have referenced this document yet.</p>
+        <div class="card-eyebrow">
+          <span>Chat threads referencing this document</span>
+          <span id="documentThreadCount" class="card-eyebrow-aside">{{ document_chat_thread_count|default("0 threads") }}</span>
+        </div>
+        <div id="documentThreadList">{{ document_chat_threads_html|safe }}</div>
       </section>
     </aside>
   </div>

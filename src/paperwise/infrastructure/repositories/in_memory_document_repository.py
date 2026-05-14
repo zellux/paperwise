@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 from threading import RLock
 
 from paperwise.application.interfaces import DocumentRepository
+from paperwise.application.services.chat_threads import chat_thread_document_references
 from paperwise.application.services.search_text import extract_search_snippet, tokenize_search_query
 from paperwise.application.services.taxonomy import normalize_name, to_title_case
 from paperwise.application.services.taxonomy_stats import (
@@ -11,17 +12,18 @@ from paperwise.application.services.taxonomy_stats import (
 )
 from paperwise.domain.models import (
     ChatThread,
+    ChatThreadDocumentReference,
     Collection,
+    Document,
     DocumentChunk,
     DocumentChunkSearchHit,
-    Document,
-    DocumentSearchHit,
     DocumentHistoryEvent,
+    DocumentSearchHit,
     DocumentStatus,
     LLMParseResult,
     ParseResult,
-    UserPreference,
     User,
+    UserPreference,
 )
 
 
@@ -32,6 +34,7 @@ class InMemoryDocumentRepository(DocumentRepository):
         self._users_by_email: dict[str, User] = {}
         self._user_preferences: dict[str, UserPreference] = {}
         self._chat_threads: dict[str, ChatThread] = {}
+        self._chat_thread_document_refs: dict[tuple[str, str], ChatThreadDocumentReference] = {}
         self._parse_results: dict[str, ParseResult] = {}
         self._llm_parse_results: dict[str, LLMParseResult] = {}
         self._history: dict[str, list[DocumentHistoryEvent]] = {}
@@ -291,7 +294,7 @@ class InMemoryDocumentRepository(DocumentRepository):
 
     def save_chat_thread(self, thread: ChatThread) -> None:
         with self._lock:
-            self._chat_threads[thread.id] = ChatThread(
+            stored = ChatThread(
                 id=thread.id,
                 owner_id=thread.owner_id,
                 title=thread.title,
@@ -300,6 +303,14 @@ class InMemoryDocumentRepository(DocumentRepository):
                 created_at=thread.created_at,
                 updated_at=thread.updated_at,
             )
+            self._chat_threads[thread.id] = stored
+            self._chat_thread_document_refs = {
+                key: reference
+                for key, reference in self._chat_thread_document_refs.items()
+                if reference.thread_id != thread.id
+            }
+            for reference in chat_thread_document_references(stored):
+                self._chat_thread_document_refs[(reference.thread_id, reference.document_id)] = reference
 
     def get_chat_thread(self, owner_id: str, thread_id: str) -> ChatThread | None:
         with self._lock:
@@ -333,12 +344,46 @@ class InMemoryDocumentRepository(DocumentRepository):
                 for thread in threads[: max(0, limit)]
             ]
 
+    def list_document_chat_thread_references(
+        self,
+        owner_id: str,
+        document_id: str,
+        limit: int = 50,
+    ) -> list[ChatThreadDocumentReference]:
+        with self._lock:
+            references = [
+                reference
+                for reference in self._chat_thread_document_refs.values()
+                if reference.owner_id == owner_id and reference.document_id == document_id
+            ]
+            references.sort(key=lambda item: item.updated_at, reverse=True)
+            return [
+                ChatThreadDocumentReference(
+                    thread_id=reference.thread_id,
+                    owner_id=reference.owner_id,
+                    document_id=reference.document_id,
+                    title=reference.title,
+                    message_count=reference.message_count,
+                    reference_count=reference.reference_count,
+                    question=reference.question,
+                    source_titles=list(reference.source_titles),
+                    created_at=reference.created_at,
+                    updated_at=reference.updated_at,
+                )
+                for reference in references[: max(0, limit)]
+            ]
+
     def delete_chat_thread(self, owner_id: str, thread_id: str) -> bool:
         with self._lock:
             thread = self._chat_threads.get(thread_id)
             if thread is None or thread.owner_id != owner_id:
                 return False
             del self._chat_threads[thread_id]
+            self._chat_thread_document_refs = {
+                key: reference
+                for key, reference in self._chat_thread_document_refs.items()
+                if reference.thread_id != thread_id
+            }
             return True
 
     def create_collection(self, collection: Collection) -> None:

@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 import sqlite3
 
-from paperwise.domain.models import Document, DocumentStatus, LLMParseResult
+from paperwise.domain.models import ChatThread, Document, DocumentStatus, LLMParseResult
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -56,6 +56,33 @@ def _llm_result(
         created_document_type=False,
         created_tags=[],
         created_at=datetime.now(UTC),
+    )
+
+
+def _chat_thread(thread_id: str, owner_id: str, document_id: str) -> ChatThread:
+    created_at = datetime(2026, 5, 2, 1, 4, 4, tzinfo=UTC)
+    return ChatThread(
+        id=thread_id,
+        owner_id=owner_id,
+        title="Tax planning question",
+        messages=[
+            {"role": "user", "content": "What should I know about the tax notice?"},
+            {
+                "role": "assistant",
+                "content": "The tax notice needs review.",
+                "citations": [
+                    {
+                        "chunk_id": "chunk-tax-1",
+                        "document_id": document_id,
+                        "title": "Tax Notice",
+                        "quote": "Tax notice excerpt",
+                    }
+                ],
+            },
+        ],
+        token_usage={"total_tokens": 12, "llm_requests": 1},
+        created_at=created_at,
+        updated_at=created_at,
     )
 
 
@@ -195,3 +222,30 @@ def test_postgres_repository_adds_starred_column_to_existing_documents_table(tmp
     loaded = repository.get("star-migration")
     assert loaded is not None
     assert loaded.starred is True
+
+
+def test_postgres_repository_indexes_chat_thread_document_references(tmp_path: Path) -> None:
+    repository = PostgresDocumentRepository(f"sqlite:///{tmp_path / 'paperwise.db'}")
+    thread = _chat_thread("thread-tax", "owner-a", "doc-tax")
+    repository.save_chat_thread(thread)
+
+    references = repository.list_document_chat_thread_references("owner-a", "doc-tax")
+
+    assert len(references) == 1
+    assert references[0].thread_id == "thread-tax"
+    assert references[0].question == "What should I know about the tax notice?"
+    assert references[0].source_titles == ["Tax Notice"]
+
+    repository.save_chat_thread(
+        ChatThread(
+            id=thread.id,
+            owner_id=thread.owner_id,
+            title=thread.title,
+            messages=[{"role": "user", "content": "No citations here."}],
+            token_usage={},
+            created_at=thread.created_at,
+            updated_at=thread.updated_at,
+        )
+    )
+
+    assert repository.list_document_chat_thread_references("owner-a", "doc-tax") == []

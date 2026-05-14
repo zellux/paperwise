@@ -863,6 +863,56 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
                 )
             ]
         )
+        repository.save_chat_thread(
+            ChatThread(
+                id="thread-tax",
+                owner_id=user_id,
+                title="Tax planning question",
+                messages=[
+                    {"role": "user", "content": "What should I know about the tax notice?"},
+                    {
+                        "role": "assistant",
+                        "content": "The tax notice needs review.",
+                        "citations": [
+                            {
+                                "chunk_id": "chunk-tax-1",
+                                "document_id": "doc-tax",
+                                "title": "Tax Notice",
+                                "quote": "Tax notice excerpt",
+                            }
+                        ],
+                    },
+                ],
+                token_usage={"total_tokens": 12, "llm_requests": 1},
+                created_at=datetime(2026, 5, 2, 1, 4, 4, tzinfo=UTC),
+                updated_at=datetime(2026, 5, 2, 1, 5, 4, tzinfo=UTC),
+            )
+        )
+        repository.save_chat_thread(
+            ChatThread(
+                id="thread-other",
+                owner_id=user_id,
+                title="Utility question",
+                messages=[
+                    {"role": "user", "content": "What about the bill?"},
+                    {
+                        "role": "assistant",
+                        "content": "The utility bill is separate.",
+                        "citations": [
+                            {
+                                "chunk_id": "chunk-bill-1",
+                                "document_id": "doc-bill",
+                                "title": "Utility Bill",
+                                "quote": "Bill excerpt",
+                            }
+                        ],
+                    },
+                ],
+                token_usage={"total_tokens": 10, "llm_requests": 1},
+                created_at=datetime(2026, 5, 2, 1, 6, 4, tzinfo=UTC),
+                updated_at=datetime(2026, 5, 2, 1, 7, 4, tzinfo=UTC),
+            )
+        )
         _save_ready_document(
             repository,
             doc_id="doc-bill",
@@ -982,6 +1032,18 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert detail_payload["document_detail"]["document"]["page_count"] == 22
         assert detail_payload["document_detail"]["ocr_text_preview"] == "OCR preview for the tax notice."
         assert detail_payload["document_history"][0]["id"] == "history-tax"
+        assert detail_payload["document_chat_threads"] == [
+            {
+                "id": "thread-tax",
+                "title": "Tax planning question",
+                "message_count": 2,
+                "reference_count": 1,
+                "question": "What should I know about the tax notice?",
+                "source_titles": ["Tax Notice"],
+                "created_at": "2026-05-02T01:04:04+00:00",
+                "updated_at": "2026-05-02T01:05:04+00:00",
+            }
+        ]
         assert (
             '<span class="pager-text">Page <span id="previewCurrentPage">1</span> / '
             '<span id="previewTotalPages">22</span></span>'
@@ -998,6 +1060,11 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "OCR preview for the tax notice." in detail_html
         assert "Metadata changed" in detail_html
         assert "suggested_title: (empty) -&gt; Tax Notice" in detail_html
+        assert 'id="documentThreadsTabCount" class="rail-tab-count">1</span>' in detail_html
+        assert "Tax planning question" in detail_html
+        assert "What should I know about the tax notice?" in detail_html
+        assert "/ui/grounded-qa?thread_id=thread-tax" in detail_html
+        assert "Utility question" not in detail_html
         assert 'id="starDocumentBtn"' in detail_html
         assert 'aria-pressed="true"' in detail_html
         assert ">Starred</span>" in detail_html

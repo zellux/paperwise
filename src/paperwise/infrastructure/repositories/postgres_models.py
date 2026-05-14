@@ -105,6 +105,22 @@ class ChatThreadRow(Base):
     token_usage: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
     updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+    document_refs_indexed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class ChatThreadDocumentReferenceRow(Base):
+    __tablename__ = "chat_thread_document_refs"
+
+    thread_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    document_id: Mapped[str] = mapped_column(String(64), primary_key=True, index=True)
+    owner_id: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(256))
+    message_count: Mapped[int] = mapped_column(Integer)
+    reference_count: Mapped[int] = mapped_column(Integer)
+    question: Mapped[str] = mapped_column(Text)
+    source_titles: Mapped[list[str]] = mapped_column(JSON)
+    created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class CollectionRow(Base):

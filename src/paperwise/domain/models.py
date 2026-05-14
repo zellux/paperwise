@@ -108,6 +108,20 @@ class ChatThread:
 
 
 @dataclass(slots=True)
+class ChatThreadDocumentReference:
+    thread_id: str
+    owner_id: str
+    document_id: str
+    title: str
+    message_count: int
+    reference_count: int
+    question: str
+    source_titles: list[str]
+    created_at: datetime
+    updated_at: datetime
+
+
+@dataclass(slots=True)
 class Collection:
     id: str
     owner_id: str

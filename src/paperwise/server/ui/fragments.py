@@ -379,6 +379,44 @@ def _history_html(events: list[dict]) -> str:
     return "\n".join(items)
 
 
+def _document_chat_threads_html(threads: list[dict]) -> str:
+    if not threads:
+        return '<p class="document-history-empty">No chat threads have referenced this document yet.</p>'
+    items: list[str] = []
+    for thread in threads:
+        raw_thread_id = str(thread.get("id") or "")
+        thread_id = escape(raw_thread_id, quote=True)
+        thread_query = quote(raw_thread_id, safe="")
+        title = escape(str(thread.get("title") or "Untitled chat"))
+        question = escape(str(thread.get("question") or "").strip())
+        updated = _chat_thread_time_label(str(thread.get("updated_at") or thread.get("created_at") or ""))
+        message_count = int(thread.get("message_count") or 0)
+        reference_count = int(thread.get("reference_count") or 0)
+        message_label = f"{message_count} msg" if message_count == 1 else f"{message_count} msgs"
+        reference_label = f"{reference_count} ref" if reference_count == 1 else f"{reference_count} refs"
+        meta = escape(" | ".join(item for item in (updated, message_label, reference_label) if item))
+        sources = thread.get("source_titles") if isinstance(thread.get("source_titles"), list) else []
+        source_html = ""
+        if sources:
+            source_html = (
+                '<div class="document-thread-sources">'
+                + "".join(f"<span>{escape(str(source))}</span>" for source in sources)
+                + "</div>"
+            )
+        question_html = f'<p class="document-thread-question">{question}</p>' if question else ""
+        items.append(
+            '<article class="document-thread-item">'
+            '<div class="document-thread-header">'
+            f'<a class="document-thread-title" href="/ui/grounded-qa?thread_id={thread_query}">{title}</a>'
+            f'<span class="document-thread-meta">{meta}</span>'
+            "</div>"
+            f"{question_html}"
+            f"{source_html}"
+            "</article>"
+        )
+    return '<div class="document-thread-list">' + "\n".join(items) + "</div>"
+
+
 def activity_rows_html(documents: list[dict]) -> str:
     if not documents:
         return '                <tr><td colspan="4">No processed documents.</td></tr>'
@@ -839,6 +877,11 @@ def document_detail_fragments(initial_data: dict) -> dict:
     document_id = str(document.get("id") or "")
     size_bytes = int(document.get("size_bytes") or 0)
     history = initial_data.get("document_history") if isinstance(initial_data.get("document_history"), list) else []
+    chat_threads = (
+        initial_data.get("document_chat_threads")
+        if isinstance(initial_data.get("document_chat_threads"), list)
+        else []
+    )
     title = str(metadata.get("suggested_title") or document.get("filename") or document_id or "Untitled document")
     correspondent = str(metadata.get("correspondent") or "")
     document_date = str(metadata.get("document_date") or "")
@@ -869,6 +912,7 @@ def document_detail_fragments(initial_data: dict) -> dict:
             "detailDocumentType": document_type or "-",
             "documentHistoryCount": f"{len(history)} event{'s' if len(history) != 1 else ''}",
             "documentHistoryTabCount": str(len(history)),
+            "documentThreadsTabCount": str(len(chat_threads)),
             "detailOcrCharCount": f"{len(ocr_preview):,} chars",
             "detailOcrParsedShort": _short_date_label(ocr_parsed_at),
             "detailDocId": document_id or "-",
@@ -900,6 +944,9 @@ def document_detail_fragments(initial_data: dict) -> dict:
         "file_meta": file_meta or "-",
         "history_count": f"{len(history)} event{'s' if len(history) != 1 else ''}",
         "history_count_short": str(len(history)),
+        "chat_thread_count": f"{len(chat_threads)} thread{'s' if len(chat_threads) != 1 else ''}",
+        "chat_thread_count_short": str(len(chat_threads)),
+        "chat_threads_html": _document_chat_threads_html(chat_threads),
         "ocr_char_count": f"{len(ocr_preview):,}",
         "ocr_parsed_short": _short_date_label(ocr_parsed_at),
         "page_count": page_count,
@@ -929,6 +976,13 @@ def document_detail_partial_html(initial_data: dict) -> str:
         _partial_template(
             "documentHistoryList",
             str(fragments.get("history_html") or ""),
+            attr="data-html-target",
+        )
+    )
+    templates.append(
+        _partial_template(
+            "documentThreadList",
+            str(fragments.get("chat_threads_html") or ""),
             attr="data-html-target",
         )
     )

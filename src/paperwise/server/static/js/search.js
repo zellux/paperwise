@@ -811,5 +811,9 @@ export async function initializePage({ authenticated }) {
   bindSearchElements();
   bindSearchEvents();
   await loadSearchAskThreads();
+  const requestedThreadId = new URLSearchParams(window.location.search).get("thread_id");
+  if (requestedThreadId) {
+    await loadSearchAskThread(requestedThreadId);
+  }
   renderSearchResultsMeta("Ready.");
 }
