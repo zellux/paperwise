@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import UTC, datetime
 import io
+import json
 from zipfile import ZipFile
 
 import httpx
@@ -213,7 +214,11 @@ def test_create_and_get_document() -> None:
         client = TestClient(app)
         create_response = client.post(
             "/documents",
-            data={"owner_id": "user-123"},
+            data={
+                "owner_id": "user-123",
+                "source_last_modified_ms": "1715069350000",
+                "source_last_modified_at": "2024-05-07T08:09:10.000Z",
+            },
             files={"file": ("receipt.pdf", b"%PDF-sample", "application/pdf")},
         )
         assert create_response.status_code == 201
@@ -230,6 +235,11 @@ def test_create_and_get_document() -> None:
         assert get_response.json()["size_bytes"] == 11
         assert get_response.json()["blob_uri"].startswith("incoming/")
         assert dispatcher.enqueued == [payload["id"]]
+        blob_path = store_dir / get_response.json()["blob_uri"]
+        metadata_path = blob_path.with_name(f"{blob_path.name.split('_', 1)[0]}.metadata.json")
+        metadata_payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+        assert metadata_payload["source_last_modified_ms"] == "1715069350000"
+        assert metadata_payload["source_last_modified_at"] == "2024-05-07T08:09:10.000Z"
 
         file_response = client.get(f"/documents/{payload['id']}/file")
         assert file_response.status_code == 200

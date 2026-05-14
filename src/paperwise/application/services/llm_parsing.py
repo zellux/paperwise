@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -11,6 +12,7 @@ from paperwise.application.interfaces import (
 from paperwise.application.services.history import build_metadata_history_events
 from paperwise.application.services.llm_runtime import summarize_llm_provider
 from paperwise.application.services.metadata_updates import validate_document_date
+from paperwise.application.services.source_dates import extract_source_document_date
 from paperwise.application.services.taxonomy import resolve_existing_name, resolve_tags
 from paperwise.application.services.user_preferences import load_user_preferences
 from paperwise.domain.models import (
@@ -51,6 +53,7 @@ def parse_with_llm(
     actor_type: HistoryActorType = HistoryActorType.SYSTEM,
     actor_id: str | None = None,
     history_source: str = "service.llm_parse",
+    source_date_resolver: Callable[[Document], str | None] = extract_source_document_date,
 ) -> LLMParseResult:
     correspondents = repository.list_correspondents()
     document_types = repository.list_document_types()
@@ -68,6 +71,7 @@ def parse_with_llm(
     )
     raw_total_tokens = raw.get("llm_total_tokens")
     llm_total_tokens = raw_total_tokens if isinstance(raw_total_tokens, int) and raw_total_tokens > 0 else 0
+    source_document_date = source_date_resolver(document)
 
     if "correspondent" in raw and str(raw.get("correspondent") or "").strip():
         candidate_correspondent = str(raw.get("correspondent", "Unknown Sender"))
@@ -132,16 +136,16 @@ def parse_with_llm(
             elif previous is not None:
                 document_date = previous.document_date
             else:
-                document_date = None
+                document_date = source_document_date
         elif raw_date is None and previous is not None:
             # Preserve previously known date when provider omits this value.
             document_date = previous.document_date
         else:
-            document_date = None
+            document_date = source_document_date
     elif previous is not None:
         document_date = previous.document_date
     else:
-        document_date = None
+        document_date = source_document_date
 
     result = LLMParseResult(
         document_id=document.id,

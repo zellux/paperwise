@@ -85,6 +85,30 @@ class NullDateLLMProvider:
         }
 
 
+class InvalidDateLLMProvider:
+    def suggest_metadata(
+        self,
+        *,
+        filename: str,
+        text_preview: str,
+        current_correspondent: str | None,
+        current_document_type: str | None,
+        existing_correspondents: list[str],
+        existing_document_types: list[str],
+        existing_tags: list[str],
+    ) -> dict:
+        del filename
+        del text_preview
+        del current_correspondent
+        del current_document_type
+        del existing_correspondents
+        del existing_document_types
+        del existing_tags
+        return {
+            "document_date": "not-a-date",
+        }
+
+
 class AcronymCaseLLMProvider:
     def suggest_metadata(
         self,
@@ -219,6 +243,54 @@ def test_parse_with_llm_keeps_previous_date_when_provider_returns_null() -> None
 
     assert first.document_date == "2026-01-15"
     assert second.document_date == first.document_date
+
+
+def test_parse_with_llm_leaves_date_empty_when_provider_omits_date_and_source_date_is_unavailable() -> None:
+    repository = InMemoryDocumentRepository()
+    document = _build_document()
+    parse_result = _build_parse_result(document.id)
+
+    result = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=PartialMetadataLLMProvider(),
+        source_date_resolver=lambda _document: None,
+    )
+
+    assert result.document_date is None
+
+
+def test_parse_with_llm_uses_source_date_when_provider_returns_null_date() -> None:
+    repository = InMemoryDocumentRepository()
+    document = _build_document()
+    parse_result = _build_parse_result(document.id)
+
+    result = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=NullDateLLMProvider(),
+        source_date_resolver=lambda _document: "2026-04-09",
+    )
+
+    assert result.document_date == "2026-04-09"
+
+
+def test_parse_with_llm_uses_source_date_when_provider_returns_invalid_date() -> None:
+    repository = InMemoryDocumentRepository()
+    document = _build_document()
+    parse_result = _build_parse_result(document.id)
+
+    result = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=InvalidDateLLMProvider(),
+        source_date_resolver=lambda _document: "2026-04-10",
+    )
+
+    assert result.document_date == "2026-04-10"
 
 
 def test_parse_with_llm_preserves_acronym_like_casing() -> None:

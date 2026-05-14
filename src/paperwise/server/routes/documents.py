@@ -150,6 +150,8 @@ def _set_document_status(
 )
 def create_document_endpoint(
     owner_id: str = Form(""),
+    source_last_modified_ms: str = Form(""),
+    source_last_modified_at: str = Form(""),
     file: UploadFile = File(...),
     repository: DocumentRepository = Depends(document_repository_dependency),
     dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
@@ -192,6 +194,10 @@ def create_document_endpoint(
         "stored_key": storage_key,
         "stored_at": now.isoformat(),
     }
+    if source_last_modified_ms.strip():
+        metadata_payload["source_last_modified_ms"] = source_last_modified_ms.strip()
+    if source_last_modified_at.strip():
+        metadata_payload["source_last_modified_at"] = source_last_modified_at.strip()
     storage.put(
         key=metadata_key,
         data=json.dumps(metadata_payload, ensure_ascii=True, indent=2).encode("utf-8"),

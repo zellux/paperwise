@@ -119,15 +119,32 @@ Before starting, replace `replace-with-a-strong-secret` with your own secret in 
 
 The example is configured for direct HTTP access at `http://localhost:8080`. If you put Paperwise behind HTTPS, set `PAPERWISE_SESSION_COOKIE_SECURE` to `"true"` in both `api` and `worker`.
 
-To pin a specific release tag, replace the image value, for example:
-
-```yaml
-image: ghcr.io/zellux/paperwise:v0.1.1
-```
-
 If the GHCR package is private, make it public in the GitHub package settings before sharing it with other users.
 
 Open Paperwise at [http://localhost:8080](http://localhost:8080).
+
+## Run From Source
+
+For local development after cloning the repo:
+
+```bash
+git clone https://github.com/zellux/paperwise.git
+cd paperwise
+make setup
+make dev-up
+```
+
+Open the app at [http://localhost:8000](http://localhost:8000).
+
+Useful local commands:
+
+```bash
+make dev-status
+make dev-stop
+uv run pytest
+```
+
+The local dev stack starts the FastAPI app, Celery worker, Redis, and Postgres. Uploaded files and local runtime data are stored under `local/`.
 
 ## Before Sharing
 
@@ -144,19 +161,6 @@ Before you hand this off to other users, it is worth checking five things on a c
 New images are published automatically when changes land on `main`.
 
 To update a running server that uses `ghcr.io/zellux/paperwise:latest`:
-
-```bash
-docker compose pull
-docker compose up -d
-```
-
-To pin a release instead of tracking `latest`, set the image tag explicitly, for example:
-
-```yaml
-image: ghcr.io/zellux/paperwise:v0.1.1
-```
-
-Then update by changing the tag in your `docker-compose.yml` and running:
 
 ```bash
 docker compose pull
@@ -246,7 +250,6 @@ If a new image was published but your server still looks old:
 
 - run `docker compose pull`
 - then run `docker compose up -d`
-- if you pinned a version tag, update the tag in `docker-compose.yml`
 
 If upload works but extraction or Ask My Docs fails:
 

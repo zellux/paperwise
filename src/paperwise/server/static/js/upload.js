@@ -196,6 +196,10 @@ function setSelectedFiles(files, options = {}) {
 async function uploadDocumentFile(file) {
   const form = new FormData();
   form.append("file", file);
+  if (Number.isFinite(file?.lastModified) && file.lastModified > 0) {
+    form.append("source_last_modified_ms", String(file.lastModified));
+    form.append("source_last_modified_at", new Date(file.lastModified).toISOString());
+  }
   const response = await apiFetch("/documents", { method: "POST", body: form });
   const payload = await response.json();
   if (!response.ok) {
