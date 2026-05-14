@@ -542,10 +542,7 @@
 }
 
 .page-canvas {
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  align-items: center;
+  display: block;
   overflow: auto;
   padding: 28px;
   background:
@@ -555,6 +552,7 @@
 
 .document-preview-frame {
   width: min(100%, 920px);
+  margin: 0 auto;
   overflow: hidden;
   background: #fff;
   border: 0;
@@ -562,6 +560,12 @@
   box-shadow:
     0 22px 45px rgba(31, 43, 39, 0.18),
     0 2px 6px rgba(31, 43, 39, 0.12);
+}
+
+.document-preview-frame-pdf {
+  width: max-content;
+  max-width: none;
+  overflow: visible;
 }
 
 .document-file-preview {
@@ -578,8 +582,8 @@
 }
 
 .document-pdf-preview {
-  width: 100%;
-  min-height: min(78vh, 760px);
+  width: auto;
+  min-height: 0;
   display: flex;
   justify-content: center;
   align-items: flex-start;
@@ -594,7 +598,7 @@
 
 .document-pdf-canvas {
   display: block;
-  max-width: 100%;
+  max-width: none;
   height: auto;
   background: #fff;
   border-radius: 6px;

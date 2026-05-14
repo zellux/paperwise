@@ -419,6 +419,18 @@ function updatePdfZoomText(scale) {
   }
 }
 
+function getPdfFitWidth(detailPdfPreview) {
+  const canvasStage = detailPdfPreview.closest(".page-canvas");
+  const stageWidth = canvasStage instanceof HTMLElement
+    ? canvasStage.clientWidth
+    : detailPdfPreview.parentElement?.clientWidth || detailPdfPreview.clientWidth || 800;
+  const stageStyle = canvasStage instanceof HTMLElement ? window.getComputedStyle(canvasStage) : null;
+  const horizontalPadding = stageStyle
+    ? Number.parseFloat(stageStyle.paddingLeft || "0") + Number.parseFloat(stageStyle.paddingRight || "0")
+    : 0;
+  return Math.max(240, stageWidth - horizontalPadding);
+}
+
 async function ensurePdfDocument() {
   const url = getPdfPreviewUrl();
   if (!url) {
@@ -472,7 +484,7 @@ async function renderPdfPage(pageNumber) {
       return;
     }
     const baseViewport = page.getViewport({ scale: 1 });
-    const availableWidth = Math.max(240, detailPdfPreview.clientWidth || 800);
+    const availableWidth = getPdfFitWidth(detailPdfPreview);
     const scale = pdfScaleMode === "fit"
       ? Math.max(0.25, Math.min(3, availableWidth / baseViewport.width))
       : pdfManualScale;
@@ -482,6 +494,8 @@ async function renderPdfPage(pageNumber) {
     detailPdfCanvas.height = Math.floor(viewport.height * deviceScale);
     detailPdfCanvas.style.width = `${viewport.width}px`;
     detailPdfCanvas.style.height = `${viewport.height}px`;
+    detailPdfPreview.style.width = `${viewport.width}px`;
+    detailPdfPreview.style.minHeight = `${viewport.height}px`;
     const context = detailPdfCanvas.getContext("2d");
     if (!context) {
       throw new Error("Canvas rendering is not available.");
