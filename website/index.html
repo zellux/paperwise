@@ -3,10 +3,27 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Paperwise — Documents, structured and queryable</title>
-<meta name="description" content="An open-source, self-hosted document intelligence engine. OCR, extract, organize, and query — without sending a single file off your machine." />
+<title>Paperwise - Self-hosted document intelligence for private PDFs</title>
+<meta name="description" content="Paperwise is an open-source, self-hosted document intelligence app for OCR, metadata extraction, document organization, and citation-backed Q&A over private PDFs and scans." />
+<meta name="robots" content="index,follow,max-image-preview:large" />
+<meta name="application-name" content="Paperwise" />
+<meta name="theme-color" content="#f3ede0" />
 <link rel="canonical" href="https://paperwise.dev/" />
+<meta property="og:type" content="website" />
+<meta property="og:site_name" content="Paperwise" />
+<meta property="og:title" content="Paperwise - Self-hosted document intelligence for private PDFs" />
+<meta property="og:description" content="OCR, organize, and ask citation-backed questions across private PDFs and scans in a self-hosted document intelligence app." />
 <meta property="og:url" content="https://paperwise.dev/" />
+<meta property="og:image" content="https://paperwise.dev/og-image.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Paperwise document library with organized private documents and grounded Q&A examples" />
+<meta property="og:locale" content="en_US" />
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="Paperwise - Self-hosted document intelligence for private PDFs" />
+<meta name="twitter:description" content="OCR, organize, and ask citation-backed questions across private PDFs and scans in a self-hosted document intelligence app." />
+<meta name="twitter:image" content="https://paperwise.dev/og-image.png" />
+<meta name="twitter:image:alt" content="Paperwise document library with organized private documents and grounded Q&A examples" />
 <link rel="icon" type="image/png" href="./paperwise-icon.png" />
 <link rel="apple-touch-icon" href="./paperwise-icon.png" />
 
@@ -14,6 +31,51 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <script defer src="https://cloud.umami.is/script.js" data-website-id="425d11c9-640e-4d9e-8319-3e4cd0914958"></script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": "https://paperwise.dev/#website",
+      "url": "https://paperwise.dev/",
+      "name": "Paperwise",
+      "description": "Self-hosted document intelligence for private PDFs and scans.",
+      "inLanguage": "en-US",
+      "publisher": {
+        "@id": "https://paperwise.dev/#organization"
+      }
+    },
+    {
+      "@type": "Organization",
+      "@id": "https://paperwise.dev/#organization",
+      "name": "Paperwise",
+      "url": "https://paperwise.dev/",
+      "logo": "https://paperwise.dev/paperwise-icon.png",
+      "sameAs": [
+        "https://github.com/zellux/paperwise"
+      ]
+    },
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://paperwise.dev/#software",
+      "name": "Paperwise",
+      "applicationCategory": "DocumentManagementApplication",
+      "operatingSystem": "Linux, macOS, Docker",
+      "softwareVersion": "0.5.1",
+      "license": "https://github.com/zellux/paperwise/blob/main/LICENSE",
+      "codeRepository": "https://github.com/zellux/paperwise",
+      "url": "https://paperwise.dev/",
+      "description": "Open-source, self-hosted document intelligence for OCR, metadata extraction, organization, and citation-backed Q&A over private PDFs and scans.",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    }
+  ]
+}
+</script>
 
 <style>
 /* ─────────────────────────────────────────────
@@ -1093,7 +1155,13 @@ p { margin: 0; }
             <div>filtered by correspondent, type, and date</div>
           </div>
         </div>
-        <img src="./demo-documents-library.png" alt="Paperwise document library — sortable, filterable view across 248 documents" />
+        <img
+          src="./demo-documents-library.png"
+          srcset="./demo-documents-library.png 1x, ./demo-documents-library@2x.png 2x"
+          width="1440"
+          height="980"
+          alt="Paperwise document library — sortable, filterable view across 248 documents"
+        />
       </div>
     </div>
   </section>
@@ -1261,7 +1329,13 @@ p { margin: 0; }
           <p class="ex-foot">Across billing &amp; insurance records · 3 sources</p>
         </div>
         <div class="ex-shot">
-          <img src="./demo-medical-bill.png" alt="Paperwise answering a medical bill question with three cited sources" />
+          <img
+            src="./demo-medical-bill.png"
+            srcset="./demo-medical-bill.png 1x, ./demo-medical-bill@2x.png 2x"
+            width="1440"
+            height="980"
+            alt="Paperwise answering a medical bill question with three cited sources"
+          />
         </div>
       </article>
 
@@ -1280,7 +1354,13 @@ p { margin: 0; }
           <p class="ex-foot">Across four utility statements · 4 sources</p>
         </div>
         <div class="ex-shot">
-          <img src="./demo-utility-bills.png" alt="Paperwise showing a four-month PG&E comparison table" />
+          <img
+            src="./demo-utility-bills.png"
+            srcset="./demo-utility-bills.png 1x, ./demo-utility-bills@2x.png 2x"
+            width="1440"
+            height="980"
+            alt="Paperwise showing a four-month PG&E comparison table"
+          />
         </div>
       </article>
 
@@ -1299,7 +1379,13 @@ p { margin: 0; }
           <p class="ex-foot">Across contract, policy &amp; usage docs · 4 sources</p>
         </div>
         <div class="ex-shot">
-          <img src="./demo-vendor-renewal.png" alt="Paperwise answering a vendor renewal question across four sources" />
+          <img
+            src="./demo-vendor-renewal.png"
+            srcset="./demo-vendor-renewal.png 1x, ./demo-vendor-renewal@2x.png 2x"
+            width="1440"
+            height="980"
+            alt="Paperwise answering a vendor renewal question across four sources"
+          />
         </div>
       </article>
 

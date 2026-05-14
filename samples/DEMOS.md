@@ -38,8 +38,16 @@ Current screenshot set:
 - `samples/screenshots/document-detail.png`: single-document detail view using a sample PDF.
 - `samples/screenshots/processing-queue.png`: active processing queue with progress states.
 
-The current document-library, Ask Your Docs, and processing screenshots are `1440x980`.
-The single-document detail screenshot is `1440x1400` so the PDF preview can show the full first page.
+Use a `1440x980` CSS viewport for the document-library, Ask Your Docs, and processing screenshots. Capture at device pixel ratio 2 for website assets, which produces `2880x1960` image files for retina screens while preserving the same layout crop.
+
+Use a `1440x1400` CSS viewport for the single-document detail screenshot so the PDF preview can show the full first page. Capture at device pixel ratio 2 if the image is used on the website, producing a `2880x2800` asset.
+
+The website copies live next to `website/index.html`:
+
+- `website/demo-documents-library.png` and `website/demo-documents-library@2x.png`
+- `website/demo-medical-bill.png` and `website/demo-medical-bill@2x.png`
+- `website/demo-utility-bills.png` and `website/demo-utility-bills@2x.png`
+- `website/demo-vendor-renewal.png` and `website/demo-vendor-renewal@2x.png`
 
 ## Demo Account Treatment
 
@@ -264,6 +272,9 @@ This screenshot is useful for showing that Paperwise exposes OCR and metadata-pr
 5. If needed, inject demo labels/counts into the browser DOM only.
 6. Replace visible account identity with `demo@paperwise.app`.
 7. Capture screenshots to `samples/screenshots/`.
+   - For website screenshots, keep the viewport at `1440x980` CSS pixels and set `deviceScaleFactor: 2` so the exported PNG is `2880x1960`.
+   - If using Playwright, the viewport should be `{ width: 1440, height: 980, deviceScaleFactor: 2 }`.
+   - Keep the 1x and 2x website filenames paired as `name.png` and `name@2x.png`.
 8. Visually inspect every screenshot for:
    - Real email addresses.
    - Real names or private document titles.

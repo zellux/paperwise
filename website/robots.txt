@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://paperwise.dev/sitemap.xml
+Sitemap: https://paperwise.dev/docs/sitemap-index.xml
