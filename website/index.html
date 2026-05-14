@@ -1117,10 +1117,21 @@ p { margin: 0; }
   .showcase-caption .meta { text-align: left; }
   .lightbox-inner { padding: 10px; }
   .lightbox-close { top: 12px; right: 12px; }
-  .step { grid-template-columns: 50px 1fr; gap: 16px; }
+  .step {
+    grid-template-columns: 96px minmax(0, 1fr);
+    align-items: start;
+    gap: 10px 16px;
+    padding: 28px 0;
+  }
+  .step-num { grid-column: 1; grid-row: 1 / span 2; }
+  .step-title,
+  .step-desc { grid-column: 2; }
   .step-num { font-size: 0.74rem; }
   .step-title { font-size: 1.25rem; }
+  .step-desc { max-width: none; }
   .cta-card { padding: 40px 24px; }
+  .cta-quote .row { display: grid; grid-template-columns: 1fr; gap: 3px; }
+  .cta-quote .row .v { overflow-wrap: anywhere; }
 }
 </style>
 </head>
