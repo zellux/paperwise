@@ -1699,6 +1699,15 @@
   overflow: auto;
 }
 
+.docs-table-bottom-spacer {
+  display: block;
+  height: 0;
+}
+
+.documents-workbench:has(.docs-bulk-bar:not([hidden])) .docs-table-bottom-spacer {
+  height: 112px;
+}
+
 .docs-design-table {
   display: block;
   width: 100%;
@@ -2588,6 +2597,10 @@
   .docs-bulk-bar {
     overflow-x: auto;
     justify-content: flex-start;
+  }
+
+  .documents-workbench:has(.docs-bulk-bar:not([hidden])) .docs-table-bottom-spacer {
+    height: 136px;
   }
 }
 
