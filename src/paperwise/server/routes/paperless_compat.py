@@ -353,7 +353,10 @@ def _filter_rows(
     rows: list[tuple[Document, LLMParseResult | None]],
     repository: DocumentRepository,
     *,
+    text: str | None,
     query: str | None,
+    title_content: str | None,
+    title_search: str | None,
     title__icontains: str | None,
     correspondent__id: int | None,
     correspondent__id__in: str | None,
@@ -412,9 +415,11 @@ def _filter_rows(
             continue
         if excluded_tags and tag_ids.intersection(excluded_tags):
             continue
-        if title__icontains and title__icontains.casefold() not in _document_title(document, llm_result).casefold():
+        title_query = title__icontains or title_search
+        if title_query and title_query.casefold() not in _document_title(document, llm_result).casefold():
             continue
-        if not _matches_query(document, llm_result, query, repository):
+        search_query = title_content or text or query
+        if not _matches_query(document, llm_result, search_query, repository):
             continue
         filtered.append((document, llm_result))
     return filtered
@@ -657,7 +662,10 @@ def list_documents(
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1),
     ordering: str | None = Query(None),
+    text: str | None = Query(None),
     query: str | None = Query(None),
+    title_content: str | None = Query(None),
+    title_search: str | None = Query(None),
     title__icontains: str | None = Query(None),
     correspondent__id: int | None = Query(None),
     correspondent__id__in: str | None = Query(None),
@@ -681,7 +689,10 @@ def list_documents(
         _filter_rows(
             _owner_rows(repository, current_user),
             repository,
+            text=text,
             query=query,
+            title_content=title_content,
+            title_search=title_search,
             title__icontains=title__icontains,
             correspondent__id=correspondent__id,
             correspondent__id__in=correspondent__id__in,

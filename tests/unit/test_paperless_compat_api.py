@@ -360,6 +360,18 @@ def test_paperless_mobile_document_filters_use_paperless_query_params(tmp_path) 
         assert filtered.status_code == 200
         assert [row["title"] for row in filtered.json()["results"]] == ["Shop Receipt"]
 
+        filtered = client.get("/api/documents/?title_content=invoice", headers=headers)
+        assert filtered.status_code == 200
+        assert [row["title"] for row in filtered.json()["results"]] == ["June Invoice", "May Invoice"]
+
+        filtered = client.get("/api/documents/?title_search=receipt", headers=headers)
+        assert filtered.status_code == 200
+        assert [row["title"] for row in filtered.json()["results"]] == ["Shop Receipt"]
+
+        filtered = client.get("/api/documents/?text=mobile%20client", headers=headers)
+        assert filtered.status_code == 200
+        assert [row["title"] for row in filtered.json()["results"]] == ["June Invoice", "May Invoice"]
+
         tagged = client.get("/api/documents/?is_tagged=1", headers=headers)
         assert tagged.status_code == 200
         assert tagged.json()["count"] == 3
