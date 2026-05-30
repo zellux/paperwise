@@ -356,27 +356,61 @@ def _filter_rows(
     query: str | None,
     title__icontains: str | None,
     correspondent__id: int | None,
+    correspondent__id__in: str | None,
+    correspondent__id__none: str | None,
+    correspondent__isnull: bool | None,
     document_type__id: int | None,
+    document_type__id__in: str | None,
+    document_type__id__none: str | None,
+    document_type__isnull: bool | None,
     tags__id__all: str | None,
     tags__id__in: str | None,
+    tags__id__none: str | None,
+    is_tagged: bool | None,
     id__in: str | None,
 ) -> list[tuple[Document, LLMParseResult | None]]:
+    correspondent_ids = set(_split_ints(correspondent__id__in))
+    excluded_correspondent_ids = set(_split_ints(correspondent__id__none))
+    document_type_ids = set(_split_ints(document_type__id__in))
+    excluded_document_type_ids = set(_split_ints(document_type__id__none))
     required_tags = set(_split_ints(tags__id__all))
     any_tags = set(_split_ints(tags__id__in))
+    excluded_tags = set(_split_ints(tags__id__none))
     document_ids = set(_split_ints(id__in))
     filtered = []
     for document, llm_result in rows:
         payload_id = _int_alias("document", document.id)
         if document_ids and payload_id not in document_ids:
             continue
-        if correspondent__id is not None and (llm_result is None or _taxonomy_id("correspondent", llm_result.correspondent) != correspondent__id):
+
+        correspondent_id = _taxonomy_id("correspondent", llm_result.correspondent) if llm_result and llm_result.correspondent else None
+        if correspondent__isnull is not None and (correspondent_id is None) != correspondent__isnull:
             continue
-        if document_type__id is not None and (llm_result is None or _taxonomy_id("document_type", llm_result.document_type) != document_type__id):
+        if correspondent__id is not None and correspondent_id != correspondent__id:
             continue
+        if correspondent_ids and correspondent_id not in correspondent_ids:
+            continue
+        if excluded_correspondent_ids and correspondent_id in excluded_correspondent_ids:
+            continue
+
+        document_type_id = _taxonomy_id("document_type", llm_result.document_type) if llm_result and llm_result.document_type else None
+        if document_type__isnull is not None and (document_type_id is None) != document_type__isnull:
+            continue
+        if document_type__id is not None and document_type_id != document_type__id:
+            continue
+        if document_type_ids and document_type_id not in document_type_ids:
+            continue
+        if excluded_document_type_ids and document_type_id in excluded_document_type_ids:
+            continue
+
         tag_ids = {_taxonomy_id("tag", tag) for tag in llm_result.tags} if llm_result else set()
+        if is_tagged is not None and bool(tag_ids) != is_tagged:
+            continue
         if required_tags and not required_tags.issubset(tag_ids):
             continue
         if any_tags and not any_tags.intersection(tag_ids):
+            continue
+        if excluded_tags and tag_ids.intersection(excluded_tags):
             continue
         if title__icontains and title__icontains.casefold() not in _document_title(document, llm_result).casefold():
             continue
@@ -626,9 +660,17 @@ def list_documents(
     query: str | None = Query(None),
     title__icontains: str | None = Query(None),
     correspondent__id: int | None = Query(None),
+    correspondent__id__in: str | None = Query(None),
+    correspondent__id__none: str | None = Query(None),
+    correspondent__isnull: bool | None = Query(None),
     document_type__id: int | None = Query(None),
+    document_type__id__in: str | None = Query(None),
+    document_type__id__none: str | None = Query(None),
+    document_type__isnull: bool | None = Query(None),
     tags__id__all: str | None = Query(None),
     tags__id__in: str | None = Query(None),
+    tags__id__none: str | None = Query(None),
+    is_tagged: bool | None = Query(None),
     id__in: str | None = Query(None),
     truncate_content: bool = Query(True),
     repository: DocumentRepository = Depends(document_repository_dependency),
@@ -642,9 +684,17 @@ def list_documents(
             query=query,
             title__icontains=title__icontains,
             correspondent__id=correspondent__id,
+            correspondent__id__in=correspondent__id__in,
+            correspondent__id__none=correspondent__id__none,
+            correspondent__isnull=correspondent__isnull,
             document_type__id=document_type__id,
+            document_type__id__in=document_type__id__in,
+            document_type__id__none=document_type__id__none,
+            document_type__isnull=document_type__isnull,
             tags__id__all=tags__id__all,
             tags__id__in=tags__id__in,
+            tags__id__none=tags__id__none,
+            is_tagged=is_tagged,
             id__in=id__in,
         ),
         ordering,

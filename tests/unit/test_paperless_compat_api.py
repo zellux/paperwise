@@ -93,6 +93,39 @@ def _seed_document(repository: InMemoryDocumentRepository, storage: LocalStorage
     )
 
 
+def _seed_receipt(repository: InMemoryDocumentRepository, storage: LocalStorageAdapter, owner_id: str) -> None:
+    blob_uri = storage.put("incoming/mobile/receipt.pdf", b"%PDF-1.4\nreceipt", "application/pdf")
+    document = Document(
+        id="doc-receipt",
+        filename="receipt.pdf",
+        owner_id=owner_id,
+        blob_uri=blob_uri,
+        checksum_sha256="def456",
+        content_type="application/pdf",
+        size_bytes=16,
+        status=DocumentStatus.READY,
+        created_at=datetime(2026, 5, 28, 12, 0, tzinfo=UTC),
+    )
+    repository.save(document)
+    repository.add_correspondent("Shop Co")
+    repository.add_document_type("Receipt")
+    repository.add_tags(["Expense"])
+    repository.save_llm_parse_result(
+        LLMParseResult(
+            document_id=document.id,
+            suggested_title="Shop Receipt",
+            document_date="2026-05-28",
+            correspondent="Shop Co",
+            document_type="Receipt",
+            tags=["Expense"],
+            created_correspondent=False,
+            created_document_type=False,
+            created_tags=[],
+            created_at=document.created_at,
+        )
+    )
+
+
 def test_paperless_mobile_auth_profile_and_document_listing(tmp_path) -> None:
     repository = InMemoryDocumentRepository()
     settings = Settings(object_store_root=str(tmp_path))
@@ -214,6 +247,60 @@ def test_paperless_mobile_labels_stats_patch_and_stubs(tmp_path) -> None:
         bulk_download = client.post("/api/documents/bulk_download/", headers=headers, json={"documents": [document_id]})
         assert bulk_download.status_code == 200
         assert bulk_download.json() == {"content": "archive", "compression": "none", "follow_formatting": False}
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_paperless_mobile_document_filters_use_paperless_query_params(tmp_path) -> None:
+    repository = InMemoryDocumentRepository()
+    settings = Settings(object_store_root=str(tmp_path))
+    storage = LocalStorageAdapter(settings.object_store_root)
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: settings
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        owner_id, headers = _create_user_and_token(client)
+        _seed_document(repository, storage, owner_id)
+        _seed_receipt(repository, storage, owner_id)
+
+        correspondents = client.get("/api/correspondents/", headers=headers).json()["results"]
+        acme_id = next(row["id"] for row in correspondents if row["name"] == "Acme Corp")
+        shop_id = next(row["id"] for row in correspondents if row["name"] == "Shop Co")
+        document_types = client.get("/api/document_types/", headers=headers).json()["results"]
+        invoice_id = next(row["id"] for row in document_types if row["name"] == "Invoice")
+        receipt_id = next(row["id"] for row in document_types if row["name"] == "Receipt")
+        tags = client.get("/api/tags/", headers=headers).json()["results"]
+        finance_id = next(row["id"] for row in tags if row["name"] == "Finance")
+
+        filtered = client.get(f"/api/documents/?correspondent__id__in={acme_id}", headers=headers)
+        assert filtered.status_code == 200
+        assert [row["title"] for row in filtered.json()["results"]] == ["May Invoice"]
+
+        filtered = client.get(f"/api/documents/?correspondent__id__none={shop_id}", headers=headers)
+        assert filtered.status_code == 200
+        assert [row["title"] for row in filtered.json()["results"]] == ["May Invoice"]
+
+        filtered = client.get(f"/api/documents/?document_type__id__in={receipt_id}", headers=headers)
+        assert filtered.status_code == 200
+        assert [row["title"] for row in filtered.json()["results"]] == ["Shop Receipt"]
+
+        filtered = client.get(f"/api/documents/?document_type__id__none={invoice_id}", headers=headers)
+        assert filtered.status_code == 200
+        assert [row["title"] for row in filtered.json()["results"]] == ["Shop Receipt"]
+
+        filtered = client.get(f"/api/documents/?tags__id__all={finance_id}", headers=headers)
+        assert filtered.status_code == 200
+        assert [row["title"] for row in filtered.json()["results"]] == ["May Invoice"]
+
+        filtered = client.get(f"/api/documents/?tags__id__none={finance_id}", headers=headers)
+        assert filtered.status_code == 200
+        assert [row["title"] for row in filtered.json()["results"]] == ["Shop Receipt"]
+
+        tagged = client.get("/api/documents/?is_tagged=1", headers=headers)
+        assert tagged.status_code == 200
+        assert tagged.json()["count"] == 2
     finally:
         app.dependency_overrides.clear()
 
