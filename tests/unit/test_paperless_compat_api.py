@@ -117,6 +117,18 @@ def test_paperless_mobile_auth_profile_and_document_listing(tmp_path) -> None:
         ui_settings = client.get("/api/ui_settings/", headers=headers)
         assert ui_settings.status_code == 200
         assert ui_settings.json()["user"]["username"] == "mobile@example.com"
+        assert "view_document" in ui_settings.json()["permissions"]
+        assert "add_document" in ui_settings.json()["permissions"]
+
+        compat_user_id = ui_settings.json()["user"]["id"]
+        compat_user = client.get(f"/api/users/{compat_user_id}/", headers=headers)
+        assert compat_user.status_code == 200
+        assert "view_document" in compat_user.json()["inherited_permissions"]
+
+        config = client.get("/api/config/", headers=headers)
+        assert config.status_code == 200
+        assert config.json()[0]["app_title"] == "Paperwise"
+        assert config.json()[0]["user_args"] is None
 
         documents = client.get("/api/documents/?page=1&page_size=10", headers=headers)
         assert documents.status_code == 200
@@ -125,6 +137,8 @@ def test_paperless_mobile_auth_profile_and_document_listing(tmp_path) -> None:
         assert payload["results"][0]["title"] == "May Invoice"
         assert isinstance(payload["results"][0]["id"], int)
         assert payload["results"][0]["tags"]
+        assert payload["results"][0]["owner"] is None
+        assert payload["results"][0]["permissions"]["view"] == {"users": [], "groups": []}
 
         document_id = payload["results"][0]["id"]
         detail = client.get(f"/api/documents/{document_id}/", headers=headers)
@@ -154,10 +168,14 @@ def test_paperless_mobile_labels_stats_patch_and_stubs(tmp_path) -> None:
         tags = client.get("/api/tags/", headers=headers).json()
         finance_tag = next(tag for tag in tags["results"] if tag["name"] == "Finance")
         assert finance_tag["document_count"] == 1
+        assert finance_tag["owner"] is None
+        assert finance_tag["is_inbox_tag"] is False
+        assert finance_tag["text_color"]
 
         created_tag = client.post("/api/tags/", headers=headers, json={"name": "Mobile"})
         assert created_tag.status_code == 201
         assert created_tag.json()["name"] == "Mobile"
+        assert created_tag.json()["owner"] is None
 
         documents = client.get("/api/documents/", headers=headers).json()
         document_id = documents["results"][0]["id"]
@@ -182,6 +200,20 @@ def test_paperless_mobile_labels_stats_patch_and_stubs(tmp_path) -> None:
         suggestions = client.get(f"/api/documents/{document_id}/suggestions/", headers=headers)
         assert suggestions.status_code == 200
         assert suggestions.json()["tags"] == [finance_tag["id"]]
+
+        selection = client.post("/api/documents/selection_data/", headers=headers, json={"document_ids": [document_id]})
+        assert selection.status_code == 200
+        assert selection.json() == {
+            "selected_correspondents": [],
+            "selected_tags": [],
+            "selected_document_types": [],
+            "selected_storage_paths": [],
+            "selected_custom_fields": [],
+        }
+
+        bulk_download = client.post("/api/documents/bulk_download/", headers=headers, json={"documents": [document_id]})
+        assert bulk_download.status_code == 200
+        assert bulk_download.json() == {"content": "archive", "compression": "none", "follow_formatting": False}
     finally:
         app.dependency_overrides.clear()
 

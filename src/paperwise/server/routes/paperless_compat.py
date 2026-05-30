@@ -41,6 +41,19 @@ router = APIRouter(prefix="/api", tags=["paperless-compat"])
 API_VERSION = "9"
 DEFAULT_PAGE_SIZE = 25
 MAX_COMPAT_ROWS = 10_000
+PAPERLESS_PERMISSION_ACTIONS = ("add", "change", "delete", "view")
+PAPERLESS_PERMISSION_TARGETS = (
+    "correspondent",
+    "customfield",
+    "document",
+    "documenttype",
+    "savedview",
+    "storagepath",
+    "tag",
+)
+PAPERLESS_COMPAT_PERMISSIONS = [
+    f"{action}_{target}" for target in PAPERLESS_PERMISSION_TARGETS for action in PAPERLESS_PERMISSION_ACTIONS
+]
 
 
 def _int_alias(namespace: str, value: str) -> int:
@@ -91,9 +104,41 @@ def _user_payload(user: User) -> dict[str, Any]:
         "is_active": user.is_active,
         "is_superuser": False,
         "groups": [],
-        "user_permissions": [],
-        "inherited_permissions": [],
+        "user_permissions": PAPERLESS_COMPAT_PERMISSIONS,
+        "inherited_permissions": PAPERLESS_COMPAT_PERMISSIONS,
         "is_mfa_enabled": False,
+    }
+
+
+def _application_configuration_payload() -> dict[str, Any]:
+    return {
+        "id": 1,
+        "user_args": None,
+        "barcode_tag_mapping": None,
+        "output_type": None,
+        "pages": None,
+        "language": None,
+        "mode": None,
+        "skip_archive_file": None,
+        "image_dpi": None,
+        "unpaper_clean": None,
+        "deskew": None,
+        "rotate_pages": None,
+        "rotate_pages_threshold": None,
+        "max_image_pixels": None,
+        "color_conversion_strategy": None,
+        "app_title": "Paperwise",
+        "app_logo": None,
+        "barcodes_enabled": False,
+        "barcode_enable_tiff_support": False,
+        "barcode_string": None,
+        "barcode_retain_split_pages": False,
+        "barcode_enable_asn": False,
+        "barcode_asn_prefix": None,
+        "barcode_upscale": None,
+        "barcode_dpi": None,
+        "barcode_max_pages": None,
+        "barcode_enable_tag": False,
     }
 
 
@@ -134,7 +179,7 @@ def _taxonomy_id(kind: str, name: str) -> int:
     return _int_alias(kind, name.strip().casefold())
 
 
-def _label_payload(kind: str, name: str, document_count: int = 0, owner_id: int | None = None) -> dict[str, Any]:
+def _label_payload(kind: str, name: str, document_count: int = 0) -> dict[str, Any]:
     payload: dict[str, Any] = {
         "id": _taxonomy_id(kind, name),
         "name": name,
@@ -143,11 +188,19 @@ def _label_payload(kind: str, name: str, document_count: int = 0, owner_id: int 
         "matching_algorithm": 6,
         "is_insensitive": True,
         "document_count": document_count,
-        "owner": owner_id,
+        "owner": None,
         "user_can_change": True,
     }
     if kind == "storage_path":
         payload["path"] = ""
+    if kind == "tag":
+        payload.update(
+            {
+                "color": "#dbe5cb",
+                "text_color": "#111827",
+                "is_inbox_tag": False,
+            }
+        )
     return payload
 
 
@@ -223,8 +276,8 @@ def _document_payload(
         "archive_serial_number": None,
         "original_file_name": document.filename,
         "archived_file_name": document.filename,
-        "owner": _int_alias("user", document.owner_id),
-        "permissions": None,
+        "owner": None,
+        "permissions": {"view": {"users": [], "groups": []}, "change": {"users": [], "groups": []}},
         "user_can_change": True,
         "is_shared_by_requester": False,
         "notes": [],
@@ -415,7 +468,7 @@ def get_ui_settings(
 ) -> dict[str, Any]:
     _paperless_headers(response)
     return {
-        "permissions": [],
+        "permissions": PAPERLESS_COMPAT_PERMISSIONS,
         "settings": {
             "version": "0.0.0",
             "app_logo": "",
@@ -527,6 +580,42 @@ def statistics(
 def remote_version(response: Response) -> dict[str, Any]:
     response.headers["x-version"] = "0.0.0"
     return {"version": "0.0.0", "update_available": False}
+
+
+@router.get("/config/")
+def list_config(current_user: User = Depends(_current_user_from_token)) -> list[dict[str, Any]]:
+    del current_user
+    return [_application_configuration_payload()]
+
+
+@router.get("/config/{config_id}/")
+def get_config(
+    config_id: int,
+    current_user: User = Depends(_current_user_from_token),
+) -> dict[str, Any]:
+    del current_user
+    if config_id != 1:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Configuration not found")
+    return _application_configuration_payload()
+
+
+@router.patch("/config/{config_id}/")
+def patch_config(
+    config_id: int,
+    payload: dict[str, Any],
+    current_user: User = Depends(_current_user_from_token),
+) -> dict[str, Any]:
+    del payload
+    return get_config(config_id, current_user)
+
+
+@router.put("/config/{config_id}/")
+def put_config(
+    config_id: int,
+    payload: dict[str, Any],
+    current_user: User = Depends(_current_user_from_token),
+) -> dict[str, Any]:
+    return patch_config(config_id, payload, current_user)
 
 
 @router.get("/documents/")
@@ -668,19 +757,24 @@ def bulk_edit(payload: dict[str, Any], current_user: User = Depends(_current_use
 @router.post("/documents/bulk_download/")
 def bulk_download(payload: dict[str, Any], current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
     del current_user
-    return {"content": "", "filename": "paperwise-documents.zip"}
+    content = payload.get("content") if isinstance(payload, dict) else None
+    compression = payload.get("compression") if isinstance(payload, dict) else None
+    return {
+        "content": content if content in {"archive", "originals", "both"} else "archive",
+        "compression": compression if compression in {"none", "deflated", "bzip2", "lzma"} else "none",
+        "follow_formatting": bool(payload.get("follow_formatting", False)) if isinstance(payload, dict) else False,
+    }
 
 
 @router.post("/documents/selection_data/")
 def selection_data(payload: dict[str, Any], current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
-    del current_user
-    document_ids = payload.get("document_ids") if isinstance(payload, dict) else []
+    del payload, current_user
     return {
         "selected_correspondents": [],
         "selected_tags": [],
         "selected_document_types": [],
         "selected_storage_paths": [],
-        "documents": document_ids or [],
+        "selected_custom_fields": [],
     }
 
 
@@ -861,7 +955,7 @@ def _list_labels(
 ) -> dict[str, Any]:
     names = _taxonomy_names(repository, kind)
     stats = _stats_map(repository, current_user, kind)
-    rows = [_label_payload(kind, name, stats.get(name, 0), _user_id(current_user)) for name in names]
+    rows = [_label_payload(kind, name, stats.get(name, 0)) for name in names]
     start = (page - 1) * page_size
     return _paginated(
         request_path,
@@ -877,7 +971,7 @@ def _get_label(kind: str, label_id: int, repository: DocumentRepository, current
     stats = _stats_map(repository, current_user, kind)
     for name in _taxonomy_names(repository, kind):
         if _taxonomy_id(kind, name) == label_id:
-            return _label_payload(kind, name, stats.get(name, 0), _user_id(current_user))
+            return _label_payload(kind, name, stats.get(name, 0))
     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Label not found")
 
 
@@ -891,7 +985,7 @@ def _create_label(kind: str, payload: dict[str, Any], repository: DocumentReposi
         repository.add_correspondent(name)
     elif kind == "document_type":
         repository.add_document_type(name)
-    return _label_payload(kind, name, 0, _user_id(current_user))
+    return _label_payload(kind, name, 0)
 
 
 def _upsert_label(
