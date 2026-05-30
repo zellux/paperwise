@@ -8,6 +8,8 @@ WORKER_PID_FILE ?= $(RUN_DIR)/worker.pid
 BACKEND_LOG ?= $(LOG_DIR)/backend.log
 WORKER_LOG ?= $(LOG_DIR)/worker.log
 WEBSITE_PORT ?= 8081
+API_HOST ?= 0.0.0.0
+API_PORT ?= 8000
 
 .PHONY: setup deps-up deps-down docker-up docker-down docker-logs docker-deploy-up docker-deploy-down docker-deploy-logs backend api worker worker-bg backend-bg website dev-up dev-stop dev-restart dev-status test smoke-llm version-check
 
@@ -56,7 +58,7 @@ docker-deploy-logs:
 	docker compose -f docker-compose.deploy.yml logs -f api worker
 
 backend:
-	$(VENV_PYTHON) -m uvicorn paperwise.server.main:app --reload
+	$(VENV_PYTHON) -m uvicorn paperwise.server.main:app --reload --host $(API_HOST) --port $(API_PORT)
 
 api: backend
 
@@ -72,9 +74,9 @@ backend-bg:
 		echo "backend already running (pid=$$(cat "$(BACKEND_PID_FILE)"))"; \
 	else \
 		rm -f "$(BACKEND_PID_FILE)"; \
-		echo "starting backend..."; \
-		nohup sh -c '$(VENV_PYTHON) -m uvicorn paperwise.server.main:app --reload' > "$(BACKEND_LOG)" 2>&1 & echo $$! > "$(BACKEND_PID_FILE)"; \
-		echo "backend started (pid=$$(cat "$(BACKEND_PID_FILE)")) log=$(BACKEND_LOG)"; \
+		echo "starting backend on $(API_HOST):$(API_PORT)..."; \
+		nohup $(VENV_PYTHON) -m uvicorn paperwise.server.main:app --reload --host $(API_HOST) --port $(API_PORT) > "$(BACKEND_LOG)" 2>&1 & echo $$! > "$(BACKEND_PID_FILE)"; \
+		echo "backend started (pid=$$(cat "$(BACKEND_PID_FILE)")) bind=$(API_HOST):$(API_PORT) log=$(BACKEND_LOG)"; \
 	fi
 
 worker-bg:
@@ -95,10 +97,18 @@ dev-stop:
 		pid="$$(cat "$(BACKEND_PID_FILE)")"; \
 		if kill -0 "$$pid" 2>/dev/null; then \
 			echo "stopping backend (pid=$$pid)..."; \
+			pkill -TERM -P "$$pid" 2>/dev/null || true; \
 			kill "$$pid" 2>/dev/null || true; \
 		fi; \
 		rm -f "$(BACKEND_PID_FILE)"; \
 	fi
+	@for pid in $$(pgrep -f "uvicorn paperwise.server.main:app.*--port $(API_PORT)" 2>/dev/null || true); do \
+		if [ "$$pid" != "$$$$" ]; then \
+			echo "stopping stale backend uvicorn (pid=$$pid)..."; \
+			pkill -TERM -P "$$pid" 2>/dev/null || true; \
+			kill "$$pid" 2>/dev/null || true; \
+		fi; \
+	done
 	@if [ -f "$(WORKER_PID_FILE)" ]; then \
 		pid="$$(cat "$(WORKER_PID_FILE)")"; \
 		if kill -0 "$$pid" 2>/dev/null; then \
@@ -115,7 +125,7 @@ dev-status:
 	@if [ -f "$(BACKEND_PID_FILE)" ]; then \
 		pid="$$(cat "$(BACKEND_PID_FILE)")"; \
 		if kill -0 "$$pid" 2>/dev/null; then \
-			echo "running (pid=$$pid) log=$(BACKEND_LOG)"; \
+			echo "running (pid=$$pid) bind=$(API_HOST):$(API_PORT) log=$(BACKEND_LOG)"; \
 		else \
 			echo "not running (stale pid file: $$pid)"; \
 		fi; \

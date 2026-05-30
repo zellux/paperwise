@@ -7,6 +7,7 @@ from paperwise import __version__
 from paperwise.server.routes.documents import router as documents_router
 from paperwise.server.routes.collections import router as collections_router
 from paperwise.server.routes.health import router as health_router
+from paperwise.server.routes.paperless_compat import router as paperless_compat_router
 from paperwise.server.routes.query import router as query_router
 from paperwise.server.routes.ui import router as ui_router
 from paperwise.server.routes.users import router as users_router
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     app.include_router(collections_router)
     app.include_router(query_router)
     app.include_router(users_router)
+    app.include_router(paperless_compat_router)
     app.include_router(health_router)
     return app
 
