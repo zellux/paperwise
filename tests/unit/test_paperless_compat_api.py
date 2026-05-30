@@ -31,41 +31,62 @@ class FakeDispatcher:
         return f"job-{document_id}"
 
 
-def _create_user_and_token(client: TestClient) -> tuple[str, dict[str, str]]:
+def _create_user_and_token(
+    client: TestClient,
+    *,
+    email: str = "mobile@example.com",
+    full_name: str = "Mobile User",
+) -> tuple[str, dict[str, str]]:
     create_response = client.post(
         "/users",
         json={
-            "email": "mobile@example.com",
-            "full_name": "Mobile User",
+            "email": email,
+            "full_name": full_name,
             "password": "strong-pass-123",
         },
     )
     assert create_response.status_code == 201
     token_response = client.post(
         "/api/token/",
-        json={"username": "mobile@example.com", "password": "strong-pass-123"},
+        json={"username": email, "password": "strong-pass-123"},
     )
     assert token_response.status_code == 200
     return create_response.json()["id"], {"Authorization": f"Token {token_response.json()['token']}"}
 
 
-def _seed_document(repository: InMemoryDocumentRepository, storage: LocalStorageAdapter, owner_id: str) -> None:
-    blob_uri = storage.put("incoming/mobile/invoice.pdf", b"%PDF-1.4\nmobile", "application/pdf")
+def _seed_document(
+    repository: InMemoryDocumentRepository,
+    storage: LocalStorageAdapter,
+    owner_id: str,
+    *,
+    document_id: str = "doc-mobile",
+    storage_key: str = "incoming/mobile/invoice.pdf",
+    filename: str = "invoice.pdf",
+    checksum: str = "abc123",
+    suggested_title: str = "May Invoice",
+    document_date: str = "2026-05-29",
+    created_at: datetime | None = None,
+    correspondent: str = "Acme Corp",
+    document_type: str = "Invoice",
+    tags: list[str] | None = None,
+) -> None:
+    blob_uri = storage.put(storage_key, b"%PDF-1.4\nmobile", "application/pdf")
     document = Document(
-        id="doc-mobile",
-        filename="invoice.pdf",
+        id=document_id,
+        filename=filename,
         owner_id=owner_id,
         blob_uri=blob_uri,
-        checksum_sha256="abc123",
+        checksum_sha256=checksum,
         content_type="application/pdf",
         size_bytes=15,
         status=DocumentStatus.READY,
-        created_at=datetime(2026, 5, 29, 12, 0, tzinfo=UTC),
+        created_at=created_at or datetime(2026, 5, 29, 12, 0, tzinfo=UTC),
     )
     repository.save(document)
-    repository.add_correspondent("Acme Corp")
-    repository.add_document_type("Invoice")
-    repository.add_tags(["Finance", "Tax"])
+    tag_names = ["Finance", "Tax"] if tags is None else tags
+    repository.add_correspondent(correspondent)
+    repository.add_document_type(document_type)
+    repository.add_tags(tag_names)
     repository.save_parse_result(
         ParseResult(
             document_id=document.id,
@@ -80,11 +101,11 @@ def _seed_document(repository: InMemoryDocumentRepository, storage: LocalStorage
     repository.save_llm_parse_result(
         LLMParseResult(
             document_id=document.id,
-            suggested_title="May Invoice",
-            document_date="2026-05-29",
-            correspondent="Acme Corp",
-            document_type="Invoice",
-            tags=["Finance", "Tax"],
+            suggested_title=suggested_title,
+            document_date=document_date,
+            correspondent=correspondent,
+            document_type=document_type,
+            tags=tag_names,
             created_correspondent=False,
             created_document_type=False,
             created_tags=[],
@@ -197,13 +218,38 @@ def test_paperless_mobile_labels_stats_patch_and_stubs(tmp_path) -> None:
         client = TestClient(app)
         owner_id, headers = _create_user_and_token(client)
         _seed_document(repository, storage, owner_id)
+        other_owner_id, _other_headers = _create_user_and_token(
+            client,
+            email="other-mobile@example.com",
+            full_name="Other Mobile",
+        )
+        _seed_document(
+            repository,
+            storage,
+            other_owner_id,
+            document_id="doc-other",
+            storage_key="incoming/mobile/other.pdf",
+            filename="other.pdf",
+            checksum="other123",
+            suggested_title="Other Statement",
+            correspondent="Other Corp",
+            document_type="Statement",
+            tags=["Other Tag"],
+        )
 
         tags = client.get("/api/tags/", headers=headers).json()
         finance_tag = next(tag for tag in tags["results"] if tag["name"] == "Finance")
+        assert {tag["name"] for tag in tags["results"]} == {"Finance", "Tax"}
         assert finance_tag["document_count"] == 1
         assert finance_tag["owner"] is None
         assert finance_tag["is_inbox_tag"] is False
         assert finance_tag["text_color"]
+
+        correspondents = client.get("/api/correspondents/", headers=headers).json()
+        assert {row["name"] for row in correspondents["results"]} == {"Acme Corp"}
+
+        document_types = client.get("/api/document_types/", headers=headers).json()
+        assert {row["name"] for row in document_types["results"]} == {"Invoice"}
 
         created_tag = client.post("/api/tags/", headers=headers, json={"name": "Mobile"})
         assert created_tag.status_code == 201
@@ -263,6 +309,18 @@ def test_paperless_mobile_document_filters_use_paperless_query_params(tmp_path) 
         client = TestClient(app)
         owner_id, headers = _create_user_and_token(client)
         _seed_document(repository, storage, owner_id)
+        _seed_document(
+            repository,
+            storage,
+            owner_id,
+            document_id="doc-mobile-2",
+            storage_key="incoming/mobile/invoice-2.pdf",
+            filename="invoice-2.pdf",
+            checksum="abc124",
+            suggested_title="June Invoice",
+            document_date="2026-06-29",
+            created_at=datetime(2026, 6, 29, 12, 0, tzinfo=UTC),
+        )
         _seed_receipt(repository, storage, owner_id)
 
         correspondents = client.get("/api/correspondents/", headers=headers).json()["results"]
@@ -276,15 +334,19 @@ def test_paperless_mobile_document_filters_use_paperless_query_params(tmp_path) 
 
         filtered = client.get(f"/api/documents/?correspondent__id__in={acme_id}", headers=headers)
         assert filtered.status_code == 200
-        assert [row["title"] for row in filtered.json()["results"]] == ["May Invoice"]
+        assert [row["title"] for row in filtered.json()["results"]] == ["June Invoice", "May Invoice"]
 
         filtered = client.get(f"/api/documents/?correspondent__id__none={shop_id}", headers=headers)
         assert filtered.status_code == 200
-        assert [row["title"] for row in filtered.json()["results"]] == ["May Invoice"]
+        assert [row["title"] for row in filtered.json()["results"]] == ["June Invoice", "May Invoice"]
 
         filtered = client.get(f"/api/documents/?document_type__id__in={receipt_id}", headers=headers)
         assert filtered.status_code == 200
         assert [row["title"] for row in filtered.json()["results"]] == ["Shop Receipt"]
+
+        filtered = client.get(f"/api/documents/?document_type__id__in={invoice_id}", headers=headers)
+        assert filtered.status_code == 200
+        assert [row["title"] for row in filtered.json()["results"]] == ["June Invoice", "May Invoice"]
 
         filtered = client.get(f"/api/documents/?document_type__id__none={invoice_id}", headers=headers)
         assert filtered.status_code == 200
@@ -292,7 +354,7 @@ def test_paperless_mobile_document_filters_use_paperless_query_params(tmp_path) 
 
         filtered = client.get(f"/api/documents/?tags__id__all={finance_id}", headers=headers)
         assert filtered.status_code == 200
-        assert [row["title"] for row in filtered.json()["results"]] == ["May Invoice"]
+        assert [row["title"] for row in filtered.json()["results"]] == ["June Invoice", "May Invoice"]
 
         filtered = client.get(f"/api/documents/?tags__id__none={finance_id}", headers=headers)
         assert filtered.status_code == 200
@@ -300,7 +362,7 @@ def test_paperless_mobile_document_filters_use_paperless_query_params(tmp_path) 
 
         tagged = client.get("/api/documents/?is_tagged=1", headers=headers)
         assert tagged.status_code == 200
-        assert tagged.json()["count"] == 2
+        assert tagged.json()["count"] == 3
     finally:
         app.dependency_overrides.clear()
 

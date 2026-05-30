@@ -1003,9 +1003,8 @@ def _list_labels(
     repository: DocumentRepository,
     current_user: User,
 ) -> dict[str, Any]:
-    names = _taxonomy_names(repository, kind)
     stats = _stats_map(repository, current_user, kind)
-    rows = [_label_payload(kind, name, stats.get(name, 0)) for name in names]
+    rows = [_label_payload(kind, name, count) for name, count in stats.items()]
     start = (page - 1) * page_size
     return _paginated(
         request_path,
@@ -1019,6 +1018,9 @@ def _list_labels(
 
 def _get_label(kind: str, label_id: int, repository: DocumentRepository, current_user: User) -> dict[str, Any]:
     stats = _stats_map(repository, current_user, kind)
+    for name, count in stats.items():
+        if _taxonomy_id(kind, name) == label_id:
+            return _label_payload(kind, name, count)
     for name in _taxonomy_names(repository, kind):
         if _taxonomy_id(kind, name) == label_id:
             return _label_payload(kind, name, stats.get(name, 0))
