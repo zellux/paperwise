@@ -123,6 +123,12 @@ If the GHCR package is private, make it public in the GitHub package settings be
 
 Open Paperwise at [http://localhost:8080](http://localhost:8080).
 
+## Mobile app support
+
+Paperwise exposes a Paperless-compatible API for the open-source [Paperless Mobile](https://github.com/astubenbord/paperless-mobile) app. Point the mobile app at your Paperwise server URL and sign in with your Paperwise account to browse, search, filter, and upload documents.
+
+Compatibility currently targets the core mobile workflows rather than the complete Paperless-ngx API surface.
+
 ## Run From Source
 
 For local development after cloning the repo:
