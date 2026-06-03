@@ -1644,11 +1644,6 @@
   background: var(--accent-soft);
 }
 
-.docs-total-label,
-.page-indicator {
-  font-size: 0.76rem;
-}
-
 .inflight-strip {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 360px) 28px;
@@ -1764,6 +1759,108 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.doc-pagination {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 26px;
+  border-top: 1px solid var(--stroke-soft);
+  background: color-mix(in srgb, var(--bg-panel) 72%, transparent);
+}
+
+.pg-left {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pg-range,
+.pg-processing {
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  color: var(--ink-mute);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.pg-range b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.pg-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--stroke);
+  border-radius: 11px;
+  background: var(--paper-solid);
+  box-shadow: var(--shadow-sm);
+}
+
+.pg-pbtn {
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  border-radius: 7px;
+  color: var(--ink-soft);
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease;
+}
+
+.pg-pbtn:hover:not(:disabled) {
+  background: var(--row-hover);
+  color: var(--ink);
+}
+
+.pg-pbtn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.pg-pbtn .icon {
+  width: 15px;
+  height: 15px;
+}
+
+.pg-pcount {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 0 12px;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--ink-mute);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.pg-pcount b {
+  color: var(--accent);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.pg-pdiv {
+  color: var(--stroke);
+}
+
+.docs-total-label,
+.page-indicator {
+  font-size: 0.76rem;
 }
 
 .docs-list-toolbar {
@@ -2638,9 +2735,15 @@
 
   .docs-page-head,
   .docs-filter-bar,
-  .docs-list-toolbar {
+  .docs-list-toolbar,
+  .doc-pagination {
     padding-left: 16px;
     padding-right: 16px;
+  }
+
+  .doc-pagination {
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 
   .docs-page-head {

@@ -690,25 +690,50 @@ def documents_pagination_toolbar_html(
     normalized_page_size = max(1, int(page_size or 20))
     total_pages = max(1, (normalized_total + normalized_page_size - 1) // normalized_page_size)
     normalized_page = min(max(1, int(page or 1)), total_pages)
-    prev_disabled = " disabled" if normalized_page <= 1 else ""
-    next_disabled = " disabled" if normalized_page >= total_pages else ""
+    range_start = ((normalized_page - 1) * normalized_page_size + 1) if normalized_total > 0 else 0
+    range_end = min(normalized_total, normalized_page * normalized_page_size)
+    page_digits = max(2, len(str(total_pages)))
+    display_page = f"{normalized_page:0{page_digits}d}"
+    display_total_pages = f"{total_pages:0{page_digits}d}"
+    first_prev_disabled = " disabled" if normalized_page <= 1 else ""
+    next_last_disabled = " disabled" if normalized_page >= total_pages else ""
     processing_label = (
-        f'              <span id="docsProcessingLabel" class="docs-total-label">Processing: {normalized_processing_count:,}</span>\n'
+        f'              <span id="docsProcessingLabel" class="pg-processing">Processing: {normalized_processing_count:,}</span>\n'
         if normalized_processing_count > 0
         else ""
     )
     return (
-        '            <div class="docs-summary">\n'
-        f'              <span id="docsTotalLabel" class="docs-total-label">Total documents: {normalized_total:,}</span>\n'
+        '            <div class="pg-left">\n'
+        f'              <span class="pg-range"><b>{range_start:,}&ndash;{range_end:,}</b> of '
+        f'<b>{normalized_total:,}</b> documents</span>\n'
         f"{processing_label}"
         "            </div>\n"
-        '            <div class="pagination-controls">\n'
-        f'              <button id="pagePrevBtn" type="button" class="btn btn-muted" '
-        f'data-docs-page-action="prev"{prev_disabled}>Prev</button>\n'
-        f'              <span id="pageIndicator" class="page-indicator">Page {normalized_page} / {total_pages}</span>\n'
-        f'              <button id="pageNextBtn" type="button" class="btn btn-muted" '
-        f'data-docs-page-action="next"{next_disabled}>Next</button>\n'
-        "            </div>"
+        '            <nav class="pg-pill" aria-label="Pagination">\n'
+        f'              <button id="pageFirstBtn" type="button" class="pg-pbtn" '
+        f'data-docs-page-action="first" aria-label="First page" title="First page"{first_prev_disabled}>'
+        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg></button>\n'
+        f'              <button id="pagePrevBtn" type="button" class="pg-pbtn" '
+        f'data-docs-page-action="prev" aria-label="Previous page" title="Previous page"{first_prev_disabled}>'
+        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<polyline points="15 18 9 12 15 6"/></svg></button>\n'
+        '              <span class="pg-pcount" aria-label="Current page">\n'
+        f'                <b>{display_page}</b>\n'
+        f'                <span class="pg-pdiv">/</span><span id="pageIndicator">{display_total_pages}</span>\n'
+        '              </span>\n'
+        f'              <button id="pageNextBtn" type="button" class="pg-pbtn" '
+        f'data-docs-page-action="next" aria-label="Next page" title="Next page"{next_last_disabled}>'
+        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<polyline points="9 18 15 12 9 6"/></svg></button>\n'
+        f'              <button id="pageLastBtn" type="button" class="pg-pbtn" '
+        f'data-docs-page-action="last" aria-label="Last page" title="Last page"{next_last_disabled}>'
+        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
+        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        '<polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg></button>\n'
+        "            </nav>"
     )
 
 

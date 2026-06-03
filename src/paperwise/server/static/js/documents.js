@@ -93,6 +93,12 @@ export function resetDocumentListPage() {
   docsPage = 1;
 }
 
+function getDocumentsTotalPages() {
+  const total = Math.max(0, Number(docsTotalCount || 0));
+  const pageSize = Math.max(1, Number(appState.docsPageSize || 20));
+  return Math.max(1, Math.ceil(total / pageSize));
+}
+
 export function getSortStateForTable(tableName) {
   return tableName === "docs" ? docsSort : { field: "", direction: "" };
 }
@@ -1451,10 +1457,15 @@ function bindDocumentsEvents() {
     if (!(button instanceof HTMLButtonElement) || button.disabled) {
       return;
     }
+    const totalPages = getDocumentsTotalPages();
     if (button.dataset.docsPageAction === "prev") {
       docsPage = Math.max(1, docsPage - 1);
+    } else if (button.dataset.docsPageAction === "first") {
+      docsPage = 1;
     } else if (button.dataset.docsPageAction === "next") {
-      docsPage += 1;
+      docsPage = Math.min(totalPages, docsPage + 1);
+    } else if (button.dataset.docsPageAction === "last") {
+      docsPage = totalPages;
     } else {
       return;
     }

@@ -715,8 +715,8 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "await loadDocumentsList();" in documents_js.text
     assert 'import { stableTagColor } from "./ui/tagColor.js";' in documents_js.text
     assert "function getDocumentsTotalPages()" in documents_js.text
-    assert "function navigateToDocumentListPage(page)" in documents_js.text
-    assert 'closest("#pageJumpForm")' in documents_js.text
+    assert "function navigateToDocumentListPage(page)" not in documents_js.text
+    assert 'closest("#pageJumpForm")' not in documents_js.text
     assert 'button.dataset.docsPageAction === "last"' in documents_js.text
     assert "let filterQueryComposing = false" in documents_js.text
     assert 'filterQuery?.addEventListener("compositionstart"' in documents_js.text
@@ -1229,7 +1229,10 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
             "connection_id": "default-connection",
             "model": "gpt-4.1-mini",
         }
-        assert "Total documents: 2" in documents_html
+        assert '<span class="pg-range"><b>1&ndash;2</b> of <b>2</b> documents</span>' in documents_html
+        assert documents_html.index('class="docs-table-wrap doc-table"') < documents_html.index(
+            'id="documentsPaginationToolbar"'
+        )
         assert "Processing: 0" not in documents_html
         assert 'id="docsProcessingLabel"' not in documents_html
         assert 'class="inflight-strip"' not in documents_html
@@ -1367,12 +1370,16 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert paged_documents_payload["documents_page"] == 2
         assert paged_documents_payload["documents_page_size"] == 1
         assert paged_documents_payload["documents_total"] == 2
-        assert "Page 2 / 2" in paged_documents_html
+        assert '<span class="pg-pcount" aria-label="Current page">' in paged_documents_html
+        assert "<b>02</b>" in paged_documents_html
+        assert '<span class="pg-pdiv">/</span><span id="pageIndicator">02</span>' in paged_documents_html
 
         overlarge_page_html = client.get("/ui/documents?page_size=1&page=99").text
         overlarge_page_payload = _initial_data_from_response(overlarge_page_html)
         assert overlarge_page_payload["documents_page"] == 2
-        assert "Page 2 / 2" in overlarge_page_html
+        assert '<span class="pg-pcount" aria-label="Current page">' in overlarge_page_html
+        assert "<b>02</b>" in overlarge_page_html
+        assert '<span class="pg-pdiv">/</span><span id="pageIndicator">02</span>' in overlarge_page_html
 
         tags_payload = _initial_data_from_response(client.get("/ui/tags").text)
         assert tags_payload["tag_stats"] == [
@@ -1477,12 +1484,13 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert '<template data-partial-target="docsInflightRegion">' in documents_partial.text
         assert 'data-doc-id="' in documents_partial.text
         assert '<a class="row-act" href="/ui/document?id=' in documents_partial.text
-        assert "Total documents: 4" in documents_partial.text
+        assert '<span class="pg-range"><b>1&ndash;1</b> of <b>4</b> documents</span>' in documents_partial.text
         assert "Processing: 1" in documents_partial.text
-        assert '<form id="pageJumpForm" class="page-jump-form"' in documents_partial.text
-        assert '<input id="pageJumpInput" class="page-jump-input"' in documents_partial.text
-        assert 'min="1" max="4" value="1"' in documents_partial.text
-        assert '<span id="pageIndicator" class="page-indicator">/ 4</span>' in documents_partial.text
+        assert '<nav class="pg-pill" aria-label="Pagination">' in documents_partial.text
+        assert '<span class="pg-pcount" aria-label="Current page">' in documents_partial.text
+        assert "<b>01</b>" in documents_partial.text
+        assert 'id="pageJumpInput"' not in documents_partial.text
+        assert '<span class="pg-pdiv">/</span><span id="pageIndicator">04</span>' in documents_partial.text
         assert 'data-docs-page-action="first"' in documents_partial.text
         assert 'data-docs-page-action="prev"' in documents_partial.text
         assert 'data-docs-page-action="next"' in documents_partial.text
@@ -1491,8 +1499,8 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         overlarge_documents_partial = client.get("/ui/partials/documents?page_size=1&page=99")
         assert overlarge_documents_partial.status_code == 200
         assert 'data-documents-page="4"' in overlarge_documents_partial.text
-        assert 'min="1" max="4" value="4"' in overlarge_documents_partial.text
-        assert '<span id="pageIndicator" class="page-indicator">/ 4</span>' in overlarge_documents_partial.text
+        assert "<b>04</b>" in overlarge_documents_partial.text
+        assert '<span class="pg-pdiv">/</span><span id="pageIndicator">04</span>' in overlarge_documents_partial.text
 
         tags_partial = client.get("/ui/partials/tags?sort_by=tag&sort_dir=desc")
         assert tags_partial.status_code == 200
