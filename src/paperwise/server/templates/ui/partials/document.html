@@ -103,10 +103,15 @@
             <iframe
               id="detailEmbedPreview"
               class="document-file-preview document-embed-preview"
-              src="{% if document_detail_preview_kind == "image" or document_detail_preview_kind == "pdf" %}about:blank{% else %}{{ document_detail_preview_url|default("") }}{% endif %}"
+              src="{% if document_detail_preview_kind == "embed" %}{{ document_detail_preview_url|default("") }}{% else %}about:blank{% endif %}"
               title="Document preview"
-              {% if document_detail_preview_kind == "image" or document_detail_preview_kind == "pdf" %}hidden{% endif %}
+              {% if document_detail_preview_kind != "embed" %}hidden{% endif %}
             ></iframe>
+            <pre
+              id="detailTextPreview"
+              class="document-file-preview document-text-preview"
+              {% if document_detail_preview_kind != "text" %}hidden{% endif %}
+            >{{ document_detail_text.detailTextPreview|default("Extracted text will appear after processing completes.") }}</pre>
             <div
               id="detailPdfPreview"
               class="document-file-preview document-pdf-preview"

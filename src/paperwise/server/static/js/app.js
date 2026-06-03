@@ -522,6 +522,7 @@ export function applyDocumentDetailPartial(partialRoot) {
   const documentPreviewFrame = document.getElementById("documentPreviewFrame");
   const detailImagePreview = document.getElementById("detailImagePreview");
   const detailEmbedPreview = document.getElementById("detailEmbedPreview");
+  const detailTextPreview = document.getElementById("detailTextPreview");
   const detailPdfPreview = document.getElementById("detailPdfPreview");
   if (documentPreviewFrame instanceof HTMLElement) {
     documentPreviewFrame.dataset.previewKind = previewKind;
@@ -530,6 +531,7 @@ export function applyDocumentDetailPartial(partialRoot) {
       "document-preview-frame-image",
       "document-preview-frame-pdf",
       "document-preview-frame-embed",
+      "document-preview-frame-text",
     );
     documentPreviewFrame.classList.add(`document-preview-frame-${previewKind || "embed"}`);
   }
@@ -538,8 +540,11 @@ export function applyDocumentDetailPartial(partialRoot) {
     detailImagePreview.hidden = previewKind !== "image";
   }
   if (detailEmbedPreview instanceof HTMLIFrameElement) {
-    detailEmbedPreview.src = previewKind !== "image" && previewKind !== "pdf" ? previewUrl : "about:blank";
-    detailEmbedPreview.hidden = previewKind === "image" || previewKind === "pdf";
+    detailEmbedPreview.src = previewKind === "embed" ? previewUrl : "about:blank";
+    detailEmbedPreview.hidden = previewKind !== "embed";
+  }
+  if (detailTextPreview instanceof HTMLElement) {
+    detailTextPreview.hidden = previewKind !== "text";
   }
   if (detailPdfPreview instanceof HTMLElement) {
     detailPdfPreview.dataset.pdfUrl = previewKind === "pdf" ? previewUrl : "";

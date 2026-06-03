@@ -130,6 +130,9 @@ class ParseResultRepository(Protocol):
     def get_parse_result(self, document_id: str) -> ParseResult | None:
         """Load parse output by document ID."""
 
+    def delete_document_analysis_artifacts(self, document_id: str) -> None:
+        """Delete parse output, LLM metadata, and derived chunks for one document."""
+
     def save_llm_parse_result(self, result: LLMParseResult) -> None:
         """Persist LLM metadata parse output for a document."""
 

@@ -1,12 +1,14 @@
 from datetime import UTC, datetime
 import base64
 from html import unescape
+import json
 import logging
 from pathlib import Path
 import re
 import shutil
 import subprocess
 from tempfile import TemporaryDirectory
+from xml.etree import ElementTree
 from zipfile import BadZipFile, ZipFile
 
 from paperwise.application.interfaces import LLMProvider
@@ -43,6 +45,15 @@ SUPPORTED_IMAGE_MIME_TYPES_BY_SUFFIX = {
     ".webp": "image/webp",
 }
 SUPPORTED_IMAGE_MIME_TYPES = frozenset(SUPPORTED_IMAGE_MIME_TYPES_BY_SUFFIX.values())
+TEXT_DOCUMENT_SUFFIXES = frozenset({".doc", ".docx", ".markdown", ".md", ".txt"})
+TEXT_DOCUMENT_CONTENT_TYPES = frozenset(
+    {
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "text/markdown",
+        "text/plain",
+    }
+)
 
 
 def _normalize_content_type(value: str | None) -> str:
@@ -59,6 +70,36 @@ def _resolve_supported_image_mime_type(*, suffix: str, content_type: str | None)
 def _build_image_data_url(*, raw: bytes, mime_type: str) -> str:
     encoded = base64.b64encode(raw).decode("ascii")
     return f"data:{mime_type};base64,{encoded}"
+
+
+def _is_text_native_document(*, suffix: str, content_type: str | None) -> bool:
+    return suffix in TEXT_DOCUMENT_SUFFIXES or _normalize_content_type(content_type) in TEXT_DOCUMENT_CONTENT_TYPES
+
+
+def _decode_text_bytes(raw: bytes) -> str:
+    for encoding in ("utf-8-sig", "utf-16", "utf-16-le", "utf-16-be", "cp1252", "latin-1"):
+        try:
+            decoded = raw.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+        cleaned = decoded.replace("\x00", "").strip()
+        if cleaned:
+            return cleaned
+    return raw.decode("utf-8", errors="replace").replace("\x00", "").strip()
+
+
+def _extract_provider_ocr_text(value: str) -> str:
+    text = str(value or "").strip()
+    if not text.startswith("{"):
+        return text
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return text
+    ocr_text = parsed.get("ocr_text") if isinstance(parsed, dict) else None
+    if isinstance(ocr_text, str) and ocr_text.strip():
+        return ocr_text.strip()
+    return text
 
 
 def _extract_text_like_segments(raw: bytes, *, max_chars: int) -> str:
@@ -116,6 +157,78 @@ def _extract_pdf_text(
                 return _fit_preview_text(re.sub(r"\s+", " ", decoded), max_chars=max_chars), page_count
 
     return "", page_count
+
+
+def _extract_plain_text(raw: bytes, *, max_chars: int) -> str:
+    return _fit_preview_text(_decode_text_bytes(raw), max_chars=max_chars)
+
+
+def _extract_word_xml_text(xml: str) -> str:
+    try:
+        root = ElementTree.fromstring(xml)
+    except ElementTree.ParseError:
+        text = re.sub(r"</w:p>", "\n", xml)
+        text = re.sub(r"</w:tr>", "\n", text)
+        text = re.sub(r"<[^>]+>", "", text)
+        return unescape(text).replace("\x00", "").strip()
+
+    paragraphs: list[str] = []
+    for paragraph in root.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}p"):
+        parts: list[str] = []
+        for node in paragraph.iter():
+            tag = node.tag.rsplit("}", 1)[-1] if isinstance(node.tag, str) else ""
+            if tag == "t" and node.text:
+                parts.append(node.text)
+            elif tag == "tab":
+                parts.append("\t")
+            elif tag in {"br", "cr"}:
+                parts.append("\n")
+        line = "".join(parts).strip()
+        if line:
+            paragraphs.append(line)
+    return "\n".join(paragraphs).strip()
+
+
+def _extract_docx_text(*, blob_path: Path, raw: bytes, max_chars: int) -> tuple[str, int]:
+    try:
+        with ZipFile(blob_path) as zip_file:
+            xml = zip_file.read("word/document.xml").decode("utf-8", errors="ignore")
+        text_preview = _fit_preview_text(_extract_word_xml_text(xml), max_chars=max_chars)
+        page_count = max(1, text_preview.count("\n") // 30 + 1)
+        if text_preview:
+            return text_preview, page_count
+    except (KeyError, BadZipFile):
+        pass
+    return _fit_preview_text(_decode_text_bytes(raw), max_chars=400), 1
+
+
+def _extract_doc_text(*, blob_path: Path, raw: bytes, max_chars: int) -> str:
+    converter_commands: list[list[str]] = []
+    textutil = shutil.which("textutil")
+    if textutil is not None:
+        converter_commands.append([textutil, "-convert", "txt", "-stdout", str(blob_path)])
+    antiword = shutil.which("antiword")
+    if antiword is not None:
+        converter_commands.append([antiword, str(blob_path)])
+    catdoc = shutil.which("catdoc")
+    if catdoc is not None:
+        converter_commands.append([catdoc, str(blob_path)])
+
+    for command in converter_commands:
+        try:
+            proc = subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                timeout=20,
+            )
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            continue
+        extracted = _decode_text_bytes(proc.stdout)
+        if extracted:
+            return _fit_preview_text(extracted, max_chars=max_chars)
+
+    return _extract_text_like_segments(raw, max_chars=max_chars)
 
 
 def _pdf_page_count(blob_path: Path) -> int:
@@ -259,6 +372,10 @@ def parse_document_blob(
 
     is_pdf = raw.startswith(b"%PDF") or suffix == ".pdf"
     is_supported_image = supported_image_mime_type is not None
+    is_text_native_document = _is_text_native_document(
+        suffix=suffix,
+        content_type=normalized_content_type,
+    )
     if is_pdf:
         if normalized_ocr == "tesseract":
             page_count = raw.count(b"/Type /Page")
@@ -296,8 +413,8 @@ def parse_document_blob(
                 quality="high" if _is_high_quality_extracted_text(text_preview) else "low",
             )
             final_text_source = "pdf_text_extraction"
-    elif suffix in {".txt", ".md", ".markdown"}:
-        text_preview = raw[:4000].decode("utf-8", errors="replace").replace("\x00", "")
+    elif suffix in {".txt", ".md", ".markdown"} or normalized_content_type in {"text/markdown", "text/plain"}:
+        text_preview = _extract_plain_text(raw, max_chars=8000)
         page_count = max(1, text_preview.count("\n\n") + 1) if text_preview.strip() else 1
         _mark_ocr_attempt(
             ocr_details,
@@ -306,21 +423,14 @@ def parse_document_blob(
             succeeded=bool(text_preview.strip()),
             chars=len(text_preview),
             quality="direct_text",
+            selected=True,
         )
         final_text_source = "plain_text_read"
-    elif suffix == ".docx":
-        try:
-            with ZipFile(blob_path) as zip_file:
-                xml = zip_file.read("word/document.xml").decode("utf-8", errors="ignore")
-            text = re.sub(r"</w:p>", "\n", xml)
-            text = re.sub(r"<[^>]+>", "", text)
-            text_preview = unescape(text).replace("\x00", "").strip()
-            if not text_preview:
-                text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
-            page_count = max(1, text.count("\n") // 30 + 1)
-        except (KeyError, BadZipFile):
-            text_preview = raw[:200].decode("latin-1", errors="ignore").replace("\x00", "")
-            page_count = 1
+    elif (
+        suffix == ".docx"
+        or normalized_content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    ):
+        text_preview, page_count = _extract_docx_text(blob_path=blob_path, raw=raw, max_chars=8000)
         _mark_ocr_attempt(
             ocr_details,
             "text_extraction",
@@ -328,8 +438,22 @@ def parse_document_blob(
             succeeded=bool(text_preview.strip()),
             chars=len(text_preview),
             quality="direct_text",
+            selected=True,
         )
         final_text_source = "docx_text_read"
+    elif suffix == ".doc" or normalized_content_type == "application/msword":
+        text_preview = _extract_doc_text(blob_path=blob_path, raw=raw, max_chars=8000)
+        page_count = max(1, text_preview.count("\n") // 30 + 1) if text_preview.strip() else 1
+        _mark_ocr_attempt(
+            ocr_details,
+            "text_extraction",
+            attempted=True,
+            succeeded=bool(text_preview.strip()),
+            chars=len(text_preview),
+            quality="direct_text" if text_preview.strip() else "empty_direct_text",
+            selected=True,
+        )
+        final_text_source = "doc_text_read"
     elif is_supported_image:
         text_preview = _extract_text_like_segments(raw, max_chars=400)
         if normalized_ocr == "tesseract":
@@ -387,7 +511,7 @@ def parse_document_blob(
             final_text_source = "binary_text_preview"
         page_count = 1
 
-    if normalized_ocr in {"llm", "llm_separate"}:
+    if normalized_ocr in {"llm", "llm_separate"} and not is_text_native_document:
         extract_images_method = (
             getattr(llm_provider, "extract_ocr_text_from_images", None) if llm_provider is not None else None
         )
@@ -488,7 +612,7 @@ def parse_document_blob(
                     )
                     if not isinstance(ocr_text, str) or not ocr_text.strip():
                         raise RuntimeError("LLM OCR failed: provider returned empty OCR text.")
-                    text_preview = ocr_text.strip()
+                    text_preview = _extract_provider_ocr_text(ocr_text)
                     used_image_ocr = True
                     _mark_ocr_attempt(
                         ocr_details,
@@ -529,7 +653,7 @@ def parse_document_blob(
                     text_preview=text_preview,
                 )
                 if isinstance(ocr_text, str) and ocr_text.strip():
-                    text_preview = ocr_text.strip()
+                    text_preview = _extract_provider_ocr_text(ocr_text)
                     _mark_ocr_attempt(
                         ocr_details,
                         "llm_text",
@@ -554,7 +678,9 @@ def parse_document_blob(
                     raise RuntimeError(f"LLM OCR failed: {exc}") from exc
 
     parser_name = "stub-local"
-    if normalized_ocr == "llm":
+    if is_text_native_document:
+        parser_name = "direct-text-parser"
+    elif normalized_ocr == "llm":
         parser_name = "stub-llm-ocr"
     elif normalized_ocr == "llm_separate":
         parser_name = "stub-llm-ocr-separate"

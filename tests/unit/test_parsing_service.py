@@ -1,4 +1,5 @@
 from pathlib import Path
+from zipfile import ZipFile
 
 import pytest
 
@@ -208,6 +209,91 @@ def test_parse_document_blob_skips_llm_ocr_for_local_provider(tmp_path) -> None:
     assert result.parser == "stub-local"
 
 
+def test_parse_document_blob_text_file_skips_llm_ocr_when_configured(tmp_path) -> None:
+    blob = tmp_path / "notes.txt"
+    blob.write_text("Directly readable notes\nwith useful metadata.", encoding="utf-8")
+    llm = RecordingOCRLLM("")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="text/plain",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert llm.image_calls == 0
+    assert result.parser == "direct-text-parser"
+    assert "Directly readable notes" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["attempts"]["text_extraction"]["selected"] is True
+    assert result.ocr_details["attempts"]["llm_text"]["attempted"] is False
+    assert result.ocr_details["final_text_source"] == "plain_text_read"
+
+
+def test_parse_document_blob_docx_extracts_text_without_llm_ocr(tmp_path) -> None:
+    blob = tmp_path / "letter.docx"
+    with ZipFile(blob, "w") as zip_file:
+        zip_file.writestr(
+            "word/document.xml",
+            (
+                '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                "<w:body><w:p><w:r><w:t>Policy renewal notice</w:t></w:r></w:p>"
+                "<w:p><w:r><w:instrText>HYPERLINK &quot;https://example.com&quot;</w:instrText></w:r>"
+                "<w:r><w:t>Coverage starts June 1.</w:t></w:r></w:p></w:body></w:document>"
+            ),
+        )
+        zip_file.writestr(
+            "word/footer1.xml",
+            (
+                '<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                "<w:p><w:r><w:t>Page 1 of 2</w:t></w:r></w:p></w:ftr>"
+            ),
+        )
+    llm = RecordingOCRLLM("")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert "Policy renewal notice" in result.text_preview
+    assert "Coverage starts June 1." in result.text_preview
+    assert "HYPERLINK" not in result.text_preview
+    assert "Page 1 of 2" not in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "docx_text_read"
+
+
+def test_parse_document_blob_doc_uses_direct_binary_text_fallback(tmp_path, monkeypatch) -> None:
+    blob = tmp_path / "legacy.doc"
+    blob.write_bytes(b"\xd0\xcf\x11\xe0 Legacy Word content Amount due 42.00 USD")
+    llm = RecordingOCRLLM("")
+
+    monkeypatch.setattr(parsing_module.shutil, "which", lambda name: None)
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="application/msword",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert "Legacy Word content" in result.text_preview
+    assert "Amount due 42.00 USD" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "doc_text_read"
+
+
 def test_parse_document_blob_llm_mode_raises_when_no_readable_text(tmp_path) -> None:
     blob = tmp_path / "scan.pdf"
     blob.write_bytes(b"%PDF-1.7\n" + bytes([0, 159, 200, 10]) * 400)
@@ -241,7 +327,7 @@ def test_parse_document_blob_llm_timeout_falls_back_to_extracted_text(tmp_path) 
 def test_parse_document_blob_pdf_render_failure_uses_text_ocr_fallback(tmp_path, monkeypatch) -> None:
     blob = tmp_path / "sample.pdf"
     blob.write_bytes(b"%PDF-1.7\nReadable sample OCR text\n/Type /Page")
-    llm = RecordingOCRLLM("Text OCR fallback")
+    llm = RecordingOCRLLM('{"ocr_text": "Text OCR fallback"}')
 
     def fail_render(**kwargs):
         del kwargs

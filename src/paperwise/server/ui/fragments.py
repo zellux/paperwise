@@ -818,6 +818,14 @@ def _document_preview_kind(content_type: object, filename: object) -> str:
         return "image"
     if "pdf" in value or value.endswith(".pdf"):
         return "pdf"
+    if (
+        "text/plain" in value
+        or "text/markdown" in value
+        or "application/msword" in value
+        or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in value
+        or value.endswith((".doc", ".docx", ".markdown", ".md", ".txt"))
+    ):
+        return "text"
     return "embed"
 
 
@@ -895,7 +903,7 @@ def document_detail_fragments(initial_data: dict) -> dict:
     ocr_parsed_at = str(detail.get("ocr_parsed_at") or "-")
     file_meta = " · ".join(part for part in [content_type, size_label] if part and part != "-")
     file_url = f"/documents/{quote(document_id, safe='')}/file" if document_id else ""
-    preview_url = file_url
+    preview_url = "" if preview_kind == "text" else file_url
     return {
         "document_id": document_id,
         "document_label": title,
@@ -925,6 +933,7 @@ def document_detail_fragments(initial_data: dict) -> dict:
             "detailChecksum": str(document.get("checksum_sha256") or "-"),
             "detailBlobUri": _relative_blob_path(str(document.get("blob_uri") or "")),
             "detailOcrContent": ocr_preview or "-",
+            "detailTextPreview": ocr_preview or "Extracted text will appear after processing completes.",
             "previewCurrentPage": "1",
             "previewTotalPages": str(page_count),
         },
@@ -952,6 +961,7 @@ def document_detail_fragments(initial_data: dict) -> dict:
         "page_count": page_count,
         "page_thumbnails_html": _document_page_thumbnails_html(page_count),
         "preview_kind": preview_kind,
+        "preview_url": preview_url,
         "correspondent_initials": _initials(correspondent or title),
         "history_html": _history_html(history),
     }

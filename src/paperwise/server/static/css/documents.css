@@ -581,6 +581,20 @@
   min-height: 620px;
 }
 
+.document-text-preview {
+  width: 100%;
+  min-height: 620px;
+  max-height: min(78vh, 960px);
+  margin: 0;
+  overflow: auto;
+  padding: 28px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
 .document-pdf-preview {
   width: auto;
   min-height: 0;

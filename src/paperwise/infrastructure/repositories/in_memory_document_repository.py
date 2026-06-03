@@ -136,6 +136,12 @@ class InMemoryDocumentRepository(DocumentRepository):
         with self._lock:
             return self._parse_results.get(document_id)
 
+    def delete_document_analysis_artifacts(self, document_id: str) -> None:
+        with self._lock:
+            self._parse_results.pop(document_id, None)
+            self._llm_parse_results.pop(document_id, None)
+            self._document_chunks.pop(document_id, None)
+
     def save_llm_parse_result(self, result: LLMParseResult) -> None:
         with self._lock:
             normalized_tags: list[str] = []

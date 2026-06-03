@@ -1,6 +1,8 @@
+from sqlalchemy import select
+
 from paperwise.application.services.taxonomy import normalize_name, to_title_case
 from paperwise.domain.models import LLMParseResult, ParseResult
-from paperwise.infrastructure.repositories.postgres_models import LLMParseResultRow, ParseResultRow
+from paperwise.infrastructure.repositories.postgres_models import DocumentChunkRow, LLMParseResultRow, ParseResultRow
 
 
 def _normalize_tags(values: list[str]) -> list[str]:
@@ -61,6 +63,24 @@ class PostgresParseResultRepositoryMixin:
                 created_at=row.created_at,
                 ocr_details=None,
             )
+
+    def delete_document_analysis_artifacts(self, document_id: str) -> None:
+        with self._session_factory() as session:
+            parse_row = session.get(ParseResultRow, document_id)
+            if parse_row is not None:
+                session.delete(parse_row)
+
+            llm_row = session.get(LLMParseResultRow, document_id)
+            if llm_row is not None:
+                session.delete(llm_row)
+
+            chunk_rows = session.scalars(
+                select(DocumentChunkRow).where(DocumentChunkRow.document_id == document_id)
+            ).all()
+            for row in chunk_rows:
+                session.delete(row)
+
+            session.commit()
 
     def save_llm_parse_result(self, result: LLMParseResult) -> None:
         with self._session_factory() as session:

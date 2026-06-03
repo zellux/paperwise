@@ -503,6 +503,7 @@ def reprocess_document_endpoint(
     )
 
     previous_status = document.status.value
+    repository.delete_document_analysis_artifacts(document.id)
     _set_document_status(
         document=document,
         repository=repository,

@@ -94,6 +94,36 @@ def test_document_detail_preview_uses_image_natural_ratio_for_images() -> None:
     assert fragments["preview_url"] == "/documents/image-doc/file"
 
 
+def test_document_detail_preview_uses_extracted_text_for_docx() -> None:
+    fragments = document_detail_fragments(
+        {
+            "document_detail": {
+                "document": {
+                    "id": "docx-doc",
+                    "filename": "letter.docx",
+                    "owner_id": "user-docx",
+                    "blob_uri": "local://letter.docx",
+                    "checksum_sha256": "b" * 64,
+                    "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "size_bytes": 456,
+                    "status": "ready",
+                    "created_at": "2026-05-12T00:00:00Z",
+                    "page_count": 1,
+                },
+                "llm_metadata": None,
+                "ocr_text_preview": "Extracted DOCX text",
+                "ocr_parsed_at": None,
+            },
+            "document_history": [],
+        }
+    )
+
+    assert fragments["preview_kind"] == "text"
+    assert fragments["preview_url"] == ""
+    assert fragments["file_url"] == "/documents/docx-doc/file"
+    assert fragments["text"]["detailTextPreview"] == "Extracted DOCX text"
+
+
 def test_document_sidebar_lists_collapse_after_ten() -> None:
     tags_html = document_sidebar_tags_html(
         [{"tag": f"Tag {index:02d}", "document_count": index} for index in range(1, 13)]

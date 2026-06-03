@@ -726,7 +726,7 @@ def test_upload_and_parse_text_document() -> None:
         parse_response = client.post(f"/documents/{doc_id}/parse")
         assert parse_response.status_code == 200
         payload = parse_response.json()
-        assert payload["parser"] == "stub-llm-ocr"
+        assert payload["parser"] == "direct-text-parser"
         assert "PPMG Pediatrics" in payload["text_preview"]
     finally:
         app.dependency_overrides.clear()
@@ -760,7 +760,7 @@ def test_upload_and_parse_docx_document() -> None:
         parse_response = client.post(f"/documents/{doc_id}/parse")
         assert parse_response.status_code == 200
         payload = parse_response.json()
-        assert payload["parser"] == "stub-llm-ocr"
+        assert payload["parser"] == "direct-text-parser"
         assert "PPMG Pediatrics annual visit" in payload["text_preview"]
     finally:
         app.dependency_overrides.clear()
@@ -1272,6 +1272,24 @@ def test_reprocess_document_requeues_and_sets_processing() -> None:
         llm_response = client.post(f"/documents/{doc_id}/llm-parse")
         assert llm_response.status_code == 200
         assert client.get(f"/documents/{doc_id}").json()["status"] == "ready"
+        repository.replace_document_chunks(
+            document_id=doc_id,
+            owner_id=TEST_USER.id,
+            chunks=[
+                DocumentChunk(
+                    id="chunk-reprocess-1",
+                    document_id=doc_id,
+                    owner_id=TEST_USER.id,
+                    chunk_index=0,
+                    content="stale parse text",
+                    token_count=3,
+                    created_at=datetime.now(UTC),
+                )
+            ],
+        )
+        assert repository.get_parse_result(doc_id) is not None
+        assert repository.get_llm_parse_result(doc_id) is not None
+        assert repository.list_document_chunks(doc_id)
 
         reprocess_response = client.post(f"/documents/{doc_id}/reprocess")
         assert reprocess_response.status_code == 200
@@ -1280,6 +1298,9 @@ def test_reprocess_document_requeues_and_sets_processing() -> None:
         assert payload["status"] == "processing"
         assert payload["job_id"] == "job-test-1"
         assert dispatcher.enqueued.count(doc_id) == 2
+        assert repository.get_parse_result(doc_id) is None
+        assert repository.get_llm_parse_result(doc_id) is None
+        assert repository.list_document_chunks(doc_id) == []
 
         history_response = client.get(f"/documents/{doc_id}/history")
         assert history_response.status_code == 200
