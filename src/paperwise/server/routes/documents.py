@@ -164,7 +164,10 @@ def create_document_endpoint(
     if not is_supported_upload(filename=filename, content_type=normalized_content_type):
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
-            detail="Unsupported upload type. Use PDF, TXT, MD, DOC, DOCX, PNG, JPG, WEBP, or GIF.",
+            detail=(
+                "Unsupported upload type. Use PDF, TXT, MD, DOC, DOCX, PPT, PPTX, XLS, XLSX, "
+                "CSV, TSV, RTF, ODT, ODS, ODP, PNG, JPG, WEBP, GIF, or TIFF."
+            ),
         )
     content = file.file.read()
     checksum = sha256(content).hexdigest()

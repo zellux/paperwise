@@ -7,6 +7,39 @@ from paperwise.application.services import parsing as parsing_module
 from paperwise.application.services.parsing import parse_document_blob
 
 
+def _write_xlsx_fixture(path: Path) -> None:
+    with ZipFile(path, "w") as zip_file:
+        zip_file.writestr(
+            "xl/sharedStrings.xml",
+            (
+                '<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                "<si><t>Invoice</t></si><si><t>Amount</t></si><si><t>Paid</t></si>"
+                "<si><t>PW-100</t></si></sst>"
+            ),
+        )
+        zip_file.writestr(
+            "xl/worksheets/sheet1.xml",
+            (
+                '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                '<sheetData><row><c t="s"><v>0</v></c><c t="s"><v>1</v></c></row>'
+                '<row><c t="s"><v>3</v></c><c><v>42.50</v></c></row></sheetData></worksheet>'
+            ),
+        )
+        zip_file.writestr(
+            "xl/worksheets/sheet2.xml",
+            (
+                '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+                '<sheetData><row><c t="inlineStr"><is><t>Status</t></is></c><c t="s"><v>2</v></c></row>'
+                "</sheetData></worksheet>"
+            ),
+        )
+
+
+def _write_open_document_fixture(path: Path, content_xml: str) -> None:
+    with ZipFile(path, "w") as zip_file:
+        zip_file.writestr("content.xml", content_xml)
+
+
 class RecordingOCRLLM:
     def __init__(self, ocr_text: str) -> None:
         self.ocr_text = ocr_text
@@ -352,6 +385,234 @@ def test_parse_document_blob_doc_uses_direct_binary_text_fallback(tmp_path, monk
     assert result.page_count == 1
     assert result.ocr_details is not None
     assert result.ocr_details["final_text_source"] == "doc_text_read"
+
+
+def test_parse_document_blob_csv_extracts_rows_without_llm_ocr(tmp_path) -> None:
+    blob = tmp_path / "ledger.csv"
+    blob.write_text('Name,Amount,Note\n"Paperwise, Inc.",19.95,"CSV cell"\n', encoding="utf-8")
+    llm = RecordingOCRLLM("")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="text/csv",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert "Name\tAmount\tNote" in result.text_preview
+    assert "Paperwise, Inc.\t19.95\tCSV cell" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "delimited_text_read"
+
+
+def test_parse_document_blob_tsv_extracts_rows_without_llm_ocr(tmp_path) -> None:
+    blob = tmp_path / "ledger.tsv"
+    blob.write_text("Name\tAmount\nPaperwise\t24.00\n", encoding="utf-8")
+    llm = RecordingOCRLLM("")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="text/tab-separated-values",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert "Name\tAmount" in result.text_preview
+    assert "Paperwise\t24.00" in result.text_preview
+
+
+def test_parse_document_blob_xlsx_extracts_sheet_cell_text_without_llm_ocr(tmp_path) -> None:
+    blob = tmp_path / "ledger.xlsx"
+    _write_xlsx_fixture(blob)
+    llm = RecordingOCRLLM("")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert result.page_count == 2
+    assert "Sheet 1" in result.text_preview
+    assert "Invoice\tAmount" in result.text_preview
+    assert "PW-100\t42.50" in result.text_preview
+    assert "Status\tPaid" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "xlsx_text_read"
+
+
+def test_parse_document_blob_xls_uses_direct_binary_text_fallback(tmp_path, monkeypatch) -> None:
+    blob = tmp_path / "legacy.xls"
+    blob.write_bytes(b"\xd0\xcf\x11\xe0 Legacy Excel workbook Revenue total 123.45")
+    llm = RecordingOCRLLM("")
+
+    monkeypatch.setattr(parsing_module.shutil, "which", lambda name: None)
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="application/vnd.ms-excel",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert "Legacy Excel workbook" in result.text_preview
+    assert "Revenue total 123.45" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "xls_text_read"
+
+
+def test_parse_document_blob_rtf_extracts_plain_text_without_llm_ocr(tmp_path) -> None:
+    blob = tmp_path / "memo.rtf"
+    blob.write_text(r"{\rtf1\ansi Policy memo\par Renewal amount \b 42\b0 \par}", encoding="utf-8")
+    llm = RecordingOCRLLM("")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="application/rtf",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert "Policy memo" in result.text_preview
+    assert "Renewal amount 42" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "rtf_text_read"
+
+
+def test_parse_document_blob_open_document_text_extracts_content(tmp_path) -> None:
+    blob = tmp_path / "letter.odt"
+    _write_open_document_fixture(
+        blob,
+        (
+            '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+            'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">'
+            "<office:body><office:text><text:h>Policy packet</text:h>"
+            "<text:p>OpenDocument text body</text:p></office:text></office:body></office:document-content>"
+        ),
+    )
+    llm = RecordingOCRLLM("")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="application/vnd.oasis.opendocument.text",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert "Policy packet" in result.text_preview
+    assert "OpenDocument text body" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "odt_text_read"
+
+
+def test_parse_document_blob_open_document_spreadsheet_extracts_cells(tmp_path) -> None:
+    blob = tmp_path / "sheet.ods"
+    _write_open_document_fixture(
+        blob,
+        (
+            '<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+            'xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" '
+            'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">'
+            '<office:body><office:spreadsheet><table:table table:name="Budget">'
+            "<table:table-row><table:table-cell><text:p>Category</text:p></table:table-cell>"
+            "<table:table-cell><text:p>Total</text:p></table:table-cell></table:table-row>"
+            "<table:table-row><table:table-cell><text:p>Supplies</text:p></table:table-cell>"
+            "<table:table-cell><text:p>88.00</text:p></table:table-cell></table:table-row>"
+            "</table:table></office:spreadsheet></office:body></office:document-content>"
+        ),
+    )
+    llm = RecordingOCRLLM("")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="application/vnd.oasis.opendocument.spreadsheet",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert result.page_count == 1
+    assert "Budget" in result.text_preview
+    assert "Category\tTotal" in result.text_preview
+    assert "Supplies\t88.00" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "ods_text_read"
+
+
+def test_parse_document_blob_open_document_presentation_extracts_slide_text(tmp_path) -> None:
+    blob = tmp_path / "deck.odp"
+    _write_open_document_fixture(
+        blob,
+        (
+            '<office:document-content xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" '
+            'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" '
+            'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">'
+            "<office:body><office:presentation><draw:page><text:p>First ODP slide</text:p></draw:page>"
+            "<draw:page><text:p>Second ODP slide</text:p></draw:page></office:presentation></office:body>"
+            "</office:document-content>"
+        ),
+    )
+    llm = RecordingOCRLLM("")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="application/vnd.oasis.opendocument.presentation",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert result.page_count == 2
+    assert "First ODP slide" in result.text_preview
+    assert "Second ODP slide" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "odp_text_read"
+
+
+def test_parse_document_blob_ppt_uses_direct_binary_text_fallback(tmp_path, monkeypatch) -> None:
+    blob = tmp_path / "legacy.ppt"
+    blob.write_bytes(b"\xd0\xcf\x11\xe0 Legacy PowerPoint deck Slide title Roadmap")
+    llm = RecordingOCRLLM("")
+
+    monkeypatch.setattr(parsing_module.shutil, "which", lambda name: None)
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="application/vnd.ms-powerpoint",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert result.parser == "direct-text-parser"
+    assert "Legacy PowerPoint deck" in result.text_preview
+    assert "Slide title Roadmap" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "ppt_text_read"
 
 
 def test_parse_document_blob_llm_mode_raises_when_no_readable_text(tmp_path) -> None:

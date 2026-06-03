@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 import base64
+import csv
 from html import unescape
+import io
 import json
 import logging
 from pathlib import Path
@@ -48,14 +50,36 @@ SUPPORTED_IMAGE_MIME_TYPES_BY_SUFFIX = {
 }
 SUPPORTED_IMAGE_MIME_TYPES = frozenset(SUPPORTED_IMAGE_MIME_TYPES_BY_SUFFIX.values())
 PPTX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-TEXT_DOCUMENT_SUFFIXES = frozenset({".doc", ".docx", ".markdown", ".md", ".pptx", ".txt"})
+DIRECT_TEXT_CONTENT_TYPES_BY_SUFFIX = {
+    ".csv": "text/csv",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".odp": "application/vnd.oasis.opendocument.presentation",
+    ".ods": "application/vnd.oasis.opendocument.spreadsheet",
+    ".odt": "application/vnd.oasis.opendocument.text",
+    ".ppt": "application/vnd.ms-powerpoint",
+    ".pptx": PPTX_CONTENT_TYPE,
+    ".rtf": "application/rtf",
+    ".tsv": "text/tab-separated-values",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+TEXT_DOCUMENT_SUFFIXES = frozenset(
+    {".markdown", ".md", ".txt", *DIRECT_TEXT_CONTENT_TYPES_BY_SUFFIX.keys()}
+)
 TEXT_DOCUMENT_CONTENT_TYPES = frozenset(
     {
-        "application/msword",
-        PPTX_CONTENT_TYPE,
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        *DIRECT_TEXT_CONTENT_TYPES_BY_SUFFIX.values(),
+        "application/vnd.oasis.opendocument.graphics",
+        "application/vnd.oasis.opendocument.graphics-template",
+        "application/vnd.oasis.opendocument.presentation-template",
+        "application/vnd.oasis.opendocument.spreadsheet-template",
+        "application/vnd.oasis.opendocument.text-template",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/x-rtf",
         "text/markdown",
         "text/plain",
+        "text/rtf",
     }
 )
 
@@ -167,6 +191,50 @@ def _extract_plain_text(raw: bytes, *, max_chars: int) -> str:
     return _fit_preview_text(_decode_text_bytes(raw), max_chars=max_chars)
 
 
+def _extract_delimited_text(raw: bytes, *, delimiter: str, max_chars: int) -> str:
+    decoded = _decode_text_bytes(raw)
+    reader = csv.reader(io.StringIO(decoded), delimiter=delimiter)
+    rows: list[str] = []
+    try:
+        for row in reader:
+            cleaned = [cell.strip() for cell in row]
+            if any(cleaned):
+                rows.append("\t".join(cleaned))
+    except csv.Error:
+        return _fit_preview_text(decoded, max_chars=max_chars)
+    return _fit_preview_text("\n".join(rows), max_chars=max_chars)
+
+
+def _xml_local_name(tag: object) -> str:
+    if not isinstance(tag, str):
+        return ""
+    return tag.rsplit("}", 1)[-1]
+
+
+def _extract_xml_text_runs(xml: str, *, text_tags: set[str] | None = None) -> str:
+    try:
+        root = ElementTree.fromstring(xml)
+    except ElementTree.ParseError:
+        text = re.sub(r"<[^>]+>", "\n", xml)
+        return "\n".join(part.strip() for part in unescape(text).splitlines() if part.strip())
+
+    parts: list[str] = []
+    wanted = text_tags or {"t"}
+    for node in root.iter():
+        if _xml_local_name(node.tag) in wanted and node.text:
+            text = node.text.strip()
+            if text:
+                parts.append(text)
+    return "\n".join(parts).strip()
+
+
+def _numeric_path_sort_key(name: str) -> tuple[int, str]:
+    match = re.search(r"(\d+)\.xml$", name)
+    if match:
+        return int(match.group(1)), name
+    return 0, name
+
+
 def _extract_word_xml_text(xml: str) -> str:
     try:
         root = ElementTree.fromstring(xml)
@@ -203,6 +271,140 @@ def _extract_docx_text(*, blob_path: Path, raw: bytes, max_chars: int) -> tuple[
     except (KeyError, BadZipFile):
         pass
     return _fit_preview_text(_decode_text_bytes(raw), max_chars=400), 1
+
+
+def _extract_rtf_text(raw: bytes, *, max_chars: int) -> str:
+    source = _decode_text_bytes(raw)
+    source = re.sub(
+        r"\\'([0-9a-fA-F]{2})",
+        lambda match: bytes.fromhex(match.group(1)).decode("cp1252", errors="replace"),
+        source,
+    )
+    source = re.sub(
+        r"\\u(-?\d+)\??",
+        lambda match: chr(int(match.group(1)) % 65536),
+        source,
+    )
+    source = re.sub(r"\\(?:par|line)\b ?", "\n", source)
+    source = re.sub(r"\\tab\b ?", "\t", source)
+    source = re.sub(r"\\[a-zA-Z]+\d* ?|\\.", "", source)
+    source = source.replace("{", "").replace("}", "")
+    return _fit_preview_text("\n".join(line.strip() for line in source.splitlines() if line.strip()), max_chars=max_chars)
+
+
+def _extract_shared_string_text(node: ElementTree.Element) -> str:
+    parts: list[str] = []
+    for child in node.iter():
+        if _xml_local_name(child.tag) == "t" and child.text:
+            parts.append(child.text)
+    return "".join(parts).strip()
+
+
+def _extract_xlsx_text(*, blob_path: Path, raw: bytes, max_chars: int) -> tuple[str, int]:
+    try:
+        with ZipFile(blob_path) as zip_file:
+            shared_strings: list[str] = []
+            try:
+                shared_root = ElementTree.fromstring(zip_file.read("xl/sharedStrings.xml"))
+                shared_strings = [_extract_shared_string_text(node) for node in shared_root if _xml_local_name(node.tag) == "si"]
+            except (KeyError, ElementTree.ParseError):
+                shared_strings = []
+
+            sheet_names = sorted(
+                (name for name in zip_file.namelist() if re.match(r"^xl/worksheets/sheet\d+\.xml$", name)),
+                key=_numeric_path_sort_key,
+            )
+            sheets: list[str] = []
+            for index, sheet_name in enumerate(sheet_names, start=1):
+                try:
+                    root = ElementTree.fromstring(zip_file.read(sheet_name))
+                except ElementTree.ParseError:
+                    continue
+                lines = [f"Sheet {index}"]
+                for row in root.iter():
+                    if _xml_local_name(row.tag) != "row":
+                        continue
+                    cells: list[str] = []
+                    for cell in row:
+                        if _xml_local_name(cell.tag) != "c":
+                            continue
+                        cell_type = cell.attrib.get("t", "")
+                        value = ""
+                        if cell_type == "inlineStr":
+                            value = _extract_shared_string_text(cell)
+                        else:
+                            value_node = next((child for child in cell if _xml_local_name(child.tag) == "v"), None)
+                            if value_node is not None and value_node.text is not None:
+                                value = value_node.text.strip()
+                                if cell_type == "s":
+                                    try:
+                                        value = shared_strings[int(value)]
+                                    except (IndexError, ValueError):
+                                        pass
+                        if value:
+                            cells.append(value)
+                    if cells:
+                        lines.append("\t".join(cells))
+                if len(lines) > 1:
+                    sheets.append("\n".join(lines))
+            text_preview = _fit_preview_text("\n\n".join(sheets), max_chars=max_chars)
+            if text_preview:
+                return text_preview, max(1, len(sheet_names))
+    except BadZipFile:
+        pass
+    return _extract_text_like_segments(raw, max_chars=max_chars), 1
+
+
+def _extract_open_document_text(*, blob_path: Path, raw: bytes, max_chars: int) -> tuple[str, int]:
+    try:
+        with ZipFile(blob_path) as zip_file:
+            xml = zip_file.read("content.xml").decode("utf-8", errors="ignore")
+    except (BadZipFile, KeyError):
+        return _extract_text_like_segments(raw, max_chars=max_chars), 1
+
+    try:
+        root = ElementTree.fromstring(xml)
+    except ElementTree.ParseError:
+        return _fit_preview_text(_extract_xml_text_runs(xml, text_tags={"p", "h"}), max_chars=max_chars), 1
+
+    suffix = blob_path.suffix.lower()
+    page_count = 1
+    blocks: list[str] = []
+
+    if suffix == ".ods":
+        tables = [node for node in root.iter() if _xml_local_name(node.tag) == "table"]
+        page_count = max(1, len(tables))
+        for index, table in enumerate(tables, start=1):
+            lines = [table.attrib.get("{urn:oasis:names:tc:opendocument:xmlns:table:1.0}name", f"Sheet {index}")]
+            for row in table:
+                if _xml_local_name(row.tag) != "table-row":
+                    continue
+                cells: list[str] = []
+                for cell in row:
+                    if _xml_local_name(cell.tag) not in {"table-cell", "covered-table-cell"}:
+                        continue
+                    text = " ".join(
+                        paragraph.text.strip()
+                        for paragraph in cell.iter()
+                        if _xml_local_name(paragraph.tag) in {"p", "h"} and paragraph.text and paragraph.text.strip()
+                    )
+                    if text:
+                        cells.append(text)
+                if cells:
+                    lines.append("\t".join(cells))
+            if len(lines) > 1:
+                blocks.append("\n".join(lines))
+    else:
+        if suffix == ".odp":
+            page_count = max(1, sum(1 for node in root.iter() if _xml_local_name(node.tag) == "page"))
+        for node in root.iter():
+            if _xml_local_name(node.tag) not in {"p", "h"}:
+                continue
+            text = "".join(node.itertext()).strip()
+            if text:
+                blocks.append(text)
+
+    return _fit_preview_text("\n".join(blocks), max_chars=max_chars), page_count
 
 
 def _extract_presentation_slide_text(xml: str) -> str:
@@ -266,6 +468,39 @@ def _extract_doc_text(*, blob_path: Path, raw: bytes, max_chars: int) -> str:
     catdoc = shutil.which("catdoc")
     if catdoc is not None:
         converter_commands.append([catdoc, str(blob_path)])
+
+    for command in converter_commands:
+        try:
+            proc = subprocess.run(
+                command,
+                check=True,
+                capture_output=True,
+                timeout=20,
+            )
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            continue
+        extracted = _decode_text_bytes(proc.stdout)
+        if extracted:
+            return _fit_preview_text(extracted, max_chars=max_chars)
+
+    return _extract_text_like_segments(raw, max_chars=max_chars)
+
+
+def _extract_legacy_office_text(
+    *,
+    blob_path: Path,
+    raw: bytes,
+    command_names: tuple[str, ...],
+    max_chars: int,
+) -> str:
+    converter_commands: list[list[str]] = []
+    textutil = shutil.which("textutil")
+    if textutil is not None:
+        converter_commands.append([textutil, "-convert", "txt", "-stdout", str(blob_path)])
+    for command_name in command_names:
+        command_path = shutil.which(command_name)
+        if command_path is not None:
+            converter_commands.append([command_path, str(blob_path)])
 
     for command in converter_commands:
         try:
@@ -477,6 +712,20 @@ def parse_document_blob(
             selected=True,
         )
         final_text_source = "plain_text_read"
+    elif suffix in {".csv", ".tsv"} or normalized_content_type in {"text/csv", "text/tab-separated-values"}:
+        delimiter = "\t" if suffix == ".tsv" or normalized_content_type == "text/tab-separated-values" else ","
+        text_preview = _extract_delimited_text(raw, delimiter=delimiter, max_chars=8000)
+        page_count = 1
+        _mark_ocr_attempt(
+            ocr_details,
+            "text_extraction",
+            attempted=True,
+            succeeded=bool(text_preview.strip()),
+            chars=len(text_preview),
+            quality="direct_text",
+            selected=True,
+        )
+        final_text_source = "delimited_text_read"
     elif (
         suffix == ".docx"
         or normalized_content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -492,6 +741,21 @@ def parse_document_blob(
             selected=True,
         )
         final_text_source = "docx_text_read"
+    elif (
+        suffix == ".xlsx"
+        or normalized_content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    ):
+        text_preview, page_count = _extract_xlsx_text(blob_path=blob_path, raw=raw, max_chars=8000)
+        _mark_ocr_attempt(
+            ocr_details,
+            "text_extraction",
+            attempted=True,
+            succeeded=bool(text_preview.strip()),
+            chars=len(text_preview),
+            quality="direct_text" if text_preview.strip() else "empty_direct_text",
+            selected=True,
+        )
+        final_text_source = "xlsx_text_read"
     elif suffix == ".pptx" or normalized_content_type == PPTX_CONTENT_TYPE:
         text_preview, page_count = _extract_pptx_text(blob_path=blob_path, raw=raw, max_chars=8000)
         _mark_ocr_attempt(
@@ -504,6 +768,35 @@ def parse_document_blob(
             selected=True,
         )
         final_text_source = "pptx_text_read"
+    elif suffix in {".odt", ".ods", ".odp"} or normalized_content_type in {
+        "application/vnd.oasis.opendocument.presentation",
+        "application/vnd.oasis.opendocument.spreadsheet",
+        "application/vnd.oasis.opendocument.text",
+    }:
+        text_preview, page_count = _extract_open_document_text(blob_path=blob_path, raw=raw, max_chars=8000)
+        _mark_ocr_attempt(
+            ocr_details,
+            "text_extraction",
+            attempted=True,
+            succeeded=bool(text_preview.strip()),
+            chars=len(text_preview),
+            quality="direct_text" if text_preview.strip() else "empty_direct_text",
+            selected=True,
+        )
+        final_text_source = f"{suffix.lstrip('.') or 'opendocument'}_text_read"
+    elif suffix == ".rtf" or normalized_content_type in {"application/rtf", "application/x-rtf", "text/rtf"}:
+        text_preview = _extract_rtf_text(raw, max_chars=8000)
+        page_count = 1
+        _mark_ocr_attempt(
+            ocr_details,
+            "text_extraction",
+            attempted=True,
+            succeeded=bool(text_preview.strip()),
+            chars=len(text_preview),
+            quality="direct_text" if text_preview.strip() else "empty_direct_text",
+            selected=True,
+        )
+        final_text_source = "rtf_text_read"
     elif suffix == ".doc" or normalized_content_type == "application/msword":
         text_preview = _extract_doc_text(blob_path=blob_path, raw=raw, max_chars=8000)
         page_count = 1
@@ -517,6 +810,42 @@ def parse_document_blob(
             selected=True,
         )
         final_text_source = "doc_text_read"
+    elif suffix == ".xls" or normalized_content_type == "application/vnd.ms-excel":
+        text_preview = _extract_legacy_office_text(
+            blob_path=blob_path,
+            raw=raw,
+            command_names=("xls2csv",),
+            max_chars=8000,
+        )
+        page_count = 1
+        _mark_ocr_attempt(
+            ocr_details,
+            "text_extraction",
+            attempted=True,
+            succeeded=bool(text_preview.strip()),
+            chars=len(text_preview),
+            quality="direct_text" if text_preview.strip() else "empty_direct_text",
+            selected=True,
+        )
+        final_text_source = "xls_text_read"
+    elif suffix == ".ppt" or normalized_content_type == "application/vnd.ms-powerpoint":
+        text_preview = _extract_legacy_office_text(
+            blob_path=blob_path,
+            raw=raw,
+            command_names=("catppt",),
+            max_chars=8000,
+        )
+        page_count = 1
+        _mark_ocr_attempt(
+            ocr_details,
+            "text_extraction",
+            attempted=True,
+            succeeded=bool(text_preview.strip()),
+            chars=len(text_preview),
+            quality="direct_text" if text_preview.strip() else "empty_direct_text",
+            selected=True,
+        )
+        final_text_source = "ppt_text_read"
     elif is_supported_image:
         text_preview = _extract_text_like_segments(raw, max_chars=400)
         if normalized_ocr == "tesseract":

@@ -911,11 +911,18 @@ def test_upload_ui_includes_batch_progress_shell() -> None:
     assert 'id="uploadProgressBar"' in response.text
     assert 'id="uploadProgressStatus"' in response.text
     assert ".pptx" in response.text
+    assert ".xlsx" in response.text
+    assert ".csv" in response.text
+    assert ".odt" in response.text
     assert "application/vnd.openxmlformats-officedocument.presentationml.presentation" in response.text
+    assert "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" in response.text
+    assert "application/vnd.oasis.opendocument.text" in response.text
     assert "PPTX" in response.text
+    assert "XLS/XLSX" in response.text
+    assert "CSV/TSV" in response.text
     assert ".tif,.tiff" in response.text
     assert "image/tiff" in response.text
-    assert "TIFF" in response.text
+    assert "images" in response.text
 
 
 def test_search_ui_does_not_include_upload_shell() -> None:
@@ -952,7 +959,12 @@ def test_static_assets_serve_upload_progress_ui() -> None:
     assert upload_js.status_code == 200
     assert "showUploadProgress" in upload_js.text
     assert '".pptx"' in upload_js.text
+    assert '".xlsx"' in upload_js.text
+    assert '".csv"' in upload_js.text
+    assert '".odt"' in upload_js.text
     assert '"application/vnd.openxmlformats-officedocument.presentationml.presentation"' in upload_js.text
+    assert '"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"' in upload_js.text
+    assert '"application/vnd.oasis.opendocument.text"' in upload_js.text
     assert '".tiff"' in upload_js.text
     assert '"image/tiff"' in upload_js.text
 

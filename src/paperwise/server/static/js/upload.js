@@ -26,7 +26,7 @@ function getUploadElements() {
   };
 }
 
-const SUPPORTED_UPLOAD_LABEL = "Supports: PDF, TXT, MD, DOCX, DOC, PPTX, PNG, JPG, WEBP, GIF, TIFF";
+const SUPPORTED_UPLOAD_LABEL = "Supports: PDF, TXT, MD, DOC/DOCX, PPT/PPTX, XLS/XLSX, CSV/TSV, RTF, ODT/ODS/ODP, images";
 const SUPPORTED_UPLOAD_EXTENSIONS = new Set([
   ".pdf",
   ".txt",
@@ -34,7 +34,16 @@ const SUPPORTED_UPLOAD_EXTENSIONS = new Set([
   ".markdown",
   ".doc",
   ".docx",
+  ".csv",
+  ".odp",
+  ".ods",
+  ".odt",
+  ".ppt",
   ".pptx",
+  ".rtf",
+  ".tsv",
+  ".xls",
+  ".xlsx",
   ".png",
   ".jpg",
   ".jpeg",
@@ -47,15 +56,26 @@ const SUPPORTED_UPLOAD_MIME_TYPES = new Set([
   "application/msword",
   "application/octet-stream",
   "application/pdf",
+  "application/rtf",
+  "application/vnd.ms-excel",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.oasis.opendocument.presentation",
+  "application/vnd.oasis.opendocument.spreadsheet",
+  "application/vnd.oasis.opendocument.text",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/x-rtf",
   "image/gif",
   "image/jpeg",
   "image/png",
   "image/tiff",
   "image/webp",
+  "text/csv",
   "text/markdown",
   "text/plain",
+  "text/rtf",
+  "text/tab-separated-values",
 ]);
 
 function isSupportedUploadFile(file) {

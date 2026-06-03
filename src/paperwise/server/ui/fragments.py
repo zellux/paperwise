@@ -849,9 +849,17 @@ def _document_preview_kind(content_type: object, filename: object) -> str:
     if (
         "text/plain" in value
         or "application/msword" in value
+        or "application/rtf" in value
+        or "application/vnd.ms-excel" in value
+        or "application/vnd.ms-powerpoint" in value
+        or "application/vnd.oasis.opendocument" in value
         or "application/vnd.openxmlformats-officedocument.presentationml.presentation" in value
+        or "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" in value
         or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in value
-        or value.endswith((".doc", ".docx", ".pptx", ".txt"))
+        or "text/csv" in value
+        or "text/rtf" in value
+        or "text/tab-separated-values" in value
+        or value.endswith((".csv", ".doc", ".docx", ".odp", ".ods", ".odt", ".ppt", ".pptx", ".rtf", ".tsv", ".txt", ".xls", ".xlsx"))
     ):
         return "text"
     return "embed"
