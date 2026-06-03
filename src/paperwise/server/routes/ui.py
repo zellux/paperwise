@@ -50,7 +50,7 @@ def root() -> RedirectResponse:
 @router.get("/ui/documents", include_in_schema=False)
 def documents_page(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int | None = Query(None, ge=1, le=100),
     sort_by: str | None = Query(None),
     sort_dir: str | None = Query(None),
     q: str | None = Query(None),
@@ -232,7 +232,7 @@ def settings_models_page(
 @router.get("/ui/partials/documents", include_in_schema=False)
 def documents_partial(
     page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
+    page_size: int | None = Query(None, ge=1, le=100),
     sort_by: str | None = Query(None),
     sort_dir: str | None = Query(None),
     q: str | None = Query(None),

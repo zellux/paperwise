@@ -623,6 +623,59 @@ def test_settings_page_server_renders_authenticated_cookie_preferences() -> None
         app.dependency_overrides.clear()
 
 
+def test_documents_page_uses_saved_page_size_preference() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "docs-size-ui@example.com",
+                "full_name": "Docs Size UI",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+        user_id = create_response.json()["id"]
+        for index in range(25):
+            _save_ready_document(
+                repository,
+                doc_id=f"doc-page-size-{index}",
+                owner_id=user_id,
+                title=f"Page Size Doc {index}",
+                document_type="Invoice",
+                tags=["Pagination"],
+            )
+        repository.save_user_preference(
+            UserPreference(
+                user_id=user_id,
+                preferences={"page_size": 50},
+            )
+        )
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "docs-size-ui@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+
+        response = client.get("/ui/documents")
+        assert response.status_code == 200
+        payload = _initial_data_from_response(response.text)
+        assert payload["documents_page_size"] == 50
+        assert payload["documents_total"] == 25
+        assert len(payload["documents"]) == 25
+
+        explicit_response = client.get("/ui/documents?page_size=10")
+        explicit_payload = _initial_data_from_response(explicit_response.text)
+        assert explicit_payload["documents_page_size"] == 10
+        assert len(explicit_payload["documents"]) == 10
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_static_assets_do_not_keep_page_selection_logic() -> None:
     client = TestClient(app)
 

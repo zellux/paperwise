@@ -144,6 +144,23 @@ def activity_partial_data(
     return activity_data(repository, current_user, limit=normalized_limit)
 
 
+def _bounded_int(value: object, *, default: int, minimum: int, maximum: int) -> int:
+    try:
+        number = int(value or default)
+    except (TypeError, ValueError):
+        number = default
+    return max(minimum, min(maximum, number))
+
+
+def _documents_page_size(initial_data: dict, page_size: int | None) -> int:
+    if page_size is not None:
+        return _bounded_int(page_size, default=20, minimum=1, maximum=100)
+    preferences = initial_data.get("user_preferences")
+    if not isinstance(preferences, dict):
+        return 20
+    return _bounded_int(preferences.get("page_size"), default=20, minimum=1, maximum=100)
+
+
 def document_filter_options(repository: TaxonomyRepository, current_user: User) -> dict:
     return {
         "tags": [tag for tag, _count in repository.list_owner_tag_stats(current_user.id)],
@@ -214,7 +231,7 @@ def documents_initial_data(
     current_user: User | None,
     *,
     page: int = 1,
-    page_size: int = 20,
+    page_size: int | None = None,
     sort_by: str | None = None,
     sort_dir: str | None = None,
     q: str | None = None,
@@ -227,7 +244,7 @@ def documents_initial_data(
 ) -> dict:
     data = page_initial_data(current_user, repository)
     data.update(document_sidebar_data(repository, current_user))
-    normalized_page_size = max(1, min(100, int(page_size or 20)))
+    normalized_page_size = _documents_page_size(data, page_size)
     requested_page = max(1, int(page or 1))
     if current_user is None:
         data.update(
