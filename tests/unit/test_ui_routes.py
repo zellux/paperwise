@@ -94,6 +94,34 @@ def test_document_detail_preview_uses_image_natural_ratio_for_images() -> None:
     assert fragments["preview_url"] == "/documents/image-doc/file"
 
 
+def test_document_detail_preview_uses_image_frame_for_tiff_suffix() -> None:
+    fragments = document_detail_fragments(
+        {
+            "document_detail": {
+                "document": {
+                    "id": "tiff-doc",
+                    "filename": "scan.tiff",
+                    "owner_id": "user-tiff",
+                    "blob_uri": "local://scan.tiff",
+                    "checksum_sha256": "e" * 64,
+                    "content_type": "application/octet-stream",
+                    "size_bytes": 123,
+                    "status": "ready",
+                    "created_at": "2026-05-12T00:00:00Z",
+                    "page_count": 1,
+                },
+                "llm_metadata": None,
+                "ocr_text_preview": "OCR text from TIFF",
+                "ocr_parsed_at": None,
+            },
+            "document_history": [],
+        }
+    )
+
+    assert fragments["preview_kind"] == "image"
+    assert fragments["preview_url"] == "/documents/tiff-doc/file"
+
+
 def test_document_detail_preview_uses_extracted_text_for_docx() -> None:
     fragments = document_detail_fragments(
         {
@@ -124,6 +152,38 @@ def test_document_detail_preview_uses_extracted_text_for_docx() -> None:
     assert fragments["page_count"] == 1
     assert fragments["text"]["previewTotalPages"] == "1"
     assert fragments["text"]["detailTextPreview"] == "Extracted DOCX text"
+
+
+def test_document_detail_preview_uses_extracted_text_for_pptx() -> None:
+    fragments = document_detail_fragments(
+        {
+            "document_detail": {
+                "document": {
+                    "id": "pptx-doc",
+                    "filename": "deck.pptx",
+                    "owner_id": "user-pptx",
+                    "blob_uri": "local://deck.pptx",
+                    "checksum_sha256": "f" * 64,
+                    "content_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    "size_bytes": 456,
+                    "status": "ready",
+                    "created_at": "2026-05-12T00:00:00Z",
+                    "page_count": 3,
+                },
+                "llm_metadata": None,
+                "ocr_text_preview": "Extracted PPTX text",
+                "ocr_parsed_at": None,
+            },
+            "document_history": [],
+        }
+    )
+
+    assert fragments["preview_kind"] == "text"
+    assert fragments["preview_url"] == ""
+    assert fragments["file_url"] == "/documents/pptx-doc/file"
+    assert fragments["page_count"] == 1
+    assert fragments["text"]["previewTotalPages"] == "1"
+    assert fragments["text"]["detailTextPreview"] == "Extracted PPTX text"
 
 
 def test_document_detail_text_preview_ignores_stale_parse_page_count() -> None:
@@ -779,6 +839,12 @@ def test_upload_ui_includes_batch_progress_shell() -> None:
     assert 'id="uploadProgressWrap"' in response.text
     assert 'id="uploadProgressBar"' in response.text
     assert 'id="uploadProgressStatus"' in response.text
+    assert ".pptx" in response.text
+    assert "application/vnd.openxmlformats-officedocument.presentationml.presentation" in response.text
+    assert "PPTX" in response.text
+    assert ".tif,.tiff" in response.text
+    assert "image/tiff" in response.text
+    assert "TIFF" in response.text
 
 
 def test_search_ui_does_not_include_upload_shell() -> None:
@@ -814,6 +880,10 @@ def test_static_assets_serve_upload_progress_ui() -> None:
     upload_js = client.get("/static/js/upload.js")
     assert upload_js.status_code == 200
     assert "showUploadProgress" in upload_js.text
+    assert '".pptx"' in upload_js.text
+    assert '"application/vnd.openxmlformats-officedocument.presentationml.presentation"' in upload_js.text
+    assert '".tiff"' in upload_js.text
+    assert '"image/tiff"' in upload_js.text
 
     upload_css = client.get("/static/css/upload.css")
     assert upload_css.status_code == 200

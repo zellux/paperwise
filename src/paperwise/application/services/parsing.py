@@ -42,13 +42,17 @@ SUPPORTED_IMAGE_MIME_TYPES_BY_SUFFIX = {
     ".jpeg": "image/jpeg",
     ".jpg": "image/jpeg",
     ".png": "image/png",
+    ".tif": "image/tiff",
+    ".tiff": "image/tiff",
     ".webp": "image/webp",
 }
 SUPPORTED_IMAGE_MIME_TYPES = frozenset(SUPPORTED_IMAGE_MIME_TYPES_BY_SUFFIX.values())
-TEXT_DOCUMENT_SUFFIXES = frozenset({".doc", ".docx", ".markdown", ".md", ".txt"})
+PPTX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+TEXT_DOCUMENT_SUFFIXES = frozenset({".doc", ".docx", ".markdown", ".md", ".pptx", ".txt"})
 TEXT_DOCUMENT_CONTENT_TYPES = frozenset(
     {
         "application/msword",
+        PPTX_CONTENT_TYPE,
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "text/markdown",
         "text/plain",
@@ -197,6 +201,56 @@ def _extract_docx_text(*, blob_path: Path, raw: bytes, max_chars: int) -> tuple[
         if text_preview:
             return text_preview, 1
     except (KeyError, BadZipFile):
+        pass
+    return _fit_preview_text(_decode_text_bytes(raw), max_chars=400), 1
+
+
+def _extract_presentation_slide_text(xml: str) -> str:
+    try:
+        root = ElementTree.fromstring(xml)
+    except ElementTree.ParseError:
+        text = re.sub(r"<[^>]+>", "\n", xml)
+        return "\n".join(part.strip() for part in unescape(text).splitlines() if part.strip())
+
+    parts: list[str] = []
+    for node in root.iter():
+        tag = node.tag.rsplit("}", 1)[-1] if isinstance(node.tag, str) else ""
+        if tag == "t" and node.text:
+            text = node.text.strip()
+            if text:
+                parts.append(text)
+    return "\n".join(parts).strip()
+
+
+def _pptx_slide_sort_key(name: str) -> tuple[int, str]:
+    match = re.search(r"/slide(\d+)\.xml$", name)
+    if match:
+        return int(match.group(1)), name
+    return 0, name
+
+
+def _extract_pptx_text(*, blob_path: Path, raw: bytes, max_chars: int) -> tuple[str, int]:
+    try:
+        with ZipFile(blob_path) as zip_file:
+            slide_names = sorted(
+                (
+                    name
+                    for name in zip_file.namelist()
+                    if re.match(r"^ppt/slides/slide\d+\.xml$", name)
+                ),
+                key=_pptx_slide_sort_key,
+            )
+            slides: list[str] = []
+            for slide_name in slide_names:
+                xml = zip_file.read(slide_name).decode("utf-8", errors="ignore")
+                slide_text = _extract_presentation_slide_text(xml)
+                if slide_text:
+                    slides.append(slide_text)
+            page_count = max(1, len(slide_names))
+            text_preview = _fit_preview_text("\n\n".join(slides), max_chars=max_chars)
+            if text_preview:
+                return text_preview, page_count
+    except BadZipFile:
         pass
     return _fit_preview_text(_decode_text_bytes(raw), max_chars=400), 1
 
@@ -440,6 +494,18 @@ def parse_document_blob(
             selected=True,
         )
         final_text_source = "docx_text_read"
+    elif suffix == ".pptx" or normalized_content_type == PPTX_CONTENT_TYPE:
+        text_preview, page_count = _extract_pptx_text(blob_path=blob_path, raw=raw, max_chars=8000)
+        _mark_ocr_attempt(
+            ocr_details,
+            "text_extraction",
+            attempted=True,
+            succeeded=bool(text_preview.strip()),
+            chars=len(text_preview),
+            quality="direct_text",
+            selected=True,
+        )
+        final_text_source = "pptx_text_read"
     elif suffix == ".doc" or normalized_content_type == "application/msword":
         text_preview = _extract_doc_text(blob_path=blob_path, raw=raw, max_chars=8000)
         page_count = 1

@@ -26,7 +26,7 @@ function getUploadElements() {
   };
 }
 
-const SUPPORTED_UPLOAD_LABEL = "Supports: PDF, TXT, MD, DOCX, DOC, PNG, JPG, WEBP, GIF";
+const SUPPORTED_UPLOAD_LABEL = "Supports: PDF, TXT, MD, DOCX, DOC, PPTX, PNG, JPG, WEBP, GIF, TIFF";
 const SUPPORTED_UPLOAD_EXTENSIONS = new Set([
   ".pdf",
   ".txt",
@@ -34,20 +34,25 @@ const SUPPORTED_UPLOAD_EXTENSIONS = new Set([
   ".markdown",
   ".doc",
   ".docx",
+  ".pptx",
   ".png",
   ".jpg",
   ".jpeg",
   ".webp",
   ".gif",
+  ".tif",
+  ".tiff",
 ]);
 const SUPPORTED_UPLOAD_MIME_TYPES = new Set([
   "application/msword",
   "application/octet-stream",
   "application/pdf",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "image/gif",
   "image/jpeg",
   "image/png",
+  "image/tiff",
   "image/webp",
   "text/markdown",
   "text/plain",

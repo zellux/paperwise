@@ -12,6 +12,7 @@ class RecordingOCRLLM:
         self.ocr_text = ocr_text
         self.calls = 0
         self.image_calls = 0
+        self.image_data_urls: list[str] = []
         self._model = "test-ocr-model"
 
     def extract_ocr_text(
@@ -34,7 +35,7 @@ class RecordingOCRLLM:
         image_data_urls: list[str],
     ) -> str:
         del filename
-        del image_data_urls
+        self.image_data_urls = image_data_urls
         self.image_calls += 1
         return self.ocr_text
 
@@ -276,6 +277,57 @@ def test_parse_document_blob_docx_extracts_text_without_llm_ocr(tmp_path) -> Non
     assert result.page_count == 1
     assert result.ocr_details is not None
     assert result.ocr_details["final_text_source"] == "docx_text_read"
+
+
+def test_parse_document_blob_pptx_extracts_slide_text_without_llm_ocr(tmp_path) -> None:
+    blob = tmp_path / "slides.pptx"
+    with ZipFile(blob, "w") as zip_file:
+        zip_file.writestr(
+            "ppt/slides/slide2.xml",
+            (
+                '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+                'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
+                "<p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>Second slide finding</a:t></a:r></a:p>"
+                "<a:p><a:r><a:t>Action item</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>"
+            ),
+        )
+        zip_file.writestr(
+            "ppt/slides/slide1.xml",
+            (
+                '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+                'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
+                "<p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>First slide title</a:t></a:r></a:p>"
+                "<a:p><a:r><a:t>Opening summary</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>"
+            ),
+        )
+        zip_file.writestr(
+            "ppt/notesSlides/notesSlide1.xml",
+            (
+                '<p:notes xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+                'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
+                "<a:t>Speaker notes should not appear</a:t></p:notes>"
+            ),
+        )
+    llm = RecordingOCRLLM("")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ocr_provider="llm",
+        llm_provider=llm,
+    )
+
+    assert llm.calls == 0
+    assert llm.image_calls == 0
+    assert result.parser == "direct-text-parser"
+    assert result.text_preview.index("First slide title") < result.text_preview.index("Second slide finding")
+    assert "Opening summary" in result.text_preview
+    assert "Action item" in result.text_preview
+    assert "Speaker notes" not in result.text_preview
+    assert result.page_count == 2
+    assert result.ocr_details is not None
+    assert result.ocr_details["final_text_source"] == "pptx_text_read"
 
 
 def test_parse_document_blob_doc_uses_direct_binary_text_fallback(tmp_path, monkeypatch) -> None:
@@ -536,6 +588,32 @@ def test_parse_document_blob_image_uses_llm_image_ocr_path(tmp_path) -> None:
     assert result.parser == "stub-llm-ocr"
     assert result.page_count == 1
     assert result.text_preview == "Vision OCR text from image"
+    assert result.ocr_details is not None
+    assert result.ocr_details["attempts"]["llm_vision"]["attempted"] is True
+    assert result.ocr_details["attempts"]["llm_vision"]["succeeded"] is True
+    assert result.ocr_details["final_text_source"] == "llm_vision_ocr"
+
+
+def test_parse_document_blob_tiff_uses_llm_image_ocr_path(tmp_path) -> None:
+    blob = tmp_path / "scan.tiff"
+    blob.write_bytes(b"II*\x00Fake tiff image bytes")
+    llm = RecordingOCRLLM("Vision OCR text from TIFF")
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        content_type="image/tiff",
+        ocr_provider="llm",
+        llm_provider=llm,
+        ocr_auto_switch=False,
+    )
+
+    assert llm.image_calls == 1
+    assert llm.calls == 0
+    assert llm.image_data_urls[0].startswith("data:image/tiff;base64,")
+    assert result.parser == "stub-llm-ocr"
+    assert result.page_count == 1
+    assert result.text_preview == "Vision OCR text from TIFF"
     assert result.ocr_details is not None
     assert result.ocr_details["attempts"]["llm_vision"]["attempted"] is True
     assert result.ocr_details["attempts"]["llm_vision"]["succeeded"] is True

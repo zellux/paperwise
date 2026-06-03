@@ -815,7 +815,7 @@ def _short_date_label(value: object) -> str:
 
 def _document_preview_kind(content_type: object, filename: object) -> str:
     value = f"{content_type or ''} {filename or ''}".strip().lower()
-    if "image/" in value or value.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif")):
+    if "image/" in value or value.endswith((".png", ".jpg", ".jpeg", ".webp", ".gif", ".tif", ".tiff")):
         return "image"
     if "pdf" in value or value.endswith(".pdf"):
         return "pdf"
@@ -824,8 +824,9 @@ def _document_preview_kind(content_type: object, filename: object) -> str:
     if (
         "text/plain" in value
         or "application/msword" in value
+        or "application/vnd.openxmlformats-officedocument.presentationml.presentation" in value
         or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in value
-        or value.endswith((".doc", ".docx", ".txt"))
+        or value.endswith((".doc", ".docx", ".pptx", ".txt"))
     ):
         return "text"
     return "embed"

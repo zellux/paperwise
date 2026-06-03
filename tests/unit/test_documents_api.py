@@ -195,6 +195,35 @@ def _build_docx_bytes(text: str) -> bytes:
     return buffer.getvalue()
 
 
+def _build_pptx_bytes(*texts: str) -> bytes:
+    buffer = io.BytesIO()
+    with ZipFile(buffer, "w") as zip_file:
+        zip_file.writestr(
+            "[Content_Types].xml",
+            (
+                '<?xml version="1.0" encoding="UTF-8"?>'
+                '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+                '<Default Extension="xml" ContentType="application/xml"/>'
+                '<Override PartName="/ppt/presentation.xml" '
+                'ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>'
+                "</Types>"
+            ),
+        )
+        for index, text in enumerate(texts, start=1):
+            zip_file.writestr(
+                f"ppt/slides/slide{index}.xml",
+                (
+                    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                    '<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+                    'xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">'
+                    f"<p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>{text}</a:t></a:r></a:p>"
+                    "</p:txBody></p:sp></p:spTree></p:cSld></p:sld>"
+                ),
+            )
+    return buffer.getvalue()
+
+
 def test_create_and_get_document() -> None:
     store_dir = Path("local/test-object-store")
     if store_dir.exists():
@@ -312,6 +341,43 @@ def test_create_and_get_image_document() -> None:
         assert file_response.status_code == 200
         assert file_response.headers["content-type"].startswith("image/png")
         assert file_response.content == b"\x89PNG\r\n\x1a\nfake-image"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_and_get_tiff_document() -> None:
+    store_dir = Path("local/test-object-store")
+    if store_dir.exists():
+        for item in store_dir.rglob("*"):
+            if item.is_file():
+                item.unlink()
+
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={"file": ("scan.tiff", b"II*\x00fake-tiff", "image/tiff")},
+        )
+        assert create_response.status_code == 201
+
+        payload = create_response.json()
+        get_response = client.get(f"/documents/{payload['id']}")
+        assert get_response.status_code == 200
+        assert get_response.json()["filename"] == "scan.tiff"
+        assert get_response.json()["content_type"] == "image/tiff"
+
+        file_response = client.get(f"/documents/{payload['id']}/file")
+        assert file_response.status_code == 200
+        assert file_response.headers["content-type"].startswith("image/tiff")
+        assert file_response.content == b"II*\x00fake-tiff"
     finally:
         app.dependency_overrides.clear()
 
@@ -762,6 +828,42 @@ def test_upload_and_parse_docx_document() -> None:
         payload = parse_response.json()
         assert payload["parser"] == "direct-text-parser"
         assert "PPMG Pediatrics annual visit" in payload["text_preview"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_upload_and_parse_pptx_document() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            files={
+                "file": (
+                    "deck.pptx",
+                    _build_pptx_bytes("Quarterly review", "Revenue outlook"),
+                    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                )
+            },
+        )
+        assert create_response.status_code == 201
+        doc_id = create_response.json()["id"]
+
+        parse_response = client.post(f"/documents/{doc_id}/parse")
+        assert parse_response.status_code == 200
+        payload = parse_response.json()
+        assert payload["parser"] == "direct-text-parser"
+        assert payload["page_count"] == 2
+        assert "Quarterly review" in payload["text_preview"]
+        assert "Revenue outlook" in payload["text_preview"]
     finally:
         app.dependency_overrides.clear()
 
