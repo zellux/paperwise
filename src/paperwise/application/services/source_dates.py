@@ -45,7 +45,10 @@ def _pdf_date(blob_path: Path) -> str | None:
     if metadata is None:
         return None
     for key in ("creation_date", "modification_date"):
-        value = getattr(metadata, key, None)
+        try:
+            value = getattr(metadata, key, None)
+        except ValueError:
+            continue
         parsed = _date_from_unknown_value(value)
         if parsed:
             return parsed
@@ -106,6 +109,9 @@ def _date_from_unknown_value(value: object) -> str | None:
     text = value.strip()
     if not text:
         return None
+    validated = validate_document_date(text)
+    if validated:
+        return validated
     validated = validate_document_date(text[:10])
     if validated:
         return validated
