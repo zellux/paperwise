@@ -40,7 +40,6 @@ let docsFilters = {
 };
 let docsPage = 1;
 let docsSort = { field: "", direction: "" };
-let docsFilterNavigateTimer = 0;
 let docsTotalCount = 0;
 let docsListRequestSeq = 0;
 let initialDocumentsHydrated = false;
@@ -82,7 +81,6 @@ export function clearSessionState() {
   docsSort = { field: "", direction: "" };
   docsTotalCount = 0;
   docsListRequestSeq = 0;
-  docsFilterNavigateTimer = 0;
   if (documentsProcessingPollTimer) {
     window.clearInterval(documentsProcessingPollTimer);
     documentsProcessingPollTimer = 0;
@@ -1246,8 +1244,14 @@ function bindDocumentsEvents() {
   const { docsFilterForm, clearFiltersBtn, clearAllFiltersBtn, showStarredBtn, filterQuery, filterSelects } =
     getDocumentsPageElements();
 
+  let filterQueryComposing = false;
+
   docsFilterForm?.addEventListener("submit", (event) => {
     event.preventDefault();
+    if (filterQueryComposing) {
+      return;
+    }
+    applyFiltersFromControls();
   });
 
   for (const selectEl of filterSelects) {
@@ -1412,14 +1416,23 @@ function bindDocumentsEvents() {
     navigateToDocumentsPageFromState();
   });
 
-  filterQuery?.addEventListener("input", () => {
-    if (docsFilterNavigateTimer) {
-      window.clearTimeout(docsFilterNavigateTimer);
+  filterQuery?.addEventListener("compositionstart", () => {
+    filterQueryComposing = true;
+  });
+
+  filterQuery?.addEventListener("compositionend", () => {
+    filterQueryComposing = false;
+  });
+
+  filterQuery?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") {
+      return;
     }
-    docsFilterNavigateTimer = window.setTimeout(() => {
-      docsFilterNavigateTimer = 0;
-      applyFiltersFromControls();
-    }, 350);
+    event.preventDefault();
+    if (filterQueryComposing || event.isComposing) {
+      return;
+    }
+    applyFiltersFromControls();
   });
 
   window.addEventListener("resize", () => {

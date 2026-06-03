@@ -699,6 +699,22 @@ export async function handleSignOutClick() {
 }
 
 export function bindAppShellEvents() {
+  const topbarSearchForm = document.querySelector(".topbar-search");
+  const topbarSearchInput = topbarSearchForm?.querySelector('input[name="q"]');
+  let topbarSearchComposing = false;
+
+  topbarSearchInput?.addEventListener("compositionstart", () => {
+    topbarSearchComposing = true;
+  });
+  topbarSearchInput?.addEventListener("compositionend", () => {
+    topbarSearchComposing = false;
+  });
+  topbarSearchForm?.addEventListener("submit", (event) => {
+    if (topbarSearchComposing) {
+      event.preventDefault();
+    }
+  });
+
   document.getElementById("signInForm")?.addEventListener("submit", handleSignInSubmit);
   document.getElementById("registerForm")?.addEventListener("submit", handleRegisterSubmit);
   document.getElementById("authTabSignIn")?.addEventListener("click", () => {

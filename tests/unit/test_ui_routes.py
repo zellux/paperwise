@@ -703,6 +703,11 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "initializePage" in app_js.text
     assert "refreshDocumentListAfterDelete" in app_js.text
     assert "loadDocumentsList" not in app_js.text
+    assert 'document.querySelector(".topbar-search")' in app_js.text
+    assert "let topbarSearchComposing = false" in app_js.text
+    assert 'topbarSearchInput?.addEventListener("compositionstart"' in app_js.text
+    assert 'topbarSearchInput?.addEventListener("compositionend"' in app_js.text
+    assert 'topbarSearchForm?.addEventListener("submit"' in app_js.text
 
     documents_js = client.get("/static/js/documents.js")
     assert documents_js.status_code == 200
@@ -713,6 +718,13 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "function navigateToDocumentListPage(page)" in documents_js.text
     assert 'closest("#pageJumpForm")' in documents_js.text
     assert 'button.dataset.docsPageAction === "last"' in documents_js.text
+    assert "let filterQueryComposing = false" in documents_js.text
+    assert 'filterQuery?.addEventListener("compositionstart"' in documents_js.text
+    assert 'filterQuery?.addEventListener("compositionend"' in documents_js.text
+    assert 'filterQuery?.addEventListener("keydown"' in documents_js.text
+    assert 'event.key !== "Enter"' in documents_js.text
+    assert 'filterQuery?.addEventListener("input"' not in documents_js.text
+    assert "docsFilterNavigateTimer" not in documents_js.text
     assert "const TAG_COLOR_SET" not in documents_js.text
 
     tag_color_js = client.get("/static/js/ui/tagColor.js")
@@ -1248,6 +1260,8 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'data-doc-id="doc-tax"' in documents_html
         assert 'data-doc-tags="[&quot;Tax&quot;, &quot;Finance&quot;]"' in documents_html
         assert "Tax Notice" in documents_html
+        assert "Search documents..." in documents_html
+        assert "⌘K" not in documents_html
         assert (
             '<a class="row-act" href="/ui/document?id=doc-tax" title="Open document" '
             'aria-label="Open document">'
