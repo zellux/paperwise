@@ -569,6 +569,32 @@ def test_parse_document_blob_auto_switch_off_pdf_uses_image_ocr_path(tmp_path, m
     assert result.text_preview == "Vision OCR output used"
 
 
+def test_parse_document_blob_tesseract_pdf_uses_reader_page_count(tmp_path, monkeypatch) -> None:
+    pypdf = pytest.importorskip("pypdf")
+    blob = tmp_path / "multipage.pdf"
+    writer = pypdf.PdfWriter()
+    for _ in range(3):
+        writer.add_blank_page(width=72, height=72)
+    with blob.open("wb") as handle:
+        writer.write(handle)
+
+    monkeypatch.setattr(
+        parsing_module,
+        "_extract_with_local_tesseract",
+        lambda **kwargs: "Tesseract text",
+    )
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        ocr_provider="tesseract",
+        ocr_auto_switch=False,
+    )
+
+    assert result.page_count == 3
+    assert result.text_preview == "Tesseract text"
+
+
 def test_parse_document_blob_image_uses_llm_image_ocr_path(tmp_path) -> None:
     blob = tmp_path / "camera-scan"
     blob.write_bytes(b"\x89PNG\r\n\x1a\nFake image bytes")

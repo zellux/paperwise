@@ -431,9 +431,7 @@ def parse_document_blob(
     )
     if is_pdf:
         if normalized_ocr == "tesseract":
-            page_count = raw.count(b"/Type /Page")
-            if page_count == 0:
-                page_count = 1
+            page_count = _pdf_page_count(blob_path)
             _mark_ocr_attempt(ocr_details, "local_tesseract", attempted=True)
             text_preview = _extract_with_local_tesseract(
                 blob_path=blob_path,
