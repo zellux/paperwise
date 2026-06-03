@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from paperwise.application.services.llm_parsing import parse_with_llm
+from paperwise.application.services.metadata_updates import validate_document_date
 from paperwise.domain.models import Document, DocumentStatus, ParseResult
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
@@ -106,6 +107,30 @@ class InvalidDateLLMProvider:
         del existing_tags
         return {
             "document_date": "not-a-date",
+        }
+
+
+class SlashDateLLMProvider:
+    def suggest_metadata(
+        self,
+        *,
+        filename: str,
+        text_preview: str,
+        current_correspondent: str | None,
+        current_document_type: str | None,
+        existing_correspondents: list[str],
+        existing_document_types: list[str],
+        existing_tags: list[str],
+    ) -> dict:
+        del filename
+        del text_preview
+        del current_correspondent
+        del current_document_type
+        del existing_correspondents
+        del existing_document_types
+        del existing_tags
+        return {
+            "document_date": "2/7/2020 05:41:45",
         }
 
 
@@ -291,6 +316,29 @@ def test_parse_with_llm_uses_source_date_when_provider_returns_invalid_date() ->
     )
 
     assert result.document_date == "2026-04-10"
+
+
+def test_parse_with_llm_accepts_common_slash_date_with_time() -> None:
+    repository = InMemoryDocumentRepository()
+    document = _build_document()
+    parse_result = _build_parse_result(document.id)
+
+    result = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=SlashDateLLMProvider(),
+        source_date_resolver=lambda _document: None,
+    )
+
+    assert result.document_date == "2020-02-07"
+
+
+def test_validate_document_date_normalizes_common_formats() -> None:
+    assert validate_document_date("2026-03-05") == "2026-03-05"
+    assert validate_document_date("2026-03-05T12:13:14Z") == "2026-03-05"
+    assert validate_document_date("2/7/2020 05:41:45") == "2020-02-07"
+    assert validate_document_date("not-a-date") is None
 
 
 def test_parse_with_llm_preserves_acronym_like_casing() -> None:

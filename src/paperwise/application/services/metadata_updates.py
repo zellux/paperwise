@@ -1,4 +1,5 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+import re
 from typing import Protocol
 
 from paperwise.application.interfaces import DocumentStore, HistoryRepository, ParseResultRepository, TaxonomyRepository
@@ -14,10 +15,34 @@ class MetadataUpdateRepository(DocumentStore, ParseResultRepository, TaxonomyRep
 def validate_document_date(value: str | None) -> str | None:
     if not value:
         return None
-    try:
-        return datetime.strptime(value, "%Y-%m-%d").date().isoformat()
-    except ValueError:
+    text = str(value).strip()
+    if not text:
         return None
+
+    if re.match(r"^\d{4}-\d{2}-\d{2}(?:$|[T\s])", text):
+        try:
+            return date.fromisoformat(text[:10]).isoformat()
+        except ValueError:
+            return None
+
+    normalized = text.replace("Z", "+00:00")
+    try:
+        return datetime.fromisoformat(normalized).date().isoformat()
+    except ValueError:
+        pass
+
+    for date_format in (
+        "%m/%d/%Y",
+        "%m/%d/%Y %H:%M",
+        "%m/%d/%Y %H:%M:%S",
+        "%m/%d/%Y %I:%M %p",
+        "%m/%d/%Y %I:%M:%S %p",
+    ):
+        try:
+            return datetime.strptime(text, date_format).date().isoformat()
+        except ValueError:
+            continue
+    return None
 
 
 def update_document_metadata(
