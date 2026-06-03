@@ -1,6 +1,7 @@
 from datetime import UTC, datetime, timedelta
 from html import escape
 import json
+import re
 from urllib.parse import quote
 
 from paperwise.server.ui.tag_colors import stable_tag_color
@@ -818,12 +819,13 @@ def _document_preview_kind(content_type: object, filename: object) -> str:
         return "image"
     if "pdf" in value or value.endswith(".pdf"):
         return "pdf"
+    if "text/markdown" in value or value.endswith((".markdown", ".md")):
+        return "markdown"
     if (
         "text/plain" in value
-        or "text/markdown" in value
         or "application/msword" in value
         or "application/vnd.openxmlformats-officedocument.wordprocessingml.document" in value
-        or value.endswith((".doc", ".docx", ".markdown", ".md", ".txt"))
+        or value.endswith((".doc", ".docx", ".txt"))
     ):
         return "text"
     return "embed"
@@ -838,9 +840,115 @@ def _normalize_detail_page_count(value: object) -> int:
 
 
 def _document_preview_page_count(*, preview_kind: str, page_count: object) -> int:
-    if preview_kind == "text":
+    if preview_kind in {"markdown", "text"}:
         return 1
     return _normalize_detail_page_count(page_count)
+
+
+def _render_markdown_inline(text: str) -> str:
+    rendered = escape(str(text or ""))
+    rendered = re.sub(r"`([^`]+)`", r"<code>\1</code>", rendered)
+    rendered = re.sub(
+        r"\[([^\]]+)\]\(((?:https?://|mailto:)[^\s)]+)\)",
+        r'<a href="\2" rel="noopener noreferrer" target="_blank">\1</a>',
+        rendered,
+    )
+    rendered = re.sub(r"\*\*([^*]+)\*\*", r"<strong>\1</strong>", rendered)
+    rendered = re.sub(r"(^|[\s(])\*([^*]+)\*(?=$|[\s).,!?;:])", r"\1<em>\2</em>", rendered)
+    return rendered
+
+
+def _flush_markdown_paragraph(buffer: list[str], html: list[str]) -> None:
+    if not buffer:
+        return
+    html.append(f"<p>{'<br>'.join(_render_markdown_inline(line) for line in buffer)}</p>")
+    buffer.clear()
+
+
+def _render_markdown_preview(markdown: str) -> str:
+    lines = str(markdown or "").replace("\r\n", "\n").split("\n")
+    html: list[str] = []
+    paragraph: list[str] = []
+    list_kind = ""
+    in_code = False
+    code_lines: list[str] = []
+
+    def close_list() -> None:
+        nonlocal list_kind
+        if list_kind:
+            html.append(f"</{list_kind}>")
+            list_kind = ""
+
+    for raw_line in lines:
+        line = raw_line.rstrip()
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            if in_code:
+                html.append(f"<pre><code>{escape(chr(10).join(code_lines))}</code></pre>")
+                code_lines = []
+                in_code = False
+            else:
+                close_list()
+                _flush_markdown_paragraph(paragraph, html)
+                in_code = True
+                code_lines = []
+            continue
+
+        if in_code:
+            code_lines.append(raw_line.rstrip("\n"))
+            continue
+
+        heading = re.match(r"^(#{1,3})\s+(.+)$", line)
+        quote_match = re.match(r"^>\s+(.+)$", line)
+        unordered = re.match(r"^[-*]\s+(.+)$", line)
+        ordered = re.match(r"^(\d+)\.\s+(.+)$", line)
+
+        if not stripped:
+            _flush_markdown_paragraph(paragraph, html)
+            close_list()
+            continue
+
+        if heading:
+            close_list()
+            _flush_markdown_paragraph(paragraph, html)
+            level = len(heading.group(1))
+            html.append(f"<h{level}>{_render_markdown_inline(heading.group(2))}</h{level}>")
+            continue
+
+        if quote_match:
+            close_list()
+            _flush_markdown_paragraph(paragraph, html)
+            html.append(f"<blockquote>{_render_markdown_inline(quote_match.group(1))}</blockquote>")
+            continue
+
+        if unordered:
+            _flush_markdown_paragraph(paragraph, html)
+            if list_kind != "ul":
+                close_list()
+                html.append("<ul>")
+                list_kind = "ul"
+            html.append(f"<li>{_render_markdown_inline(unordered.group(1))}</li>")
+            continue
+
+        if ordered:
+            _flush_markdown_paragraph(paragraph, html)
+            if list_kind != "ol":
+                close_list()
+                start = int(ordered.group(1) or "1")
+                html.append(f'<ol start="{start}">' if start > 1 else "<ol>")
+                list_kind = "ol"
+            html.append(f"<li>{_render_markdown_inline(ordered.group(2))}</li>")
+            continue
+
+        close_list()
+        paragraph.append(line)
+
+    if in_code:
+        html.append(f"<pre><code>{escape(chr(10).join(code_lines))}</code></pre>")
+    close_list()
+    _flush_markdown_paragraph(paragraph, html)
+    return "".join(html) or "<p>Extracted text will appear after processing completes.</p>"
 
 
 def _document_page_thumbnails_html(page_count: int) -> str:
@@ -912,7 +1020,9 @@ def document_detail_fragments(initial_data: dict) -> dict:
     ocr_parsed_at = str(detail.get("ocr_parsed_at") or "-")
     file_meta = " · ".join(part for part in [content_type, size_label] if part and part != "-")
     file_url = f"/documents/{quote(document_id, safe='')}/file" if document_id else ""
-    preview_url = "" if preview_kind == "text" else file_url
+    preview_url = "" if preview_kind in {"markdown", "text"} else file_url
+    text_preview = ocr_preview or "Extracted text will appear after processing completes."
+    markdown_preview_html = _render_markdown_preview(ocr_preview) if preview_kind == "markdown" else ""
     return {
         "document_id": document_id,
         "document_label": title,
@@ -942,13 +1052,14 @@ def document_detail_fragments(initial_data: dict) -> dict:
             "detailChecksum": str(document.get("checksum_sha256") or "-"),
             "detailBlobUri": _relative_blob_path(str(document.get("blob_uri") or "")),
             "detailOcrContent": ocr_preview or "-",
-            "detailTextPreview": ocr_preview or "Extracted text will appear after processing completes.",
+            "detailTextPreview": text_preview,
             "previewCurrentPage": "1",
             "previewTotalPages": str(page_count),
         },
         "html": {
             "detailStatus": _status_badge_html(str(document.get("status") or "")),
             "detailTagPills": _document_detail_tags_html(tags),
+            "detailMarkdownPreview": markdown_preview_html,
             "pageStrip": _document_page_thumbnails_html(page_count),
         },
         "inputs": {

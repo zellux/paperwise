@@ -204,6 +204,7 @@ def _initial_render_context(initial_data: dict) -> dict:
         "document_detail_page_count": fragments.get("page_count", 1),
         "document_detail_starred": bool((initial_data.get("document_detail") or {}).get("document", {}).get("starred")),
         "document_detail_page_thumbnails_html": fragments.get("page_thumbnails_html", ""),
+        "document_detail_html": fragments["html"],
         "document_detail_inputs": fragments["inputs"],
         "document_detail_status_html": fragments["html"].get("detailStatus", "-"),
         "document_detail_tags_html": fragments.get("tags_html", ""),

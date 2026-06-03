@@ -595,6 +595,89 @@
   white-space: pre-wrap;
 }
 
+.document-markdown-preview {
+  width: 100%;
+  min-height: 620px;
+  max-height: min(78vh, 960px);
+  margin: 0;
+  overflow: auto;
+  padding: 34px;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 0.94rem;
+  line-height: 1.58;
+  white-space: normal;
+}
+
+.document-markdown-preview h1,
+.document-markdown-preview h2,
+.document-markdown-preview h3 {
+  margin: 0 0 12px 0;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.document-markdown-preview h1 {
+  font-family: var(--serif);
+  font-size: 1.55rem;
+}
+
+.document-markdown-preview h2 {
+  font-family: var(--serif);
+  font-size: 1.3rem;
+}
+
+.document-markdown-preview h3 {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.document-markdown-preview p,
+.document-markdown-preview ul,
+.document-markdown-preview ol,
+.document-markdown-preview blockquote,
+.document-markdown-preview pre {
+  margin: 0 0 14px 0;
+}
+
+.document-markdown-preview ul,
+.document-markdown-preview ol {
+  padding-left: 24px;
+}
+
+.document-markdown-preview code {
+  font-family: var(--mono);
+  font-size: 0.88em;
+  background: color-mix(in srgb, var(--accent-soft) 38%, white);
+  border-radius: 5px;
+  padding: 1px 5px;
+}
+
+.document-markdown-preview pre {
+  overflow: auto;
+  padding: 14px;
+  background: color-mix(in srgb, var(--accent-soft) 30%, white);
+  border: 1px solid var(--stroke-soft);
+  border-radius: 6px;
+}
+
+.document-markdown-preview pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.document-markdown-preview blockquote {
+  border-left: 3px solid var(--stroke);
+  padding-left: 12px;
+  color: var(--ink-soft);
+}
+
+.document-markdown-preview a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
 .document-pdf-preview {
   width: auto;
   min-height: 0;

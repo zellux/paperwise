@@ -156,6 +156,63 @@ def test_document_detail_text_preview_ignores_stale_parse_page_count() -> None:
     assert 'data-preview-page="2"' not in fragments["html"]["pageStrip"]
 
 
+def test_document_detail_markdown_preview_renders_simple_markdown() -> None:
+    fragments = document_detail_fragments(
+        {
+            "document_detail": {
+                "document": {
+                    "id": "md-doc",
+                    "filename": "notes.md",
+                    "owner_id": "user-md",
+                    "blob_uri": "local://notes.md",
+                    "checksum_sha256": "d" * 64,
+                    "content_type": "text/markdown",
+                    "size_bytes": 789,
+                    "status": "ready",
+                    "created_at": "2026-05-12T00:00:00Z",
+                    "page_count": 7,
+                },
+                "llm_metadata": None,
+                "ocr_text_preview": (
+                    "# Portfolio Notes\n\n"
+                    "**Bold** and *italic* with `code`.\n\n"
+                    "- Item one\n"
+                    "- Item two\n\n"
+                    "> Quote\n\n"
+                    "```js\n"
+                    "alert('<bad>')\n"
+                    "```\n\n"
+                    "[Safe](https://example.com?a=1&b=2)\n"
+                    "[Bad](javascript:alert(1))\n"
+                    "<script>alert('x')</script>"
+                ),
+                "ocr_parsed_at": None,
+            },
+            "document_history": [],
+        }
+    )
+
+    assert fragments["preview_kind"] == "markdown"
+    assert fragments["preview_url"] == ""
+    assert fragments["file_url"] == "/documents/md-doc/file"
+    assert fragments["page_count"] == 1
+    assert fragments["text"]["previewTotalPages"] == "1"
+    assert fragments["text"]["detailTextPreview"].startswith("# Portfolio Notes")
+
+    html = fragments["html"]["detailMarkdownPreview"]
+    assert "<h1>Portfolio Notes</h1>" in html
+    assert "<strong>Bold</strong>" in html
+    assert "<em>italic</em>" in html
+    assert "<code>code</code>" in html
+    assert "<ul><li>Item one</li><li>Item two</li></ul>" in html
+    assert "<blockquote>Quote</blockquote>" in html
+    assert "<pre><code>alert(&#x27;&lt;bad&gt;&#x27;)</code></pre>" in html
+    assert 'href="https://example.com?a=1&amp;b=2"' in html
+    assert 'href="javascript:alert' not in html
+    assert "<script>" not in html
+    assert "&lt;script&gt;alert(&#x27;x&#x27;)&lt;/script&gt;" in html
+
+
 def test_document_sidebar_lists_collapse_after_ten() -> None:
     tags_html = document_sidebar_tags_html(
         [{"tag": f"Tag {index:02d}", "document_count": index} for index in range(1, 13)]
@@ -638,6 +695,7 @@ def test_static_assets_split_theme_css() -> None:
     documents = client.get("/static/css/documents.css")
     assert documents.status_code == 200
     assert ".document-detail-workbench" in documents.text
+    assert ".document-markdown-preview" in documents.text
     assert ".filter-chip" in documents.text
     assert "#metaDate" in documents.text
 

@@ -113,6 +113,11 @@
               {% if document_detail_preview_kind != "text" %}hidden{% endif %}
             >{{ document_detail_text.detailTextPreview|default("Extracted text will appear after processing completes.") }}</pre>
             <div
+              id="detailMarkdownPreview"
+              class="document-file-preview document-markdown-preview"
+              {% if document_detail_preview_kind != "markdown" %}hidden{% endif %}
+            >{{ document_detail_html.detailMarkdownPreview|default("")|safe }}</div>
+            <div
               id="detailPdfPreview"
               class="document-file-preview document-pdf-preview"
               data-pdf-url="{{ document_detail_file_url|default("") }}"

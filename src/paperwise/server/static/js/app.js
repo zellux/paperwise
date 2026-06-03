@@ -523,6 +523,7 @@ export function applyDocumentDetailPartial(partialRoot) {
   const detailImagePreview = document.getElementById("detailImagePreview");
   const detailEmbedPreview = document.getElementById("detailEmbedPreview");
   const detailTextPreview = document.getElementById("detailTextPreview");
+  const detailMarkdownPreview = document.getElementById("detailMarkdownPreview");
   const detailPdfPreview = document.getElementById("detailPdfPreview");
   if (documentPreviewFrame instanceof HTMLElement) {
     documentPreviewFrame.dataset.previewKind = previewKind;
@@ -531,6 +532,7 @@ export function applyDocumentDetailPartial(partialRoot) {
       "document-preview-frame-image",
       "document-preview-frame-pdf",
       "document-preview-frame-embed",
+      "document-preview-frame-markdown",
       "document-preview-frame-text",
     );
     documentPreviewFrame.classList.add(`document-preview-frame-${previewKind || "embed"}`);
@@ -545,6 +547,9 @@ export function applyDocumentDetailPartial(partialRoot) {
   }
   if (detailTextPreview instanceof HTMLElement) {
     detailTextPreview.hidden = previewKind !== "text";
+  }
+  if (detailMarkdownPreview instanceof HTMLElement) {
+    detailMarkdownPreview.hidden = previewKind !== "markdown";
   }
   if (detailPdfPreview instanceof HTMLElement) {
     detailPdfPreview.dataset.pdfUrl = previewKind === "pdf" ? previewUrl : "";
