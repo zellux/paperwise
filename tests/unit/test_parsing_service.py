@@ -211,7 +211,12 @@ def test_parse_document_blob_skips_llm_ocr_for_local_provider(tmp_path) -> None:
 
 def test_parse_document_blob_text_file_skips_llm_ocr_when_configured(tmp_path) -> None:
     blob = tmp_path / "notes.txt"
-    blob.write_text("Directly readable notes\nwith useful metadata.", encoding="utf-8")
+    blob.write_text(
+        "Directly readable notes\n\n"
+        "Section breaks in plain text are not rendered document pages.\n\n"
+        "Still the same text preview.",
+        encoding="utf-8",
+    )
     llm = RecordingOCRLLM("")
 
     result = parse_document_blob(
@@ -226,6 +231,7 @@ def test_parse_document_blob_text_file_skips_llm_ocr_when_configured(tmp_path) -
     assert llm.image_calls == 0
     assert result.parser == "direct-text-parser"
     assert "Directly readable notes" in result.text_preview
+    assert result.page_count == 1
     assert result.ocr_details is not None
     assert result.ocr_details["attempts"]["text_extraction"]["selected"] is True
     assert result.ocr_details["attempts"]["llm_text"]["attempted"] is False
@@ -267,6 +273,7 @@ def test_parse_document_blob_docx_extracts_text_without_llm_ocr(tmp_path) -> Non
     assert "Coverage starts June 1." in result.text_preview
     assert "HYPERLINK" not in result.text_preview
     assert "Page 1 of 2" not in result.text_preview
+    assert result.page_count == 1
     assert result.ocr_details is not None
     assert result.ocr_details["final_text_source"] == "docx_text_read"
 
@@ -290,6 +297,7 @@ def test_parse_document_blob_doc_uses_direct_binary_text_fallback(tmp_path, monk
     assert result.parser == "direct-text-parser"
     assert "Legacy Word content" in result.text_preview
     assert "Amount due 42.00 USD" in result.text_preview
+    assert result.page_count == 1
     assert result.ocr_details is not None
     assert result.ocr_details["final_text_source"] == "doc_text_read"
 

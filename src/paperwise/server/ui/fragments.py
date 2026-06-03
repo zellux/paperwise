@@ -837,6 +837,12 @@ def _normalize_detail_page_count(value: object) -> int:
     return max(1, page_count)
 
 
+def _document_preview_page_count(*, preview_kind: str, page_count: object) -> int:
+    if preview_kind == "text":
+        return 1
+    return _normalize_detail_page_count(page_count)
+
+
 def _document_page_thumbnails_html(page_count: int) -> str:
     normalized_count = _normalize_detail_page_count(page_count)
     lines = (
@@ -897,7 +903,10 @@ def document_detail_fragments(initial_data: dict) -> dict:
     content_type = str(document.get("content_type") or "-")
     filename = str(document.get("filename") or "-")
     preview_kind = _document_preview_kind(content_type, filename)
-    page_count = _normalize_detail_page_count(document.get("page_count"))
+    page_count = _document_preview_page_count(
+        preview_kind=preview_kind,
+        page_count=document.get("page_count"),
+    )
     size_label = _format_bytes(size_bytes)
     ocr_preview = str(detail.get("ocr_text_preview") or "").strip()
     ocr_parsed_at = str(detail.get("ocr_parsed_at") or "-")

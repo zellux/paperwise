@@ -194,9 +194,8 @@ def _extract_docx_text(*, blob_path: Path, raw: bytes, max_chars: int) -> tuple[
         with ZipFile(blob_path) as zip_file:
             xml = zip_file.read("word/document.xml").decode("utf-8", errors="ignore")
         text_preview = _fit_preview_text(_extract_word_xml_text(xml), max_chars=max_chars)
-        page_count = max(1, text_preview.count("\n") // 30 + 1)
         if text_preview:
-            return text_preview, page_count
+            return text_preview, 1
     except (KeyError, BadZipFile):
         pass
     return _fit_preview_text(_decode_text_bytes(raw), max_chars=400), 1
@@ -415,7 +414,7 @@ def parse_document_blob(
             final_text_source = "pdf_text_extraction"
     elif suffix in {".txt", ".md", ".markdown"} or normalized_content_type in {"text/markdown", "text/plain"}:
         text_preview = _extract_plain_text(raw, max_chars=8000)
-        page_count = max(1, text_preview.count("\n\n") + 1) if text_preview.strip() else 1
+        page_count = 1
         _mark_ocr_attempt(
             ocr_details,
             "text_extraction",
@@ -443,7 +442,7 @@ def parse_document_blob(
         final_text_source = "docx_text_read"
     elif suffix == ".doc" or normalized_content_type == "application/msword":
         text_preview = _extract_doc_text(blob_path=blob_path, raw=raw, max_chars=8000)
-        page_count = max(1, text_preview.count("\n") // 30 + 1) if text_preview.strip() else 1
+        page_count = 1
         _mark_ocr_attempt(
             ocr_details,
             "text_extraction",

@@ -121,7 +121,39 @@ def test_document_detail_preview_uses_extracted_text_for_docx() -> None:
     assert fragments["preview_kind"] == "text"
     assert fragments["preview_url"] == ""
     assert fragments["file_url"] == "/documents/docx-doc/file"
+    assert fragments["page_count"] == 1
+    assert fragments["text"]["previewTotalPages"] == "1"
     assert fragments["text"]["detailTextPreview"] == "Extracted DOCX text"
+
+
+def test_document_detail_text_preview_ignores_stale_parse_page_count() -> None:
+    fragments = document_detail_fragments(
+        {
+            "document_detail": {
+                "document": {
+                    "id": "txt-doc",
+                    "filename": "report.txt",
+                    "owner_id": "user-txt",
+                    "blob_uri": "local://report.txt",
+                    "checksum_sha256": "c" * 64,
+                    "content_type": "text/plain",
+                    "size_bytes": 456,
+                    "status": "ready",
+                    "created_at": "2026-05-12T00:00:00Z",
+                    "page_count": 6,
+                },
+                "llm_metadata": None,
+                "ocr_text_preview": "Plain text report",
+                "ocr_parsed_at": None,
+            },
+            "document_history": [],
+        }
+    )
+
+    assert fragments["preview_kind"] == "text"
+    assert fragments["page_count"] == 1
+    assert fragments["text"]["previewTotalPages"] == "1"
+    assert 'data-preview-page="2"' not in fragments["html"]["pageStrip"]
 
 
 def test_document_sidebar_lists_collapse_after_ten() -> None:
