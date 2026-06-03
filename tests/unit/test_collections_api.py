@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import logging
 
 from fastapi.testclient import TestClient
 
@@ -671,6 +672,59 @@ def test_chat_search_tool_does_not_run_llm_rewrite() -> None:
         payload = response.json()
         assert "Sonic Internet Bill" in payload["message"]["content"]
         assert payload["token_usage"]["llm_requests"] == 2
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_chat_debug_timing_logs_do_not_include_query_or_result_payload(caplog, monkeypatch) -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-sonic",
+        owner_id=TEST_USER.id,
+        filename="sonic.pdf",
+        text_preview="Sonic Internet monthly bill amount due: $54.99.",
+        title="Sonic Internet Bill",
+        document_type="Invoice",
+        tags=["Utilities"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeToolChatLLM()
+    llm_debug_records = []
+
+    def record_llm_debug_exchange(**kwargs) -> None:
+        llm_debug_records.append(kwargs)
+
+    monkeypatch.setattr(
+        "paperwise.application.services.chat_runtime.log_llm_exchange",
+        record_llm_debug_exchange,
+    )
+
+    try:
+        caplog.set_level(logging.DEBUG, logger="paperwise.application.services.chat_runtime")
+        client = TestClient(app)
+        response = client.post(
+            "/query/chat",
+            json={
+                "messages": [{"role": "user", "content": "How much was Sonic internet?"}],
+                "top_k_chunks": 8,
+            },
+        )
+        assert response.status_code == 200
+        log_text = "\n".join(record.getMessage() for record in caplog.records)
+        assert "chat_runtime_timing stage=initial_local_search" in log_text
+        assert "chat_runtime_timing stage=llm_tool_round" in log_text
+        assert "chat_runtime_timing stage=tool_execution" in log_text
+        assert "How much was Sonic internet?" not in log_text
+        assert "Sonic Internet Bill" not in log_text
+        serialized_llm_debug = str(llm_debug_records)
+        assert "'provider': 'chat_runtime'" in serialized_llm_debug
+        assert "'endpoint': 'debug/timing'" in serialized_llm_debug
+        assert "initial_local_search" in serialized_llm_debug
+        assert "How much was Sonic internet?" not in serialized_llm_debug
+        assert "Sonic Internet Bill" not in serialized_llm_debug
     finally:
         app.dependency_overrides.clear()
 

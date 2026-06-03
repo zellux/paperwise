@@ -1,14 +1,18 @@
 from collections.abc import Iterator
 from dataclasses import dataclass
 import json
+import logging
+import time
 from typing import Any
 from uuid import uuid4
 
 from paperwise.application.interfaces import LLMProvider
 from paperwise.application.services.chat_tools import ChatToolRepository, ChatToolScope, execute_chat_tool
 from paperwise.domain.models import User
+from paperwise.infrastructure.llm.debug_log import log_llm_exchange
 
 INITIAL_LOCAL_SEARCH_MAX_CHUNKS = 8
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -97,6 +101,7 @@ def _append_initial_local_search_context(
     query = _latest_user_query(messages)
     if not query:
         return
+    started_at = time.perf_counter()
     limit = max(1, min(INITIAL_LOCAL_SEARCH_MAX_CHUNKS, top_k_chunks))
     result = execute_chat_tool(
         repository=repository,
@@ -107,6 +112,13 @@ def _append_initial_local_search_context(
         max_documents=max_documents,
         name="search_document_chunks",
         arguments={"query": query, "limit": limit},
+    )
+    elapsed_ms = (time.perf_counter() - started_at) * 1000
+    _debug_chat_timing(
+        stage="initial_local_search",
+        elapsed_ms=elapsed_ms,
+        result_count=int(result.get("total_results") or result.get("returned_results") or 0),
+        scope_document_count=result.get("scope_document_count"),
     )
     payload = {
         "query": query,
@@ -126,6 +138,32 @@ def _append_initial_local_search_context(
             ),
         },
     )
+
+
+def _debug_chat_timing(*, stage: str, elapsed_ms: float, **fields: Any) -> None:
+    payload = {
+        "stage": stage,
+        "elapsed_ms": round(elapsed_ms, 1),
+        **{
+            key: value
+            for key, value in fields.items()
+            if isinstance(value, (str, int, float, bool)) or value is None
+        },
+    }
+    log_llm_exchange(
+        provider="chat_runtime",
+        endpoint="debug/timing",
+        request_payload=payload,
+    )
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    safe_fields = " ".join(
+        f"{key}={value}"
+        for key, value in sorted(payload.items())
+        if key not in {"stage", "elapsed_ms"}
+    )
+    suffix = f" {safe_fields}" if safe_fields else ""
+    logger.debug("chat_runtime_timing stage=%s elapsed_ms=%.1f%s", stage, elapsed_ms, suffix)
 
 
 def iter_chat_runtime_events(
@@ -178,9 +216,19 @@ def iter_chat_runtime_events(
             status_detail = f"Choosing document tools, round {round_index + 1}."
         yield ChatRuntimeEvent("status", {"label": "LLM request", "detail": status_detail})
 
+        started_at = time.perf_counter()
         last_response = answer_with_tools(messages=messages, tools=tools)
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
         _record_chat_token_usage(token_usage, last_response)
         tool_calls = last_response.get("tool_calls", []) if isinstance(last_response, dict) else []
+        _debug_chat_timing(
+            stage="llm_tool_round",
+            elapsed_ms=elapsed_ms,
+            round=round_index + 1,
+            tool_call_count=len(tool_calls),
+            llm_requests=token_usage.get("llm_requests", 0),
+            total_tokens=token_usage.get("total_tokens", 0),
+        )
         yield ChatRuntimeEvent(
             "llm_response",
             {
@@ -205,6 +253,7 @@ def iter_chat_runtime_events(
                 }
             )
             yield ChatRuntimeEvent("tool_call", {"name": name, "arguments": arguments})
+            started_at = time.perf_counter()
             result = execute_chat_tool(
                 repository=repository,
                 llm_provider=llm_provider,
@@ -215,9 +264,16 @@ def iter_chat_runtime_events(
                 name=name,
                 arguments=arguments,
             )
+            elapsed_ms = (time.perf_counter() - started_at) * 1000
             tool_payloads.append(result)
             tool_results.append((call_id, name, result))
             result_count = int(result.get("total_results") or result.get("returned_results") or 0)
+            _debug_chat_timing(
+                stage="tool_execution",
+                elapsed_ms=elapsed_ms,
+                tool=name,
+                result_count=result_count,
+            )
             tool_calls_for_response.append(
                 {"name": name, "arguments": arguments, "result_count": result_count}
             )
@@ -250,8 +306,16 @@ def iter_chat_runtime_events(
             "status",
             {"label": "LLM request", "detail": "Writing final answer from collected tool results."},
         )
+        started_at = time.perf_counter()
         last_response = answer_with_tools(messages=messages, tools=[])
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
         _record_chat_token_usage(token_usage, last_response)
+        _debug_chat_timing(
+            stage="llm_final_from_exhausted_tools",
+            elapsed_ms=elapsed_ms,
+            llm_requests=token_usage.get("llm_requests", 0),
+            total_tokens=token_usage.get("total_tokens", 0),
+        )
         yield ChatRuntimeEvent("token_usage", dict(token_usage))
 
     content = str(last_response.get("content") or "").strip()
