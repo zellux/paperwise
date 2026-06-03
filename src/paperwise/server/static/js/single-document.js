@@ -352,11 +352,67 @@ function bindSystemInformationToggle() {
 
 function getPreviewPageCount() {
   const { pageStrip, previewTotalPages } = getSingleDocumentElements();
-  const rawCount = pageStrip instanceof HTMLElement
-    ? pageStrip.dataset.pageCount
-    : previewTotalPages?.textContent;
-  const pageCount = Number.parseInt(rawCount || "1", 10);
-  return Number.isFinite(pageCount) && pageCount > 0 ? pageCount : 1;
+  const candidates = [
+    pageStrip instanceof HTMLElement ? pageStrip.dataset.pageCount : "",
+    previewTotalPages?.textContent || "",
+    pdfDocument?.numPages || "",
+  ].map((value) => Number.parseInt(String(value || "1"), 10));
+  const pageCount = Math.max(
+    1,
+    ...candidates.filter((value) => Number.isFinite(value) && value > 0),
+  );
+  return pageCount;
+}
+
+function createPageThumbnailButton(pageNumber, activePage = 1) {
+  const button = document.createElement("button");
+  button.type = "button";
+  const active = pageNumber === activePage;
+  button.className = `strip-thumb${active ? " active" : ""}`;
+  button.dataset.previewPage = String(pageNumber);
+  button.setAttribute("aria-label", `Go to page ${pageNumber}`);
+  if (active) {
+    button.setAttribute("aria-current", "page");
+  }
+
+  const page = document.createElement("span");
+  page.className = "strip-thumb-page";
+  for (const width of ["70%", "85%", "60%", "78%", "55%"]) {
+    const line = document.createElement("span");
+    line.className = "strip-line";
+    line.style.width = width;
+    page.append(line);
+  }
+
+  const number = document.createElement("span");
+  number.className = "strip-num";
+  number.textContent = String(pageNumber);
+
+  button.append(page, number);
+  return button;
+}
+
+function syncPreviewPageCount(pageCount) {
+  const { pageStrip, previewCurrentPage, previewTotalPages } = getSingleDocumentElements();
+  const normalizedCount = Math.max(1, Number.parseInt(String(pageCount || 1), 10) || 1);
+  if (previewTotalPages instanceof HTMLElement) {
+    previewTotalPages.textContent = String(normalizedCount);
+  }
+  if (!(pageStrip instanceof HTMLElement)) {
+    return;
+  }
+  pageStrip.dataset.pageCount = String(normalizedCount);
+  const thumbnails = pageStrip.querySelectorAll("[data-preview-page]");
+  if (thumbnails.length === normalizedCount) {
+    return;
+  }
+  const activePage = Math.min(
+    normalizedCount,
+    Math.max(1, Number.parseInt(previewCurrentPage?.textContent || "1", 10) || 1),
+  );
+  pageStrip.replaceChildren(
+    ...Array.from({ length: normalizedCount }, (_, index) => createPageThumbnailButton(index + 1, activePage)),
+  );
 }
 
 function previewUrlForPage(src, pageNumber) {
@@ -456,10 +512,7 @@ async function ensurePdfDocument() {
     wasmUrl: PDFJS_WASM_URL,
     withCredentials: true,
   }).promise;
-  const { previewTotalPages } = getSingleDocumentElements();
-  if (previewTotalPages instanceof HTMLElement) {
-    previewTotalPages.textContent = String(pdfDocument.numPages || 1);
-  }
+  syncPreviewPageCount(pdfDocument.numPages || 1);
   return pdfDocument;
 }
 

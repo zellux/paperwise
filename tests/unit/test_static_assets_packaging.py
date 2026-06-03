@@ -22,6 +22,17 @@ def test_all_static_assets_are_declared_as_package_data() -> None:
     assert missing == []
 
 
+def test_pdf_viewer_syncs_navigation_with_loaded_pdf_page_count() -> None:
+    project_root = Path(__file__).resolve().parents[2]
+    viewer_script = (
+        project_root / "src" / "paperwise" / "server" / "static" / "js" / "single-document.js"
+    ).read_text()
+
+    assert "pdfDocument?.numPages" in viewer_script
+    assert "syncPreviewPageCount(pdfDocument.numPages || 1)" in viewer_script
+    assert "pageStrip.replaceChildren(" in viewer_script
+
+
 def _matches_package_data_pattern(relative_path: str, pattern: str) -> bool:
     path_parts = relative_path.split("/")
     pattern_parts = pattern.split("/")
