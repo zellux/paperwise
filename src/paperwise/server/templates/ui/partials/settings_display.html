@@ -127,8 +127,6 @@
               <div class="settings-form-grid settings-compact-number-grid">
                 <div class="settings-field">
                   <label class="settings-field-label" for="settingsGroundedQaTopKInput">Context chunks</label>
-                  <div class="settings-range-row">
-                    <input class="settings-range-slider" type="range" min="2" max="48" value="{{ settings_preferences.grounded_qa_top_k_chunks }}" />
                   <input
                     id="settingsGroundedQaTopKInput"
                     class="settings-number-input"
@@ -138,14 +136,10 @@
                     max="48"
                     value="{{ settings_preferences.grounded_qa_top_k_chunks }}"
                   />
-                  </div>
-                  <div class="settings-range-ticks"><span>2</span><span>12</span><span>24</span><span>36</span><span>48</span></div>
                   <span class="settings-field-hint">Higher = more grounded but slower; ~1.2k tokens per chunk.</span>
                 </div>
                 <div class="settings-field">
                   <label class="settings-field-label" for="settingsGroundedQaMaxDocsInput">Max source documents</label>
-                  <div class="settings-range-row">
-                    <input class="settings-range-slider" type="range" min="1" max="24" value="{{ settings_preferences.grounded_qa_max_documents }}" />
                   <input
                     id="settingsGroundedQaMaxDocsInput"
                     class="settings-number-input"
@@ -155,8 +149,6 @@
                     max="24"
                     value="{{ settings_preferences.grounded_qa_max_documents }}"
                   />
-                  </div>
-                  <div class="settings-range-ticks"><span>1</span><span>6</span><span>12</span><span>18</span><span>24</span></div>
                   <span class="settings-field-hint">Caps the citation list; the retriever will diversify across this many docs.</span>
                 </div>
               </div>

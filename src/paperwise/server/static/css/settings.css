@@ -670,62 +670,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-.settings-range-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 76px;
-  gap: 12px;
-  align-items: center;
-}
-
-.settings-range-slider {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 100%;
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(
-    to right,
-    var(--accent) 0%,
-    var(--accent) var(--pct, 50%),
-    color-mix(in srgb, var(--ink) 10%, transparent) var(--pct, 50%),
-    color-mix(in srgb, var(--ink) 10%, transparent) 100%
-  );
-  outline: none;
-}
-
-.settings-range-slider::-webkit-slider-thumb {
-  appearance: none;
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--accent);
-  border-radius: 50%;
-  background: var(--paper-solid);
-  box-shadow: var(--shadow-sm);
-  cursor: pointer;
-  transition: transform 120ms ease;
-}
-
-.settings-range-slider::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-}
-
-.settings-range-slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--accent);
-  border-radius: 50%;
-  background: var(--paper-solid);
-  cursor: pointer;
-}
-
-.settings-range-ticks {
-  display: flex;
-  justify-content: space-between;
-  color: var(--ink-mute);
-  font-family: var(--mono);
-  font-size: 0.7rem;
-}
-
 .settings-toggle {
   position: relative;
   width: 36px;

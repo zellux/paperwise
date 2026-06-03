@@ -617,6 +617,8 @@ def test_settings_page_server_renders_authenticated_cookie_preferences() -> None
         assert '<option value="50" selected>50 documents</option>' in response.text
         assert 'value="24"' in response.text
         assert 'value="7"' in response.text
+        assert 'class="settings-range-slider"' not in response.text
+        assert 'class="settings-range-ticks"' not in response.text
     finally:
         app.dependency_overrides.clear()
 
@@ -654,6 +656,10 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert "export async function refreshDocumentListAfterDelete" in documents_js.text
     assert "await loadDocumentsList();" in documents_js.text
     assert 'import { stableTagColor } from "./ui/tagColor.js";' in documents_js.text
+    assert "function getDocumentsTotalPages()" in documents_js.text
+    assert "function navigateToDocumentListPage(page)" in documents_js.text
+    assert 'closest("#pageJumpForm")' in documents_js.text
+    assert 'button.dataset.docsPageAction === "last"' in documents_js.text
     assert "const TAG_COLOR_SET" not in documents_js.text
 
     tag_color_js = client.get("/static/js/ui/tagColor.js")
@@ -1393,13 +1399,20 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert '<a class="row-act" href="/ui/document?id=' in documents_partial.text
         assert "Total documents: 4" in documents_partial.text
         assert "Processing: 1" in documents_partial.text
-        assert "Page 1 / 4" in documents_partial.text
+        assert '<form id="pageJumpForm" class="page-jump-form"' in documents_partial.text
+        assert '<input id="pageJumpInput" class="page-jump-input"' in documents_partial.text
+        assert 'min="1" max="4" value="1"' in documents_partial.text
+        assert '<span id="pageIndicator" class="page-indicator">/ 4</span>' in documents_partial.text
+        assert 'data-docs-page-action="first"' in documents_partial.text
+        assert 'data-docs-page-action="prev"' in documents_partial.text
         assert 'data-docs-page-action="next"' in documents_partial.text
+        assert 'data-docs-page-action="last"' in documents_partial.text
 
         overlarge_documents_partial = client.get("/ui/partials/documents?page_size=1&page=99")
         assert overlarge_documents_partial.status_code == 200
         assert 'data-documents-page="4"' in overlarge_documents_partial.text
-        assert "Page 4 / 4" in overlarge_documents_partial.text
+        assert 'min="1" max="4" value="4"' in overlarge_documents_partial.text
+        assert '<span id="pageIndicator" class="page-indicator">/ 4</span>' in overlarge_documents_partial.text
 
         tags_partial = client.get("/ui/partials/tags?sort_by=tag&sort_dir=desc")
         assert tags_partial.status_code == 200
