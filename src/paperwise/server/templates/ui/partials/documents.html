@@ -110,19 +110,19 @@
         <thead>
           <tr class="doc-thead">
             <th class="td-check"><input id="docsSelectAll" type="checkbox" aria-label="Select all visible documents" /></th>
-            <th class="th" data-sort-table="docs" data-sort-field="title" aria-sort="none">
-              <button type="button" class="table-sort-button th-btn"><span>Document</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+            <th class="th" data-sort-table="docs" data-sort-field="title" aria-sort="{% if documents_sort_by == 'title' and documents_sort_dir == 'asc' %}ascending{% elif documents_sort_by == 'title' and documents_sort_dir == 'desc' %}descending{% else %}none{% endif %}">
+              <button type="button" class="table-sort-button th-btn"><span>Document</span><span class="table-sort-indicator" aria-hidden="true">{% if documents_sort_by == 'title' and documents_sort_dir == 'asc' %}▲{% elif documents_sort_by == 'title' and documents_sort_dir == 'desc' %}▼{% else %}⇅{% endif %}</span></button>
             </th>
-            <th class="th th-corr" data-sort-table="docs" data-sort-field="correspondent" aria-sort="none">
-              <button type="button" class="table-sort-button th-btn"><span>Correspondent</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+            <th class="th th-corr" data-sort-table="docs" data-sort-field="correspondent" aria-sort="{% if documents_sort_by == 'correspondent' and documents_sort_dir == 'asc' %}ascending{% elif documents_sort_by == 'correspondent' and documents_sort_dir == 'desc' %}descending{% else %}none{% endif %}">
+              <button type="button" class="table-sort-button th-btn"><span>Correspondent</span><span class="table-sort-indicator" aria-hidden="true">{% if documents_sort_by == 'correspondent' and documents_sort_dir == 'asc' %}▲{% elif documents_sort_by == 'correspondent' and documents_sort_dir == 'desc' %}▼{% else %}⇅{% endif %}</span></button>
             </th>
-            <th class="th th-tags" data-sort-table="docs" data-sort-field="tags" aria-sort="none">
-              <button type="button" class="table-sort-button th-btn"><span>Tags</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+            <th class="th th-tags" data-sort-table="docs" data-sort-field="tags" aria-sort="{% if documents_sort_by == 'tags' and documents_sort_dir == 'asc' %}ascending{% elif documents_sort_by == 'tags' and documents_sort_dir == 'desc' %}descending{% else %}none{% endif %}">
+              <button type="button" class="table-sort-button th-btn"><span>Tags</span><span class="table-sort-indicator" aria-hidden="true">{% if documents_sort_by == 'tags' and documents_sort_dir == 'asc' %}▲{% elif documents_sort_by == 'tags' and documents_sort_dir == 'desc' %}▼{% else %}⇅{% endif %}</span></button>
             </th>
             <th class="th th-date-size" aria-label="Date and size">
               <span class="date-size-sort-group">
-                <button type="button" class="table-sort-button th-btn date-size-sort-button" data-sort-table="docs" data-sort-field="document_date" aria-sort="none"><span>Date</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
-                <button type="button" class="table-sort-button th-btn date-size-sort-button" data-sort-table="docs" data-sort-field="size" aria-sort="none"><span>Size</span><span class="table-sort-indicator" aria-hidden="true">⇅</span></button>
+                <button type="button" class="table-sort-button th-btn date-size-sort-button" data-sort-table="docs" data-sort-field="document_date" aria-sort="{% if documents_sort_by == 'document_date' and documents_sort_dir == 'asc' %}ascending{% elif documents_sort_by == 'document_date' and documents_sort_dir == 'desc' %}descending{% else %}none{% endif %}"><span>Date</span><span class="table-sort-indicator" aria-hidden="true">{% if documents_sort_by == 'document_date' and documents_sort_dir == 'asc' %}▲{% elif documents_sort_by == 'document_date' and documents_sort_dir == 'desc' %}▼{% else %}⇅{% endif %}</span></button>
+                <button type="button" class="table-sort-button th-btn date-size-sort-button" data-sort-table="docs" data-sort-field="size" aria-sort="{% if documents_sort_by == 'size' and documents_sort_dir == 'asc' %}ascending{% elif documents_sort_by == 'size' and documents_sort_dir == 'desc' %}descending{% else %}none{% endif %}"><span>Size</span><span class="table-sort-indicator" aria-hidden="true">{% if documents_sort_by == 'size' and documents_sort_dir == 'asc' %}▲{% elif documents_sort_by == 'size' and documents_sort_dir == 'desc' %}▼{% else %}⇅{% endif %}</span></button>
               </span>
             </th>
             <th class="th" aria-label="Actions"></th>

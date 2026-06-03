@@ -9,7 +9,12 @@ from paperwise.application.interfaces import (
 )
 from paperwise.application.services.activity import ActivityRepository, owner_activity_summary
 from paperwise.application.services.chat_threads import LegacyChatThreadRepository, migrate_legacy_chat_threads
-from paperwise.application.services.document_listing import list_filtered_documents, normalized_values
+from paperwise.application.services.document_listing import (
+    list_filtered_documents,
+    normalized_sort_direction,
+    normalized_sort_field,
+    normalized_values,
+)
 from paperwise.application.services.llm_preferences import (
     llm_provider_defaults_payload,
     llm_supported_providers_payload,
@@ -244,6 +249,17 @@ def documents_initial_data(
 ) -> dict:
     data = page_initial_data(current_user, repository)
     data.update(document_sidebar_data(repository, current_user))
+    normalized_sort_by = normalized_sort_field(sort_by) or ""
+    normalized_sort_dir = normalized_sort_direction(sort_dir) or ""
+    if not normalized_sort_by or not normalized_sort_dir:
+        normalized_sort_by = ""
+        normalized_sort_dir = ""
+    data.update(
+        {
+            "documents_sort_by": normalized_sort_by,
+            "documents_sort_dir": normalized_sort_dir,
+        }
+    )
     normalized_page_size = _documents_page_size(data, page_size)
     requested_page = max(1, int(page or 1))
     if current_user is None:

@@ -1288,6 +1288,19 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'data-delete-doc-id="doc-tax"' not in documents_html
         assert "icon-action-button" not in documents_html
 
+        sorted_documents_html = client.get("/ui/documents?sort_by=title&sort_dir=asc").text
+        sorted_documents_payload = _initial_data_from_response(sorted_documents_html)
+        assert sorted_documents_payload["documents_sort_by"] == "title"
+        assert sorted_documents_payload["documents_sort_dir"] == "asc"
+        assert (
+            '<th class="th" data-sort-table="docs" data-sort-field="title" aria-sort="ascending">'
+            in sorted_documents_html
+        )
+        assert (
+            '<span>Document</span><span class="table-sort-indicator" aria-hidden="true">▲</span>'
+            in sorted_documents_html
+        )
+
         detail_html = client.get("/ui/document?id=doc-tax").text
         detail_payload = _initial_data_from_response(detail_html)
         assert detail_payload["document_detail"]["document"]["id"] == "doc-tax"

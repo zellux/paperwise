@@ -1469,6 +1469,7 @@ export async function initializePage({ authenticated, initialData }) {
     return;
   }
   readDocumentListStateFromUrl();
+  renderSortHeaders();
   bindDocumentsEvents();
   applyDocumentListFiltersToControls();
   if (hydrateInitialDocumentsData(initialData || {})) {

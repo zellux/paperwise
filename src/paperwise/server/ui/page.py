@@ -187,6 +187,8 @@ def _initial_render_context(initial_data: dict) -> dict:
     processing_count = int(initial_data.get("documents_processing_count") or 0)
     page = max(1, int(initial_data.get("documents_page") or 1))
     page_size = max(1, int(initial_data.get("documents_page_size") or 20))
+    documents_sort_by = str(initial_data.get("documents_sort_by") or "")
+    documents_sort_dir = str(initial_data.get("documents_sort_dir") or "")
     return {
         "activity_table_body_html": activity_rows_html(
             activity_documents if isinstance(activity_documents, list) else []
@@ -229,6 +231,8 @@ def _initial_render_context(initial_data: dict) -> dict:
         ),
         "documents_total": total,
         "documents_processing_count": processing_count,
+        "documents_sort_by": documents_sort_by,
+        "documents_sort_dir": documents_sort_dir,
         "documents_all_count": int(initial_data.get("documents_all_count") or total),
         "documents_failed_count": int(initial_data.get("documents_failed_count") or 0),
         "documents_failed_filter": bool(initial_data.get("documents_failed_filter")),
