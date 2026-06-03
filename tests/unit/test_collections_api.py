@@ -162,10 +162,13 @@ class FakeTimeoutGroundedLLM(FakeGroundedLLM):
 class FakeToolChatLLM(FakeGroundedLLM):
     def __init__(self) -> None:
         self.calls = 0
+        self.first_messages: list[dict] | None = None
 
     def answer_with_tools(self, *, messages: list[dict], tools: list[dict]) -> dict:
         del tools
         self.calls += 1
+        if self.calls == 1:
+            self.first_messages = [dict(message) for message in messages]
         if self.calls == 1:
             return {
                 "role": "assistant",
@@ -193,6 +196,12 @@ class FakeToolChatLLM(FakeGroundedLLM):
             "llm_total_tokens": 13,
             "tool_calls": [],
         }
+
+
+class FakeNoRewriteToolChatLLM(FakeToolChatLLM):
+    def rewrite_retrieval_queries(self, *, question: str) -> dict:
+        del question
+        raise AssertionError("chat search should use local heuristic search without LLM rewrite")
 
 
 class FakeMetadataToolChatLLM(FakeGroundedLLM):
@@ -567,9 +576,10 @@ def test_chat_queries_all_documents_with_tool_calls() -> None:
         tags=["Medical"],
     )
 
+    llm = FakeToolChatLLM()
     app.dependency_overrides[document_repository_dependency] = lambda: repository
     app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
-    app.dependency_overrides[llm_provider_dependency] = lambda: FakeToolChatLLM()
+    app.dependency_overrides[llm_provider_dependency] = lambda: llm
 
     try:
         client = TestClient(app)
@@ -588,6 +598,14 @@ def test_chat_queries_all_documents_with_tool_calls() -> None:
         assert payload["token_usage"]["llm_requests"] == 2
         assert payload["citations"]
         assert payload["citations"][0]["document_id"] == "doc-sonic"
+        initial_search_messages = [
+            message
+            for message in llm.first_messages or []
+            if "Initial local document search" in str(message.get("content") or "")
+        ]
+        assert initial_search_messages
+        assert '"search_strategy": "local_heuristic"' in initial_search_messages[0]["content"]
+        assert "Sonic Internet Bill" in initial_search_messages[0]["content"]
         thread_id = payload["thread_id"]
         assert thread_id
         saved_preferences = repository.get_user_preference(TEST_USER.id)
@@ -619,6 +637,40 @@ def test_chat_queries_all_documents_with_tool_calls() -> None:
 
         missing_thread_response = client.get(f"/query/chat/threads/{thread_id}")
         assert missing_thread_response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_chat_search_tool_does_not_run_llm_rewrite() -> None:
+    repository = InMemoryDocumentRepository()
+    _save_document(
+        repository,
+        doc_id="doc-sonic",
+        owner_id=TEST_USER.id,
+        filename="sonic.pdf",
+        text_preview="Sonic Internet monthly bill amount due: $54.99.",
+        title="Sonic Internet Bill",
+        document_type="Invoice",
+        tags=["Utilities"],
+    )
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: FakeNoRewriteToolChatLLM()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/query/chat",
+            json={
+                "messages": [{"role": "user", "content": "How much was Sonic internet?"}],
+                "top_k_chunks": 8,
+            },
+        )
+        assert response.status_code == 200
+        payload = response.json()
+        assert "Sonic Internet Bill" in payload["message"]["content"]
+        assert payload["token_usage"]["llm_requests"] == 2
     finally:
         app.dependency_overrides.clear()
 

@@ -50,7 +50,9 @@ CHAT_SYSTEM_PROMPT = (
     "documents, tags, metadata, and grounded text chunks. Do not answer from outside knowledge. For document "
     "content claims, cite returned source titles or chunk IDs in your Markdown answer. Always query across all "
     "owner-visible documents unless a metadata filter is needed. If the tools return no useful evidence, say "
-    "that the documents do not contain enough evidence. Prefer metadata tools for "
+    "that the documents do not contain enough evidence. The first request may include preliminary local search "
+    "results; use them when sufficient, or call search_document_chunks with a rewritten query when they are not. "
+    "Prefer metadata tools for "
     "questions about counts, available tags, document types, dates, correspondents, or document lists."
 )
 MAX_CHAT_TOOL_ROUNDS = 3

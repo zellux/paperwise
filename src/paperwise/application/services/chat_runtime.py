@@ -8,6 +8,8 @@ from paperwise.application.interfaces import LLMProvider
 from paperwise.application.services.chat_tools import ChatToolRepository, ChatToolScope, execute_chat_tool
 from paperwise.domain.models import User
 
+INITIAL_LOCAL_SEARCH_MAX_CHUNKS = 8
+
 
 @dataclass(frozen=True)
 class ChatRuntimeResult:
@@ -72,6 +74,60 @@ def _append_chat_tool_messages(
         )
 
 
+def _latest_user_query(messages: list[dict[str, Any]]) -> str:
+    for message in reversed(messages):
+        if str(message.get("role") or "").strip().lower() != "user":
+            continue
+        content = " ".join(str(message.get("content") or "").split()).strip()
+        if content:
+            return content
+    return ""
+
+
+def _append_initial_local_search_context(
+    *,
+    repository: ChatToolRepository,
+    llm_provider: LLMProvider,
+    current_user: User,
+    messages: list[dict[str, Any]],
+    scope: ChatToolScope,
+    top_k_chunks: int,
+    max_documents: int,
+) -> None:
+    query = _latest_user_query(messages)
+    if not query:
+        return
+    limit = max(1, min(INITIAL_LOCAL_SEARCH_MAX_CHUNKS, top_k_chunks))
+    result = execute_chat_tool(
+        repository=repository,
+        llm_provider=llm_provider,
+        current_user=current_user,
+        scope=scope,
+        top_k_chunks=limit,
+        max_documents=max_documents,
+        name="search_document_chunks",
+        arguments={"query": query, "limit": limit},
+    )
+    payload = {
+        "query": query,
+        "search_strategy": "local_heuristic",
+        "result": result,
+    }
+    messages.insert(
+        1,
+        {
+            "role": "system",
+            "content": (
+                "Initial local document search for the latest user message has already run. "
+                "Use these preliminary OCR chunk results if they contain enough evidence. "
+                "If they are incomplete or poorly targeted, call search_document_chunks with "
+                "your own rewritten query or metadata filters. JSON: "
+                f"{json.dumps(payload)}"
+            ),
+        },
+    )
+
+
 def iter_chat_runtime_events(
     *,
     repository: ChatToolRepository,
@@ -97,6 +153,20 @@ def iter_chat_runtime_events(
     token_usage: dict[str, int] = {"total_tokens": 0, "llm_requests": 0}
     last_response: dict[str, Any] = {}
     exhausted_tool_rounds = False
+
+    yield ChatRuntimeEvent(
+        "status",
+        {"label": "Local search", "detail": "Searching OCR chunks before the first LLM request."},
+    )
+    _append_initial_local_search_context(
+        repository=repository,
+        llm_provider=llm_provider,
+        current_user=current_user,
+        messages=messages,
+        scope=scope,
+        top_k_chunks=top_k_chunks,
+        max_documents=max_documents,
+    )
 
     for round_index in range(max_tool_rounds):
         if tool_calls_for_response:

@@ -74,7 +74,7 @@ def execute_chat_tool(
             query=query,
             limit=max(limit * 3, limit),
             document_ids=scoped_ids,
-            llm_provider=llm_provider,
+            llm_provider=None,
         )
         contexts = build_qa_contexts(
             repository=repository,
