@@ -1,0 +1,15 @@
+{% if not rows %}
+<tr><td colspan="3">No document types found.</td></tr>
+{% else %}
+{% for row in rows %}
+<tr>
+  <td data-label="Document Type">{{ row.document_type }}</td>
+  <td data-label="Documents">{{ row.count }}</td>
+  <td data-label="Action">
+    <div class="table-actions">
+      <a class="btn" href="/ui/documents?document_type={{ row.document_type_query }}" title="View documents for type {{ row.document_type }}">View Docs</a>
+    </div>
+  </td>
+</tr>
+{% endfor %}
+{% endif %}

@@ -1,0 +1,14 @@
+{% for page_number in page_numbers %}
+<button
+  type="button"
+  class="strip-thumb{% if page_number == 1 %} active{% endif %}"
+  data-preview-page="{{ page_number }}"
+  aria-label="Go to page {{ page_number }}"
+  {% if page_number == 1 %}aria-current="page"{% endif %}
+>
+  <span class="strip-thumb-page">
+    {% for width in line_widths %}<span class="strip-line" style="width: {{ width }}%"></span>{% endfor %}
+  </span>
+  <span class="strip-num">{{ page_number }}</span>
+</button>
+{% endfor %}

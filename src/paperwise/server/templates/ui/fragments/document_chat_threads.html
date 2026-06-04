@@ -1,0 +1,20 @@
+{% if not items %}
+<p class="document-history-empty">No chat threads have referenced this document yet.</p>
+{% else %}
+<div class="document-thread-list">
+  {% for item in items %}
+  <article class="document-thread-item">
+    <div class="document-thread-header">
+      <a class="document-thread-title" href="/ui/grounded-qa?thread_id={{ item.thread_query }}">{{ item.title }}</a>
+      <span class="document-thread-meta">{{ item.meta }}</span>
+    </div>
+    {% if item.question %}<p class="document-thread-question">{{ item.question }}</p>{% endif %}
+    {% if item.sources %}
+    <div class="document-thread-sources">
+      {% for source in item.sources %}<span>{{ source }}</span>{% endfor %}
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>
+{% endif %}

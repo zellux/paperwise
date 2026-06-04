@@ -1,0 +1,86 @@
+{% if not rows %}
+<tr class="docs-empty-row">
+  <td colspan="6">
+    <div class="doc-empty">
+      <div class="doc-empty-mark" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/>
+        </svg>
+      </div>
+      <p>No documents found.</p>
+    </div>
+  </td>
+</tr>
+{% else %}
+{% for row in rows %}
+<tr
+  class="doc-row"
+  data-doc-id="{{ row.document_id }}"
+  data-doc-title="{{ row.raw_title }}"
+  data-doc-filename="{{ row.raw_filename }}"
+  data-doc-date="{{ row.document_date_raw }}"
+  data-doc-correspondent="{{ row.correspondent_raw }}"
+  data-doc-type="{{ row.document_type_raw }}"
+  data-doc-starred="{% if row.starred %}true{% else %}false{% endif %}"
+  data-doc-tags="{{ row.tags_json_attr|safe }}"
+>
+  <td class="td td-check" data-label="Select">
+    <input type="checkbox" data-doc-select="{{ row.document_id }}" aria-label="Select {{ row.title }}" />
+  </td>
+  <td class="td td-title" data-label="Document">
+    <span class="type-icon {{ row.type_icon_class }}" aria-hidden="true">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+    </span>
+    <span class="title-stack">
+      <span class="title-row">
+        <a class="title-link" href="/ui/document?id={{ row.document_id_query }}">{{ row.title }}</a>
+        {% if row.starred %}<span class="row-star" aria-label="Starred document">★</span>{% endif %}
+        {% if row.status %}<span class="status-badge status-{{ row.status.status }}">{{ row.status.label }}</span>{% endif %}
+      </span>
+      <span class="title-meta">
+        <span class="filename">{{ row.filename }}</span>
+        {% if row.page_count %}<span class="dot" aria-hidden="true"></span><span>{{ row.page_count }}</span>{% endif %}
+      </span>
+    </span>
+  </td>
+  <td class="td td-corr" data-label="Correspondent">
+    <span class="corr-cell">
+      <span class="corr-avatar corr-avatar-sm">{{ row.correspondent_initials }}</span>
+      <a class="corr-link" href="/ui/documents?correspondent={{ row.correspondent_query }}">{{ row.correspondent }}</a>
+    </span>
+  </td>
+  <td class="td td-tags" data-label="Tags">
+    {% if row.tags %}
+    {% for tag in row.tags %}
+    <a class="tag-pill" href="{{ tag.href }}" style="--tag-color: {{ tag.color }};" data-full-tag="{{ tag.label }}">
+      <span class="tag-swatch tag-swatch-xs" aria-hidden="true"></span>
+      <span class="tag-pill-label">{{ tag.label }}</span>
+    </a>
+    {% endfor %}
+    {% if row.hidden_tag_count > 0 %}
+    <button type="button" class="tag-pill tag-more tag-more-button" data-tags-expand="{{ row.document_id }}" aria-label="Show all tags for {{ row.title }}">+{{ row.hidden_tag_count }}</button>
+    {% endif %}
+    {% else %}
+    <span class="muted">-</span>
+    {% endif %}
+  </td>
+  <td class="td td-date-size" data-label="Date / Size">
+    <span>{{ row.display_date }}</span>
+    <span class="td-size-line">{{ row.size }}</span>
+  </td>
+  <td class="td td-actions" data-label="Action">
+    <div class="table-actions">
+      <a class="row-act" href="/ui/document?id={{ row.document_id_query }}" title="Open document" aria-label="Open document">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+    </div>
+  </td>
+</tr>
+{% endfor %}
+{% endif %}

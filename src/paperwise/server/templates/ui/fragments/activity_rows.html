@@ -1,0 +1,19 @@
+{% if not rows %}
+<tr><td colspan="4">No processed documents.</td></tr>
+{% else %}
+{% for row in rows %}
+<tr>
+  <td data-label="Title"><a class="link-button" href="/ui/document?id={{ row.document_id_query }}">{{ row.title }}</a></td>
+  <td data-label="Status">
+    <span class="status-badge status-{{ row.status.status }}">{{ row.status.label }}</span>
+  </td>
+  <td data-label="Uploaded">{{ row.created_at }}</td>
+  <td data-label="Action">
+    <div class="table-actions">
+      <a class="btn" href="/ui/document?id={{ row.document_id_query }}" title="Open document">Open</a>
+      <a class="btn btn-muted" href="/documents/{{ row.document_id_query }}/file" target="_blank" rel="noopener noreferrer" title="View file">View</a>
+    </div>
+  </td>
+</tr>
+{% endfor %}
+{% endif %}

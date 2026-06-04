@@ -1,0 +1,10 @@
+{% if not tags %}
+<span class="tag-pill tag-empty">No tags</span>
+{% else %}
+{% for tag in tags %}
+<a class="tag-pill" href="{{ tag.href }}" style="--tag-color: {{ tag.color }};">
+  <span class="tag-swatch tag-swatch-xs" aria-hidden="true"></span>
+  {{ tag.label }}
+</a>
+{% endfor %}
+{% endif %}

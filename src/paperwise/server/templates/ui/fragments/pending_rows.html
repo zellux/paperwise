@@ -1,0 +1,53 @@
+{% if not rows %}
+<tr class="docs-empty-row">
+  <td colspan="5">
+    <div class="doc-empty">
+      <div class="doc-empty-mark" aria-hidden="true">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7h18"/><path d="M5 7l1 12h12l1-12"/><path d="M9 11h6"/>
+        </svg>
+      </div>
+      <p>No documents are processing.</p>
+    </div>
+  </td>
+</tr>
+{% else %}
+{% for row in rows %}
+<tr class="doc-row pending-row" data-pending-doc-id="{{ row.document_id }}">
+  <td class="td td-title" data-label="Document">
+    <span class="type-icon {{ row.type_icon_class }}" aria-hidden="true">
+      <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+        <polyline points="14 2 14 8 20 8"/>
+      </svg>
+    </span>
+    <span class="title-stack">
+      <span class="title-row">
+        <a class="title-link" href="/ui/document?id={{ row.document_id_query }}">{{ row.title }}</a>
+      </span>
+      <span class="title-meta"><span class="filename">{{ row.filename }}</span></span>
+    </span>
+  </td>
+  <td class="td td-status" data-label="Status">
+    <span class="status-badge status-{{ row.status.status }}">{{ row.status.label }}</span>
+    <span class="pending-stage">
+      <span class="pending-stage-row"><span>{{ row.stage_label }}</span><span>{{ row.stage_progress }}%</span></span>
+      <span class="pending-stage-track" data-stage="{{ row.stage_key }}">
+        <span style="width: {{ row.stage_progress }}%"></span>
+      </span>
+    </span>
+  </td>
+  <td class="td td-date-size" data-label="Queued"><span>{{ row.created_at }}</span></td>
+  <td class="td td-file" data-label="File"><span>{{ row.size }}</span><span class="td-meta">{{ row.content_type }}</span></td>
+  <td class="td td-actions" data-label="Action">
+    <div class="table-actions">
+      <a class="row-act" href="/ui/document?id={{ row.document_id_query }}" title="Open document" aria-label="Open document">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </a>
+    </div>
+  </td>
+</tr>
+{% endfor %}
+{% endif %}

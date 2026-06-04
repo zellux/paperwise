@@ -1,0 +1,27 @@
+{% if not rows %}
+<span class="docs-side-empty">{{ empty_label }}</span>
+{% else %}
+{% for row in rows %}
+<a class="docs-side-row {{ row_class }}" href="{{ row.href }}"{% if row.hidden %} hidden data-sidebar-extra="{{ group }}"{% endif %}>
+  {% if kind == "tags" %}
+  <span class="tag-swatch" style="--tag-color: {{ row.color }};" aria-hidden="true"></span>
+  {% elif kind == "document-types" %}
+  <span class="doc-type-dot" aria-hidden="true"></span>
+  {% elif kind == "correspondents" %}
+  <span class="corr-avatar corr-avatar-sm" aria-hidden="true">{{ row.initials }}</span>
+  {% endif %}
+  <span>{{ row.label }}</span>
+  <span class="docs-side-count">{{ row.count|format_number }}</span>
+</a>
+{% endfor %}
+{% if hidden_count > 0 %}
+<button
+  type="button"
+  class="docs-side-toggle"
+  data-sidebar-toggle="{{ group }}"
+  data-collapsed-label="Show all ({{ hidden_count }} more)"
+  data-expanded-label="Show fewer"
+  aria-expanded="false"
+>Show all ({{ hidden_count }} more)</button>
+{% endif %}
+{% endif %}

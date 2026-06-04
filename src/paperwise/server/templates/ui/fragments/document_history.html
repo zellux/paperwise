@@ -1,0 +1,17 @@
+{% if not items %}
+<p class="document-history-empty">No history entries yet.</p>
+{% else %}
+{% for item in items %}
+<article class="document-history-item">
+  <div class="document-history-header">
+    <span class="document-history-type">{{ item.event_type }}</span>
+    <span class="document-history-meta">{{ item.actor }} | {{ item.source }} | {{ item.created_at }}</span>
+  </div>
+  <div class="document-history-changes">
+    {% for change in item.changes %}
+    <p class="document-history-change">{{ change }}</p>
+    {% endfor %}
+  </div>
+</article>
+{% endfor %}
+{% endif %}

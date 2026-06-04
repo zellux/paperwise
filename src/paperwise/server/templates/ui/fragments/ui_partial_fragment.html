@@ -1,0 +1,10 @@
+<div
+  class="ui-partial-fragment"
+  {% for key, value in data_attrs.items() -%}
+  data-{{ key|replace("_", "-") }}="{% if value is sameas true %}true{% elif value is sameas false %}false{% else %}{{ value }}{% endif %}"
+  {% endfor -%}
+>
+  {% for item in templates %}
+  <template {{ item.attr }}="{{ item.target_id }}">{{ item.html|safe }}</template>
+  {% endfor %}
+</div>

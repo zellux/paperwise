@@ -53,6 +53,7 @@ paperwise = [
   "server/static/vendor/pdfjs/standard_fonts/*",
   "server/static/vendor/pdfjs/wasm/*",
   "server/templates/ui/*.html",
+  "server/templates/ui/fragments/*.html",
   "server/templates/ui/partials/*.html",
 ]
 

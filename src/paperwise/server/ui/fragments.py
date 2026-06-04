@@ -1,71 +1,55 @@
 from datetime import UTC, datetime, timedelta
 from html import escape
 import json
+from pathlib import Path
 import re
 from urllib.parse import quote
 
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
 from paperwise.server.ui.tag_colors import stable_tag_color
+
+_SERVER_DIR = Path(__file__).resolve().parent.parent
+_FRAGMENT_TEMPLATE_ENV = Environment(
+    loader=FileSystemLoader(_SERVER_DIR / "templates" / "ui" / "fragments"),
+    autoescape=select_autoescape(("html", "xml")),
+    trim_blocks=True,
+    lstrip_blocks=True,
+)
+_FRAGMENT_TEMPLATE_ENV.filters["format_number"] = lambda value: f"{int(value or 0):,}"
+
+
+def _render_fragment_template(template_name: str, **context: object) -> str:
+    return _FRAGMENT_TEMPLATE_ENV.get_template(template_name).render(context).strip()
 
 
 def _stable_tag_color(value: str) -> str:
     return stable_tag_color(value)
 
 
-def _tag_color_style(value: str) -> str:
-    return f' style="--tag-color: {_stable_tag_color(value)};"'
-
-
-def _html_attr(value: object) -> str:
-    return escape(str(value or ""), quote=True)
-
-
 def tag_rows_html(tag_stats: list[dict]) -> str:
-    if not tag_stats:
-        return '                <tr><td colspan="3">No tags found.</td></tr>'
-    rows: list[str] = []
-    for stat in tag_stats:
-        raw_tag = str(stat.get("tag") or "")
-        tag = escape(raw_tag)
-        tag_query = quote(raw_tag, safe="")
-        count = int(stat.get("document_count") or 0)
-        rows.append(
-            "                <tr>"
-            f'<td data-label="Tag"><span class="tag-list-label"{_tag_color_style(raw_tag)}>'
-            '<span class="tag-swatch" aria-hidden="true"></span>'
-            f"<span>{tag}</span></span></td>"
-            f'<td data-label="Documents">{count}</td>'
-            '<td data-label="Action"><div class="table-actions">'
-            f'<a class="btn" href="/ui/documents?tag={tag_query}" title="View documents for tag {tag}">'
-            "View Docs"
-            "</a>"
-            "</div></td>"
-            "</tr>"
-        )
-    return "\n".join(rows)
+    rows = [
+        {
+            "tag": str(stat.get("tag") or ""),
+            "tag_query": quote(str(stat.get("tag") or ""), safe=""),
+            "count": int(stat.get("document_count") or 0),
+            "color": _stable_tag_color(str(stat.get("tag") or "")),
+        }
+        for stat in tag_stats
+    ]
+    return _render_fragment_template("tag_rows.html", rows=rows)
 
 
 def document_type_rows_html(type_stats: list[dict]) -> str:
-    if not type_stats:
-        return '                <tr><td colspan="3">No document types found.</td></tr>'
-    rows: list[str] = []
-    for stat in type_stats:
-        raw_document_type = str(stat.get("document_type") or "")
-        document_type = escape(raw_document_type)
-        document_type_query = quote(raw_document_type, safe="")
-        count = int(stat.get("document_count") or 0)
-        rows.append(
-            "                <tr>"
-            f'<td data-label="Document Type">{document_type}</td>'
-            f'<td data-label="Documents">{count}</td>'
-            '<td data-label="Action"><div class="table-actions">'
-            f'<a class="btn" href="/ui/documents?document_type={document_type_query}" '
-            f'title="View documents for type {document_type}">'
-            "View Docs"
-            "</a>"
-            "</div></td>"
-            "</tr>"
-        )
-    return "\n".join(rows)
+    rows = [
+        {
+            "document_type": str(stat.get("document_type") or ""),
+            "document_type_query": quote(str(stat.get("document_type") or ""), safe=""),
+            "count": int(stat.get("document_count") or 0),
+        }
+        for stat in type_stats
+    ]
+    return _render_fragment_template("document_type_rows.html", rows=rows)
 
 
 def _document_title(item: dict) -> str:
@@ -134,6 +118,13 @@ def _document_type_icon_class(content_type: str, filename: str) -> str:
     return "type-file"
 
 
+def _status_badge_context(status_value: str, *, hide_ready: bool = False) -> dict[str, str] | None:
+    status = str(status_value or "").lower()
+    if hide_ready and status == "ready":
+        return None
+    return {"status": status, "label": _format_status(status)}
+
+
 def _format_page_count(value: object) -> str:
     try:
         page_count = int(value or 0)
@@ -154,93 +145,81 @@ def _initials(value: str) -> str:
     return cleaned[:2].upper()
 
 
-def _sidebar_expand_button(*, group: str, hidden_count: int) -> str:
-    group_attr = _html_attr(group)
-    collapsed_label = f"Show all ({hidden_count} more)"
-    return (
-        f'<button type="button" class="docs-side-toggle" data-sidebar-toggle="{group_attr}" '
-        f'data-collapsed-label="{_html_attr(collapsed_label)}" '
-        'data-expanded-label="Show fewer" aria-expanded="false">'
-        f"{escape(collapsed_label)}</button>"
-    )
-
-
 def document_sidebar_tags_html(tag_stats: list[dict], *, limit: int = 10) -> str:
-    if not tag_stats:
-        return '<span class="docs-side-empty">No tags yet</span>'
-    rows: list[str] = []
+    rows = []
     for stat in tag_stats:
         raw_tag = str(stat.get("tag") or "").strip()
         if not raw_tag:
             continue
-        tag = escape(raw_tag)
-        tag_query = quote(raw_tag, safe="")
-        count = int(stat.get("document_count") or 0)
-        hidden = ' hidden data-sidebar-extra="tags"' if len(rows) >= limit else ""
         rows.append(
-            f'<a class="docs-side-row docs-tag-row" href="/ui/documents?tag={tag_query}"{hidden}>'
-            f'<span class="tag-swatch"{_tag_color_style(raw_tag)} aria-hidden="true"></span>'
-            f"<span>{tag}</span>"
-            f'<span class="docs-side-count">{count:,}</span>'
-            "</a>"
+            {
+                "label": raw_tag,
+                "href": f"/ui/documents?tag={quote(raw_tag, safe='')}",
+                "count": int(stat.get("document_count") or 0),
+                "hidden": len(rows) >= limit,
+                "color": _stable_tag_color(raw_tag),
+            }
         )
-    if not rows:
-        return '<span class="docs-side-empty">No tags yet</span>'
-    if len(rows) > limit:
-        rows.append(_sidebar_expand_button(group="tags", hidden_count=len(rows) - limit))
-    return "\n".join(rows)
+    return _render_fragment_template(
+        "document_sidebar_rows.html",
+        rows=rows,
+        empty_label="No tags yet",
+        row_class="docs-tag-row",
+        group="tags",
+        hidden_count=max(0, len(rows) - limit),
+        kind="tags",
+    )
 
 
 def document_sidebar_document_types_html(type_stats: list[dict], *, limit: int = 10) -> str:
-    if not type_stats:
-        return '<span class="docs-side-empty">No document types yet</span>'
-    rows: list[str] = []
+    rows = []
     for stat in type_stats:
         raw_document_type = str(stat.get("document_type") or "").strip()
         if not raw_document_type:
             continue
-        document_type = escape(raw_document_type)
-        document_type_query = quote(raw_document_type, safe="")
-        count = int(stat.get("document_count") or 0)
-        hidden = ' hidden data-sidebar-extra="document-types"' if len(rows) >= limit else ""
         rows.append(
-            f'<a class="docs-side-row docs-type-row" href="/ui/documents?document_type={document_type_query}"{hidden}>'
-            '<span class="doc-type-dot" aria-hidden="true"></span>'
-            f"<span>{document_type}</span>"
-            f'<span class="docs-side-count">{count:,}</span>'
-            "</a>"
+            {
+                "label": raw_document_type,
+                "href": f"/ui/documents?document_type={quote(raw_document_type, safe='')}",
+                "count": int(stat.get("document_count") or 0),
+                "hidden": len(rows) >= limit,
+            }
         )
-    if not rows:
-        return '<span class="docs-side-empty">No document types yet</span>'
-    if len(rows) > limit:
-        rows.append(_sidebar_expand_button(group="document-types", hidden_count=len(rows) - limit))
-    return "\n".join(rows)
+    return _render_fragment_template(
+        "document_sidebar_rows.html",
+        rows=rows,
+        empty_label="No document types yet",
+        row_class="docs-type-row",
+        group="document-types",
+        hidden_count=max(0, len(rows) - limit),
+        kind="document-types",
+    )
 
 
 def document_sidebar_correspondents_html(correspondent_stats: list[dict], *, limit: int = 10) -> str:
-    if not correspondent_stats:
-        return '<span class="docs-side-empty">No correspondents yet</span>'
-    rows: list[str] = []
+    rows = []
     for stat in correspondent_stats:
         raw_correspondent = str(stat.get("correspondent") or "").strip()
         if not raw_correspondent:
             continue
-        correspondent = escape(raw_correspondent)
-        correspondent_query = quote(raw_correspondent, safe="")
-        count = int(stat.get("document_count") or 0)
-        hidden = ' hidden data-sidebar-extra="correspondents"' if len(rows) >= limit else ""
         rows.append(
-            f'<a class="docs-side-row docs-corr-row" href="/ui/documents?correspondent={correspondent_query}"{hidden}>'
-            f'<span class="corr-avatar corr-avatar-sm" aria-hidden="true">{escape(_initials(raw_correspondent))}</span>'
-            f"<span>{correspondent}</span>"
-            f'<span class="docs-side-count">{count:,}</span>'
-            "</a>"
+            {
+                "label": raw_correspondent,
+                "href": f"/ui/documents?correspondent={quote(raw_correspondent, safe='')}",
+                "count": int(stat.get("document_count") or 0),
+                "hidden": len(rows) >= limit,
+                "initials": _initials(raw_correspondent),
+            }
         )
-    if not rows:
-        return '<span class="docs-side-empty">No correspondents yet</span>'
-    if len(rows) > limit:
-        rows.append(_sidebar_expand_button(group="correspondents", hidden_count=len(rows) - limit))
-    return "\n".join(rows)
+    return _render_fragment_template(
+        "document_sidebar_rows.html",
+        rows=rows,
+        empty_label="No correspondents yet",
+        row_class="docs-corr-row",
+        group="correspondents",
+        hidden_count=max(0, len(rows) - limit),
+        kind="correspondents",
+    )
 
 
 def _relative_blob_path(blob_uri: str | None) -> str:
@@ -356,163 +335,87 @@ def _history_change_lines(event: dict) -> list[str]:
 
 
 def _history_html(events: list[dict]) -> str:
-    if not events:
-        return '<p class="document-history-empty">No history entries yet.</p>'
-    items: list[str] = []
+    items = []
     for event in events:
-        event_type = escape(_format_history_event_type(str(event.get("event_type") or "")))
-        actor = escape(_format_history_actor(event))
-        source = escape(str(event.get("source") or "-"))
-        created_at = escape(str(event.get("created_at") or "-"))
-        changes = "\n".join(
-            f'                <p class="document-history-change">{escape(line)}</p>'
-            for line in _history_change_lines(event)
-        )
         items.append(
-            '              <article class="document-history-item">\n'
-            '                <div class="document-history-header">\n'
-            f'                  <span class="document-history-type">{event_type}</span>\n'
-            f'                  <span class="document-history-meta">{actor} | {source} | {created_at}</span>\n'
-            "                </div>\n"
-            f'                <div class="document-history-changes">\n{changes}\n                </div>\n'
-            "              </article>"
+            {
+                "event_type": _format_history_event_type(str(event.get("event_type") or "")),
+                "actor": _format_history_actor(event),
+                "source": str(event.get("source") or "-"),
+                "created_at": str(event.get("created_at") or "-"),
+                "changes": _history_change_lines(event),
+            }
         )
-    return "\n".join(items)
+    return _render_fragment_template("document_history.html", items=items)
 
 
 def _document_chat_threads_html(threads: list[dict]) -> str:
-    if not threads:
-        return '<p class="document-history-empty">No chat threads have referenced this document yet.</p>'
-    items: list[str] = []
+    items = []
     for thread in threads:
         raw_thread_id = str(thread.get("id") or "")
-        thread_id = escape(raw_thread_id, quote=True)
-        thread_query = quote(raw_thread_id, safe="")
-        title = escape(str(thread.get("title") or "Untitled chat"))
-        question = escape(str(thread.get("question") or "").strip())
         updated = _chat_thread_time_label(str(thread.get("updated_at") or thread.get("created_at") or ""))
         message_count = int(thread.get("message_count") or 0)
         reference_count = int(thread.get("reference_count") or 0)
         message_label = f"{message_count} msg" if message_count == 1 else f"{message_count} msgs"
         reference_label = f"{reference_count} ref" if reference_count == 1 else f"{reference_count} refs"
-        meta = escape(" | ".join(item for item in (updated, message_label, reference_label) if item))
         sources = thread.get("source_titles") if isinstance(thread.get("source_titles"), list) else []
-        source_html = ""
-        if sources:
-            source_html = (
-                '<div class="document-thread-sources">'
-                + "".join(f"<span>{escape(str(source))}</span>" for source in sources)
-                + "</div>"
-            )
-        question_html = f'<p class="document-thread-question">{question}</p>' if question else ""
         items.append(
-            '<article class="document-thread-item">'
-            '<div class="document-thread-header">'
-            f'<a class="document-thread-title" href="/ui/grounded-qa?thread_id={thread_query}">{title}</a>'
-            f'<span class="document-thread-meta">{meta}</span>'
-            "</div>"
-            f"{question_html}"
-            f"{source_html}"
-            "</article>"
+            {
+                "thread_query": quote(raw_thread_id, safe=""),
+                "title": str(thread.get("title") or "Untitled chat"),
+                "question": str(thread.get("question") or "").strip(),
+                "meta": " | ".join(item for item in (updated, message_label, reference_label) if item),
+                "sources": [str(source) for source in sources],
+            }
         )
-    return '<div class="document-thread-list">' + "\n".join(items) + "</div>"
+    return _render_fragment_template("document_chat_threads.html", items=items)
 
 
 def activity_rows_html(documents: list[dict]) -> str:
-    if not documents:
-        return '                <tr><td colspan="4">No processed documents.</td></tr>'
-    rows: list[str] = []
+    rows = []
     for item in documents:
         raw_document_id = str(item.get("id") or "")
-        document_id_query = quote(raw_document_id, safe="")
-        title = escape(_document_title(item))
-        status_html = _status_badge_html(str(item.get("status") or ""))
-        created_at = escape(str(item.get("created_at") or "-"))
         rows.append(
-            "                <tr>"
-            f'<td data-label="Title"><a class="link-button" href="/ui/document?id={document_id_query}">{title}</a></td>'
-            f'<td data-label="Status">{status_html}</td>'
-            f'<td data-label="Uploaded">{created_at}</td>'
-            '<td data-label="Action"><div class="table-actions">'
-            f'<a class="btn" href="/ui/document?id={document_id_query}" title="Open document">'
-            "Open"
-            "</a>"
-            f'<a class="btn btn-muted" href="/documents/{document_id_query}/file" '
-            'target="_blank" rel="noopener noreferrer" title="View file">'
-            "View"
-            "</a>"
-            "</div></td>"
-            "</tr>"
+            {
+                "document_id_query": quote(raw_document_id, safe=""),
+                "title": _document_title(item),
+                "status": _status_badge_context(str(item.get("status") or "")),
+                "created_at": str(item.get("created_at") or "-"),
+            }
         )
-    return "\n".join(rows)
+    return _render_fragment_template("activity_rows.html", rows=rows)
 
 
 def pending_rows_html(documents: list[dict]) -> str:
-    if not documents:
-        return (
-            '                <tr class="docs-empty-row"><td colspan="5">'
-            '<div class="doc-empty"><div class="doc-empty-mark" aria-hidden="true">'
-            '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-            '<path d="M3 7h18"/><path d="M5 7l1 12h12l1-12"/><path d="M9 11h6"/>'
-            "</svg></div><p>No documents are processing.</p></div></td></tr>"
-        )
-    rows: list[str] = []
+    rows = []
     for item in documents:
         raw_document_id = str(item.get("id") or "")
-        document_id = escape(raw_document_id)
-        document_id_query = quote(raw_document_id, safe="")
-        raw_title = _document_title(item)
-        title = escape(raw_title)
         raw_filename = str(item.get("filename") or "Untitled document")
-        filename = escape(raw_filename)
-        status_html = _status_badge_html(str(item.get("status") or ""))
         stage = item.get("processing_stage") if isinstance(item.get("processing_stage"), dict) else {}
-        stage_label = escape(str(stage.get("label") or "Processing"))
-        stage_key = escape(str(stage.get("key") or "processing"), quote=True)
         try:
             stage_progress = max(0, min(100, int(stage.get("progress") or 0)))
         except (TypeError, ValueError):
             stage_progress = 0
-        progress_html = (
-            '<span class="pending-stage">'
-            f'<span class="pending-stage-row"><span>{stage_label}</span><span>{stage_progress}%</span></span>'
-            f'<span class="pending-stage-track" data-stage="{stage_key}">'
-            f'<span style="width: {stage_progress}%"></span></span></span>'
-        )
-        created_at = escape(_short_date(str(item.get("created_at") or "-")))
-        size = escape(_format_document_size(item.get("size_bytes")))
-        content_type = escape(str(item.get("content_type") or "-"))
-        type_icon_class = escape(
-            _document_type_icon_class(str(item.get("content_type") or ""), str(item.get("filename") or "")),
-            quote=True,
-        )
         rows.append(
-            f'                <tr class="doc-row pending-row" data-pending-doc-id="{document_id}">'
-            '<td class="td td-title" data-label="Document">'
-            f'<span class="type-icon {type_icon_class}" aria-hidden="true">'
-            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-            '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
-            '<polyline points="14 2 14 8 20 8"/></svg></span>'
-            '<span class="title-stack">'
-            '<span class="title-row">'
-            f'<a class="title-link" href="/ui/document?id={document_id_query}">{title}</a>'
-            "</span>"
-            f'<span class="title-meta"><span class="filename">{filename}</span></span>'
-            "</span></td>"
-            f'<td class="td td-status" data-label="Status">{status_html}{progress_html}</td>'
-            f'<td class="td td-date-size" data-label="Queued"><span>{created_at}</span></td>'
-            f'<td class="td td-file" data-label="File"><span>{size}</span><span class="td-meta">{content_type}</span></td>'
-            '<td class="td td-actions" data-label="Action"><div class="table-actions">'
-            f'<a class="row-act" href="/ui/document?id={document_id_query}" title="Open document" aria-label="Open document">'
-            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-            '<polyline points="9 18 15 12 9 6"/></svg></a>'
-            "</div></td>"
-            "</tr>"
+            {
+                "document_id": raw_document_id,
+                "document_id_query": quote(raw_document_id, safe=""),
+                "title": _document_title(item),
+                "filename": raw_filename,
+                "status": _status_badge_context(str(item.get("status") or "")),
+                "stage_label": str(stage.get("label") or "Processing"),
+                "stage_key": str(stage.get("key") or "processing"),
+                "stage_progress": stage_progress,
+                "created_at": _short_date(str(item.get("created_at") or "-")),
+                "size": _format_document_size(item.get("size_bytes")),
+                "content_type": str(item.get("content_type") or "-"),
+                "type_icon_class": _document_type_icon_class(
+                    str(item.get("content_type") or ""),
+                    str(item.get("filename") or ""),
+                ),
+            }
         )
-    return "\n".join(rows)
+    return _render_fragment_template("pending_rows.html", rows=rows)
 
 
 def processing_strip_html(documents: list[dict], *, processing_count: int) -> str:
@@ -548,134 +451,65 @@ def processing_strip_html(documents: list[dict], *, processing_count: int) -> st
                 "stage_progress": 25,
             }
         )
-    plural = "s" if normalized_count != 1 else ""
-    files_html = "".join(f"<span>{escape(str(item['filename']))}</span>" for item in items)
-    progress_rows = "".join(
-        '<div class="inflight-progress-row">'
-        f"<span>{escape(str(item['stage_label']))}</span>"
-        f'<span class="inflight-progress-track" data-stage="{escape(str(item["stage_key"]), quote=True)}">'
-        f'<span style="width: {int(item["stage_progress"])}%"></span></span>'
-        "</div>"
-        for item in items
-    )
-    return (
-        '<div class="inflight-strip" data-processing-count="'
-        f'{normalized_count}">'
-        '<div class="inflight-copy">'
-        '<div class="inflight-head">'
-        '<span class="inflight-spin" aria-hidden="true"><span></span></span>'
-        f'<a class="inflight-title" href="/ui/pending">{normalized_count:,} document{plural} processing</a>'
-        "</div>"
-        f'<div class="inflight-files">{files_html}</div>'
-        "</div>"
-        '<div class="inflight-progress" aria-label="Processing stages">'
-        f"{progress_rows}"
-        "</div>"
-        '<a class="inflight-close" href="/ui/pending" aria-label="View processing queue">'
-        '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-        'stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-        '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></a>'
-        "</div>"
+    return _render_fragment_template(
+        "processing_strip.html",
+        processing_count=normalized_count,
+        plural="s" if normalized_count != 1 else "",
+        items=items,
     )
 
 
 def document_rows_html(documents: list[dict]) -> str:
-    if not documents:
-        return (
-            '                <tr class="docs-empty-row"><td colspan="6">'
-            '<div class="doc-empty"><div class="doc-empty-mark" aria-hidden="true">'
-            '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-            '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
-            '<polyline points="14 2 14 8 20 8"/></svg></div>'
-            "<p>No documents found.</p></div></td></tr>"
-        )
-    rows: list[str] = []
+    rows = []
     for item in documents:
         raw_document_id = str(item.get("id") or "")
-        document_id = escape(raw_document_id)
-        document_id_query = quote(raw_document_id, safe="")
         raw_title = _document_title(item)
-        title = escape(raw_title)
         raw_filename = str(item.get("filename") or "Untitled document")
-        filename = escape(raw_filename)
         metadata = item.get("llm_metadata") if isinstance(item.get("llm_metadata"), dict) else {}
         document_type_raw = str(metadata.get("document_type") or "")
         document_type = str(document_type_raw or "-")
         correspondent_raw = str(metadata.get("correspondent") or "")
-        correspondent = escape(correspondent_raw or "-")
-        correspondent_query = quote(correspondent_raw, safe="")
         tags = metadata.get("tags") if isinstance(metadata.get("tags"), list) else []
-        tag_pills = "".join(
-            f'<a class="tag-pill" href="/ui/documents?tag={quote(str(tag), safe="")}"'
-            f'{_tag_color_style(str(tag))}'
-            f' data-full-tag="{_html_attr(str(tag))}">'
-            '<span class="tag-swatch tag-swatch-xs" aria-hidden="true"></span>'
-            f'<span class="tag-pill-label">{escape(str(tag))}</span></a>'
-            for tag in tags[:3]
-        )
-        if len(tags) > 3:
-            tag_pills += (
-                f'<button type="button" class="tag-pill tag-more tag-more-button" '
-                f'data-tags-expand="{document_id}" aria-label="Show all tags for {title}">'
-                f"+{len(tags) - 3}</button>"
-            )
-        if not tag_pills:
-            tag_pills = '<span class="muted">-</span>'
         document_date_raw = str(metadata.get("document_date") or "")
-        display_date = escape(_short_date(document_date_raw))
-        status_html = _document_list_status_badge_html(str(item.get("status") or ""))
         starred = bool(item.get("starred"))
-        size = escape(_format_document_size(item.get("size_bytes")))
-        page_count = escape(_format_page_count(item.get("page_count")))
-        type_icon_class = escape(
-            _document_type_icon_class(str(item.get("content_type") or ""), str(item.get("filename") or "")),
-            quote=True,
-        )
-        title_meta_parts = [f'<span class="filename">{filename}</span>']
-        if page_count:
-            title_meta_parts.append(f'<span class="dot" aria-hidden="true"></span><span>{page_count}</span>')
-        row_star = '<span class="row-star" aria-label="Starred document">★</span>' if starred else ""
+        tag_rows = [
+            {
+                "label": str(tag),
+                "href": f"/ui/documents?tag={quote(str(tag), safe='')}",
+                "color": _stable_tag_color(str(tag)),
+            }
+            for tag in tags[:3]
+        ]
         rows.append(
-            f'                <tr class="doc-row" data-doc-id="{document_id}"'
-            f' data-doc-title="{_html_attr(raw_title)}"'
-            f' data-doc-filename="{_html_attr(raw_filename)}"'
-            f' data-doc-date="{_html_attr(document_date_raw)}"'
-            f' data-doc-correspondent="{_html_attr(correspondent_raw)}"'
-            f' data-doc-type="{_html_attr(document_type_raw)}"'
-            f' data-doc-starred="{"true" if starred else "false"}"'
-            f' data-doc-tags="{_html_attr(json.dumps([str(tag) for tag in tags], ensure_ascii=True))}">'
-            '<td class="td td-check" data-label="Select">'
-            f'<input type="checkbox" data-doc-select="{document_id}" aria-label="Select {title}" /></td>'
-            '<td class="td td-title" data-label="Document">'
-            f'<span class="type-icon {type_icon_class}" aria-hidden="true">'
-            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-            '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
-            '<polyline points="14 2 14 8 20 8"/></svg></span>'
-            '<span class="title-stack">'
-            '<span class="title-row">'
-            f'<a class="title-link" href="/ui/document?id={document_id_query}">{title}</a>'
-            f"{row_star}"
-            f"{status_html}"
-            "</span>"
-            f'<span class="title-meta">{"".join(title_meta_parts)}</span>'
-            "</span></td>"
-            '<td class="td td-corr" data-label="Correspondent">'
-            f'<span class="corr-cell"><span class="corr-avatar corr-avatar-sm">{escape(_initials(correspondent_raw))}</span>'
-            f'<a class="corr-link" href="/ui/documents?correspondent={correspondent_query}">{correspondent}</a></span></td>'
-            f'<td class="td td-tags" data-label="Tags">{tag_pills}</td>'
-            f'<td class="td td-date-size" data-label="Date / Size"><span>{display_date}</span>'
-            f'<span class="td-size-line">{size}</span></td>'
-            '<td class="td td-actions" data-label="Action"><div class="table-actions">'
-            f'<a class="row-act" href="/ui/document?id={document_id_query}" title="Open document" aria-label="Open document">'
-            '<svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-            'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
-            '<polyline points="9 18 15 12 9 6"/></svg></a>'
-            "</div></td>"
-            "</tr>"
+            {
+                "document_id": raw_document_id,
+                "document_id_query": quote(raw_document_id, safe=""),
+                "raw_title": raw_title,
+                "raw_filename": raw_filename,
+                "document_date_raw": document_date_raw,
+                "correspondent_raw": correspondent_raw,
+                "document_type_raw": document_type_raw,
+                "document_type": document_type,
+                "starred": starred,
+                "tags_json_attr": escape(json.dumps([str(tag) for tag in tags], ensure_ascii=True), quote=True),
+                "title": raw_title,
+                "filename": raw_filename,
+                "status": _status_badge_context(str(item.get("status") or ""), hide_ready=True),
+                "correspondent": correspondent_raw or "-",
+                "correspondent_query": quote(correspondent_raw, safe=""),
+                "correspondent_initials": _initials(correspondent_raw),
+                "tags": tag_rows,
+                "hidden_tag_count": max(0, len(tags) - 3),
+                "display_date": _short_date(document_date_raw),
+                "size": _format_document_size(item.get("size_bytes")),
+                "page_count": _format_page_count(item.get("page_count")),
+                "type_icon_class": _document_type_icon_class(
+                    str(item.get("content_type") or ""),
+                    str(item.get("filename") or ""),
+                ),
+            }
         )
-    return "\n".join(rows)
+    return _render_fragment_template("document_rows.html", rows=rows)
 
 
 def documents_pagination_toolbar_html(
@@ -695,67 +529,17 @@ def documents_pagination_toolbar_html(
     page_digits = max(2, len(str(total_pages)))
     display_page = f"{normalized_page:0{page_digits}d}"
     display_total_pages = f"{total_pages:0{page_digits}d}"
-    first_prev_disabled = " disabled" if normalized_page <= 1 else ""
-    next_last_disabled = " disabled" if normalized_page >= total_pages else ""
-    processing_label = (
-        f'              <span id="docsProcessingLabel" class="pg-processing">Processing: {normalized_processing_count:,}</span>\n'
-        if normalized_processing_count > 0
-        else ""
+    return _render_fragment_template(
+        "documents_pagination_toolbar.html",
+        range_start=range_start,
+        range_end=range_end,
+        total=normalized_total,
+        processing_count=normalized_processing_count,
+        display_page=display_page,
+        display_total_pages=display_total_pages,
+        first_prev_disabled=normalized_page <= 1,
+        next_last_disabled=normalized_page >= total_pages,
     )
-    return (
-        '            <div class="pg-left">\n'
-        f'              <span class="pg-range"><b>{range_start:,}&ndash;{range_end:,}</b> of '
-        f'<b>{normalized_total:,}</b> documents</span>\n'
-        f"{processing_label}"
-        "            </div>\n"
-        '            <nav class="pg-pill" aria-label="Pagination">\n'
-        f'              <button id="pageFirstBtn" type="button" class="pg-pbtn" '
-        f'data-docs-page-action="first" aria-label="First page" title="First page"{first_prev_disabled}>'
-        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-        '<polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg></button>\n'
-        f'              <button id="pagePrevBtn" type="button" class="pg-pbtn" '
-        f'data-docs-page-action="prev" aria-label="Previous page" title="Previous page"{first_prev_disabled}>'
-        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-        '<polyline points="15 18 9 12 15 6"/></svg></button>\n'
-        '              <span class="pg-pcount" aria-label="Current page">\n'
-        f'                <b>{display_page}</b>\n'
-        f'                <span class="pg-pdiv">/</span><span id="pageIndicator">{display_total_pages}</span>\n'
-        '              </span>\n'
-        f'              <button id="pageNextBtn" type="button" class="pg-pbtn" '
-        f'data-docs-page-action="next" aria-label="Next page" title="Next page"{next_last_disabled}>'
-        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-        '<polyline points="9 18 15 12 9 6"/></svg></button>\n'
-        f'              <button id="pageLastBtn" type="button" class="pg-pbtn" '
-        f'data-docs-page-action="last" aria-label="Last page" title="Last page"{next_last_disabled}>'
-        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" '
-        'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-        '<polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/></svg></button>\n'
-        "            </nav>"
-    )
-
-
-def _fragment_data_attrs(attrs: dict[str, object]) -> str:
-    parts: list[str] = []
-    for key, value in attrs.items():
-        attr_name = key.replace("_", "-")
-        if isinstance(value, bool):
-            attr_value = "true" if value else "false"
-        else:
-            attr_value = str(value)
-        parts.append(f'data-{escape(attr_name)}="{escape(attr_value, quote=True)}"')
-    return (" " + " ".join(parts)) if parts else ""
-
-
-def _partial_template(
-    target_id: str,
-    html: str,
-    *,
-    attr: str = "data-partial-target",
-) -> str:
-    return f'<template {attr}="{escape(target_id, quote=True)}">{html}</template>'
 
 
 def ui_partial_fragment_html(
@@ -763,12 +547,14 @@ def ui_partial_fragment_html(
     templates: dict[str, str],
     data_attrs: dict[str, object] | None = None,
 ) -> str:
-    body = "\n".join(
-        _partial_template(target_id, html) for target_id, html in templates.items()
-    )
-    return (
-        f'<div class="ui-partial-fragment"'
-        f"{_fragment_data_attrs(data_attrs or {})}>{body}</div>"
+    template_rows = [
+        {"target_id": target_id, "html": html, "attr": "data-partial-target"}
+        for target_id, html in templates.items()
+    ]
+    return _render_fragment_template(
+        "ui_partial_fragment.html",
+        data_attrs=data_attrs or {},
+        templates=template_rows,
     )
 
 
@@ -811,20 +597,19 @@ def table_body_partial_html(
 
 
 def _status_badge_html(status_value: str) -> str:
-    status = str(status_value or "").lower()
-    label = escape(_format_status(status))
-    return f'<span class="status-badge status-{escape(status)}">{label}</span>'
+    return _render_fragment_template("status_badge.html", badge=_status_badge_context(status_value))
 
 
 def _document_detail_tags_html(tags: list[object]) -> str:
-    if not tags:
-        return '<span class="tag-pill tag-empty">No tags</span>'
-    return "".join(
-        f'<a class="tag-pill" href="/ui/documents?tag={quote(str(tag), safe="")}"{_tag_color_style(str(tag))}>'
-        '<span class="tag-swatch tag-swatch-xs" aria-hidden="true"></span>'
-        f"{escape(str(tag))}</a>"
+    tag_rows = [
+        {
+            "label": str(tag),
+            "href": f"/ui/documents?tag={quote(str(tag), safe='')}",
+            "color": _stable_tag_color(str(tag)),
+        }
         for tag in tags
-    )
+    ]
+    return _render_fragment_template("document_detail_tags.html", tags=tag_rows)
 
 
 def _short_date_label(value: object) -> str:
@@ -987,32 +772,11 @@ def _render_markdown_preview(markdown: str) -> str:
 
 def _document_page_thumbnails_html(page_count: int) -> str:
     normalized_count = _normalize_detail_page_count(page_count)
-    lines = (
-        '<span class="strip-line" style="width: 70%"></span>'
-        '<span class="strip-line" style="width: 85%"></span>'
-        '<span class="strip-line" style="width: 60%"></span>'
-        '<span class="strip-line" style="width: 78%"></span>'
-        '<span class="strip-line" style="width: 55%"></span>'
+    return _render_fragment_template(
+        "document_page_thumbnails.html",
+        page_numbers=list(range(1, normalized_count + 1)),
+        line_widths=(70, 85, 60, 78, 55),
     )
-    items = []
-    for page_number in range(1, normalized_count + 1):
-        active = " active" if page_number == 1 else ""
-        current = ' aria-current="page"' if page_number == 1 else ""
-        items.append(
-            f'<button type="button" class="strip-thumb{active}" data-preview-page="{page_number}" '
-            f'aria-label="Go to page {page_number}"{current}>'
-            f'<span class="strip-thumb-page">{lines}</span>'
-            f'<span class="strip-num">{page_number}</span>'
-            "</button>"
-        )
-    return "\n".join(items)
-
-
-def _document_list_status_badge_html(status_value: str) -> str:
-    status = str(status_value or "").lower()
-    if status == "ready":
-        return ""
-    return _status_badge_html(status)
 
 
 def document_detail_fragments(initial_data: dict) -> dict:
@@ -1123,32 +887,32 @@ def document_detail_fragments(initial_data: dict) -> dict:
 
 def document_detail_partial_html(initial_data: dict) -> str:
     fragments = document_detail_fragments(initial_data)
-    templates: list[str] = []
+    templates: list[dict[str, str]] = []
     for element_id, value in fragments.get("text", {}).items():
         templates.append(
-            _partial_template(element_id, escape(str(value)), attr="data-text-target")
+            {"target_id": element_id, "html": escape(str(value)), "attr": "data-text-target"}
         )
     for element_id, value in fragments.get("html", {}).items():
         templates.append(
-            _partial_template(element_id, str(value), attr="data-html-target")
+            {"target_id": element_id, "html": str(value), "attr": "data-html-target"}
         )
     for element_id, value in fragments.get("inputs", {}).items():
         templates.append(
-            _partial_template(element_id, escape(str(value)), attr="data-input-target")
+            {"target_id": element_id, "html": escape(str(value)), "attr": "data-input-target"}
         )
     templates.append(
-        _partial_template(
-            "documentHistoryList",
-            str(fragments.get("history_html") or ""),
-            attr="data-html-target",
-        )
+        {
+            "target_id": "documentHistoryList",
+            "html": str(fragments.get("history_html") or ""),
+            "attr": "data-html-target",
+        }
     )
     templates.append(
-        _partial_template(
-            "documentThreadList",
-            str(fragments.get("chat_threads_html") or ""),
-            attr="data-html-target",
-        )
+        {
+            "target_id": "documentThreadList",
+            "html": str(fragments.get("chat_threads_html") or ""),
+            "attr": "data-html-target",
+        }
     )
     data_attrs = {
         "document_id": fragments.get("document_id", ""),
@@ -1159,10 +923,10 @@ def document_detail_partial_html(initial_data: dict) -> str:
         "preview_url": fragments.get("preview_url", ""),
         "page_count": str(fragments.get("page_count", 1)),
     }
-    return (
-        f'<div class="ui-partial-fragment"{_fragment_data_attrs(data_attrs)}>'
-        + "\n".join(templates)
-        + "</div>"
+    return _render_fragment_template(
+        "ui_partial_fragment.html",
+        data_attrs=data_attrs,
+        templates=templates,
     )
 
 
@@ -1217,37 +981,32 @@ def chat_thread_list_html(
     ]
     if not filtered_threads:
         message = "No chats match that search." if normalized_query else "No recent chats yet."
-        return f'<p class="thread-empty">{escape(message)}</p>'
+        return _render_fragment_template("chat_thread_list.html", empty_message=message, sections=[])
 
-    sections: list[str] = []
+    sections = []
     for bucket, label in (("today", "Today"), ("yesterday", "Yesterday"), ("earlier", "Earlier")):
         items = [thread for thread in filtered_threads if _chat_thread_bucket(thread) == bucket]
         if not items:
             continue
-        rows: list[str] = []
+        rows = []
         for thread in items:
             raw_thread_id = str(thread.get("id") or "")
-            thread_id = escape(raw_thread_id)
-            title = escape(str(thread.get("title") or "Untitled chat"))
+            title = str(thread.get("title") or "Untitled chat")
             updated = _chat_thread_time_label(str(thread.get("updated_at") or thread.get("created_at") or ""))
             count = int(thread.get("message_count") or 0)
             count_label = f"{count} msg" if count == 1 else f"{count} msgs"
-            meta = escape(" | ".join(item for item in (updated, count_label) if item))
-            active_class = " active" if raw_thread_id == active_thread_id else ""
             rows.append(
-                f'<li class="thread-item{active_class}">'
-                f'<button type="button" class="thread-button" data-thread-id="{thread_id}">'
-                f'<span class="thread-title">{title}</span>'
-                f'<span class="thread-meta">{meta}</span>'
-                "</button>"
-                f'<button type="button" class="thread-action" data-delete-thread-id="{thread_id}" '
-                f'title="Delete chat" aria-label="Delete {title}">&times;</button>'
-                "</li>"
+                {
+                    "thread_id": raw_thread_id,
+                    "title": title,
+                    "meta": " | ".join(item for item in (updated, count_label) if item),
+                    "active": raw_thread_id == active_thread_id,
+                }
             )
         sections.append(
-            '<section class="thread-group">'
-            f'<h4 class="thread-group-label">{escape(label)}</h4>'
-            f'<ul class="thread-list">{"".join(rows)}</ul>'
-            "</section>"
+            {
+                "label": label,
+                "rows": rows,
+            }
         )
-    return "".join(sections)
+    return _render_fragment_template("chat_thread_list.html", empty_message="", sections=sections)

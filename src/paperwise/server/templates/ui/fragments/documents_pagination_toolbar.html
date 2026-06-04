@@ -1,0 +1,32 @@
+<div class="pg-left">
+  <span class="pg-range"><b>{{ range_start|format_number }}&ndash;{{ range_end|format_number }}</b> of <b>{{ total|format_number }}</b> documents</span>
+  {% if processing_count > 0 %}
+  <span id="docsProcessingLabel" class="pg-processing">Processing: {{ processing_count|format_number }}</span>
+  {% endif %}
+</div>
+<nav class="pg-pill" aria-label="Pagination">
+  <button id="pageFirstBtn" type="button" class="pg-pbtn" data-docs-page-action="first" aria-label="First page" title="First page"{% if first_prev_disabled %} disabled{% endif %}>
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/>
+    </svg>
+  </button>
+  <button id="pagePrevBtn" type="button" class="pg-pbtn" data-docs-page-action="prev" aria-label="Previous page" title="Previous page"{% if first_prev_disabled %} disabled{% endif %}>
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+  </button>
+  <span class="pg-pcount" aria-label="Current page">
+    <b>{{ display_page }}</b>
+    <span class="pg-pdiv">/</span><span id="pageIndicator">{{ display_total_pages }}</span>
+  </span>
+  <button id="pageNextBtn" type="button" class="pg-pbtn" data-docs-page-action="next" aria-label="Next page" title="Next page"{% if next_last_disabled %} disabled{% endif %}>
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+  </button>
+  <button id="pageLastBtn" type="button" class="pg-pbtn" data-docs-page-action="last" aria-label="Last page" title="Last page"{% if next_last_disabled %} disabled{% endif %}>
+    <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <polyline points="13 17 18 12 13 7"/><polyline points="6 17 11 12 6 7"/>
+    </svg>
+  </button>
+</nav>

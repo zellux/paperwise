@@ -1,0 +1,15 @@
+{% if not rows %}
+<tr><td colspan="3">No tags found.</td></tr>
+{% else %}
+{% for row in rows %}
+<tr>
+  <td data-label="Tag"><span class="tag-list-label" style="--tag-color: {{ row.color }};"><span class="tag-swatch" aria-hidden="true"></span><span>{{ row.tag }}</span></span></td>
+  <td data-label="Documents">{{ row.count }}</td>
+  <td data-label="Action">
+    <div class="table-actions">
+      <a class="btn" href="/ui/documents?tag={{ row.tag_query }}" title="View documents for tag {{ row.tag }}">View Docs</a>
+    </div>
+  </td>
+</tr>
+{% endfor %}
+{% endif %}
