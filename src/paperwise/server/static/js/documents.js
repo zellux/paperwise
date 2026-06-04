@@ -882,6 +882,51 @@ function animateRowInlineUpdate(row) {
   window.setTimeout(() => row.classList.remove("is-inline-updated"), 1100);
 }
 
+function renderRowStarButton(button, starred, title = "") {
+  button.classList.toggle("is-starred", starred);
+  button.setAttribute("aria-pressed", starred ? "true" : "false");
+  button.setAttribute("aria-label", `${starred ? "Unstar" : "Star"} ${title || "document"}`);
+  button.title = starred ? "Unstar document" : "Star document";
+}
+
+function applyRowStarredChange(row, starred) {
+  row.dataset.docStarred = starred ? "true" : "false";
+  const button = row.querySelector("[data-doc-star-toggle]");
+  if (button instanceof HTMLButtonElement) {
+    renderRowStarButton(button, starred, row.dataset.docTitle || "");
+  }
+  animateRowInlineUpdate(row);
+}
+
+async function handleRowStarToggle(button) {
+  const row = button.closest("tr[data-doc-id]");
+  const documentId = button.dataset.docStarToggle || row?.dataset.docId || "";
+  if (!(row instanceof HTMLTableRowElement) || !documentId || button.disabled) {
+    return;
+  }
+  const nextStarred = button.getAttribute("aria-pressed") !== "true";
+  button.disabled = true;
+  try {
+    const response = await apiFetch(`/documents/${documentId}/starred`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ starred: nextStarred }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || response.statusText);
+    }
+    const starred = Boolean(payload?.document?.starred);
+    applyRowStarredChange(row, starred);
+    await loadDocumentsList({ showLoading: false, logResult: false });
+    logActivity(`${starred ? "Starred" : "Unstarred"} document ${documentId}.`);
+  } catch (error) {
+    logActivity(`Star update failed: ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 function applyRowMetadataChanges(row, changes) {
   if (Array.isArray(changes.tags)) {
     const tags = unique(changes.tags);
@@ -1446,6 +1491,16 @@ function bindDocumentsEvents() {
     }
     event.preventDefault();
     await handleBulkEditorSubmit();
+  });
+
+  document.addEventListener("click", (event) => {
+    const button = event.target instanceof Element ? event.target.closest("[data-doc-star-toggle]") : null;
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    void handleRowStarToggle(button);
   });
 
   document.addEventListener("keydown", (event) => {
