@@ -207,6 +207,19 @@ async function toggleFilterOption(selectEl, value) {
   await applyFiltersFromControls();
 }
 
+async function applyFilterDropdownAction(selectEl, action) {
+  for (const option of selectEl.options) {
+    if (action === "clear") {
+      option.selected = false;
+    } else if (action === "select-all") {
+      option.selected = true;
+    } else if (action === "invert") {
+      option.selected = !option.selected;
+    }
+  }
+  await applyFiltersFromControls();
+}
+
 function renderFilterDropdownOptions(selectEl) {
   const state = filterDropdownState.get(selectEl);
   if (!state) {
@@ -306,10 +319,33 @@ function setupFilterDropdown(selectEl) {
   search.className = "filter-dropdown-search";
   search.placeholder = `Filter ${labelText.toLowerCase()}`;
 
+  const actions = document.createElement("div");
+  actions.className = "filter-dropdown-actions";
+
+  const clearAction = document.createElement("button");
+  clearAction.type = "button";
+  clearAction.dataset.filterDropdownAction = "clear";
+  clearAction.textContent = "Clear all";
+
+  const selectAllAction = document.createElement("button");
+  selectAllAction.type = "button";
+  selectAllAction.dataset.filterDropdownAction = "select-all";
+  selectAllAction.textContent = "Select all";
+
+  const invertAction = document.createElement("button");
+  invertAction.type = "button";
+  invertAction.dataset.filterDropdownAction = "invert";
+  invertAction.textContent = "Invert";
+
+  actions.appendChild(clearAction);
+  actions.appendChild(selectAllAction);
+  actions.appendChild(invertAction);
+
   const options = document.createElement("div");
   options.className = "filter-dropdown-options";
 
   panel.appendChild(search);
+  panel.appendChild(actions);
   panel.appendChild(options);
   dropdown.appendChild(trigger);
   dropdown.appendChild(panel);
@@ -337,6 +373,16 @@ function setupFilterDropdown(selectEl) {
     renderFilterDropdownOptions(selectEl);
   });
 
+  actions.addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-filter-dropdown-action]");
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    await applyFilterDropdownAction(selectEl, button.dataset.filterDropdownAction || "");
+    renderFilterDropdown(selectEl);
+    filterDropdownState.get(selectEl)?.search.focus();
+  });
+
   options.addEventListener("click", async (event) => {
     const button = event.target.closest(".filter-dropdown-option");
     if (!button) {
@@ -348,6 +394,7 @@ function setupFilterDropdown(selectEl) {
     }
     await toggleFilterOption(selectEl, value);
     renderFilterDropdown(selectEl);
+    filterDropdownState.get(selectEl)?.search.focus();
   });
 }
 
@@ -404,7 +451,7 @@ function renderAppliedFilterSummary() {
   }
 }
 
-function clearAllDocumentFilters() {
+async function clearAllDocumentFilters() {
   docsFilters.q = "";
   docsFilters.tag = [];
   docsFilters.correspondent = [];
@@ -413,7 +460,9 @@ function clearAllDocumentFilters() {
   docsFilters.starred = false;
   docsPage = 1;
   applyDocumentListFiltersToControls();
-  navigateToDocumentsPageFromState();
+  window.history.pushState({}, "", buildDocumentsUrl());
+  renderAppliedFilterSummary();
+  await loadDocumentsList();
 }
 
 function setSelectOptions(selectEl, values) {
@@ -558,10 +607,12 @@ function navigateToDocumentsPageFromState() {
   window.location.href = buildDocumentsUrl();
 }
 
-function applyFiltersFromControls() {
+async function applyFiltersFromControls() {
   readFiltersFromControls();
   docsPage = 1;
-  navigateToDocumentsPageFromState();
+  window.history.pushState({}, "", buildDocumentsUrl());
+  renderAppliedFilterSummary();
+  await loadDocumentsList();
 }
 
 function applyDocumentsPartial(payload) {
@@ -1408,11 +1459,11 @@ function bindDocumentsEvents() {
   });
 
   clearFiltersBtn?.addEventListener("click", () => {
-    clearAllDocumentFilters();
+    void clearAllDocumentFilters();
   });
 
   clearAllFiltersBtn?.addEventListener("click", () => {
-    clearAllDocumentFilters();
+    void clearAllDocumentFilters();
   });
 
   showStarredBtn?.addEventListener("click", () => {

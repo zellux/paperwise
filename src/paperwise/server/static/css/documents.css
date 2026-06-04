@@ -167,7 +167,29 @@
   background: #f8faf8;
   padding: 9px 10px;
   font-size: 0.9rem;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
+}
+
+.filter-dropdown-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 8px;
+}
+
+.filter-dropdown-actions button {
+  border: 1px solid #c2cec9;
+  border-radius: 999px;
+  background: #f8faf8;
+  color: #2b463e;
+  cursor: pointer;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 5px 8px;
+}
+
+.filter-dropdown-actions button:hover {
+  background: rgba(130, 157, 148, 0.14);
 }
 
 .filter-dropdown-options {
@@ -1621,6 +1643,8 @@
 }
 
 .docs-filter-count {
+  display: inline-flex;
+  align-items: center;
   border: 1px solid var(--stroke);
   background: var(--panel);
   color: var(--ink-soft);

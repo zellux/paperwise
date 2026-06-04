@@ -725,6 +725,10 @@ def test_static_assets_do_not_keep_page_selection_logic() -> None:
     assert 'event.key !== "Enter"' in documents_js.text
     assert 'filterQuery?.addEventListener("input"' not in documents_js.text
     assert "docsFilterNavigateTimer" not in documents_js.text
+    assert 'dataset.filterDropdownAction = "clear"' in documents_js.text
+    assert 'dataset.filterDropdownAction = "select-all"' in documents_js.text
+    assert 'dataset.filterDropdownAction = "invert"' in documents_js.text
+    assert 'window.history.pushState({}, "", buildDocumentsUrl())' in documents_js.text
     assert "const TAG_COLOR_SET" not in documents_js.text
 
     tag_color_js = client.get("/static/js/ui/tagColor.js")
@@ -1290,12 +1294,17 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'id="docsBulkEditor"' in documents_html
         assert 'id="docsBulkEditorInput"' in documents_html
         assert 'id="docsAppliedFiltersBtn"' in documents_html
-        assert 'id="clearAllFiltersBtn"' in documents_html
-        assert 'id="showStarredBtn"' in documents_html
+        assert 'id="clearAllFiltersBtn"' not in documents_html
+        assert 'id="showStarredBtn"' not in documents_html
         assert "0 filters applied" in documents_html
-        assert "Clear all filters" in documents_html
+        assert "Clear filters" in documents_html
+        assert "Clear all filters" not in documents_html
+        assert "Sync" not in documents_html
         assert '<span class="row-star" aria-label="Starred document">★</span>' in documents_html
-        assert documents_html.index('id="docsFilterForm"') < documents_html.index('id="docsAppliedFiltersBtn"')
+        assert documents_html.index('id="clearFiltersBtn"') < documents_html.index('id="docsAppliedFiltersBtn"')
+        assert documents_html.index('id="docsAppliedFiltersBtn"') < documents_html.index(
+            '<a class="btn btn-primary" href="/ui/upload">'
+        )
         assert 'id="filterStatus"' not in documents_html
         assert 'data-sort-field="document_date"' in documents_html
         assert 'data-sort-field="size"' in documents_html
