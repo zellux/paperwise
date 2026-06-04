@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from paperwise.application.interfaces import DocumentStore
 from paperwise.application.services.taxonomy import normalize_name
-from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, User
+from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, ParseResult, User
 
 DOCUMENT_SORT_FIELDS = {"title", "document_type", "correspondent", "tags", "document_date", "size", "status"}
 
@@ -155,19 +155,32 @@ def iter_filtered_documents(
     batch_size = 1000
     scan_offset = 0
     status_filter = _document_statuses_for_filter(normalized_statuses)
+    include_parse_text = bool(_normalized_text_query(query))
     while True:
-        documents_with_metadata = repository.list_owner_documents_with_llm_results(
-            owner_id=current_user.id,
-            limit=batch_size,
-            offset=scan_offset,
-            statuses=status_filter,
-        )
-        if not documents_with_metadata:
+        if include_parse_text:
+            document_rows = repository.list_owner_documents_with_search_results(
+                owner_id=current_user.id,
+                limit=batch_size,
+                offset=scan_offset,
+                statuses=status_filter,
+            )
+        else:
+            document_rows = [
+                (document, llm_result, None)
+                for document, llm_result in repository.list_owner_documents_with_llm_results(
+                    owner_id=current_user.id,
+                    limit=batch_size,
+                    offset=scan_offset,
+                    statuses=status_filter,
+                )
+            ]
+        if not document_rows:
             break
-        for document, llm_result in documents_with_metadata:
+        for document, llm_result, parse_result in document_rows:
             if not _matches_document_filters(
                 document=document,
                 llm_result=llm_result,
+                parse_result=parse_result,
                 normalized_tags=normalized_tags,
                 normalized_correspondents=normalized_correspondents,
                 normalized_document_types=normalized_document_types,
@@ -177,7 +190,7 @@ def iter_filtered_documents(
             ):
                 continue
             yield document, llm_result
-        if len(documents_with_metadata) < batch_size:
+        if len(document_rows) < batch_size:
             break
         scan_offset += batch_size
 
@@ -217,6 +230,7 @@ def _matches_text_query(
     query: str | None,
     document: Document,
     llm_result: LLMParseResult | None,
+    parse_result: ParseResult | None,
 ) -> bool:
     normalized_query = _normalized_text_query(query)
     if not normalized_query:
@@ -233,6 +247,8 @@ def _matches_text_query(
                 " ".join(llm_result.tags),
             ]
         )
+    if parse_result is not None:
+        candidates.append(parse_result.text_preview)
 
     haystack = " ".join(" ".join(str(value).split()) for value in candidates).casefold()
     return normalized_query in haystack
@@ -246,6 +262,7 @@ def _matches_document_filters(
     *,
     document: Document,
     llm_result: LLMParseResult | None,
+    parse_result: ParseResult | None,
     normalized_tags: set[str],
     normalized_correspondents: set[str],
     normalized_document_types: set[str],
@@ -266,6 +283,11 @@ def _matches_document_filters(
     if normalized_document_types:
         if llm_result is None or normalize_name(llm_result.document_type) not in normalized_document_types:
             return False
-    if not _matches_text_query(query=query, document=document, llm_result=llm_result):
+    if not _matches_text_query(
+        query=query,
+        document=document,
+        llm_result=llm_result,
+        parse_result=parse_result,
+    ):
         return False
     return True

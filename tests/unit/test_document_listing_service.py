@@ -1,7 +1,7 @@
 from datetime import UTC, datetime, timedelta
 
 from paperwise.application.services.document_listing import list_filtered_documents
-from paperwise.domain.models import Document, DocumentStatus, User
+from paperwise.domain.models import Document, DocumentStatus, ParseResult, User
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 
 
@@ -47,6 +47,18 @@ def _user(created_at: datetime) -> User:
         full_name="User",
         password_hash="hash",
         is_active=True,
+        created_at=created_at,
+    )
+
+
+def _parse_result(document_id: str, text_preview: str, *, created_at: datetime) -> ParseResult:
+    return ParseResult(
+        document_id=document_id,
+        parser="test",
+        status="parsed",
+        size_bytes=100,
+        page_count=1,
+        text_preview=text_preview,
         created_at=created_at,
     )
 
@@ -110,3 +122,31 @@ def test_list_filtered_documents_keeps_scan_path_for_metadata_filters() -> None:
     assert listing.total == 0
     assert repository.count_calls == []
     assert repository.list_calls[0]["limit"] == 1000
+
+
+def test_list_filtered_documents_searches_parsed_document_text() -> None:
+    repository = SpyDocumentRepository()
+    now = datetime.now(UTC)
+    repository.save(_document("ordinary-title", created_at=now))
+    repository.save_parse_result(
+        _parse_result(
+            "ordinary-title",
+            "OCR body mentions xenolith and nothing in metadata does.",
+            created_at=now,
+        )
+    )
+
+    listing = list_filtered_documents(
+        repository=repository,
+        current_user=_user(now),
+        query="xenolith",
+        tag=None,
+        correspondent=None,
+        document_type=None,
+        status=None,
+        limit=20,
+        offset=0,
+    )
+
+    assert [document.id for document, _metadata in listing.rows] == ["ordinary-title"]
+    assert listing.total == 1

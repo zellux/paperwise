@@ -2,7 +2,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 import sqlite3
 
-from paperwise.domain.models import ChatThread, Document, DocumentStatus, LLMParseResult
+from paperwise.domain.models import ChatThread, Document, DocumentStatus, LLMParseResult, ParseResult
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -55,6 +55,18 @@ def _llm_result(
         created_correspondent=False,
         created_document_type=False,
         created_tags=[],
+        created_at=datetime.now(UTC),
+    )
+
+
+def _parse_result(document_id: str, text_preview: str) -> ParseResult:
+    return ParseResult(
+        document_id=document_id,
+        parser="test",
+        status="parsed",
+        size_bytes=123,
+        page_count=1,
+        text_preview=text_preview,
         created_at=datetime.now(UTC),
     )
 
@@ -164,6 +176,36 @@ def test_list_owner_documents_with_llm_results_filters_by_status() -> None:
     )
 
     assert [document.id for document, _llm_result in rows] == ["owner-a-processing"]
+
+
+def test_list_owner_documents_with_search_results_includes_parse_text() -> None:
+    repository = InMemoryDocumentRepository()
+    repository.save(_document("owner-a-ready", "owner-a"))
+    repository.save(_document("owner-b-ready", "owner-b"))
+    repository.save_parse_result(_parse_result("owner-a-ready", "Parsed text with a xenolith marker."))
+    repository.save_parse_result(_parse_result("owner-b-ready", "Parsed text from another owner."))
+
+    rows = repository.list_owner_documents_with_search_results(owner_id="owner-a")
+
+    assert [
+        (document.id, parse_result.text_preview if parse_result else None)
+        for document, _llm_result, parse_result in rows
+    ] == [("owner-a-ready", "Parsed text with a xenolith marker.")]
+
+
+def test_postgres_list_owner_documents_with_search_results_includes_parse_text(tmp_path: Path) -> None:
+    repository = PostgresDocumentRepository(f"sqlite:///{tmp_path / 'paperwise.db'}")
+    repository.save(_document("owner-a-ready", "owner-a"))
+    repository.save(_document("owner-b-ready", "owner-b"))
+    repository.save_parse_result(_parse_result("owner-a-ready", "Parsed text with a xenolith marker."))
+    repository.save_parse_result(_parse_result("owner-b-ready", "Parsed text from another owner."))
+
+    rows = repository.list_owner_documents_with_search_results(owner_id="owner-a")
+
+    assert [
+        (document.id, parse_result.text_preview if parse_result else None)
+        for document, _llm_result, parse_result in rows
+    ] == [("owner-a-ready", "Parsed text with a xenolith marker.")]
 
 
 def test_count_owner_documents_by_statuses_is_owner_scoped() -> None:

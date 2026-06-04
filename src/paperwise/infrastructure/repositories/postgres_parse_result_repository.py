@@ -33,6 +33,19 @@ def llm_parse_result_from_row(row: LLMParseResultRow) -> LLMParseResult:
     )
 
 
+def parse_result_from_row(row: ParseResultRow) -> ParseResult:
+    return ParseResult(
+        document_id=row.document_id,
+        parser=row.parser,
+        status=row.status,
+        size_bytes=row.size_bytes,
+        page_count=row.page_count,
+        text_preview=row.text_preview,
+        created_at=row.created_at,
+        ocr_details=None,
+    )
+
+
 class PostgresParseResultRepositoryMixin:
     def save_parse_result(self, result: ParseResult) -> None:
         with self._session_factory() as session:
@@ -53,16 +66,7 @@ class PostgresParseResultRepositoryMixin:
             row = session.get(ParseResultRow, document_id)
             if row is None:
                 return None
-            return ParseResult(
-                document_id=row.document_id,
-                parser=row.parser,
-                status=row.status,
-                size_bytes=row.size_bytes,
-                page_count=row.page_count,
-                text_preview=row.text_preview,
-                created_at=row.created_at,
-                ocr_details=None,
-            )
+            return parse_result_from_row(row)
 
     def delete_document_analysis_artifacts(self, document_id: str) -> None:
         with self._session_factory() as session:

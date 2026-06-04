@@ -111,6 +111,16 @@ class DocumentStore(Protocol):
     ) -> list[tuple[Document, LLMParseResult | None]]:
         """List owner documents with optional LLM metadata in one repository call."""
 
+    def list_owner_documents_with_search_results(
+        self,
+        *,
+        owner_id: str,
+        limit: int = 100,
+        offset: int = 0,
+        statuses: set[DocumentStatus] | None = None,
+    ) -> list[tuple[Document, LLMParseResult | None, ParseResult | None]]:
+        """List owner documents with metadata and parsed text for search scans."""
+
     def count_owner_documents_by_statuses(
         self,
         *,

@@ -10,6 +10,7 @@ from paperwise.domain.models import (
     Document,
     DocumentStatus,
     LLMParseResult,
+    ParseResult,
 )
 from paperwise.infrastructure.db import Base, build_engine, build_session_factory
 from paperwise.infrastructure.repositories.postgres_chat_thread_repository import (
@@ -24,6 +25,7 @@ from paperwise.infrastructure.repositories.postgres_history_repository import Po
 from paperwise.infrastructure.repositories.postgres_parse_result_repository import (
     PostgresParseResultRepositoryMixin,
     llm_parse_result_from_row,
+    parse_result_from_row,
 )
 from paperwise.infrastructure.repositories.postgres_search_repository import PostgresSearchRepositoryMixin
 from paperwise.infrastructure.repositories.postgres_models import (
@@ -205,6 +207,41 @@ class PostgresDocumentRepository(
                     llm_parse_result_from_row(llm_row) if llm_row is not None else None,
                 )
                 for document_row, llm_row in rows
+            ]
+
+    def list_owner_documents_with_search_results(
+        self,
+        *,
+        owner_id: str,
+        limit: int = 100,
+        offset: int = 0,
+        statuses: set[DocumentStatus] | None = None,
+    ) -> list[tuple[Document, LLMParseResult | None, ParseResult | None]]:
+        if statuses is not None and not statuses:
+            return []
+        status_values = [status.value for status in statuses] if statuses is not None else None
+        with self._session_factory() as session:
+            statement = (
+                select(DocumentRow, LLMParseResultRow, ParseResultRow)
+                .outerjoin(LLMParseResultRow, LLMParseResultRow.document_id == DocumentRow.id)
+                .outerjoin(ParseResultRow, ParseResultRow.document_id == DocumentRow.id)
+                .where(DocumentRow.owner_id == owner_id)
+            )
+            if status_values is not None:
+                statement = statement.where(DocumentRow.status.in_(status_values))
+            rows = session.execute(
+                statement
+                .order_by(DocumentRow.created_at.desc())
+                .offset(max(0, offset))
+                .limit(max(0, limit))
+            ).all()
+            return [
+                (
+                    document_from_row(document_row),
+                    llm_parse_result_from_row(llm_row) if llm_row is not None else None,
+                    parse_result_from_row(parse_row) if parse_row is not None else None,
+                )
+                for document_row, llm_row, parse_row in rows
             ]
 
     def count_owner_documents_by_statuses(

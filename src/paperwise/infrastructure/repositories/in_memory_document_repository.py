@@ -100,6 +100,38 @@ class InMemoryDocumentRepository(DocumentRepository):
                 for document in docs[start:end]
             ]
 
+    def list_owner_documents_with_search_results(
+        self,
+        *,
+        owner_id: str,
+        limit: int = 100,
+        offset: int = 0,
+        statuses: set[DocumentStatus] | None = None,
+    ) -> list[tuple[Document, LLMParseResult | None, ParseResult | None]]:
+        if statuses is not None and not statuses:
+            return []
+        with self._lock:
+            docs = sorted(
+                (
+                    document
+                    for document in self._documents.values()
+                    if document.owner_id == owner_id
+                    and (statuses is None or document.status in statuses)
+                ),
+                key=lambda d: d.created_at,
+                reverse=True,
+            )
+            start = max(0, offset)
+            end = start + max(0, limit)
+            return [
+                (
+                    document,
+                    self._llm_parse_results.get(document.id),
+                    self._parse_results.get(document.id),
+                )
+                for document in docs[start:end]
+            ]
+
     def count_owner_documents_by_statuses(
         self,
         *,
