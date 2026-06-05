@@ -6,6 +6,7 @@ onto Paperwise's native document, user, and taxonomy model. Keep compatibility
 behavior isolated here so the native Paperwise API can evolve independently.
 """
 
+import hmac
 import json
 import re
 import zlib
@@ -22,7 +23,7 @@ from paperwise.application.interfaces import DocumentRepository, IngestionDispat
 from paperwise.application.services.documents import CreateDocumentCommand, create_document
 from paperwise.application.services.filenames import sanitize_storage_filename
 from paperwise.application.services.metadata_updates import update_document_metadata, validate_document_date
-from paperwise.application.services.session_tokens import create_session_token, decode_session_token
+from paperwise.application.services.session_tokens import create_paperless_api_token, decode_session_token
 from paperwise.application.services.upload_validation import is_supported_upload, normalize_content_type
 from paperwise.application.services.users import authenticate_user
 from paperwise.application.services.document_file_cleanup import resolve_file_path_from_uri
@@ -39,6 +40,7 @@ from paperwise.server.dependencies import (
 router = APIRouter(prefix="/api", tags=["paperless-compat"])
 
 API_VERSION = "9"
+PAPERLESS_VERSION = "2.20.15"
 DEFAULT_PAGE_SIZE = 25
 MAX_COMPAT_ROWS = 10_000
 PAPERLESS_PERMISSION_ACTIONS = ("add", "change", "delete", "view")
@@ -68,6 +70,15 @@ def _slug(value: str) -> str:
 
 def _paperless_headers(response: Response) -> None:
     response.headers["x-api-version"] = API_VERSION
+    response.headers["x-version"] = PAPERLESS_VERSION
+
+
+def _auth_exception(detail: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=detail,
+        headers={"WWW-Authenticate": "Token"},
+    )
 
 
 def _current_user_from_token(
@@ -77,14 +88,42 @@ def _current_user_from_token(
 ) -> User:
     scheme, _, token = (authorization or "").partition(" ")
     if scheme.lower() != "token" or not token.strip():
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
-    payload = decode_session_token(token=token.strip(), secret=settings.auth_secret)
-    if payload is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired token")
-    user = repository.get_user(str(payload.get("sub")))
+        raise _auth_exception("Authentication credentials were not provided.")
+    provided_token = token.strip()
+    payload = decode_session_token(token=provided_token, secret=settings.auth_secret)
+    if payload is not None:
+        user = repository.get_user(str(payload.get("sub")))
+        if user is None or not user.is_active:
+            raise _auth_exception("Invalid user")
+        return user
+
+    user = _current_user_from_paperless_api_token(
+        token=provided_token,
+        repository=repository,
+        settings=settings,
+    )
     if user is None or not user.is_active:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid user")
+        raise _auth_exception("Invalid or expired token")
     return user
+
+
+def _current_user_from_paperless_api_token(
+    *,
+    token: str,
+    repository: UserRepository,
+    settings: Settings,
+) -> User | None:
+    for user in repository.list_users(limit=MAX_COMPAT_ROWS):
+        if not user.is_active:
+            continue
+        expected_token = create_paperless_api_token(
+            user_id=user.id,
+            password_hash=user.password_hash,
+            secret=settings.auth_secret,
+        )
+        if hmac.compare_digest(expected_token, token):
+            return user
+    return None
 
 
 def _user_id(user: User) -> int:
@@ -458,7 +497,11 @@ def create_token(
     )
     if user is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to log in with provided credentials.")
-    token = create_session_token(user_id=user.id, secret=settings.auth_secret, ttl_seconds=settings.session_ttl_seconds)
+    token = create_paperless_api_token(
+        user_id=user.id,
+        password_hash=user.password_hash,
+        secret=settings.auth_secret,
+    )
     return {"token": token}
 
 
@@ -617,8 +660,8 @@ def statistics(
 
 @router.get("/remote_version/")
 def remote_version(response: Response) -> dict[str, Any]:
-    response.headers["x-version"] = "0.0.0"
-    return {"version": "0.0.0", "update_available": False}
+    _paperless_headers(response)
+    return {"version": f"v{PAPERLESS_VERSION}", "update_available": False}
 
 
 @router.get("/config/")

@@ -1,13 +1,17 @@
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 from paperwise import __version__
 from paperwise.server.routes.documents import router as documents_router
 from paperwise.server.routes.collections import router as collections_router
 from paperwise.server.routes.health import router as health_router
-from paperwise.server.routes.paperless_compat import router as paperless_compat_router
+from paperwise.server.routes.paperless_compat import (
+    API_VERSION as PAPERLESS_COMPAT_API_VERSION,
+    PAPERLESS_VERSION as PAPERLESS_COMPAT_VERSION,
+    router as paperless_compat_router,
+)
 from paperwise.server.routes.query import router as query_router
 from paperwise.server.routes.ui import router as ui_router
 from paperwise.server.routes.users import router as users_router
@@ -24,6 +28,15 @@ def create_app() -> FastAPI:
         version=__version__,
         description="AI-native document management platform API",
     )
+
+    @app.middleware("http")
+    async def paperless_compat_version_headers(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["x-api-version"] = PAPERLESS_COMPAT_API_VERSION
+            response.headers["x-version"] = PAPERLESS_COMPAT_VERSION
+        return response
+
     static_dir = Path(__file__).resolve().parent / "static"
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
     app.include_router(ui_router)

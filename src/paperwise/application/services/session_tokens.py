@@ -29,6 +29,15 @@ def create_session_token(*, user_id: str, secret: str, ttl_seconds: int) -> str:
     return f"{payload_part}.{_b64url_encode(signature)}"
 
 
+def create_paperless_api_token(*, user_id: str, password_hash: str, secret: str) -> str:
+    message = f"paperless-api-token:{user_id}:{password_hash}".encode("utf-8")
+    return hmac.new(
+        key=secret.encode("utf-8"),
+        msg=message,
+        digestmod=hashlib.sha256,
+    ).hexdigest()[:40]
+
+
 def decode_session_token(token: str, secret: str) -> dict | None:
     try:
         payload_part, signature_part = token.split(".", 1)

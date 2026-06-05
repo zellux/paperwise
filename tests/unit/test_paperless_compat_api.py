@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, ParseResult
 from paperwise.infrastructure.config import Settings
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
+from paperwise.application.services.session_tokens import create_session_token
 from paperwise.infrastructure.storage.local_storage import LocalStorageAdapter
 from paperwise.server.dependencies import (
     document_repository_dependency,
@@ -52,6 +53,103 @@ def _create_user_and_token(
     )
     assert token_response.status_code == 200
     return create_response.json()["id"], {"Authorization": f"Token {token_response.json()['token']}"}
+
+
+def _create_user(client: TestClient, *, email: str = "mobile@example.com") -> str:
+    create_response = client.post(
+        "/users",
+        json={
+            "email": email,
+            "full_name": "Mobile User",
+            "password": "strong-pass-123",
+        },
+    )
+    assert create_response.status_code == 201
+    return create_response.json()["id"]
+
+
+def _paperless_token(client: TestClient, *, email: str = "mobile@example.com") -> str:
+    token_response = client.post(
+        "/api/token/",
+        json={"username": email, "password": "strong-pass-123"},
+    )
+    assert token_response.status_code == 200
+    return token_response.json()["token"]
+
+
+def test_paperless_token_is_stable_and_not_session_shaped(tmp_path) -> None:
+    repository = InMemoryDocumentRepository()
+    settings = Settings(object_store_root=str(tmp_path), session_ttl_seconds=60)
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: settings
+
+    try:
+        client = TestClient(app)
+        _create_user(client)
+
+        first_token = _paperless_token(client)
+        second_token = _paperless_token(client)
+
+        assert first_token == second_token
+        assert len(first_token) == 40
+        assert "." not in first_token
+
+        profile = client.get("/api/profile/", headers={"Authorization": f"Token {first_token}"})
+        assert profile.status_code == 200
+        assert profile.json()["email"] == "mobile@example.com"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_paperless_compat_still_accepts_existing_session_tokens(tmp_path) -> None:
+    repository = InMemoryDocumentRepository()
+    settings = Settings(object_store_root=str(tmp_path))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: settings
+
+    try:
+        client = TestClient(app)
+        user_id = _create_user(client)
+        session_token = create_session_token(
+            user_id=user_id,
+            secret=settings.auth_secret,
+            ttl_seconds=settings.session_ttl_seconds,
+        )
+
+        profile = client.get("/api/profile/", headers={"Authorization": f"Token {session_token}"})
+        assert profile.status_code == 200
+        assert profile.json()["email"] == "mobile@example.com"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_paperless_compat_headers_apply_to_normal_and_error_responses(tmp_path) -> None:
+    repository = InMemoryDocumentRepository()
+    settings = Settings(object_store_root=str(tmp_path))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: settings
+
+    try:
+        client = TestClient(app)
+        _create_user(client)
+        headers = {"Authorization": f"Token {_paperless_token(client)}"}
+
+        for response in [
+            client.get("/api/documents/", headers=headers),
+            client.get("/api/config/", headers=headers),
+            client.get("/api/tags/", headers=headers),
+            client.get("/api/remote_version/", headers=headers),
+            client.get("/api/profile/"),
+        ]:
+            assert response.headers["x-api-version"] == "9"
+            assert response.headers["x-version"] == "2.20.15"
+
+        unauthenticated = client.get("/api/profile/")
+        assert unauthenticated.status_code == 401
+        assert unauthenticated.headers["www-authenticate"] == "Token"
+        assert unauthenticated.json()["detail"] == "Authentication credentials were not provided."
+    finally:
+        app.dependency_overrides.clear()
 
 
 def _seed_document(
