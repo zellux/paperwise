@@ -900,6 +900,30 @@ function animateRowInlineUpdate(row) {
   window.setTimeout(() => row.classList.remove("is-inline-updated"), 1100);
 }
 
+function setRowStarred(row, starred) {
+  row.dataset.docStarred = starred ? "true" : "false";
+  const titleRow = row.querySelector(".title-row");
+  if (!titleRow) {
+    return;
+  }
+  const existingIndicator = titleRow.querySelector(".row-star-indicator");
+  if (!starred) {
+    existingIndicator?.remove();
+    animateRowInlineUpdate(row);
+    return;
+  }
+  if (!existingIndicator) {
+    const indicator = document.createElement("span");
+    indicator.className = "row-star-indicator";
+    indicator.setAttribute("aria-label", "Starred document");
+    indicator.title = "Starred document";
+    indicator.textContent = "★";
+    const statusBadge = titleRow.querySelector(".status-badge");
+    titleRow.insertBefore(indicator, statusBadge || null);
+  }
+  animateRowInlineUpdate(row);
+}
+
 function applyRowMetadataChanges(row, changes) {
   if (Array.isArray(changes.tags)) {
     const tags = unique(changes.tags);
@@ -1130,7 +1154,7 @@ async function handleBulkStarClick(button) {
       if (!response.ok) {
         throw new Error(payload.detail || response.statusText);
       }
-      row.dataset.docStarred = targetStarred ? "true" : "false";
+      setRowStarred(row, targetStarred);
       updatedCount += 1;
     }
     await loadDocumentsList({ showLoading: false, logResult: false });

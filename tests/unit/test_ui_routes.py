@@ -1016,6 +1016,8 @@ def test_static_assets_poll_processing_state_without_page_refresh() -> None:
     assert "handleRowStarToggle" not in documents_js.text
     assert "[data-doc-star-toggle]" not in documents_js.text
     assert "handleBulkStarClick" in documents_js.text
+    assert "setRowStarred(row, targetStarred)" in documents_js.text
+    assert 'indicator.className = "row-star-indicator"' in documents_js.text
     assert "docsBulkStarBtn" in documents_js.text
     assert 'apiFetch(`/documents/${documentId}/starred`' in documents_js.text
 
