@@ -1450,6 +1450,7 @@
 .row-star-indicator {
   display: inline-grid;
   place-items: center;
+  appearance: none;
   width: 18px;
   height: 18px;
   flex: 0 0 auto;
@@ -1459,7 +1460,9 @@
   color: var(--accent-2);
   cursor: pointer;
   font-size: 0.78rem;
-  line-height: 1;
+  line-height: 16px;
+  padding: 0;
+  text-align: center;
 }
 
 .row-star-indicator:hover,
