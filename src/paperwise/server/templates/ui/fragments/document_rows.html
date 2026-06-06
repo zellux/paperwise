@@ -38,6 +38,7 @@
     <span class="title-stack">
       <span class="title-row">
         <a class="title-link" href="/ui/document?id={{ row.document_id_query }}">{{ row.title }}</a>
+        {% if row.starred %}<span class="row-star-indicator" aria-label="Starred document" title="Starred document">★</span>{% endif %}
         {% if row.status %}<span class="status-badge status-{{ row.status.status }}">{{ row.status.label }}</span>{% endif %}
       </span>
       <span class="title-meta">

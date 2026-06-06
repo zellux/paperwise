@@ -66,6 +66,34 @@ def test_document_rows_render_expandable_tag_overflow() -> None:
     assert "+2</button>" in html
 
 
+def test_document_rows_render_passive_star_indicator() -> None:
+    html = document_rows_html(
+        [
+            {
+                "id": "doc-starred",
+                "filename": "starred.pdf",
+                "status": "ready",
+                "size_bytes": 123,
+                "starred": True,
+                "llm_metadata": {"suggested_title": "Starred Notice"},
+            },
+            {
+                "id": "doc-plain",
+                "filename": "plain.pdf",
+                "status": "ready",
+                "size_bytes": 456,
+                "starred": False,
+                "llm_metadata": {"suggested_title": "Plain Notice"},
+            },
+        ]
+    )
+
+    assert html.count('class="row-star-indicator"') == 1
+    assert 'aria-label="Starred document"' in html
+    assert 'data-doc-star-toggle="doc-starred"' not in html
+    assert 'class="row-star-button' not in html
+
+
 def test_document_detail_preview_uses_image_natural_ratio_for_images() -> None:
     fragments = document_detail_fragments(
         {
@@ -1308,6 +1336,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "Sync" not in documents_html
         assert 'data-doc-star-toggle="doc-tax"' not in documents_html
         assert 'data-doc-starred="true"' in documents_html
+        assert 'class="row-star-indicator"' in documents_html
         assert "row-star-button" not in documents_html
         assert 'aria-label="Unstar Tax Notice"' not in documents_html
         assert documents_html.index('id="clearFiltersBtn"') < documents_html.index('id="docsAppliedFiltersBtn"')
