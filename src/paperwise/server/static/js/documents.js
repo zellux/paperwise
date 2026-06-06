@@ -697,6 +697,7 @@ function renderDocSelectionState() {
   if (selectedDocIds.size === 0) {
     closeBulkEditor();
   }
+  updateBulkStarAction();
 }
 
 function syncSelectionToVisibleRows() {
@@ -734,6 +735,23 @@ function toggleDocumentSelection(documentId, selected) {
 
 function getSelectedDocumentRows() {
   return getVisibleDocRows().filter((row) => selectedDocIds.has(row.dataset.docId || ""));
+}
+
+function updateBulkStarAction() {
+  const button = document.getElementById("docsBulkStarBtn");
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+  const rows = getSelectedDocumentRows();
+  const allSelectedStarred =
+    rows.length > 0 && rows.every((row) => row.dataset.docStarred === "true");
+  button.dataset.bulkStarredTarget = allSelectedStarred ? "false" : "true";
+  const label = button.querySelector("span");
+  if (label) {
+    label.textContent = allSelectedStarred ? "Unstar" : "Star";
+  }
+  button.title = allSelectedStarred ? "Unstar selected documents" : "Star selected documents";
+  button.setAttribute("aria-label", button.title);
 }
 
 function parseRowTags(row) {
@@ -880,51 +898,6 @@ function animateRowInlineUpdate(row) {
   void row.offsetWidth;
   row.classList.add("is-inline-updated");
   window.setTimeout(() => row.classList.remove("is-inline-updated"), 1100);
-}
-
-function renderRowStarButton(button, starred, title = "") {
-  button.classList.toggle("is-starred", starred);
-  button.setAttribute("aria-pressed", starred ? "true" : "false");
-  button.setAttribute("aria-label", `${starred ? "Unstar" : "Star"} ${title || "document"}`);
-  button.title = starred ? "Unstar document" : "Star document";
-}
-
-function applyRowStarredChange(row, starred) {
-  row.dataset.docStarred = starred ? "true" : "false";
-  const button = row.querySelector("[data-doc-star-toggle]");
-  if (button instanceof HTMLButtonElement) {
-    renderRowStarButton(button, starred, row.dataset.docTitle || "");
-  }
-  animateRowInlineUpdate(row);
-}
-
-async function handleRowStarToggle(button) {
-  const row = button.closest("tr[data-doc-id]");
-  const documentId = button.dataset.docStarToggle || row?.dataset.docId || "";
-  if (!(row instanceof HTMLTableRowElement) || !documentId || button.disabled) {
-    return;
-  }
-  const nextStarred = button.getAttribute("aria-pressed") !== "true";
-  button.disabled = true;
-  try {
-    const response = await apiFetch(`/documents/${documentId}/starred`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ starred: nextStarred }),
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.detail || response.statusText);
-    }
-    const starred = Boolean(payload?.document?.starred);
-    applyRowStarredChange(row, starred);
-    await loadDocumentsList({ showLoading: false, logResult: false });
-    logActivity(`${starred ? "Starred" : "Unstarred"} document ${documentId}.`);
-  } catch (error) {
-    logActivity(`Star update failed: ${error.message}`);
-  } finally {
-    button.disabled = false;
-  }
 }
 
 function applyRowMetadataChanges(row, changes) {
@@ -1132,6 +1105,42 @@ async function handleBulkEditorSubmit() {
 
 async function handleBulkTypeClick(button) {
   openBulkEditor("document_type", button);
+}
+
+async function handleBulkStarClick(button) {
+  const rows = getSelectedRowsOrLog();
+  if (!rows.length) {
+    return;
+  }
+  const targetStarred = button.dataset.bulkStarredTarget !== "false";
+  button.disabled = true;
+  try {
+    let updatedCount = 0;
+    for (const row of rows) {
+      const documentId = row.dataset.docId || "";
+      if (!documentId || row.dataset.docStarred === String(targetStarred)) {
+        continue;
+      }
+      const response = await apiFetch(`/documents/${documentId}/starred`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ starred: targetStarred }),
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(payload.detail || response.statusText);
+      }
+      row.dataset.docStarred = targetStarred ? "true" : "false";
+      updatedCount += 1;
+    }
+    await loadDocumentsList({ showLoading: false, logResult: false });
+    logActivity(`${targetStarred ? "Starred" : "Unstarred"} ${updatedCount} document(s).`);
+  } catch (error) {
+    logActivity(`Bulk star update failed: ${error.message}`);
+  } finally {
+    button.disabled = false;
+    updateBulkStarAction();
+  }
 }
 
 async function handleBulkReprocessClick(button) {
@@ -1435,6 +1444,13 @@ function bindDocumentsEvents() {
       return;
     }
 
+    const bulkStar = event.target instanceof Element ? event.target.closest("#docsBulkStarBtn") : null;
+    if (bulkStar instanceof HTMLButtonElement) {
+      closeBulkEditor();
+      await handleBulkStarClick(bulkStar);
+      return;
+    }
+
     const bulkReprocess =
       event.target instanceof Element ? event.target.closest("#docsBulkReprocessBtn") : null;
     if (bulkReprocess instanceof HTMLButtonElement) {
@@ -1491,16 +1507,6 @@ function bindDocumentsEvents() {
     }
     event.preventDefault();
     await handleBulkEditorSubmit();
-  });
-
-  document.addEventListener("click", (event) => {
-    const button = event.target instanceof Element ? event.target.closest("[data-doc-star-toggle]") : null;
-    if (!(button instanceof HTMLButtonElement)) {
-      return;
-    }
-    event.preventDefault();
-    event.stopPropagation();
-    void handleRowStarToggle(button);
   });
 
   document.addEventListener("keydown", (event) => {

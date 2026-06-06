@@ -66,37 +66,6 @@ def test_document_rows_render_expandable_tag_overflow() -> None:
     assert "+2</button>" in html
 
 
-def test_document_rows_render_inline_star_toggle() -> None:
-    html = document_rows_html(
-        [
-            {
-                "id": "doc-starred",
-                "filename": "starred.pdf",
-                "status": "ready",
-                "size_bytes": 123,
-                "starred": True,
-                "llm_metadata": {"suggested_title": "Starred Notice"},
-            },
-            {
-                "id": "doc-plain",
-                "filename": "plain.pdf",
-                "status": "ready",
-                "size_bytes": 456,
-                "starred": False,
-                "llm_metadata": {"suggested_title": "Plain Notice"},
-            },
-        ]
-    )
-
-    assert 'data-doc-star-toggle="doc-starred"' in html
-    assert 'class="row-star-button is-starred"' in html
-    assert 'aria-label="Unstar Starred Notice"' in html
-    assert 'aria-pressed="true"' in html
-    assert 'data-doc-star-toggle="doc-plain"' in html
-    assert 'aria-label="Star Plain Notice"' in html
-    assert 'aria-pressed="false"' in html
-
-
 def test_document_detail_preview_uses_image_natural_ratio_for_images() -> None:
     fragments = document_detail_fragments(
         {
@@ -1016,8 +985,10 @@ def test_static_assets_poll_processing_state_without_page_refresh() -> None:
     assert "docsInflightRegion" in documents_js.text
     assert "documentsProcessingPollTimer" in documents_js.text
     assert "loadDocumentsList({ showLoading: false, logResult: false })" in documents_js.text
-    assert "handleRowStarToggle" in documents_js.text
-    assert "[data-doc-star-toggle]" in documents_js.text
+    assert "handleRowStarToggle" not in documents_js.text
+    assert "[data-doc-star-toggle]" not in documents_js.text
+    assert "handleBulkStarClick" in documents_js.text
+    assert "docsBulkStarBtn" in documents_js.text
     assert 'apiFetch(`/documents/${documentId}/starred`' in documents_js.text
 
     pending_js = client.get("/static/js/pending.js")
@@ -1322,6 +1293,7 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert 'id="docsBulkTagsBtn"' in documents_html
         assert 'id="docsBulkCorrespondentBtn"' in documents_html
         assert 'id="docsBulkTypeBtn"' in documents_html
+        assert 'id="docsBulkStarBtn"' in documents_html
         assert 'id="docsBulkReprocessBtn"' in documents_html
         assert 'id="docsBulkDownloadBtn"' in documents_html
         assert 'id="docsBulkDeleteBtn"' in documents_html
@@ -1334,9 +1306,10 @@ def test_catalog_ui_pages_include_initial_data_for_cookie_session() -> None:
         assert "Clear filters" in documents_html
         assert "Clear all filters" not in documents_html
         assert "Sync" not in documents_html
-        assert 'data-doc-star-toggle="doc-tax"' in documents_html
-        assert 'class="row-star-button is-starred"' in documents_html
-        assert 'aria-label="Unstar Tax Notice"' in documents_html
+        assert 'data-doc-star-toggle="doc-tax"' not in documents_html
+        assert 'data-doc-starred="true"' in documents_html
+        assert "row-star-button" not in documents_html
+        assert 'aria-label="Unstar Tax Notice"' not in documents_html
         assert documents_html.index('id="clearFiltersBtn"') < documents_html.index('id="docsAppliedFiltersBtn"')
         assert documents_html.index('id="docsAppliedFiltersBtn"') < documents_html.index(
             '<a class="btn btn-primary" href="/ui/upload">'

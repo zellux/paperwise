@@ -38,16 +38,6 @@
     <span class="title-stack">
       <span class="title-row">
         <a class="title-link" href="/ui/document?id={{ row.document_id_query }}">{{ row.title }}</a>
-        <button
-          type="button"
-          class="row-star-button{% if row.starred %} is-starred{% endif %}"
-          data-doc-star-toggle="{{ row.document_id }}"
-          aria-label="{% if row.starred %}Unstar {{ row.title }}{% else %}Star {{ row.title }}{% endif %}"
-          aria-pressed="{% if row.starred %}true{% else %}false{% endif %}"
-          title="{% if row.starred %}Unstar document{% else %}Star document{% endif %}"
-        >
-          <span class="row-star" aria-hidden="true">★</span>
-        </button>
         {% if row.status %}<span class="status-badge status-{{ row.status.status }}">{{ row.status.label }}</span>{% endif %}
       </span>
       <span class="title-meta">
