@@ -89,7 +89,8 @@ def test_document_rows_render_passive_star_indicator() -> None:
     )
 
     assert html.count('class="row-star-indicator"') == 1
-    assert 'aria-label="Starred document"' in html
+    assert 'data-doc-star-unstar="doc-starred"' in html
+    assert 'aria-label="Unstar document"' in html
     assert 'data-doc-star-toggle="doc-starred"' not in html
     assert 'class="row-star-button' not in html
 
@@ -1015,9 +1016,11 @@ def test_static_assets_poll_processing_state_without_page_refresh() -> None:
     assert "loadDocumentsList({ showLoading: false, logResult: false })" in documents_js.text
     assert "handleRowStarToggle" not in documents_js.text
     assert "[data-doc-star-toggle]" not in documents_js.text
+    assert "handleRowStarUnstar" in documents_js.text
+    assert "[data-doc-star-unstar]" in documents_js.text
     assert "handleBulkStarClick" in documents_js.text
     assert "setRowStarred(row, targetStarred)" in documents_js.text
-    assert 'indicator.className = "row-star-indicator"' in documents_js.text
+    assert 'indicator.dataset.docStarUnstar = row.dataset.docId || ""' in documents_js.text
     assert "docsBulkStarBtn" in documents_js.text
     assert 'apiFetch(`/documents/${documentId}/starred`' in documents_js.text
 

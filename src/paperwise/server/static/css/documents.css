@@ -1450,10 +1450,27 @@
 .row-star-indicator {
   display: inline-grid;
   place-items: center;
+  width: 24px;
+  height: 24px;
   flex: 0 0 auto;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
   color: var(--accent);
+  cursor: pointer;
   font-size: 0.92rem;
   line-height: 1;
+}
+
+.row-star-indicator:hover,
+.row-star-indicator:focus-visible {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--stroke));
+  background: var(--row-hover);
+}
+
+.row-star-indicator:disabled {
+  cursor: progress;
+  opacity: 0.62;
 }
 
 .docs-side-row > span:nth-child(2) {

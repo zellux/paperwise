@@ -913,15 +913,43 @@ function setRowStarred(row, starred) {
     return;
   }
   if (!existingIndicator) {
-    const indicator = document.createElement("span");
+    const indicator = document.createElement("button");
+    indicator.type = "button";
     indicator.className = "row-star-indicator";
-    indicator.setAttribute("aria-label", "Starred document");
-    indicator.title = "Starred document";
+    indicator.dataset.docStarUnstar = row.dataset.docId || "";
+    indicator.setAttribute("aria-label", "Unstar document");
+    indicator.title = "Unstar document";
     indicator.textContent = "★";
     const statusBadge = titleRow.querySelector(".status-badge");
     titleRow.insertBefore(indicator, statusBadge || null);
   }
   animateRowInlineUpdate(row);
+}
+
+async function handleRowStarUnstar(button) {
+  const row = button.closest("tr[data-doc-id]");
+  const documentId = button.dataset.docStarUnstar || row?.dataset.docId || "";
+  if (!(row instanceof HTMLTableRowElement) || !documentId || button.disabled) {
+    return;
+  }
+  button.disabled = true;
+  try {
+    const response = await apiFetch(`/documents/${documentId}/starred`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ starred: false }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || response.statusText);
+    }
+    setRowStarred(row, false);
+    await loadDocumentsList({ showLoading: false, logResult: false });
+    logActivity(`Unstarred document ${documentId}.`);
+  } catch (error) {
+    logActivity(`Star update failed: ${error.message}`);
+    button.disabled = false;
+  }
 }
 
 function applyRowMetadataChanges(row, changes) {
@@ -1435,6 +1463,15 @@ function bindDocumentsEvents() {
       if (row instanceof HTMLTableRowElement) {
         expandRowTags(row);
       }
+      return;
+    }
+
+    const starUnstar =
+      event.target instanceof Element ? event.target.closest("[data-doc-star-unstar]") : null;
+    if (starUnstar instanceof HTMLButtonElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      await handleRowStarUnstar(starUnstar);
       return;
     }
 
