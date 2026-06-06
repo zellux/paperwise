@@ -1450,22 +1450,22 @@
 .row-star-indicator {
   display: inline-grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  width: 18px;
+  height: 18px;
   flex: 0 0 auto;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-2);
   cursor: pointer;
-  font-size: 0.92rem;
+  font-size: 0.78rem;
   line-height: 1;
 }
 
 .row-star-indicator:hover,
 .row-star-indicator:focus-visible {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--stroke));
-  background: var(--row-hover);
+  border-color: color-mix(in srgb, var(--accent-2) 28%, transparent);
+  background: color-mix(in srgb, var(--accent-2) 8%, transparent);
 }
 
 .row-star-indicator:disabled {
