@@ -285,10 +285,18 @@ def test_paperless_mobile_auth_profile_and_document_listing(tmp_path) -> None:
         assert compat_user.status_code == 200
         assert "view_document" in compat_user.json()["inherited_permissions"]
 
+        groups = client.get("/api/groups/?page=1&full_perms=true&page_size=250", headers=headers)
+        assert groups.status_code == 200
+        assert groups.json()["results"] == []
+
         config = client.get("/api/config/", headers=headers)
         assert config.status_code == 200
         assert config.json()[0]["app_title"] == "Paperwise"
         assert config.json()[0]["user_args"] is None
+
+        tasks = client.get("/api/tasks/?task_name=consume_file&acknowledged=false", headers=headers)
+        assert tasks.status_code == 200
+        assert tasks.json() == []
 
         documents = client.get("/api/documents/?page=1&page_size=10", headers=headers)
         assert documents.status_code == 200

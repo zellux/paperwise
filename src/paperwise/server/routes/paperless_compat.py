@@ -632,6 +632,16 @@ def list_users(
     return _paginated("/api/users/", count=1, page=1, page_size=1, results=[payload], all_ids=[payload["id"]])
 
 
+@router.get("/groups/")
+def list_groups(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10_000, ge=1),
+    current_user: User = Depends(_current_user_from_token),
+) -> dict[str, Any]:
+    del current_user
+    return _paginated("/api/groups/", count=0, page=page, page_size=page_size, all_ids=[], results=[])
+
+
 @router.get("/statistics/")
 def statistics(
     repository: DocumentRepository = Depends(document_repository_dependency),
@@ -1233,9 +1243,9 @@ def list_saved_views(page: int = Query(1, ge=1), page_size: int = Query(10_000, 
 
 
 @router.get("/tasks/")
-def list_tasks(page: int = Query(1, ge=1), page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1), current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
+def list_tasks(current_user: User = Depends(_current_user_from_token)) -> list[Any]:
     del current_user
-    return _paginated("/api/tasks/", count=0, page=page, page_size=page_size, results=[])
+    return []
 
 
 @router.get("/tasks/{task_id}")
