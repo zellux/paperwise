@@ -97,6 +97,7 @@ def test_paperless_token_is_stable_and_not_session_shaped(tmp_path) -> None:
         profile = client.get("/api/profile/", headers={"Authorization": f"Token {first_token}"})
         assert profile.status_code == 200
         assert profile.json()["email"] == "mobile@example.com"
+        assert profile.json()["auth_token"] == first_token
     finally:
         app.dependency_overrides.clear()
 
@@ -119,6 +120,7 @@ def test_paperless_compat_still_accepts_existing_session_tokens(tmp_path) -> Non
         profile = client.get("/api/profile/", headers={"Authorization": f"Token {session_token}"})
         assert profile.status_code == 200
         assert profile.json()["email"] == "mobile@example.com"
+        assert profile.json()["auth_token"] == _paperless_token(client)
     finally:
         app.dependency_overrides.clear()
 
@@ -261,6 +263,10 @@ def test_paperless_mobile_auth_profile_and_document_listing(tmp_path) -> None:
         profile = client.head("/api/profile/", headers=headers)
         assert profile.status_code == 200
         assert profile.headers["x-api-version"] == "9"
+
+        profile = client.get("/api/profile/", headers=headers)
+        assert profile.status_code == 200
+        assert profile.json()["auth_token"] == headers["Authorization"].removeprefix("Token ")
 
         schema = client.head("/api/schema/")
         assert schema.status_code == 200

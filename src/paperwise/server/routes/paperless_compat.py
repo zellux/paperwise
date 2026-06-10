@@ -116,14 +116,18 @@ def _current_user_from_paperless_api_token(
     for user in repository.list_users(limit=MAX_COMPAT_ROWS):
         if not user.is_active:
             continue
-        expected_token = create_paperless_api_token(
-            user_id=user.id,
-            password_hash=user.password_hash,
-            secret=settings.auth_secret,
-        )
+        expected_token = _paperless_api_token(user, settings)
         if hmac.compare_digest(expected_token, token):
             return user
     return None
+
+
+def _paperless_api_token(user: User, settings: Settings) -> str:
+    return create_paperless_api_token(
+        user_id=user.id,
+        password_hash=user.password_hash,
+        secret=settings.auth_secret,
+    )
 
 
 def _user_id(user: User) -> int:
@@ -497,12 +501,7 @@ def create_token(
     )
     if user is None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unable to log in with provided credentials.")
-    token = create_paperless_api_token(
-        user_id=user.id,
-        password_hash=user.password_hash,
-        secret=settings.auth_secret,
-    )
-    return {"token": token}
+    return {"token": _paperless_api_token(user, settings)}
 
 
 @router.head("/schema/")
@@ -529,6 +528,7 @@ def head_profile(
 def get_profile(
     response: Response,
     current_user: User = Depends(_current_user_from_token),
+    settings: Settings = Depends(settings_dependency),
 ) -> dict[str, Any]:
     _paperless_headers(response)
     name_parts = current_user.full_name.strip().split()
@@ -536,7 +536,7 @@ def get_profile(
         "email": current_user.email,
         "first_name": name_parts[0] if name_parts else "",
         "last_name": " ".join(name_parts[1:]) if len(name_parts) > 1 else "",
-        "auth_token": None,
+        "auth_token": _paperless_api_token(current_user, settings),
         "has_usable_password": True,
         "social_accounts": [],
         "is_mfa_enabled": False,
