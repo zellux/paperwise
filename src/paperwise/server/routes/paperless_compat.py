@@ -568,7 +568,7 @@ def get_ui_settings(
                 "default_view_groups": [],
             },
             "date_display": {"date_format": "mediumDate", "date_locale": "en-US"},
-            "search": {"more_link": "title-content"},
+            "search": {"more_link": "title-content", "db_only": False},
             "saved_views": {"dashboard_views_sort_order": []},
         },
         "user": {

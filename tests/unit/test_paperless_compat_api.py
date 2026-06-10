@@ -278,6 +278,7 @@ def test_paperless_mobile_auth_profile_and_document_listing(tmp_path) -> None:
         assert "view_document" in ui_settings.json()["permissions"]
         assert "add_document" in ui_settings.json()["permissions"]
         assert ui_settings.json()["settings"]["date_display"]["date_locale"] == "en-US"
+        assert ui_settings.json()["settings"]["search"]["db_only"] is False
 
         compat_user_id = ui_settings.json()["user"]["id"]
         compat_user = client.get(f"/api/users/{compat_user_id}/", headers=headers)
