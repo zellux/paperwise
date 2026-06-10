@@ -30,6 +30,10 @@ export function setAuthMessage(message, isError = false) {
 export function setActiveAuthTab(tab) {
   const isSignUp = tab === "signup";
   const { authTabSignIn, authTabSignUp, authPanelSignIn, authPanelSignUp } = getAuthElements();
+  if (isSignUp && !authPanelSignUp) {
+    setAuthMessage("Public signup is disabled.", true);
+    return;
+  }
   authTabSignIn?.classList.toggle("is-active", !isSignUp);
   authTabSignIn?.setAttribute("aria-selected", String(!isSignUp));
   authTabSignUp?.classList.toggle("is-active", isSignUp);

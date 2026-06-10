@@ -10,7 +10,9 @@ from paperwise.server.dependencies import (
     current_user_dependency,
     document_repository_dependency,
     optional_current_user_dependency,
+    settings_dependency,
 )
+from paperwise.infrastructure.config import Settings
 from paperwise.server.ui.initial_data import (
     activity_initial_data,
     activity_partial_data,
@@ -42,6 +44,13 @@ from paperwise.server.ui.fragments import (
 router = APIRouter(tags=["ui"])
 
 
+def _with_public_config(initial_data: dict, settings: Settings) -> dict:
+    return {
+        **initial_data,
+        "signup_enabled": not settings.disable_signup,
+    }
+
+
 @router.get("/", include_in_schema=False)
 def root() -> RedirectResponse:
     return RedirectResponse(url="/ui/documents", status_code=307)
@@ -61,24 +70,28 @@ def documents_page(
     starred: bool = Query(False),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-docs",
         page_name="documents",
-        initial_data=documents_initial_data(
-            repository,
-            current_user,
-            page=page,
-            page_size=page_size,
-            sort_by=sort_by,
-            sort_dir=sort_dir,
-            q=q,
-            tag=tag,
-            correspondent=correspondent,
-            document_type=document_type,
-            status=status,
-            starred=starred,
-            include_filter_options=True,
+        initial_data=_with_public_config(
+            documents_initial_data(
+                repository,
+                current_user,
+                page=page,
+                page_size=page_size,
+                sort_by=sort_by,
+                sort_dir=sort_dir,
+                q=q,
+                tag=tag,
+                correspondent=correspondent,
+                document_type=document_type,
+                status=status,
+                starred=starred,
+                include_filter_options=True,
+            ),
+            settings,
         ),
     )
 
@@ -88,11 +101,15 @@ def document_page(
     id: str | None = Query(None),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-document",
         page_name="document",
-        initial_data=document_detail_initial_data(repository, current_user, id),
+        initial_data=_with_public_config(
+            document_detail_initial_data(repository, current_user, id),
+            settings,
+        ),
     )
 
 
@@ -100,11 +117,12 @@ def document_page(
 def tags_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-tags",
         page_name="tags",
-        initial_data=tag_stats_initial_data(repository, current_user),
+        initial_data=_with_public_config(tag_stats_initial_data(repository, current_user), settings),
     )
 
 
@@ -112,11 +130,15 @@ def tags_page(
 def document_types_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-document-types",
         page_name="document-types",
-        initial_data=document_type_stats_initial_data(repository, current_user),
+        initial_data=_with_public_config(
+            document_type_stats_initial_data(repository, current_user),
+            settings,
+        ),
     )
 
 
@@ -124,11 +146,12 @@ def document_types_page(
 def search_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-search",
         page_name="search",
-        initial_data=page_initial_data(current_user, repository),
+        initial_data=_with_public_config(page_initial_data(current_user, repository), settings),
     )
 
 
@@ -136,11 +159,12 @@ def search_page(
 def grounded_qa_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-search",
         page_name="grounded-qa",
-        initial_data=chat_thread_initial_data(repository, current_user),
+        initial_data=_with_public_config(chat_thread_initial_data(repository, current_user), settings),
         active_nav_href="/ui/grounded-qa",
     )
 
@@ -149,11 +173,12 @@ def grounded_qa_page(
 def pending_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-pending",
         page_name="pending",
-        initial_data=pending_initial_data(repository, current_user),
+        initial_data=_with_public_config(pending_initial_data(repository, current_user), settings),
     )
 
 
@@ -161,11 +186,12 @@ def pending_page(
 def upload_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-upload",
         page_name="upload",
-        initial_data=upload_initial_data(repository, current_user),
+        initial_data=_with_public_config(upload_initial_data(repository, current_user), settings),
     )
 
 
@@ -173,11 +199,12 @@ def upload_page(
 def activity_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-activity",
         page_name="activity",
-        initial_data=activity_initial_data(repository, current_user),
+        initial_data=_with_public_config(activity_initial_data(repository, current_user), settings),
     )
 
 
@@ -185,11 +212,12 @@ def activity_page(
 def settings_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-settings",
         page_name="settings-display",
-        initial_data=page_initial_data(current_user, repository),
+        initial_data=_with_public_config(page_initial_data(current_user, repository), settings),
     )
 
 
@@ -197,11 +225,12 @@ def settings_page(
 def settings_account_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-settings",
         page_name="settings-account",
-        initial_data=page_initial_data(current_user, repository),
+        initial_data=_with_public_config(page_initial_data(current_user, repository), settings),
     )
 
 
@@ -209,11 +238,12 @@ def settings_account_page(
 def settings_display_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-settings",
         page_name="settings-display",
-        initial_data=page_initial_data(current_user, repository),
+        initial_data=_with_public_config(page_initial_data(current_user, repository), settings),
     )
 
 
@@ -221,11 +251,12 @@ def settings_display_page(
 def settings_models_page(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User | None = Depends(optional_current_user_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> HTMLResponse:
     return render_ui_page(
         "section-settings",
         page_name="settings-models",
-        initial_data=page_initial_data(current_user, repository),
+        initial_data=_with_public_config(page_initial_data(current_user, repository), settings),
     )
 
 

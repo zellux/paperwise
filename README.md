@@ -41,6 +41,7 @@ services:
       PAPERWISE_AUTH_SECRET: replace-with-a-strong-secret
       PAPERWISE_SESSION_TTL_SECONDS: "43200"
       PAPERWISE_SESSION_COOKIE_SECURE: "false"
+      PAPERWISE_DISABLE_SIGNUP: "false"
     depends_on:
       redis:
         condition: service_healthy
@@ -71,6 +72,7 @@ services:
       PAPERWISE_AUTH_SECRET: replace-with-a-strong-secret
       PAPERWISE_SESSION_TTL_SECONDS: "43200"
       PAPERWISE_SESSION_COOKIE_SECURE: "false"
+      PAPERWISE_DISABLE_SIGNUP: "false"
     depends_on:
       redis:
         condition: service_healthy
@@ -118,6 +120,8 @@ docker compose up -d
 Before starting, replace `replace-with-a-strong-secret` with your own secret in both `api` and `worker`.
 
 The example is configured for direct HTTP access at `http://localhost:8080`. If you put Paperwise behind HTTPS, set `PAPERWISE_SESSION_COOKIE_SECURE` to `"true"` in both `api` and `worker`.
+
+Set `PAPERWISE_DISABLE_SIGNUP` to `"true"` on the `api` service to disable public self-service account registration while keeping login available for existing users.
 
 If the GHCR package is private, make it public in the GitHub package settings before sharing it with other users.
 

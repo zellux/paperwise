@@ -100,6 +100,7 @@ def render_ui_page(
         "page_module_name": script_names[2] if len(script_names) > 2 else "",
         "page_template": _PAGE_PARTIAL_BY_NAME[page_name],
         "settings_preferences": _settings_preferences_context(initial_data or {}),
+        "signup_enabled": bool((initial_data or {}).get("signup_enabled", True)),
         "supported_ui_themes": list(SUPPORTED_UI_THEMES),
         "ui_theme_storage_key": UI_THEME_STORAGE_KEY,
     }

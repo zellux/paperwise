@@ -53,7 +53,7 @@
         </div>
         <p class="eyebrow">Access Required</p>
         <h1>Sign In</h1>
-        <p class="subhead">Create an account or sign in to continue.</p>
+        <p class="subhead">{% if signup_enabled %}Create an account or sign in to continue.{% else %}Sign in with an existing account to continue.{% endif %}</p>
         <div class="auth-tabs" role="tablist" aria-label="Authentication options">
           <button
             id="authTabSignIn"
@@ -65,6 +65,7 @@
           >
             Sign In
           </button>
+{% if signup_enabled %}
           <button
             id="authTabSignUp"
             type="button"
@@ -75,6 +76,7 @@
           >
             Sign Up
           </button>
+{% endif %}
         </div>
         <div class="auth-layout">
           <section id="authPanelSignIn" class="auth-panel" role="tabpanel">
@@ -88,6 +90,7 @@
               <button type="submit" class="btn btn-primary">Sign In</button>
             </form>
           </section>
+{% if signup_enabled %}
           <section id="authPanelSignUp" class="auth-panel view-hidden" role="tabpanel">
             <h2 class="auth-panel-title">Sign Up</h2>
             <p class="auth-panel-note">Create a new account.</p>
@@ -101,6 +104,7 @@
               <button type="submit" class="btn btn-primary">Create Account</button>
             </form>
           </section>
+{% endif %}
         </div>
         <p id="authMessage" class="auth-message">Enter credentials to continue.</p>
       </div>

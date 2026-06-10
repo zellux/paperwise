@@ -64,6 +64,66 @@ def test_create_user_rejects_duplicate_email() -> None:
         app.dependency_overrides.clear()
 
 
+def test_create_user_allowed_by_default_signup_config() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: Settings()
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/users",
+            json={
+                "email": "default-signup@example.com",
+                "full_name": "Default Signup",
+                "password": "strong-pass-123",
+            },
+        )
+
+        assert response.status_code == 201
+        assert response.json()["email"] == "default-signup@example.com"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_create_user_blocked_when_signup_disabled_but_login_still_works() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        seed_response = client.post(
+            "/users",
+            json={
+                "email": "existing@example.com",
+                "full_name": "Existing User",
+                "password": "strong-pass-123",
+            },
+        )
+        assert seed_response.status_code == 201
+
+        app.dependency_overrides[settings_dependency] = lambda: Settings(disable_signup=True)
+        blocked_response = client.post(
+            "/users",
+            json={
+                "email": "blocked@example.com",
+                "full_name": "Blocked Signup",
+                "password": "strong-pass-123",
+            },
+        )
+        assert blocked_response.status_code == 403
+        assert blocked_response.json()["detail"] == "Public signup is disabled."
+
+        login_response = client.post(
+            "/users/login",
+            json={"email": "existing@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+        assert login_response.json()["user"]["email"] == "existing@example.com"
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_login_user_success_and_failure() -> None:
     repository = InMemoryDocumentRepository()
     app.dependency_overrides[document_repository_dependency] = lambda: repository

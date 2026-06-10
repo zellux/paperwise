@@ -47,7 +47,13 @@ def _session_cookie_secure(settings: Settings) -> bool:
 def create_user_endpoint(
     payload: CreateUserRequest,
     repository: UserRepository = Depends(document_repository_dependency),
+    settings: Settings = Depends(settings_dependency),
 ) -> UserResponse:
+    if settings.disable_signup:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Public signup is disabled.",
+        )
     try:
         user = create_user(
             CreateUserCommand(

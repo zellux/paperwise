@@ -16,8 +16,9 @@ from paperwise.domain.models import (
     ParseResult,
     UserPreference,
 )
+from paperwise.infrastructure.config import Settings
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
-from paperwise.server.dependencies import document_repository_dependency
+from paperwise.server.dependencies import document_repository_dependency, settings_dependency
 from paperwise.server.main import app
 from paperwise.server.ui.fragments import (
     _initials,
@@ -927,6 +928,40 @@ def test_static_assets_keep_auth_state_cookie_only() -> None:
     assert app_js.status_code == 200
     assert 'document.documentElement.classList.toggle("has-session", signedIn)' in app_js.text
     assert 'apiFetch("/users/me")' not in app_js.text
+
+
+def test_auth_gate_shows_signup_by_default() -> None:
+    app.dependency_overrides[settings_dependency] = lambda: Settings()
+
+    try:
+        client = TestClient(app)
+        response = client.get("/ui/documents")
+
+        assert response.status_code == 200
+        assert 'id="authTabSignUp"' in response.text
+        assert 'id="registerForm"' in response.text
+        assert "Create an account or sign in to continue." in response.text
+        payload = _initial_data_from_response(response.text)
+        assert payload["signup_enabled"] is True
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_auth_gate_hides_signup_when_disabled() -> None:
+    app.dependency_overrides[settings_dependency] = lambda: Settings(disable_signup=True)
+
+    try:
+        client = TestClient(app)
+        response = client.get("/ui/documents")
+
+        assert response.status_code == 200
+        assert 'id="authTabSignUp"' not in response.text
+        assert 'id="registerForm"' not in response.text
+        assert "Sign in with an existing account to continue." in response.text
+        payload = _initial_data_from_response(response.text)
+        assert payload["signup_enabled"] is False
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_upload_ui_includes_batch_progress_shell() -> None:
