@@ -354,6 +354,7 @@ def test_paperless_mobile_pdf_images_are_generated_once_in_derived_cache(tmp_pat
 
         assert first.status_code == 200
         assert first.headers["content-type"] == "image/png"
+        assert first.headers["content-disposition"].startswith("inline;")
         assert first.content == b"\x89PNG\r\n\x1a\nthumb"
         assert second.status_code == 200
         assert second.content == first.content
@@ -402,6 +403,7 @@ def test_paperless_mobile_non_image_preview_returns_cached_placeholder_png(tmp_p
 
         assert preview.status_code == 200
         assert preview.headers["content-type"] == "image/png"
+        assert preview.headers["content-disposition"].startswith("inline;")
         assert preview.content.startswith(b"\x89PNG\r\n\x1a\n")
         assert thumb.status_code == 200
         assert thumb.headers["content-type"] == "image/png"

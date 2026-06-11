@@ -1116,7 +1116,12 @@ def _placeholder_image_response(*, document: Document, settings: Settings, name:
     image_path = _document_image_cache_path(document, settings, name)
     if not image_path.exists():
         _write_placeholder_image(image_path, label=_placeholder_label(document), size=size)
-    return FileResponse(path=image_path, media_type="image/png", filename=f"{Path(document.filename).stem}-{name}.png")
+    return FileResponse(
+        path=image_path,
+        media_type="image/png",
+        filename=f"{Path(document.filename).stem}-{name}.png",
+        content_disposition_type="inline",
+    )
 
 
 def _pdf_image_response(
@@ -1136,7 +1141,12 @@ def _pdf_image_response(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail=f"Document preview image unavailable: {exc}",
             ) from exc
-    return FileResponse(path=image_path, media_type="image/png", filename=f"{Path(document.filename).stem}-{name}.png")
+    return FileResponse(
+        path=image_path,
+        media_type="image/png",
+        filename=f"{Path(document.filename).stem}-{name}.png",
+        content_disposition_type="inline",
+    )
 
 
 def _compat_image_response(
@@ -1148,7 +1158,12 @@ def _compat_image_response(
     scale_to: int,
 ) -> FileResponse:
     if document.content_type.startswith("image/"):
-        return FileResponse(path=source_path, media_type=document.content_type, filename=document.filename)
+        return FileResponse(
+            path=source_path,
+            media_type=document.content_type,
+            filename=document.filename,
+            content_disposition_type="inline",
+        )
     if document.content_type == "application/pdf" or source_path.suffix.casefold() == ".pdf":
         return _pdf_image_response(document=document, settings=settings, source_path=source_path, name=name, scale_to=scale_to)
     return _placeholder_image_response(document=document, settings=settings, name=name, size=scale_to)
