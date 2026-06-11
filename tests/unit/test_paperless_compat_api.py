@@ -7,6 +7,7 @@ from paperwise.infrastructure.config import Settings
 from paperwise.infrastructure.repositories.in_memory_document_repository import InMemoryDocumentRepository
 from paperwise.application.services.session_tokens import create_session_token
 from paperwise.infrastructure.storage.local_storage import LocalStorageAdapter
+from paperwise.server.routes import paperless_compat
 from paperwise.server.dependencies import (
     document_repository_dependency,
     ingestion_dispatcher_dependency,
@@ -316,6 +317,46 @@ def test_paperless_mobile_auth_profile_and_document_listing(tmp_path) -> None:
         download = client.get(f"/api/documents/{document_id}/download/", headers=headers)
         assert download.status_code == 200
         assert download.content == b"%PDF-1.4\nmobile"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_paperless_mobile_pdf_thumbnail_is_generated_once_in_derived_cache(tmp_path, monkeypatch) -> None:
+    repository = InMemoryDocumentRepository()
+    settings = Settings(object_store_root=str(tmp_path))
+    storage = LocalStorageAdapter(settings.object_store_root)
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: settings
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    generated_paths = []
+
+    def fake_generate_pdf_thumbnail(source_path, destination_path) -> None:
+        del source_path
+        generated_paths.append(destination_path)
+        destination_path.parent.mkdir(parents=True, exist_ok=True)
+        destination_path.write_bytes(b"\x89PNG\r\n\x1a\nthumb")
+
+    monkeypatch.setattr(paperless_compat, "_generate_pdf_thumbnail", fake_generate_pdf_thumbnail)
+
+    try:
+        client = TestClient(app)
+        owner_id, headers = _create_user_and_token(client)
+        _seed_document(repository, storage, owner_id, document_id="doc/cache test", checksum="abc/123")
+
+        documents = client.get("/api/documents/", headers=headers).json()
+        document_id = documents["results"][0]["id"]
+
+        first = client.get(f"/api/documents/{document_id}/thumb/", headers=headers)
+        second = client.get(f"/api/documents/{document_id}/thumb/", headers=headers)
+
+        assert first.status_code == 200
+        assert first.headers["content-type"] == "image/png"
+        assert first.content == b"\x89PNG\r\n\x1a\nthumb"
+        assert second.status_code == 200
+        assert second.content == first.content
+        assert len(generated_paths) == 1
+        assert generated_paths[0] == tmp_path / "derived" / "document-thumbnails" / "doc-cache-test" / "abc-123" / "thumb.png"
     finally:
         app.dependency_overrides.clear()
 

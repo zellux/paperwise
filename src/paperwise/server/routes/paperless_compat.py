@@ -9,10 +9,13 @@ behavior isolated here so the native Paperwise API can evolve independently.
 import hmac
 import json
 import re
+import shutil
+import subprocess
 import zlib
 from datetime import UTC, datetime
 from hashlib import sha256
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 from uuid import uuid4
 
@@ -980,6 +983,51 @@ def preview_document(
     return download_document(document_id, repository, settings, current_user)
 
 
+def _thumbnail_path(document: Document, settings: Settings) -> Path:
+    safe_document_id = re.sub(r"[^a-zA-Z0-9_.-]+", "-", document.id)
+    safe_checksum = re.sub(r"[^a-zA-Z0-9_.-]+", "-", document.checksum_sha256 or "unknown")
+    return (
+        Path(settings.object_store_root).expanduser().resolve()
+        / "derived"
+        / "document-thumbnails"
+        / safe_document_id
+        / safe_checksum
+        / "thumb.png"
+    )
+
+
+def _generate_pdf_thumbnail(source_path: Path, destination_path: Path) -> None:
+    pdftoppm = shutil.which("pdftoppm")
+    if pdftoppm is None:
+        raise RuntimeError("pdftoppm executable not found for PDF thumbnail generation.")
+
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix="paperwise-thumb-") as temp_dir:
+        output_prefix = Path(temp_dir) / "thumb"
+        subprocess.run(
+            [
+                pdftoppm,
+                "-f",
+                "1",
+                "-l",
+                "1",
+                "-singlefile",
+                "-scale-to",
+                "512",
+                "-png",
+                str(source_path),
+                str(output_prefix),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        rendered_path = output_prefix.with_suffix(".png")
+        if not rendered_path.exists():
+            raise RuntimeError("No PDF thumbnail was generated.")
+        shutil.copyfile(rendered_path, destination_path)
+
+
 @router.get("/documents/{document_id}/thumb/")
 def thumb_document(
     document_id: int,
@@ -987,7 +1035,24 @@ def thumb_document(
     settings: Settings = Depends(settings_dependency),
     current_user: User = Depends(_current_user_from_token),
 ) -> FileResponse:
-    return download_document(document_id, repository, settings, current_user)
+    document, _ = _resolve_document(document_id, repository, current_user)
+    file_path = resolve_file_path_from_uri(document.blob_uri, settings.object_store_root)
+    if file_path is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found")
+
+    if document.content_type == "application/pdf" or file_path.suffix.casefold() == ".pdf":
+        thumbnail_path = _thumbnail_path(document, settings)
+        if not thumbnail_path.exists():
+            try:
+                _generate_pdf_thumbnail(file_path, thumbnail_path)
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=f"Document thumbnail unavailable: {exc}",
+                ) from exc
+        return FileResponse(path=thumbnail_path, media_type="image/png", filename=f"{Path(document.filename).stem}.png")
+
+    return FileResponse(path=file_path, media_type=document.content_type or "application/octet-stream", filename=document.filename)
 
 
 @router.get("/documents/{document_id}/metadata/")
