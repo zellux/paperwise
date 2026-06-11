@@ -308,6 +308,7 @@ def test_paperless_mobile_auth_profile_and_document_listing(tmp_path) -> None:
         assert payload["results"][0]["tags"]
         assert payload["results"][0]["owner"] is None
         assert payload["results"][0]["permissions"]["view"] == {"users": [], "groups": []}
+        assert payload["results"][0]["archived_file_name"] is None
 
         document_id = payload["results"][0]["id"]
         detail = client.get(f"/api/documents/{document_id}/", headers=headers)

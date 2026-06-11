@@ -322,7 +322,7 @@ def _document_payload(
         "deleted_at": None,
         "archive_serial_number": None,
         "original_file_name": document.filename,
-        "archived_file_name": document.filename,
+        "archived_file_name": None,
         "owner": None,
         "permissions": {"view": {"users": [], "groups": []}, "change": {"users": [], "groups": []}},
         "user_can_change": True,
