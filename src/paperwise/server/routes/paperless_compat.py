@@ -1034,11 +1034,72 @@ def _generate_pdf_image(source_path: Path, destination_path: Path, *, scale_to: 
         shutil.copyfile(rendered_path, destination_path)
 
 
-def _write_placeholder_image(destination_path: Path, *, size: int = 512) -> None:
+PLACEHOLDER_GLYPHS = {
+    "C": ("01110", "10001", "10000", "10000", "10000", "10001", "01110"),
+    "D": ("11110", "10001", "10001", "10001", "10001", "10001", "11110"),
+    "M": ("10001", "11011", "10101", "10101", "10001", "10001", "10001"),
+    "O": ("01110", "10001", "10001", "10001", "10001", "10001", "01110"),
+    "T": ("11111", "00100", "00100", "00100", "00100", "00100", "00100"),
+    "X": ("10001", "01010", "00100", "00100", "00100", "01010", "10001"),
+}
+
+
+def _placeholder_label(document: Document) -> str:
+    suffix = Path(document.filename).suffix.casefold().lstrip(".")
+    if suffix in {"md", "markdown"} or document.content_type in {"text/markdown", "text/x-markdown"}:
+        return "MD"
+    if suffix == "docx" or document.content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+        return "DOCX"
+    if suffix == "txt" or document.content_type.startswith("text/"):
+        return "TXT"
+    return (suffix[:4] or "FILE").upper()
+
+
+def _draw_rect(pixels: bytearray, *, width: int, x: int, y: int, rect_width: int, rect_height: int, color: bytes) -> None:
+    for row in range(max(0, y), min(width, y + rect_height)):
+        for col in range(max(0, x), min(width, x + rect_width)):
+            offset = (row * width + col) * 3
+            pixels[offset : offset + 3] = color
+
+
+def _write_placeholder_image(destination_path: Path, *, label: str, size: int = 512) -> None:
     destination_path.parent.mkdir(parents=True, exist_ok=True)
     width = height = size
-    row = b"\x00" + (b"\xf3\xf4\xf6" * width)
-    raw = row * height
+    pixels = bytearray(b"\xf3\xf4\xf6" * width * height)
+    _draw_rect(pixels, width=width, x=width // 10, y=height // 8, rect_width=width * 8 // 10, rect_height=height * 3 // 4, color=b"\xff\xff\xff")
+    _draw_rect(pixels, width=width, x=width // 10, y=height // 8, rect_width=width * 8 // 10, rect_height=max(4, height // 90), color=b"\xd1\xd5\xdb")
+    _draw_rect(pixels, width=width, x=width // 10, y=height * 7 // 8, rect_width=width * 8 // 10, rect_height=max(4, height // 90), color=b"\xd1\xd5\xdb")
+    _draw_rect(pixels, width=width, x=width // 10, y=height // 8, rect_width=max(4, width // 90), rect_height=height * 3 // 4, color=b"\xd1\xd5\xdb")
+    _draw_rect(pixels, width=width, x=width * 9 // 10, y=height // 8, rect_width=max(4, width // 90), rect_height=height * 3 // 4, color=b"\xd1\xd5\xdb")
+
+    glyphs = [PLACEHOLDER_GLYPHS.get(char) for char in label if char in PLACEHOLDER_GLYPHS]
+    if glyphs:
+        glyph_width = 5
+        glyph_height = 7
+        spacing = 1
+        total_units = len(glyphs) * glyph_width + (len(glyphs) - 1) * spacing
+        cell = max(1, min(width * 7 // 10 // total_units, height * 2 // 5 // glyph_height))
+        text_width = total_units * cell
+        text_height = glyph_height * cell
+        start_x = (width - text_width) // 2
+        start_y = (height - text_height) // 2
+        x_cursor = start_x
+        for glyph in glyphs:
+            for glyph_y, row_pattern in enumerate(glyph):
+                for glyph_x, value in enumerate(row_pattern):
+                    if value == "1":
+                        _draw_rect(
+                            pixels,
+                            width=width,
+                            x=x_cursor + glyph_x * cell,
+                            y=start_y + glyph_y * cell,
+                            rect_width=max(1, cell - 1),
+                            rect_height=max(1, cell - 1),
+                            color=b"\x1f\x29\x37",
+                        )
+            x_cursor += (glyph_width + spacing) * cell
+
+    raw = b"".join(b"\x00" + pixels[row * width * 3 : (row + 1) * width * 3] for row in range(height))
 
     def chunk(kind: bytes, data: bytes) -> bytes:
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
@@ -1054,7 +1115,7 @@ def _write_placeholder_image(destination_path: Path, *, size: int = 512) -> None
 def _placeholder_image_response(*, document: Document, settings: Settings, name: str, size: int) -> FileResponse:
     image_path = _document_image_cache_path(document, settings, name)
     if not image_path.exists():
-        _write_placeholder_image(image_path, size=size)
+        _write_placeholder_image(image_path, label=_placeholder_label(document), size=size)
     return FileResponse(path=image_path, media_type="image/png", filename=f"{Path(document.filename).stem}-{name}.png")
 
 

@@ -411,6 +411,31 @@ def test_paperless_mobile_non_image_preview_returns_cached_placeholder_png(tmp_p
         app.dependency_overrides.clear()
 
 
+def test_paperless_mobile_placeholder_labels_match_document_types() -> None:
+    base = {
+        "id": "doc-label",
+        "owner_id": "owner",
+        "blob_uri": "incoming/doc",
+        "checksum_sha256": "checksum",
+        "size_bytes": 1,
+        "status": DocumentStatus.READY,
+        "created_at": datetime(2026, 5, 29, 12, 0, tzinfo=UTC),
+    }
+
+    assert paperless_compat._placeholder_label(Document(filename="note.md", content_type="text/markdown", **base)) == "MD"
+    assert paperless_compat._placeholder_label(Document(filename="note.txt", content_type="text/plain", **base)) == "TXT"
+    assert (
+        paperless_compat._placeholder_label(
+            Document(
+                filename="handbook.docx",
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                **base,
+            )
+        )
+        == "DOCX"
+    )
+
+
 def test_paperless_mobile_labels_stats_patch_and_stubs(tmp_path) -> None:
     repository = InMemoryDocumentRepository()
     settings = Settings(object_store_root=str(tmp_path))
