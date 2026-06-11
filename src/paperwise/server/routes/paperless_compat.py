@@ -10,6 +10,7 @@ import hmac
 import json
 import re
 import shutil
+import struct
 import subprocess
 import zlib
 from datetime import UTC, datetime
@@ -985,10 +986,7 @@ def preview_document(
     if file_path is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found")
 
-    if document.content_type == "application/pdf" or file_path.suffix.casefold() == ".pdf":
-        return _pdf_image_response(document=document, settings=settings, source_path=file_path, name="preview", scale_to=1024)
-
-    return FileResponse(path=file_path, media_type=document.content_type or "application/octet-stream", filename=document.filename)
+    return _compat_image_response(document=document, settings=settings, source_path=file_path, name="preview", scale_to=1024)
 
 
 def _document_image_cache_path(document: Document, settings: Settings, name: str) -> Path:
@@ -1036,6 +1034,30 @@ def _generate_pdf_image(source_path: Path, destination_path: Path, *, scale_to: 
         shutil.copyfile(rendered_path, destination_path)
 
 
+def _write_placeholder_image(destination_path: Path, *, size: int = 512) -> None:
+    destination_path.parent.mkdir(parents=True, exist_ok=True)
+    width = height = size
+    row = b"\x00" + (b"\xf3\xf4\xf6" * width)
+    raw = row * height
+
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data) & 0xFFFFFFFF)
+
+    destination_path.write_bytes(
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw, level=9))
+        + chunk(b"IEND", b"")
+    )
+
+
+def _placeholder_image_response(*, document: Document, settings: Settings, name: str, size: int) -> FileResponse:
+    image_path = _document_image_cache_path(document, settings, name)
+    if not image_path.exists():
+        _write_placeholder_image(image_path, size=size)
+    return FileResponse(path=image_path, media_type="image/png", filename=f"{Path(document.filename).stem}-{name}.png")
+
+
 def _pdf_image_response(
     *,
     document: Document,
@@ -1056,6 +1078,21 @@ def _pdf_image_response(
     return FileResponse(path=image_path, media_type="image/png", filename=f"{Path(document.filename).stem}-{name}.png")
 
 
+def _compat_image_response(
+    *,
+    document: Document,
+    settings: Settings,
+    source_path: Path,
+    name: str,
+    scale_to: int,
+) -> FileResponse:
+    if document.content_type.startswith("image/"):
+        return FileResponse(path=source_path, media_type=document.content_type, filename=document.filename)
+    if document.content_type == "application/pdf" or source_path.suffix.casefold() == ".pdf":
+        return _pdf_image_response(document=document, settings=settings, source_path=source_path, name=name, scale_to=scale_to)
+    return _placeholder_image_response(document=document, settings=settings, name=name, size=scale_to)
+
+
 @router.get("/documents/{document_id}/thumb/")
 def thumb_document(
     document_id: int,
@@ -1068,10 +1105,7 @@ def thumb_document(
     if file_path is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found")
 
-    if document.content_type == "application/pdf" or file_path.suffix.casefold() == ".pdf":
-        return _pdf_image_response(document=document, settings=settings, source_path=file_path, name="thumb", scale_to=512)
-
-    return FileResponse(path=file_path, media_type=document.content_type or "application/octet-stream", filename=document.filename)
+    return _compat_image_response(document=document, settings=settings, source_path=file_path, name="thumb", scale_to=512)
 
 
 @router.get("/documents/{document_id}/metadata/")

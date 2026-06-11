@@ -369,6 +369,48 @@ def test_paperless_mobile_pdf_images_are_generated_once_in_derived_cache(tmp_pat
         app.dependency_overrides.clear()
 
 
+def test_paperless_mobile_non_image_preview_returns_cached_placeholder_png(tmp_path) -> None:
+    repository = InMemoryDocumentRepository()
+    settings = Settings(object_store_root=str(tmp_path))
+    storage = LocalStorageAdapter(settings.object_store_root)
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: settings
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        owner_id, headers = _create_user_and_token(client)
+        blob_uri = storage.put("incoming/mobile/wechat.md", b"# Notes\n", "text/markdown")
+        document = Document(
+            id="doc-markdown",
+            filename="wechat.md",
+            owner_id=owner_id,
+            blob_uri=blob_uri,
+            checksum_sha256="markdown-checksum",
+            content_type="text/markdown",
+            size_bytes=8,
+            status=DocumentStatus.READY,
+            created_at=datetime(2026, 5, 29, 12, 0, tzinfo=UTC),
+        )
+        repository.save(document)
+
+        documents = client.get("/api/documents/", headers=headers).json()
+        document_id = documents["results"][0]["id"]
+
+        preview = client.get(f"/api/documents/{document_id}/preview/", headers=headers)
+        thumb = client.get(f"/api/documents/{document_id}/thumb/", headers=headers)
+
+        assert preview.status_code == 200
+        assert preview.headers["content-type"] == "image/png"
+        assert preview.content.startswith(b"\x89PNG\r\n\x1a\n")
+        assert thumb.status_code == 200
+        assert thumb.headers["content-type"] == "image/png"
+        assert (tmp_path / "derived" / "document-thumbnails" / "doc-markdown" / "markdown-checksum" / "preview.png").exists()
+        assert (tmp_path / "derived" / "document-thumbnails" / "doc-markdown" / "markdown-checksum" / "thumb.png").exists()
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_paperless_mobile_labels_stats_patch_and_stubs(tmp_path) -> None:
     repository = InMemoryDocumentRepository()
     settings = Settings(object_store_root=str(tmp_path))
