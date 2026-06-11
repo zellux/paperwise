@@ -980,10 +980,18 @@ def preview_document(
     settings: Settings = Depends(settings_dependency),
     current_user: User = Depends(_current_user_from_token),
 ) -> FileResponse:
-    return download_document(document_id, repository, settings, current_user)
+    document, _ = _resolve_document(document_id, repository, current_user)
+    file_path = resolve_file_path_from_uri(document.blob_uri, settings.object_store_root)
+    if file_path is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found")
+
+    if document.content_type == "application/pdf" or file_path.suffix.casefold() == ".pdf":
+        return _pdf_image_response(document=document, settings=settings, source_path=file_path, name="preview", scale_to=1024)
+
+    return FileResponse(path=file_path, media_type=document.content_type or "application/octet-stream", filename=document.filename)
 
 
-def _thumbnail_path(document: Document, settings: Settings) -> Path:
+def _document_image_cache_path(document: Document, settings: Settings, name: str) -> Path:
     safe_document_id = re.sub(r"[^a-zA-Z0-9_.-]+", "-", document.id)
     safe_checksum = re.sub(r"[^a-zA-Z0-9_.-]+", "-", document.checksum_sha256 or "unknown")
     return (
@@ -992,14 +1000,14 @@ def _thumbnail_path(document: Document, settings: Settings) -> Path:
         / "document-thumbnails"
         / safe_document_id
         / safe_checksum
-        / "thumb.png"
+        / f"{name}.png"
     )
 
 
-def _generate_pdf_thumbnail(source_path: Path, destination_path: Path) -> None:
+def _generate_pdf_image(source_path: Path, destination_path: Path, *, scale_to: int) -> None:
     pdftoppm = shutil.which("pdftoppm")
     if pdftoppm is None:
-        raise RuntimeError("pdftoppm executable not found for PDF thumbnail generation.")
+        raise RuntimeError("pdftoppm executable not found for PDF preview generation.")
 
     destination_path.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix="paperwise-thumb-") as temp_dir:
@@ -1013,7 +1021,7 @@ def _generate_pdf_thumbnail(source_path: Path, destination_path: Path) -> None:
                 "1",
                 "-singlefile",
                 "-scale-to",
-                "512",
+                str(scale_to),
                 "-png",
                 str(source_path),
                 str(output_prefix),
@@ -1024,8 +1032,28 @@ def _generate_pdf_thumbnail(source_path: Path, destination_path: Path) -> None:
         )
         rendered_path = output_prefix.with_suffix(".png")
         if not rendered_path.exists():
-            raise RuntimeError("No PDF thumbnail was generated.")
+            raise RuntimeError("No PDF preview image was generated.")
         shutil.copyfile(rendered_path, destination_path)
+
+
+def _pdf_image_response(
+    *,
+    document: Document,
+    settings: Settings,
+    source_path: Path,
+    name: str,
+    scale_to: int,
+) -> FileResponse:
+    image_path = _document_image_cache_path(document, settings, name)
+    if not image_path.exists():
+        try:
+            _generate_pdf_image(source_path, image_path, scale_to=scale_to)
+        except Exception as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=f"Document preview image unavailable: {exc}",
+            ) from exc
+    return FileResponse(path=image_path, media_type="image/png", filename=f"{Path(document.filename).stem}-{name}.png")
 
 
 @router.get("/documents/{document_id}/thumb/")
@@ -1041,16 +1069,7 @@ def thumb_document(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found")
 
     if document.content_type == "application/pdf" or file_path.suffix.casefold() == ".pdf":
-        thumbnail_path = _thumbnail_path(document, settings)
-        if not thumbnail_path.exists():
-            try:
-                _generate_pdf_thumbnail(file_path, thumbnail_path)
-            except Exception as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                    detail=f"Document thumbnail unavailable: {exc}",
-                ) from exc
-        return FileResponse(path=thumbnail_path, media_type="image/png", filename=f"{Path(document.filename).stem}.png")
+        return _pdf_image_response(document=document, settings=settings, source_path=file_path, name="thumb", scale_to=512)
 
     return FileResponse(path=file_path, media_type=document.content_type or "application/octet-stream", filename=document.filename)
 
