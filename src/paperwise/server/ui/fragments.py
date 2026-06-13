@@ -459,6 +459,23 @@ def processing_strip_html(documents: list[dict], *, processing_count: int) -> st
     )
 
 
+def _document_processing_stage_html(document: dict) -> str:
+    status = str(document.get("status") or "").strip().lower()
+    if status not in {"received", "processing"}:
+        return ""
+    stage = document.get("processing_stage") if isinstance(document.get("processing_stage"), dict) else {}
+    try:
+        progress = max(0, min(100, int(stage.get("progress") or 0)))
+    except (TypeError, ValueError):
+        progress = 0
+    return _render_fragment_template(
+        "document_processing_stage.html",
+        stage_label=str(stage.get("label") or "Processing"),
+        stage_key=str(stage.get("key") or "processing"),
+        stage_progress=progress,
+    )
+
+
 def document_rows_html(documents: list[dict]) -> str:
     rows = []
     for item in documents:
@@ -856,6 +873,7 @@ def document_detail_fragments(initial_data: dict) -> dict:
         },
         "html": {
             "detailStatus": _status_badge_html(str(document.get("status") or "")),
+            "detailProcessingStage": _document_processing_stage_html(document),
             "detailTagPills": _document_detail_tags_html(tags),
             "detailMarkdownPreview": markdown_preview_html,
             "pageStrip": _document_page_thumbnails_html(page_count),
@@ -880,6 +898,7 @@ def document_detail_fragments(initial_data: dict) -> dict:
         "page_thumbnails_html": _document_page_thumbnails_html(page_count),
         "preview_kind": preview_kind,
         "preview_url": preview_url,
+        "status": str(document.get("status") or ""),
         "correspondent_initials": _initials(correspondent or title),
         "history_html": _history_html(history),
     }
@@ -922,6 +941,7 @@ def document_detail_partial_html(initial_data: dict) -> str:
         "preview_kind": fragments.get("preview_kind", ""),
         "preview_url": fragments.get("preview_url", ""),
         "page_count": str(fragments.get("page_count", 1)),
+        "document_status": fragments.get("status", ""),
     }
     return _render_fragment_template(
         "ui_partial_fragment.html",

@@ -22,6 +22,8 @@ let pdfRenderSerial = 0;
 let pdfScaleMode = "fit";
 let pdfManualScale = 1;
 let pdfResizeObserver = null;
+let documentProcessingWatch = null;
+let documentProcessingWatchId = "";
 const PDFJS_MODULE_URL = "/static/vendor/pdfjs/pdf.min.mjs";
 const PDFJS_WORKER_URL = "/static/vendor/pdfjs/pdf.worker.min.mjs";
 const PDFJS_CMAP_URL = "/static/vendor/pdfjs/cmaps/";
@@ -98,6 +100,42 @@ function hydrateInitialDocumentData(initialData) {
   appState.currentDocumentId = documentId;
   logActivity(`Opened document ${appState.currentDocumentId}`);
   return true;
+}
+
+function isActiveDocumentStatus(status) {
+  return ["received", "processing"].includes(String(status || "").trim().toLowerCase());
+}
+
+function startDocumentProcessingWatch(options = {}) {
+  const documentId = String(appState.currentDocumentId || "").trim();
+  if (!documentId) {
+    return null;
+  }
+  if (documentProcessingWatch && documentProcessingWatchId === documentId) {
+    return documentProcessingWatch;
+  }
+  documentProcessingWatchId = documentId;
+  documentProcessingWatch = (async () => {
+    const completed = await waitForDocumentReady(documentId);
+    if (appState.currentDocumentId !== documentId) {
+      return completed;
+    }
+    if (completed) {
+      if (options.completedMessage) {
+        logActivity(options.completedMessage);
+      }
+      await refreshDocumentRelatedLists({ catalog: Boolean(options.refreshCatalog) });
+    } else if (options.timeoutMessage) {
+      logActivity(options.timeoutMessage);
+    }
+    return completed;
+  })().finally(() => {
+    if (documentProcessingWatchId === documentId) {
+      documentProcessingWatch = null;
+      documentProcessingWatchId = "";
+    }
+  });
+  return documentProcessingWatch;
 }
 
 function renderDocumentStarButton(starred) {
@@ -794,14 +832,11 @@ function bindSingleDocumentEvents() {
     );
     await openDocumentView(appState.currentDocumentId);
     await refreshDocumentRelatedLists();
-    const completed = await waitForDocumentReady(appState.currentDocumentId);
-    if (completed) {
-      logActivity(`Reprocessing completed for ${appState.currentDocumentId}.`);
-      await openDocumentView(appState.currentDocumentId);
-      await refreshDocumentRelatedLists({ catalog: true });
-    } else {
-      logActivity(`Reprocessing still running for ${appState.currentDocumentId}. Refresh to check later.`);
-    }
+    await startDocumentProcessingWatch({
+      completedMessage: `Reprocessing completed for ${appState.currentDocumentId}.`,
+      timeoutMessage: `Reprocessing still running for ${appState.currentDocumentId}. Refresh to check later.`,
+      refreshCatalog: true,
+    });
   });
 
   deleteDocumentBtn?.addEventListener("click", async () => {
@@ -859,6 +894,13 @@ export async function initializePage({ authenticated, initialData }) {
     renderTagEditor();
     renderOcrText();
     initializePdfPreview();
+    if (isActiveDocumentStatus(initialData?.document_detail?.document?.status)) {
+      startDocumentProcessingWatch({
+        completedMessage: `Processing completed for ${appState.currentDocumentId}.`,
+        timeoutMessage: `Processing still running for ${appState.currentDocumentId}. Refresh to check later.`,
+        refreshCatalog: true,
+      });
+    }
     return;
   }
   appState.currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";

@@ -1,0 +1,9 @@
+<div class="detail-processing-stage" role="status" aria-live="polite">
+  <div class="detail-processing-stage-row">
+    <span>{{ stage_label }}</span>
+    <span>{{ stage_progress }}%</span>
+  </div>
+  <span class="detail-processing-track" data-stage="{{ stage_key }}">
+    <span style="width: {{ stage_progress }}%"></span>
+  </span>
+</div>

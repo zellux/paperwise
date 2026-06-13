@@ -459,6 +459,75 @@ def _save_failed_document(
     )
 
 
+def test_document_detail_shows_processing_stage_progress() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/users",
+            json={
+                "email": "detail-progress@example.com",
+                "full_name": "Detail Progress",
+                "password": "strong-pass-123",
+            },
+        )
+        assert create_response.status_code == 201
+        user_id = create_response.json()["id"]
+        login_response = client.post(
+            "/users/login",
+            json={"email": "detail-progress@example.com", "password": "strong-pass-123"},
+        )
+        assert login_response.status_code == 200
+        created_at = datetime(2026, 5, 6, tzinfo=UTC)
+        repository.save(
+            Document(
+                id="doc-classifying",
+                filename="doc-classifying.pdf",
+                owner_id=user_id,
+                blob_uri="local://doc-classifying.pdf",
+                checksum_sha256="classifying".ljust(64, "0"),
+                content_type="application/pdf",
+                size_bytes=100,
+                status=DocumentStatus.PROCESSING,
+                created_at=created_at,
+            )
+        )
+        repository.save_parse_result(
+            ParseResult(
+                document_id="doc-classifying",
+                parser="test-parser",
+                status="success",
+                size_bytes=100,
+                page_count=1,
+                text_preview="OCR text is ready, metadata is still running.",
+                created_at=created_at,
+            )
+        )
+
+        detail_html = client.get("/ui/document?id=doc-classifying").text
+        detail_payload = _initial_data_from_response(detail_html)
+        assert detail_payload["document_detail"]["document"]["processing_stage"] == {
+            "label": "Classifying",
+            "progress": 72,
+            "key": "classifying",
+        }
+        assert 'id="detailProcessingStage"' in detail_html
+        assert "Classifying" in detail_html
+        assert "72%" in detail_html
+        assert 'class="detail-processing-track" data-stage="classifying"' in detail_html
+
+        document_partial = client.get("/ui/partials/document?id=doc-classifying")
+        assert document_partial.status_code == 200
+        assert 'data-document-status="processing"' in document_partial.text
+        assert '<template data-html-target="detailProcessingStage">' in document_partial.text
+        assert "Classifying" in document_partial.text
+        assert "72%" in document_partial.text
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_ui_routes_serve_page_html() -> None:
     client = TestClient(app)
     routes = (
@@ -1063,6 +1132,15 @@ def test_static_assets_poll_processing_state_without_page_refresh() -> None:
     assert pending_js.status_code == 200
     assert "pendingPollTimer" in pending_js.text
     assert "loadPendingDocuments({ showLoading: false, logResult: false })" in pending_js.text
+
+    single_document_js = client.get("/static/js/single-document.js")
+    assert single_document_js.status_code == 200
+    assert "startDocumentProcessingWatch" in single_document_js.text
+    assert "Processing completed for" in single_document_js.text
+
+    documents_css = client.get("/static/css/documents.css")
+    assert documents_css.status_code == 200
+    assert ".detail-processing-stage" in documents_css.text
     assert "pendingSummaryToolbar" in pending_js.text
 
     documents_css = client.get("/static/css/documents.css")

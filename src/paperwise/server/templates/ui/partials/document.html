@@ -37,6 +37,9 @@
           <span id="detailStatus" class="detail-status-wrap">{{ document_detail_status_html|safe }}</span>
         </div>
         <h1 id="detailTitle" class="doc-detail-title">{{ document_detail_title|default(document_detail_inputs.metaTitle)|default("Untitled document") }}</h1>
+        <div id="detailProcessingStage" class="detail-processing-stage-wrap">
+          {{ document_detail_html.detailProcessingStage|default("")|safe }}
+        </div>
         <div class="doc-meta-row">
           <span class="meta-pill">
             <span class="meta-key">Correspondent</span>

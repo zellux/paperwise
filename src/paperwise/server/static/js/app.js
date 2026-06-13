@@ -562,6 +562,13 @@ export function applyDocumentDetailPartial(partialRoot) {
   document.dispatchEvent(new CustomEvent("paperwise:document-detail-updated"));
 }
 
+async function refreshDocumentDetailPartial(documentId) {
+  const query = new URLSearchParams({ id: documentId });
+  const payload = await fetchHtmlPartial(`/ui/partials/document?${query.toString()}`);
+  applyDocumentDetailPartial(payload);
+  return payload;
+}
+
 export async function initializeCurrentPageData() {
   if (typeof activePageModule?.initializePage !== "function") {
     return;
@@ -573,9 +580,7 @@ export async function initializeCurrentPageData() {
 }
 
 export async function openDocumentView(documentId) {
-  const query = new URLSearchParams({ id: documentId });
-  const payload = await fetchHtmlPartial(`/ui/partials/document?${query.toString()}`);
-  applyDocumentDetailPartial(payload);
+  await refreshDocumentDetailPartial(documentId);
   logActivity(`Opened document ${documentId}`);
 }
 
@@ -588,26 +593,26 @@ export async function waitForDocumentReady(
 ) {
   const fastDeadline = Date.now() + fastPhaseMs;
   while (Date.now() < fastDeadline) {
-    const response = await apiFetch(`/documents/${documentId}`);
-    const payload = await response.json();
-    if (!response.ok) {
-      throw new Error(payload.detail || "Failed to refresh document status");
-    }
-    if (payload.status === "ready") {
+    const payload = await refreshDocumentDetailPartial(documentId);
+    const status = String(payload?.dataset?.documentStatus || "").toLowerCase();
+    if (status === "ready") {
       return true;
+    }
+    if (status === "failed") {
+      return false;
     }
     await delay(fastIntervalMs);
   }
 
   const slowDeadline = Date.now() + slowPhaseMs;
   while (Date.now() < slowDeadline) {
-    const response = await apiFetch(`/documents/${documentId}`);
-    const payload = await response.json();
-    if (!response.ok) {
-      throw new Error(payload.detail || "Failed to refresh document status");
-    }
-    if (payload.status === "ready") {
+    const payload = await refreshDocumentDetailPartial(documentId);
+    const status = String(payload?.dataset?.documentStatus || "").toLowerCase();
+    if (status === "ready") {
       return true;
+    }
+    if (status === "failed") {
+      return false;
     }
     await delay(slowIntervalMs);
   }
