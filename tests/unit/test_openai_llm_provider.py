@@ -1,6 +1,6 @@
 import json
 
-from paperwise.infrastructure.llm.ocr_prompt import OCR_SYSTEM_PROMPT
+from paperwise.infrastructure.llm.ocr_prompt import OCR_SYSTEM_PROMPT, extract_ocr_text_result
 from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 
 
@@ -152,6 +152,57 @@ def test_openai_provider_omits_missing_keys(monkeypatch) -> None:
     assert result == {"suggested_title": "Only Title"}
 
 
+def test_openai_provider_uses_extended_timeout_for_metadata(monkeypatch) -> None:
+    captured_call: dict[str, object] = {}
+
+    class FakeClient:
+        def post(self, _path: str, json: dict, timeout: float | None = None):
+            captured_call["payload"] = json
+            captured_call["timeout"] = timeout
+
+            class Response:
+                status_code = 200
+                text = ""
+
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict:
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": json_module.dumps(
+                                        {
+                                            "suggested_title": "Slow Local Result",
+                                            "correspondent": "Local Model",
+                                        }
+                                    )
+                                }
+                            }
+                        ]
+                    }
+
+            return Response()
+
+    json_module = json
+    provider = OpenAILLMProvider(api_key="k", model="m")
+    monkeypatch.setattr(provider, "_client", FakeClient())
+
+    result = provider.suggest_metadata(
+        filename="credit.pdf",
+        text_preview="sample",
+        current_correspondent=None,
+        current_document_type=None,
+        existing_correspondents=[],
+        existing_document_types=[],
+        existing_tags=[],
+    )
+
+    assert captured_call["timeout"] == 120.0
+    assert result["suggested_title"] == "Slow Local Result"
+
+
 def test_openai_provider_can_use_text_response_format_for_custom_providers(monkeypatch) -> None:
     captured_request: dict[str, dict] = {}
 
@@ -243,6 +294,24 @@ def test_openai_provider_uses_ocr_specific_prompt(monkeypatch) -> None:
 
     assert result == "Invoice #123\nTotal Due: $1,200.00"
     assert captured_request["payload"]["messages"][0]["content"] == OCR_SYSTEM_PROMPT
+
+
+def test_extract_ocr_text_result_flattens_structured_line_items() -> None:
+    result = extract_ocr_text_result(
+        {
+            "ocr_text": [
+                {"line": "May 10, 1994", "page_number": "1"},
+                {"line": "A Block-sorting Lossless Data Compression Algorithm", "page_number": "1"},
+                {"text": "M. Burrows and D.J. Wheeler"},
+            ]
+        }
+    )
+
+    assert result == (
+        "May 10, 1994\n"
+        "A Block-sorting Lossless Data Compression Algorithm\n"
+        "M. Burrows and D.J. Wheeler"
+    )
 
 
 def test_openai_provider_uses_image_ocr_payload(monkeypatch) -> None:
@@ -341,6 +410,48 @@ def test_openai_provider_image_ocr_calls_each_page_and_combines(monkeypatch) -> 
 
     assert result == "page-1\n\npage-2"
     assert len(captured_requests) == 2
+
+
+def test_openai_provider_retries_empty_image_ocr_page(monkeypatch) -> None:
+    calls = {"count": 0}
+
+    class FakeClient:
+        def post(self, _path: str, json: dict, timeout: float | None = None):
+            del timeout
+            calls["count"] += 1
+
+            class Response:
+                status_code = 200
+                text = ""
+
+                def raise_for_status(self) -> None:
+                    return None
+
+                def json(self) -> dict:
+                    ocr_text = "" if calls["count"] == 1 else "Recovered page text"
+                    return {
+                        "choices": [
+                            {
+                                "message": {
+                                    "content": json_module.dumps({"ocr_text": ocr_text})
+                                }
+                            }
+                        ]
+                    }
+
+            return Response()
+
+    json_module = json
+    provider = OpenAILLMProvider(api_key="k", model="m")
+    monkeypatch.setattr(provider, "_client", FakeClient())
+
+    result = provider.extract_ocr_text_from_images(
+        filename="scan.pdf",
+        image_data_urls=["data:image/png;base64,a"],
+    )
+
+    assert result == "Recovered page text"
+    assert calls["count"] == 2
 
 
 def test_openai_provider_grounded_qa_uses_extended_timeout(monkeypatch) -> None:

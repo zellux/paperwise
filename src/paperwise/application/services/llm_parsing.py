@@ -1,5 +1,6 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
+import logging
 from typing import Protocol
 
 from paperwise.application.interfaces import (
@@ -23,6 +24,8 @@ from paperwise.domain.models import (
     UserPreference,
 )
 
+logger = logging.getLogger(__name__)
+
 
 class LLMParseRepository(ParseResultRepository, TaxonomyRepository, PreferenceRepository, HistoryRepository, Protocol):
     pass
@@ -32,9 +35,10 @@ def _build_metadata_llm_details(
     *,
     llm_provider: LLMProvider,
     llm_total_tokens: int,
+    error: Exception | None = None,
 ) -> dict[str, object]:
     summary = summarize_llm_provider(llm_provider)
-    return {
+    details: dict[str, object] = {
         "task": "metadata",
         "engine": "llm",
         "provider": summary["provider"],
@@ -42,6 +46,11 @@ def _build_metadata_llm_details(
         "base_url": summary["base_url"],
         "total_tokens": llm_total_tokens,
     }
+    if error is not None:
+        details["status"] = "fallback"
+        details["error_type"] = type(error).__name__
+        details["error_message"] = str(error).strip() or type(error).__name__
+    return details
 
 
 def parse_with_llm(
@@ -60,15 +69,25 @@ def parse_with_llm(
     tags = repository.list_tags()
     previous = repository.get_llm_parse_result(document.id)
 
-    raw = llm_provider.suggest_metadata(
-        filename=document.filename,
-        text_preview=parse_result.text_preview,
-        current_correspondent=previous.correspondent if previous is not None else None,
-        current_document_type=previous.document_type if previous is not None else None,
-        existing_correspondents=correspondents,
-        existing_document_types=document_types,
-        existing_tags=tags,
-    )
+    metadata_error: Exception | None = None
+    try:
+        raw = llm_provider.suggest_metadata(
+            filename=document.filename,
+            text_preview=parse_result.text_preview,
+            current_correspondent=previous.correspondent if previous is not None else None,
+            current_document_type=previous.document_type if previous is not None else None,
+            existing_correspondents=correspondents,
+            existing_document_types=document_types,
+            existing_tags=tags,
+        )
+    except Exception as exc:
+        metadata_error = exc
+        logger.warning(
+            "Metadata classification failed for document_id=%s; using fallback metadata: %s",
+            document.id,
+            exc,
+        )
+        raw = {}
     raw_total_tokens = raw.get("llm_total_tokens")
     llm_total_tokens = raw_total_tokens if isinstance(raw_total_tokens, int) and raw_total_tokens > 0 else 0
     source_document_date = source_date_resolver(document)
@@ -162,6 +181,7 @@ def parse_with_llm(
         llm_details=_build_metadata_llm_details(
             llm_provider=llm_provider,
             llm_total_tokens=llm_total_tokens,
+            error=metadata_error,
         ),
     )
     repository.save_llm_parse_result(result)

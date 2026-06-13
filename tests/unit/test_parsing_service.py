@@ -99,6 +99,18 @@ class TimeoutImageOCRLLM:
         raise RuntimeError("The read operation timed out")
 
 
+class EmptyImageOCRLLM:
+    def extract_ocr_text_from_images(
+        self,
+        *,
+        filename: str,
+        image_data_urls: list[str],
+    ) -> str:
+        del filename
+        del image_data_urls
+        return ""
+
+
 class TextOnlyOCRLLM:
     def extract_ocr_text(
         self,
@@ -123,6 +135,19 @@ def test_fit_preview_text_preserves_head_and_tail_content() -> None:
     assert preview.endswith("2026-03-20 END")
     assert "..." in preview
     assert len(preview) == 120
+
+
+def test_extract_provider_ocr_text_flattens_json_line_objects() -> None:
+    raw = (
+        "```json\n"
+        '{"ocr_text": {"line1": "May 10, 1994", '
+        '"line2": "A Block-sorting Lossless Data Compression Algorithm"}}\n'
+        "```"
+    )
+
+    result = parsing_module._extract_provider_ocr_text(raw)
+
+    assert result == "May 10, 1994 A Block-sorting Lossless Data Compression Algorithm"
 
 
 def test_select_pdf_page_numbers_prioritizes_front_and_back_pages() -> None:
@@ -933,6 +958,36 @@ def test_parse_document_blob_image_ocr_timeout_falls_back_to_extracted_text(
     assert result.ocr_details is not None
     assert result.ocr_details["attempts"]["llm_vision"]["attempted"] is True
     assert result.ocr_details["attempts"]["llm_vision"]["succeeded"] is False
+    assert result.ocr_details["final_text_source"] == "pdf_text_extraction"
+
+
+def test_parse_document_blob_empty_image_ocr_falls_back_to_extracted_text(
+    tmp_path, monkeypatch
+) -> None:
+    blob = tmp_path / "vision-empty.pdf"
+    blob.write_bytes(b"%PDF-1.7\nReadable sample OCR text\n/Type /Page")
+    llm = EmptyImageOCRLLM()
+
+    monkeypatch.setattr(
+        parsing_module,
+        "_render_pdf_pages_to_data_urls",
+        lambda **kwargs: ["data:image/png;base64,abc"],
+    )
+
+    result = parse_document_blob(
+        document_id="doc-1",
+        blob_uri=blob.as_uri(),
+        ocr_provider="llm",
+        llm_provider=llm,
+        ocr_auto_switch=False,
+    )
+
+    assert result.parser == "stub-llm-ocr"
+    assert "Readable sample OCR text" in result.text_preview
+    assert result.ocr_details is not None
+    assert result.ocr_details["attempts"]["llm_vision"]["attempted"] is True
+    assert result.ocr_details["attempts"]["llm_vision"]["succeeded"] is False
+    assert "empty OCR text" in result.ocr_details["attempts"]["llm_vision"]["error"]
     assert result.ocr_details["final_text_source"] == "pdf_text_extraction"
 
 

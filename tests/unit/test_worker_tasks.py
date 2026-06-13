@@ -12,6 +12,14 @@ from paperwise.application.services import document_pipeline
 from paperwise.workers import tasks as worker_tasks
 
 
+class FailingMetadataProvider:
+    _model = "slow-qwen3"
+
+    def suggest_metadata(self, **kwargs):
+        del kwargs
+        raise RuntimeError("metadata classification timed out")
+
+
 def test_resolve_ocr_provider_defaults_to_llm_without_preferences() -> None:
     repository = InMemoryDocumentRepository()
     assert resolve_owner_ocr_provider(repository, "user-1") == "llm"
@@ -161,6 +169,76 @@ def test_parse_document_task_marks_document_failed_and_records_history(monkeypat
     assert "OpenRouter" in history[0].changes["error"]["message"]
     assert "vision-capable model" in history[0].changes["error"]["message"]
     assert "Raw error: LLM OCR failed: HTTP 404 from OpenRouter" in history[0].changes["error"]["message"]
+
+
+def test_parse_document_task_completes_with_metadata_fallback(monkeypatch) -> None:
+    repository = InMemoryDocumentRepository()
+    document = Document(
+        id="doc-metadata-timeout",
+        filename="paper.pdf",
+        owner_id="user-1",
+        blob_uri="incoming/paper.pdf",
+        checksum_sha256="abc123",
+        content_type="application/pdf",
+        size_bytes=123,
+        status=DocumentStatus.PROCESSING,
+        created_at=datetime.now(UTC),
+    )
+    repository.save(document)
+
+    def fake_parse_document_blob(**kwargs):
+        del kwargs
+        return ParseResult(
+            document_id="doc-metadata-timeout",
+            parser="stub-llm-ocr",
+            status="parsed",
+            size_bytes=123,
+            page_count=1,
+            text_preview="sample text",
+            created_at=datetime.now(UTC),
+        )
+
+    monkeypatch.setattr(worker_tasks, "build_document_repository", lambda settings: repository)
+    monkeypatch.setattr(worker_tasks, "build_llm_provider", lambda settings: object())
+    monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_provider", lambda *args, **kwargs: "llm")
+    monkeypatch.setattr(worker_tasks, "resolve_owner_ocr_auto_switch", lambda *args, **kwargs: False)
+    monkeypatch.setattr(
+        worker_tasks,
+        "_resolve_metadata_llm_provider_for_owner",
+        lambda *args, **kwargs: FailingMetadataProvider(),
+    )
+    monkeypatch.setattr(worker_tasks, "_resolve_ocr_llm_provider_for_owner", lambda *args, **kwargs: object())
+    monkeypatch.setattr(document_pipeline, "parse_document_blob", fake_parse_document_blob)
+    monkeypatch.setattr(document_pipeline, "index_document_chunks", lambda **kwargs: 1)
+    monkeypatch.setattr(
+        document_pipeline,
+        "move_blob_to_processed",
+        lambda **kwargs: "processed/doc-metadata-timeout/paper.pdf",
+    )
+
+    result = worker_tasks.parse_document_task(
+        document_id="doc-metadata-timeout",
+        blob_uri="incoming/paper.pdf",
+        filename="paper.pdf",
+        content_type="application/pdf",
+    )
+
+    updated = repository.get("doc-metadata-timeout")
+    assert updated is not None
+    assert updated.status == DocumentStatus.READY
+    assert result["status"] == "ready"
+    metadata = repository.get_llm_parse_result("doc-metadata-timeout")
+    assert metadata is not None
+    assert metadata.llm_details is not None
+    assert metadata.llm_details["status"] == "fallback"
+    assert "metadata classification timed out" in metadata.llm_details["error_message"]
+    completed_events = [
+        event for event in repository.list_history("doc-metadata-timeout")
+        if event.event_type.value == "processing_completed"
+    ]
+    assert completed_events
+    metadata_parse = completed_events[0].changes["metadata_parse"]
+    assert metadata_parse["status"] == "fallback"
 
 
 def test_parse_document_task_skips_duplicate_ready_document(monkeypatch) -> None:

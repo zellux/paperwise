@@ -29,6 +29,7 @@ from paperwise.application.services.parsing_support import (
 )
 from paperwise.domain.models import ParseResult
 from paperwise.infrastructure.config import get_settings
+from paperwise.infrastructure.llm.ocr_prompt import extract_ocr_text_result
 from paperwise.application.services.storage_paths import blob_ref_to_path
 
 try:
@@ -118,15 +119,23 @@ def _decode_text_bytes(raw: bytes) -> str:
 
 def _extract_provider_ocr_text(value: str) -> str:
     text = str(value or "").strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].lstrip().startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
     if not text.startswith("{"):
         return text
     try:
         parsed = json.loads(text)
     except json.JSONDecodeError:
         return text
-    ocr_text = parsed.get("ocr_text") if isinstance(parsed, dict) else None
-    if isinstance(ocr_text, str) and ocr_text.strip():
-        return ocr_text.strip()
+    if isinstance(parsed, dict):
+        extracted = extract_ocr_text_result(parsed)
+        if extracted:
+            return extracted
     return text
 
 
@@ -1021,9 +1030,12 @@ def parse_document_blob(
                         succeeded=False,
                         error=str(exc),
                     )
-                    if "timed out" in str(exc).lower():
-                        # Keep pipeline moving when vision OCR times out on large/complex PDFs.
-                        logger.warning("Vision OCR timed out for %s; using extracted text fallback.", blob_path)
+                    normalized_error = str(exc).lower()
+                    if "timed out" in normalized_error or (
+                        "empty ocr text" in normalized_error and text_preview.strip()
+                    ):
+                        # Keep pipeline moving when vision OCR is transiently unavailable.
+                        logger.warning("Vision OCR failed for %s; using extracted text fallback: %s", blob_path, exc)
                     else:
                         raise RuntimeError(f"LLM OCR failed: {exc}") from exc
         extract_method = getattr(llm_provider, "extract_ocr_text", None) if llm_provider is not None else None
@@ -1063,9 +1075,12 @@ def parse_document_blob(
                     succeeded=False,
                     error=str(exc),
                 )
-                if "timed out" in str(exc).lower():
+                normalized_error = str(exc).lower()
+                if "timed out" in normalized_error or (
+                    "empty ocr text" in normalized_error and text_preview.strip()
+                ):
                     # Fall back to extracted text to avoid blocking document processing.
-                    logger.warning("LLM OCR timed out for %s; using extracted text fallback.", blob_path)
+                    logger.warning("LLM OCR failed for %s; using extracted text fallback: %s", blob_path, exc)
                 else:
                     raise RuntimeError(f"LLM OCR failed: {exc}") from exc
 

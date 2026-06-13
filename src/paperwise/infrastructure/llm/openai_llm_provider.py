@@ -179,7 +179,7 @@ class OpenAILLMProvider(LLMProvider):
                 {"role": "user", "content": json.dumps(user_prompt)},
             ],
         }
-        response, response_payload = self._chat_completions(request_payload)
+        response, response_payload = self._chat_completions(request_payload, timeout=120.0)
 
         log_llm_exchange(
             provider="openai",
@@ -329,6 +329,7 @@ class OpenAILLMProvider(LLMProvider):
             page_error: Exception | None = None
 
             for attempt in range(2):
+                extracted: str | None = None
                 try:
                     # Dense scanned pages can take much longer than metadata calls.
                     try:
@@ -344,6 +345,41 @@ class OpenAILLMProvider(LLMProvider):
                         response_payload = response.json()
                     except ValueError:
                         response_payload = {"raw_text": getattr(response, "text", "")}
+                    log_llm_exchange(
+                        provider="openai",
+                        endpoint="/chat/completions",
+                        request_payload=request_payload,
+                        response_status=getattr(response, "status_code", None),
+                        response_payload=response_payload,
+                    )
+                    response.raise_for_status()
+                    payload = response_payload if isinstance(response_payload, dict) else response.json()
+                    content = str(payload["choices"][0]["message"]["content"]).strip()
+                    try:
+                        parsed = _parse_json_content(content)
+                        extracted = extract_ocr_text_result(parsed)
+                    except json.JSONDecodeError:
+                        extracted = content
+                    if extracted and extracted.strip():
+                        return index, extracted.strip(), None
+                    page_error = RuntimeError("LLM OCR failed: provider returned empty OCR text.")
+                    log_llm_exchange(
+                        provider="openai",
+                        endpoint="/chat/completions",
+                        request_payload=request_payload,
+                        response_status=getattr(response, "status_code", None),
+                        response_payload=response_payload,
+                        error=str(page_error),
+                    )
+                    logger.warning(
+                        "Vision OCR page %d/%d returned empty text for %s (attempt %d).",
+                        index,
+                        total_pages,
+                        filename,
+                        attempt + 1,
+                    )
+                    if attempt == 0:
+                        continue
                     break
                 except Exception as exc:
                     page_error = exc
@@ -365,27 +401,7 @@ class OpenAILLMProvider(LLMProvider):
                         continue
                     break
 
-            if response is None:
-                return index, None, page_error
-
-            log_llm_exchange(
-                provider="openai",
-                endpoint="/chat/completions",
-                request_payload=request_payload,
-                response_status=getattr(response, "status_code", None),
-                response_payload=response_payload,
-            )
-            response.raise_for_status()
-            payload = response_payload if isinstance(response_payload, dict) else response.json()
-            content = str(payload["choices"][0]["message"]["content"]).strip()
-            try:
-                parsed = _parse_json_content(content)
-                extracted = extract_ocr_text_result(parsed)
-            except json.JSONDecodeError:
-                extracted = content
-            if extracted and extracted.strip():
-                return index, extracted.strip(), None
-            return index, None, RuntimeError("LLM OCR failed: provider returned empty OCR text.")
+            return index, None, page_error
 
         max_workers = min(3, len(image_data_urls))
         with ThreadPoolExecutor(max_workers=max_workers) as executor:

@@ -1,5 +1,7 @@
 from datetime import UTC, datetime
 
+import httpx
+
 from paperwise.application.services.llm_parsing import parse_with_llm
 from paperwise.application.services.metadata_updates import validate_document_date
 from paperwise.domain.models import Document, DocumentStatus, ParseResult
@@ -195,6 +197,30 @@ class TokenUsageLLMProvider:
         }
 
 
+class TimeoutMetadataLLMProvider:
+    _model = "slow-qwen3"
+
+    def suggest_metadata(
+        self,
+        *,
+        filename: str,
+        text_preview: str,
+        current_correspondent: str | None,
+        current_document_type: str | None,
+        existing_correspondents: list[str],
+        existing_document_types: list[str],
+        existing_tags: list[str],
+    ) -> dict:
+        del filename
+        del text_preview
+        del current_correspondent
+        del current_document_type
+        del existing_correspondents
+        del existing_document_types
+        del existing_tags
+        raise httpx.ReadTimeout("classification timed out")
+
+
 def _build_document() -> Document:
     return Document(
         id="doc-llm-merge",
@@ -384,3 +410,28 @@ def test_parse_with_llm_tracks_total_tokens_in_user_preferences() -> None:
     preference = repository.get_user_preference(document.owner_id)
     assert preference is not None
     assert preference.preferences["llm_total_tokens_processed"] == 200
+
+
+def test_parse_with_llm_uses_fallback_metadata_when_classification_times_out() -> None:
+    repository = InMemoryDocumentRepository()
+    document = _build_document()
+    parse_result = _build_parse_result(document.id)
+
+    result = parse_with_llm(
+        document=document,
+        parse_result=parse_result,
+        repository=repository,
+        llm_provider=TimeoutMetadataLLMProvider(),
+        source_date_resolver=lambda _document: "2026-05-01",
+    )
+
+    assert result.suggested_title == document.filename
+    assert result.document_date == "2026-05-01"
+    assert result.correspondent == "Unknown Sender"
+    assert result.document_type == "General Document"
+    assert result.tags == []
+    assert result.llm_details is not None
+    assert result.llm_details["status"] == "fallback"
+    assert result.llm_details["error_type"] == "ReadTimeout"
+    assert "classification timed out" in result.llm_details["error_message"]
+    assert repository.get_llm_parse_result(document.id) == result
