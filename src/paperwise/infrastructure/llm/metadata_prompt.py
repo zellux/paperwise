@@ -1,5 +1,7 @@
 from typing import Any
 
+MAX_METADATA_TAGS = 5
+
 SYSTEM_PROMPT = (
     "You extract metadata for scanned documents. "
     "Return strict JSON with keys: suggested_title, document_date, "
@@ -47,6 +49,21 @@ USER_GUIDANCE = (
 )
 
 
+def _extract_tag_values(tags: list[Any]) -> tuple[list[str], bool]:
+    cleaned: list[str] = []
+    seen: set[str] = set()
+    for tag in tags:
+        text = str(tag).strip()
+        if not text:
+            continue
+        key = text.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        cleaned.append(text)
+    return cleaned, len(cleaned) > MAX_METADATA_TAGS
+
+
 def build_user_prompt(
     *,
     filename: str,
@@ -84,5 +101,7 @@ def extract_metadata_result(parsed: dict[str, Any]) -> dict[str, Any]:
         result["document_type"] = document_type.strip()
     tags = parsed.get("tags")
     if isinstance(tags, list):
-        result["tags"] = [str(tag) for tag in tags if str(tag).strip()]
+        clean_tags, too_many_tags = _extract_tag_values(tags)
+        if not too_many_tags:
+            result["tags"] = clean_tags
     return result

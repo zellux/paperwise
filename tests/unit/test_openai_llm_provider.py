@@ -1,6 +1,7 @@
 import json
 
 from paperwise.infrastructure.llm.ocr_prompt import OCR_SYSTEM_PROMPT, extract_ocr_text_result
+from paperwise.infrastructure.llm.metadata_prompt import extract_metadata_result
 from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 
 
@@ -150,6 +151,27 @@ def test_openai_provider_omits_missing_keys(monkeypatch) -> None:
     )
 
     assert result == {"suggested_title": "Only Title"}
+
+
+def test_metadata_result_discards_overlong_tag_lists() -> None:
+    result = extract_metadata_result(
+        {
+            "suggested_title": "HTM Patricia Trie Study",
+            "tags": ["AI Infrastructure", "Algorithm", "Birthday", "Credit", "Dental", "Estate"],
+        }
+    )
+
+    assert result == {"suggested_title": "HTM Patricia Trie Study"}
+
+
+def test_metadata_result_keeps_up_to_five_unique_tags() -> None:
+    result = extract_metadata_result(
+        {
+            "tags": ["Algorithm", "algorithm", " Data Structures ", "", "HTM", "Patricia Tries"],
+        }
+    )
+
+    assert result["tags"] == ["Algorithm", "Data Structures", "HTM", "Patricia Tries"]
 
 
 def test_openai_provider_uses_extended_timeout_for_metadata(monkeypatch) -> None:
