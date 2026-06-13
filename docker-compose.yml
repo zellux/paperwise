@@ -37,7 +37,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: ["celery", "-A", "paperwise.workers.celery_app.celery_app", "worker", "--loglevel=INFO"]
+    command: ["sh", "-c", "exec celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO ${PAPERWISE_WORKER_CONCURRENCY:+--concurrency=${PAPERWISE_WORKER_CONCURRENCY}}"]
     environment:
       PAPERWISE_ENV: docker
       PAPERWISE_LOG_LEVEL: INFO

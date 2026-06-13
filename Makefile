@@ -10,6 +10,7 @@ WORKER_LOG ?= $(LOG_DIR)/worker.log
 WEBSITE_PORT ?= 8081
 API_HOST ?= 0.0.0.0
 API_PORT ?= 8000
+WORKER_CONCURRENCY_ARG = $(if $(PAPERWISE_WORKER_CONCURRENCY),--concurrency=$(PAPERWISE_WORKER_CONCURRENCY),)
 
 .PHONY: setup deps-up deps-down docker-up docker-down docker-logs docker-deploy-up docker-deploy-down docker-deploy-logs backend api worker worker-bg backend-bg website dev-up dev-stop dev-restart dev-status test smoke-llm version-check
 
@@ -63,7 +64,7 @@ backend:
 api: backend
 
 worker:
-	$(VENV_PYTHON) -m celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO
+	$(VENV_PYTHON) -m celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO $(WORKER_CONCURRENCY_ARG)
 
 website:
 	cd website && $(PYTHON) -m http.server $(WEBSITE_PORT)
@@ -86,7 +87,7 @@ worker-bg:
 	else \
 		rm -f "$(WORKER_PID_FILE)"; \
 		echo "starting worker..."; \
-		nohup sh -c '$(VENV_PYTHON) -m celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO' > "$(WORKER_LOG)" 2>&1 & echo $$! > "$(WORKER_PID_FILE)"; \
+		nohup sh -c '$(VENV_PYTHON) -m celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO $(WORKER_CONCURRENCY_ARG)' > "$(WORKER_LOG)" 2>&1 & echo $$! > "$(WORKER_PID_FILE)"; \
 		echo "worker started (pid=$$(cat "$(WORKER_PID_FILE)")) log=$(WORKER_LOG)"; \
 	fi
 

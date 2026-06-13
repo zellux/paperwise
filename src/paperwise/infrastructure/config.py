@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +25,7 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = 60 * 60 * 12
     session_cookie_secure: bool | None = None
     disable_signup: bool = False
+    worker_concurrency: PositiveInt | None = None
 
 
 @lru_cache

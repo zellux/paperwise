@@ -61,7 +61,7 @@ services:
 
   worker:
     image: ghcr.io/zellux/paperwise:latest
-    command: ["celery", "-A", "paperwise.workers.celery_app.celery_app", "worker", "--loglevel=INFO"]
+    command: ["sh", "-c", "exec celery -A paperwise.workers.celery_app.celery_app worker --loglevel=INFO ${PAPERWISE_WORKER_CONCURRENCY:+--concurrency=${PAPERWISE_WORKER_CONCURRENCY}}"]
     environment:
       PAPERWISE_ENV: docker
       PAPERWISE_LOG_LEVEL: INFO
@@ -123,6 +123,8 @@ The example is configured for direct HTTP access at `http://localhost:8080`. If 
 
 Set `PAPERWISE_DISABLE_SIGNUP` to `"true"` on the `api` service to disable public self-service account registration while keeping login available for existing users.
 
+Set `PAPERWISE_WORKER_CONCURRENCY` to a positive integer before running `docker compose up -d` if you need to limit worker parallelism for a local or rate-limited model backend, for example `PAPERWISE_WORKER_CONCURRENCY=1`. When unset, Celery keeps its default concurrency behavior.
+
 If the GHCR package is private, make it public in the GitHub package settings before sharing it with other users.
 
 Open Paperwise at [http://localhost:8080](http://localhost:8080).
@@ -155,6 +157,8 @@ uv run pytest
 ```
 
 The local dev stack starts the FastAPI app, Celery worker, Redis, and Postgres. Uploaded files and local runtime data are stored under `local/`.
+
+For local source runs, set `PAPERWISE_WORKER_CONCURRENCY` before `make worker` or `make dev-up` to limit Celery worker concurrency.
 
 ## Before Sharing
 
@@ -252,6 +256,7 @@ If uploads stay stuck in `processing`:
 If CPU usage spikes while documents are processing:
 
 - local OCR is the most likely cause, especially when **Local Tesseract** is enabled
+- set `PAPERWISE_WORKER_CONCURRENCY` to a positive integer, such as `1`, before starting the worker if your local LLM or OCR backend cannot handle Celery's default parallelism
 - open **Settings > Model Config**
 - switch **OCR Engine** away from **Local Tesseract**, or disable OCR auto-switch if you do not want Paperwise to fall back to local OCR
 - use an LLM OCR route instead if you prefer to trade provider calls for lower local CPU load
