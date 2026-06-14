@@ -101,7 +101,7 @@ If your documents are mostly clean text PDFs, start with the faster models and o
 
 ### User-verified self-hosted models
 
-Paperwise users have reported successful local processing with these Ollama models:
+Paperwise users have reported successful local processing with this Ollama split:
 
 | Task | Ollama model |
 | --- | --- |
@@ -109,7 +109,9 @@ Paperwise users have reported successful local processing with these Ollama mode
 | Metadata extraction | `qwen3:8b` |
 | Grounded Q&A | `qwen3:8b` |
 
-Use these as known-working starting points for self-hosted setups, not as the only supported local models. For custom providers, configure Ollama as an OpenAI-compatible connection, for example:
+Use a vision model such as `minicpm-v:latest` for OCR because Paperwise sends rendered page images for LLM OCR. Use a text model such as `qwen3:8b` for metadata extraction and grounded Q&A because those tasks work from extracted text.
+
+Treat these as known-working starting points for self-hosted setups, not as the only supported local models. For custom providers, configure Ollama as an OpenAI-compatible connection, for example:
 
 ```text
 http://host.docker.internal:11434/v1
