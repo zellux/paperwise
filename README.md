@@ -1,3 +1,5 @@
+
+
 # Paperwise
 
 Paperwise is an open-source, self-hosted document intelligence app for OCR, metadata extraction, document organization, and grounded Q&A.
@@ -145,6 +147,8 @@ cd paperwise
 make setup
 make dev-up
 ```
+
+*Requires Python 3.11 or newer.*
 
 Open the app at [http://localhost:8000](http://localhost:8000).
 
