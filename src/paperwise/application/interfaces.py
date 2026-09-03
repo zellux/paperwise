@@ -9,6 +9,7 @@ from paperwise.domain.models import (
     DocumentChunk,
     DocumentChunkSearchHit,
     DocumentHistoryEvent,
+    DocumentIndexState,
     DocumentSearchHit,
     DocumentStatus,
     LLMParseResult,
@@ -304,6 +305,25 @@ class DocumentChunkRepository(Protocol):
         """Run keyword chunk search over owner-visible chunks (optionally scoped)."""
 
 
+class DocumentIndexStateRepository(Protocol):
+    def save_document_index_state(self, state: DocumentIndexState) -> None:
+        """Persist the current retrieval-index state for one document."""
+
+    def get_document_index_state(self, document_id: str) -> DocumentIndexState | None:
+        """Load one document's retrieval-index state."""
+
+    def list_document_index_states(
+        self,
+        *,
+        owner_id: str,
+        document_ids: list[str] | None = None,
+    ) -> list[DocumentIndexState]:
+        """List retrieval-index states for an owner, optionally scoped to documents."""
+
+    def delete_document_index_state(self, document_id: str) -> None:
+        """Delete the retrieval-index state for one document."""
+
+
 class DocumentRepository(
     DocumentStore,
     ParseResultRepository,
@@ -315,6 +335,7 @@ class DocumentRepository(
     CollectionRepository,
     SearchRepository,
     DocumentChunkRepository,
+    DocumentIndexStateRepository,
     Protocol,
 ):
     """Compatibility aggregate for call sites that still need the full repository surface."""
@@ -329,3 +350,6 @@ class IngestionDispatcher(Protocol):
         content_type: str,
     ) -> str:
         """Dispatch ingestion work and return a job identifier."""
+
+    def enqueue_reindex(self, document_id: str) -> str:
+        """Dispatch retrieval-index rebuilding and return a job identifier."""

@@ -2,7 +2,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 import sqlite3
 
-from paperwise.domain.models import ChatThread, Document, DocumentStatus, LLMParseResult, ParseResult
+from paperwise.application.services.chunk_indexing import index_document_chunks
+from paperwise.domain.models import (
+    ChatThread,
+    Document,
+    DocumentIndexStatus,
+    DocumentStatus,
+    LLMParseResult,
+    ParseResult,
+)
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -266,6 +274,34 @@ def test_postgres_repository_adds_starred_column_to_existing_documents_table(tmp
     assert loaded.starred is True
 
 
+def test_postgres_repository_adds_full_text_column_to_existing_parse_results_table(tmp_path: Path) -> None:
+    db_path = tmp_path / "paperwise-existing-parse.db"
+    with sqlite3.connect(db_path) as connection:
+        connection.execute(
+            """
+            CREATE TABLE parse_results (
+                document_id VARCHAR(64) PRIMARY KEY,
+                parser VARCHAR(128),
+                status VARCHAR(64),
+                size_bytes INTEGER,
+                page_count INTEGER,
+                text_preview TEXT,
+                created_at DATETIME
+            )
+            """
+        )
+        connection.commit()
+
+    repository = PostgresDocumentRepository(f"sqlite:///{db_path}")
+    result = _parse_result("full-text-migration", "short preview")
+    result.full_text = "complete document text"
+    repository.save_parse_result(result)
+
+    loaded = repository.get_parse_result(result.document_id)
+    assert loaded is not None
+    assert loaded.full_text == "complete document text"
+
+
 def test_postgres_repository_indexes_chat_thread_document_references(tmp_path: Path) -> None:
     repository = PostgresDocumentRepository(f"sqlite:///{tmp_path / 'paperwise.db'}")
     thread = _chat_thread("thread-tax", "owner-a", "doc-tax")
@@ -291,3 +327,61 @@ def test_postgres_repository_indexes_chat_thread_document_references(tmp_path: P
     )
 
     assert repository.list_document_chat_thread_references("owner-a", "doc-tax") == []
+
+
+def test_index_document_chunks_records_ready_state() -> None:
+    repository = InMemoryDocumentRepository()
+    document = _document("indexed-doc", "owner-a")
+    repository.save(document)
+
+    chunk_count = index_document_chunks(
+        repository=repository,
+        document=document,
+        parse_result=_parse_result(document.id, "alpha beta gamma"),
+    )
+
+    state = repository.get_document_index_state(document.id)
+    assert chunk_count == 1
+    assert state is not None
+    assert state.status == DocumentIndexStatus.READY
+    assert state.index_version == "fts-v1"
+    assert state.chunk_count == 1
+    assert state.indexed_at is not None
+
+
+def test_index_document_chunks_prefers_full_text_over_preview() -> None:
+    repository = InMemoryDocumentRepository()
+    document = _document("full-text-doc", "owner-a")
+    repository.save(document)
+    parse_result = _parse_result(document.id, "preview only")
+    parse_result.full_text = "preview only plus uniquefulltextmarker"
+
+    index_document_chunks(repository=repository, document=document, parse_result=parse_result)
+
+    hits = repository.search_document_chunks(
+        owner_id=document.owner_id,
+        query="uniquefulltextmarker",
+    )
+    assert [hit.chunk.document_id for hit in hits] == [document.id]
+
+
+def test_postgres_repository_round_trips_index_state_and_deletes_it(tmp_path: Path) -> None:
+    repository = PostgresDocumentRepository(f"sqlite:///{tmp_path / 'paperwise.db'}")
+    document = _document("indexed-doc", "owner-a")
+    repository.save(document)
+    repository.save_parse_result(_parse_result(document.id, "alpha beta gamma"))
+    index_document_chunks(
+        repository=repository,
+        document=document,
+        parse_result=repository.get_parse_result(document.id),
+    )
+
+    state = repository.get_document_index_state(document.id)
+    assert state is not None
+    assert state.status == DocumentIndexStatus.READY
+    assert [item.document_id for item in repository.list_document_index_states(owner_id="owner-a")] == [
+        document.id
+    ]
+
+    repository.delete_document_analysis_artifacts(document.id)
+    assert repository.get_document_index_state(document.id) is None

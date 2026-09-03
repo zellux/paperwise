@@ -337,6 +337,28 @@ def test_parse_document_blob_docx_extracts_text_without_llm_ocr(tmp_path) -> Non
     assert result.ocr_details["final_text_source"] == "docx_text_read"
 
 
+def test_plain_text_keeps_full_index_text_beyond_preview_limit(tmp_path) -> None:
+    blob = tmp_path / "long-notes.txt"
+    middle_marker = "uniquemiddlemarker"
+    blob.write_text(
+        ("opening " * 1800) + middle_marker + (" closing" * 1800),
+        encoding="utf-8",
+    )
+
+    result = parse_document_blob(
+        document_id="doc-long-text",
+        blob_uri=blob.as_uri(),
+        content_type="text/plain",
+        ocr_provider="llm",
+        llm_provider=None,
+    )
+
+    assert len(result.text_preview) == parsing_module.PARSE_PREVIEW_MAX_CHARS
+    assert middle_marker not in result.text_preview
+    assert result.full_text is not None
+    assert middle_marker in result.full_text
+
+
 def test_parse_document_blob_pptx_extracts_slide_text_without_llm_ocr(tmp_path) -> None:
     blob = tmp_path / "slides.pptx"
     with ZipFile(blob, "w") as zip_file:

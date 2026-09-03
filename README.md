@@ -158,6 +158,12 @@ uv run pytest
 
 The local dev stack starts the FastAPI app, Celery worker, Redis, and Postgres. Uploaded files and local runtime data are stored under `local/`.
 
+### Document retrieval index
+
+Document chunks are indexed with PostgreSQL full-text search. On PostgreSQL, Paperwise creates a GIN expression index and ranks matching chunks in the database; SQLite-backed local or test runs use a compatible in-process fallback. Qdrant is not required for this retrieval layer.
+
+Each document exposes an independent index status (`not_indexed`, `pending`, `indexing`, `ready`, `stale`, or `failed`). Select documents in the Documents view and use **Reindex** to rebuild them in the Celery worker without repeating OCR or metadata extraction. The same operation is available through `POST /documents/index/batch`, and status details are available from `GET /documents/{document_id}/index`.
+
 For local source runs, set `PAPERWISE_WORKER_CONCURRENCY` before `make worker` or `make dev-up` to limit Celery worker concurrency.
 
 ## Before Sharing

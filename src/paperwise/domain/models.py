@@ -11,6 +11,14 @@ class DocumentStatus(StrEnum):
     READY = "ready"
 
 
+class DocumentIndexStatus(StrEnum):
+    PENDING = "pending"
+    INDEXING = "indexing"
+    READY = "ready"
+    STALE = "stale"
+    FAILED = "failed"
+
+
 class HistoryEventType(StrEnum):
     METADATA_CHANGED = "metadata_changed"
     TAGS_ADDED = "tags_added"
@@ -50,6 +58,7 @@ class ParseResult:
     text_preview: str
     created_at: datetime
     ocr_details: dict[str, Any] | None = None
+    full_text: str | None = None
 
 
 @dataclass(slots=True)
@@ -155,3 +164,16 @@ class DocumentChunkSearchHit:
     chunk: DocumentChunk
     score: float
     matched_terms: list[str]
+
+
+@dataclass(slots=True)
+class DocumentIndexState:
+    document_id: str
+    owner_id: str
+    status: DocumentIndexStatus
+    index_version: str
+    source_checksum: str
+    chunk_count: int
+    updated_at: datetime
+    indexed_at: datetime | None = None
+    last_error: str | None = None

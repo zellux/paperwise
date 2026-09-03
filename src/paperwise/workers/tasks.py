@@ -5,6 +5,7 @@ from paperwise.application.services.history import (
     build_processing_failed_history_event,
 )
 from paperwise.application.services.document_pipeline import process_document
+from paperwise.application.services.chunk_indexing import reindex_document_chunks
 from paperwise.application.services.llm_preferences import (
     LLM_TASK_METADATA,
     LLM_TASK_OCR,
@@ -136,6 +137,18 @@ def ingest_document_task(
         content_type=content_type,
     )
     return {"document_id": document_id, "status": "processing"}
+
+
+@celery_app.task(name="paperwise.tasks.reindex_document")
+def reindex_document_task(document_id: str) -> dict[str, str | int]:
+    repository = build_document_repository(settings)
+    document = repository.get(document_id)
+    if document is None:
+        logger.error("reindex task failed; document_id=%s not found", document_id)
+        return {"document_id": document_id, "status": "not_found", "chunk_count": 0}
+    chunk_count = reindex_document_chunks(repository=repository, document=document)
+    logger.info("reindex task completed document_id=%s chunks=%d", document_id, chunk_count)
+    return {"document_id": document_id, "status": "ready", "chunk_count": chunk_count}
 
 
 @celery_app.task(name="paperwise.tasks.parse_document")

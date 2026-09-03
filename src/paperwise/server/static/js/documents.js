@@ -45,6 +45,8 @@ let docsListRequestSeq = 0;
 let initialDocumentsHydrated = false;
 let documentsEventsBound = false;
 let documentsProcessingPollTimer = 0;
+let documentsProcessingCount = 0;
+let documentsIndexingCount = 0;
 let activeBulkEditMode = "";
 let clippedTagResizeTimer = 0;
 const selectedDocIds = new Set();
@@ -85,6 +87,8 @@ export function clearSessionState() {
     window.clearInterval(documentsProcessingPollTimer);
     documentsProcessingPollTimer = 0;
   }
+  documentsProcessingCount = 0;
+  documentsIndexingCount = 0;
   selectedDocIds.clear();
   renderDocSelectionState();
 }
@@ -626,18 +630,25 @@ function applyDocumentsPartial(payload) {
   docsPage = Math.max(1, Number(payload.dataset.documentsPage || docsPage || 1));
   appState.docsPageSize = normalizePageSize(payload.dataset.documentsPageSize || appState.docsPageSize);
   setDocumentsProcessingCount(Number(payload.dataset.documentsProcessingCount || 0));
+  setDocumentsIndexingCount(Number(payload.dataset.documentsIndexingCount || 0));
   syncSelectionToVisibleRows();
   refreshClippedTagTooltips(docsTableBody);
 }
 
 function setDocumentsProcessingCount(count) {
   const normalizedCount = Math.max(0, Number(count || 0));
+  documentsProcessingCount = normalizedCount;
   const sideCount = document.getElementById("docsProcessingSideCount");
   if (sideCount) {
     sideCount.textContent = normalizedCount.toLocaleString();
     sideCount.classList.toggle("accent", normalizedCount > 0);
   }
-  syncDocumentsProcessingPoll(normalizedCount);
+  syncDocumentsProcessingPoll(documentsProcessingCount + documentsIndexingCount);
+}
+
+function setDocumentsIndexingCount(count) {
+  documentsIndexingCount = Math.max(0, Number(count || 0));
+  syncDocumentsProcessingPoll(documentsProcessingCount + documentsIndexingCount);
 }
 
 function syncDocumentsProcessingPoll(processingCount) {
@@ -1225,6 +1236,35 @@ async function handleBulkReprocessClick(button) {
   }
 }
 
+async function handleBulkReindexClick(button) {
+  const rows = getSelectedRowsOrLog();
+  if (!rows.length) {
+    return;
+  }
+  button.disabled = true;
+  try {
+    const documentIds = rows.map((row) => row.dataset.docId || "").filter(Boolean);
+    const response = await apiFetch("/documents/index/batch", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_ids: documentIds, force: true }),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(payload.detail || response.statusText);
+    }
+    selectedDocIds.clear();
+    await loadDocumentsList();
+    logActivity(
+      `Indexing queued for ${payload.queued_count || 0} document(s); ${payload.skipped_count || 0} skipped.`,
+    );
+  } catch (error) {
+    logActivity(`Bulk reindex failed: ${error.message}`);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 async function handleBulkDeleteClick(button) {
   const rows = getSelectedRowsOrLog();
   if (!rows.length) {
@@ -1395,6 +1435,7 @@ function hydrateInitialDocumentsData(initialData) {
   syncSelectionToVisibleRows();
   refreshClippedTagTooltips();
   setDocumentsProcessingCount(Number(initialData.documents_processing_count || 0));
+  setDocumentsIndexingCount(Number(initialData.documents_indexing_count || 0));
   logActivity(`Loaded ${initialData.documents.length} document(s) of ${docsTotalCount} total`);
   initialDocumentsHydrated = true;
   return true;
@@ -1524,6 +1565,13 @@ function bindDocumentsEvents() {
     if (bulkDownload instanceof HTMLButtonElement) {
       closeBulkEditor();
       await handleBulkDownloadClick(bulkDownload);
+      return;
+    }
+
+    const bulkReindex = event.target instanceof Element ? event.target.closest("#docsBulkReindexBtn") : null;
+    if (bulkReindex instanceof HTMLButtonElement) {
+      closeBulkEditor();
+      await handleBulkReindexClick(bulkReindex);
       return;
     }
 

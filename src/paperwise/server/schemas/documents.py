@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class MetadataUpdateRequest(BaseModel):
@@ -14,6 +14,11 @@ class MetadataUpdateRequest(BaseModel):
 
 class DocumentStarredRequest(BaseModel):
     starred: bool
+
+
+class DocumentIndexBatchRequest(BaseModel):
+    document_ids: list[str] = Field(min_length=1, max_length=500)
+    force: bool = False
 
 
 class LLMConnectionTestRequest(BaseModel):
@@ -44,6 +49,7 @@ class DocumentResponse(BaseModel):
     status: str
     created_at: datetime
     starred: bool = False
+    index_status: str = "not_indexed"
 
 
 class DocumentListMetadata(BaseModel):
@@ -119,6 +125,24 @@ class DocumentTypeStatResponse(BaseModel):
 class RestartPendingResponse(BaseModel):
     restarted_count: int
     skipped_ready_count: int
+
+
+class DocumentIndexStateResponse(BaseModel):
+    document_id: str
+    status: str
+    index_version: str | None = None
+    source_checksum: str | None = None
+    chunk_count: int = 0
+    updated_at: datetime | None = None
+    indexed_at: datetime | None = None
+    last_error: str | None = None
+
+
+class DocumentIndexBatchResponse(BaseModel):
+    queued_count: int
+    skipped_count: int
+    failed_count: int
+    jobs: dict[str, str]
 
 
 class CountResponse(BaseModel):

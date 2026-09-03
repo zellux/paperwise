@@ -28,6 +28,7 @@ class ParseResultRow(Base):
     size_bytes: Mapped[int] = mapped_column(Integer)
     page_count: Mapped[int] = mapped_column(Integer)
     text_preview: Mapped[str] = mapped_column(Text)
+    full_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True))
 
 
@@ -152,3 +153,17 @@ class DocumentChunkRow(Base):
     content: Mapped[str] = mapped_column(Text)
     token_count: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+
+
+class DocumentIndexStateRow(Base):
+    __tablename__ = "document_index_states"
+
+    document_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(String(64), index=True)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    index_version: Mapped[str] = mapped_column(String(64))
+    source_checksum: Mapped[str] = mapped_column(String(64))
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0)
+    updated_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), index=True)
+    indexed_at: Mapped[DateTime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)

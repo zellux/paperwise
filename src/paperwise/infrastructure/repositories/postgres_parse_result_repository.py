@@ -2,7 +2,12 @@ from sqlalchemy import select
 
 from paperwise.application.services.taxonomy import normalize_name, to_title_case
 from paperwise.domain.models import LLMParseResult, ParseResult
-from paperwise.infrastructure.repositories.postgres_models import DocumentChunkRow, LLMParseResultRow, ParseResultRow
+from paperwise.infrastructure.repositories.postgres_models import (
+    DocumentChunkRow,
+    DocumentIndexStateRow,
+    LLMParseResultRow,
+    ParseResultRow,
+)
 
 
 def _normalize_tags(values: list[str]) -> list[str]:
@@ -43,6 +48,7 @@ def parse_result_from_row(row: ParseResultRow) -> ParseResult:
         text_preview=row.text_preview,
         created_at=row.created_at,
         ocr_details=None,
+        full_text=row.full_text,
     )
 
 
@@ -58,6 +64,7 @@ class PostgresParseResultRepositoryMixin:
             row.size_bytes = result.size_bytes
             row.page_count = result.page_count
             row.text_preview = result.text_preview
+            row.full_text = result.full_text
             row.created_at = result.created_at
             session.commit()
 
@@ -83,6 +90,10 @@ class PostgresParseResultRepositoryMixin:
             ).all()
             for row in chunk_rows:
                 session.delete(row)
+
+            index_state_row = session.get(DocumentIndexStateRow, document_id)
+            if index_state_row is not None:
+                session.delete(index_state_row)
 
             session.commit()
 

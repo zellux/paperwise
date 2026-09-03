@@ -232,6 +232,7 @@ def _initial_render_context(initial_data: dict) -> dict:
         ),
         "documents_total": total,
         "documents_processing_count": processing_count,
+        "documents_indexing_count": int(initial_data.get("documents_indexing_count") or 0),
         "documents_sort_by": documents_sort_by,
         "documents_sort_dir": documents_sort_dir,
         "documents_all_count": int(initial_data.get("documents_all_count") or total),

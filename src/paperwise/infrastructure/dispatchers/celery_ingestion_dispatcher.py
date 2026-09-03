@@ -1,5 +1,5 @@
 from paperwise.application.interfaces import IngestionDispatcher
-from paperwise.workers.tasks import ingest_document_task
+from paperwise.workers.tasks import ingest_document_task, reindex_document_task
 
 
 class CeleryIngestionDispatcher(IngestionDispatcher):
@@ -16,4 +16,8 @@ class CeleryIngestionDispatcher(IngestionDispatcher):
             filename=filename,
             content_type=content_type,
         )
+        return str(result.id)
+
+    def enqueue_reindex(self, document_id: str) -> str:
+        result = reindex_document_task.delay(document_id=document_id)
         return str(result.id)

@@ -25,6 +25,9 @@ from paperwise.server.schemas.documents import (
     CreateDocumentResponse,
     DocumentDetailResponse,
     DocumentHistoryEventResponse,
+    DocumentIndexBatchRequest,
+    DocumentIndexBatchResponse,
+    DocumentIndexStateResponse,
     DocumentListItemResponse,
     DocumentResponse,
     DocumentStarredRequest,
@@ -67,6 +70,10 @@ from paperwise.application.services.document_file_cleanup import (
 )
 from paperwise.application.services.filenames import sanitize_storage_filename
 from paperwise.application.services.document_listing import count_filtered_documents, list_filtered_documents
+from paperwise.application.services.document_indexing import (
+    effective_document_index_status,
+    queue_document_indexes,
+)
 from paperwise.application.services.history import (
     build_processing_restarted_history_event,
 )
@@ -255,8 +262,19 @@ def list_documents_endpoint(
         limit=limit,
         offset=offset,
     )
+    states = {
+        state.document_id: state
+        for state in repository.list_document_index_states(
+            owner_id=current_user.id,
+            document_ids=[document.id for document, _ in listing.rows],
+        )
+    }
     return [
-        present_document_list_item(document=document, llm_result=llm_result)
+        present_document_list_item(
+            document=document,
+            llm_result=llm_result,
+            index_state=states.get(document.id),
+        )
         for document, llm_result in listing.rows
     ]
 
@@ -292,17 +310,62 @@ def list_pending_documents_endpoint(
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(current_user_dependency),
 ) -> list[DocumentListItemResponse]:
+    pending = list_pending_documents(
+        repository=repository,
+        owner_id=current_user.id,
+        limit=limit,
+    )
+    states = {
+        state.document_id: state
+        for state in repository.list_document_index_states(
+            owner_id=current_user.id,
+            document_ids=[document.id for document, _ in pending],
+        )
+    }
     return [
         present_document_list_item(
             document=document,
             llm_result=llm_result,
+            index_state=states.get(document.id),
         )
-        for document, llm_result in list_pending_documents(
-            repository=repository,
-            owner_id=current_user.id,
-            limit=limit,
-        )
+        for document, llm_result in pending
     ]
+
+
+@router.post("/index/batch", response_model=DocumentIndexBatchResponse)
+def batch_index_documents_endpoint(
+    payload: DocumentIndexBatchRequest,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    dispatcher: IngestionDispatcher = Depends(ingestion_dispatcher_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> DocumentIndexBatchResponse:
+    document_ids = list(dict.fromkeys(document_id.strip() for document_id in payload.document_ids))
+    documents = [
+        get_owned_document_or_404(
+            document_id=document_id,
+            repository=repository,
+            current_user=current_user,
+        )
+        for document_id in document_ids
+        if document_id
+    ]
+    if not documents:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="At least one document ID is required.",
+        )
+    result = queue_document_indexes(
+        repository=repository,
+        dispatcher=dispatcher,
+        documents=documents,
+        force=payload.force,
+    )
+    return DocumentIndexBatchResponse(
+        queued_count=result.queued_count,
+        skipped_count=result.skipped_count,
+        failed_count=result.failed_count,
+        jobs=result.jobs,
+    )
 
 
 @router.post("/pending/restart", response_model=RestartPendingResponse)
@@ -396,7 +459,7 @@ def get_document_endpoint(
         repository=repository,
         current_user=current_user,
     )
-    return present_document(document)
+    return present_document(document, repository.get_document_index_state(document.id))
 
 
 @router.get("/{document_id}/detail", response_model=DocumentDetailResponse)
@@ -416,6 +479,7 @@ def get_document_detail_endpoint(
         document=document,
         llm_result=llm_result,
         parse_result=parse_result,
+        index_state=repository.get_document_index_state(document.id),
     )
 
 
@@ -437,6 +501,33 @@ def update_document_starred_endpoint(
         document=document,
         llm_result=repository.get_llm_parse_result(document.id),
         parse_result=repository.get_parse_result(document.id),
+        index_state=repository.get_document_index_state(document.id),
+    )
+
+
+@router.get("/{document_id}/index", response_model=DocumentIndexStateResponse)
+def get_document_index_state_endpoint(
+    document_id: str,
+    repository: DocumentRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> DocumentIndexStateResponse:
+    document = get_owned_document_or_404(
+        document_id=document_id,
+        repository=repository,
+        current_user=current_user,
+    )
+    state = repository.get_document_index_state(document.id)
+    if state is None:
+        return DocumentIndexStateResponse(document_id=document.id, status="not_indexed")
+    return DocumentIndexStateResponse(
+        document_id=state.document_id,
+        status=effective_document_index_status(document=document, state=state),
+        index_version=state.index_version,
+        source_checksum=state.source_checksum,
+        chunk_count=state.chunk_count,
+        updated_at=state.updated_at,
+        indexed_at=state.indexed_at,
+        last_error=state.last_error,
     )
 
 

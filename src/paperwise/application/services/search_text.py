@@ -2,7 +2,7 @@ import re
 
 
 def tokenize_search_query(query: str) -> list[str]:
-    return [token.lower() for token in re.findall(r"[A-Za-z0-9]{2,}", query)]
+    return [token.lower() for token in re.findall(r"[^\W_]{2,}", query, flags=re.UNICODE)]
 
 
 def extract_search_snippet(text: str, terms: list[str], *, max_len: int = 240) -> str:

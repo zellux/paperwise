@@ -34,3 +34,23 @@ def test_celery_ingestion_dispatcher_enqueues_and_returns_job_id(monkeypatch) ->
         "filename": "doc-1.pdf",
         "content_type": "application/pdf",
     }
+
+
+def test_celery_ingestion_dispatcher_enqueues_reindex(monkeypatch) -> None:
+    class FakeTask:
+        called_with: dict | None = None
+
+        @classmethod
+        def delay(cls, **kwargs):
+            cls.called_with = kwargs
+            return SimpleNamespace(id="celery-reindex-1")
+
+    monkeypatch.setattr(
+        "paperwise.infrastructure.dispatchers.celery_ingestion_dispatcher.reindex_document_task",
+        FakeTask,
+    )
+
+    job_id = CeleryIngestionDispatcher().enqueue_reindex("doc-1")
+
+    assert job_id == "celery-reindex-1"
+    assert FakeTask.called_with == {"document_id": "doc-1"}

@@ -1,4 +1,11 @@
-from paperwise.domain.models import Document, DocumentHistoryEvent, LLMParseResult, ParseResult
+from paperwise.domain.models import (
+    Document,
+    DocumentHistoryEvent,
+    DocumentIndexState,
+    LLMParseResult,
+    ParseResult,
+)
+from paperwise.application.services.document_indexing import effective_document_index_status
 from paperwise.server.schemas.documents import (
     DocumentDetailResponse,
     DocumentHistoryEventResponse,
@@ -10,8 +17,13 @@ from paperwise.server.schemas.documents import (
 )
 
 
-def present_document(document: Document) -> DocumentResponse:
-    return DocumentResponse.model_validate(document)
+def present_document(
+    document: Document,
+    index_state: DocumentIndexState | None = None,
+) -> DocumentResponse:
+    payload = DocumentResponse.model_validate(document).model_dump()
+    payload["index_status"] = effective_document_index_status(document=document, state=index_state)
+    return DocumentResponse(**payload)
 
 
 def present_document_list_metadata(result: LLMParseResult | None) -> DocumentListMetadata | None:
@@ -24,8 +36,9 @@ def present_document_list_item(
     *,
     document: Document,
     llm_result: LLMParseResult | None = None,
+    index_state: DocumentIndexState | None = None,
 ) -> DocumentListItemResponse:
-    base = present_document(document).model_dump()
+    base = present_document(document, index_state).model_dump()
     return DocumentListItemResponse(
         **base,
         llm_metadata=present_document_list_metadata(llm_result),
@@ -49,9 +62,10 @@ def present_document_detail(
     document: Document,
     llm_result: LLMParseResult | None,
     parse_result: ParseResult | None,
+    index_state: DocumentIndexState | None = None,
 ) -> DocumentDetailResponse:
     return DocumentDetailResponse(
-        document=present_document(document),
+        document=present_document(document, index_state),
         llm_metadata=present_document_list_metadata(llm_result),
         ocr_text_preview=parse_result.text_preview if parse_result is not None else None,
         ocr_parsed_at=parse_result.created_at if parse_result is not None else None,

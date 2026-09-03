@@ -22,6 +22,9 @@ from paperwise.infrastructure.repositories.postgres_collection_repository import
 )
 from paperwise.infrastructure.repositories.postgres_document_mapper import document_from_row
 from paperwise.infrastructure.repositories.postgres_history_repository import PostgresHistoryRepositoryMixin
+from paperwise.infrastructure.repositories.postgres_index_state_repository import (
+    PostgresIndexStateRepositoryMixin,
+)
 from paperwise.infrastructure.repositories.postgres_parse_result_repository import (
     PostgresParseResultRepositoryMixin,
     llm_parse_result_from_row,
@@ -36,6 +39,7 @@ from paperwise.infrastructure.repositories.postgres_models import (
     DocumentChunkRow,
     DocumentRow,
     DocumentHistoryEventRow,
+    DocumentIndexStateRow,
     LLMParseResultRow,
     ParseResultRow,
 )
@@ -48,6 +52,7 @@ class PostgresDocumentRepository(
     PostgresChunkRepositoryMixin,
     PostgresCollectionRepositoryMixin,
     PostgresHistoryRepositoryMixin,
+    PostgresIndexStateRepositoryMixin,
     PostgresParseResultRepositoryMixin,
     PostgresSearchRepositoryMixin,
     PostgresTaxonomyRepositoryMixin,
@@ -58,9 +63,22 @@ class PostgresDocumentRepository(
         self._engine = build_engine(database_url)
         Base.metadata.create_all(self._engine)
         self._ensure_document_schema()
+        self._ensure_parse_result_schema()
         self._ensure_chat_thread_schema()
         self._session_factory: Callable = build_session_factory(self._engine)
         self._ensure_chat_thread_reference_schema()
+        self._ensure_chunk_search_schema()
+
+    def _ensure_chunk_search_schema(self) -> None:
+        if self._engine.dialect.name != "postgresql":
+            return
+        with self._engine.begin() as connection:
+            connection.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_document_chunks_fts_simple "
+                    "ON document_chunks USING GIN (to_tsvector('simple', content))"
+                )
+            )
 
     def _ensure_document_schema(self) -> None:
         inspector = inspect(self._engine)
@@ -74,6 +92,16 @@ class PostgresDocumentRepository(
             connection.execute(
                 text(f"ALTER TABLE documents ADD COLUMN starred BOOLEAN NOT NULL DEFAULT {default_value}")
             )
+
+    def _ensure_parse_result_schema(self) -> None:
+        inspector = inspect(self._engine)
+        if "parse_results" not in inspector.get_table_names():
+            return
+        column_names = {column["name"] for column in inspector.get_columns("parse_results")}
+        if "full_text" in column_names:
+            return
+        with self._engine.begin() as connection:
+            connection.execute(text("ALTER TABLE parse_results ADD COLUMN full_text TEXT"))
 
     def _ensure_chat_thread_schema(self) -> None:
         inspector = inspect(self._engine)
@@ -299,6 +327,10 @@ class PostgresDocumentRepository(
             ).all()
             for row in chunk_rows:
                 session.delete(row)
+
+            index_state_row = session.get(DocumentIndexStateRow, document_id)
+            if index_state_row is not None:
+                session.delete(index_state_row)
 
             document_row = session.get(DocumentRow, document_id)
             if document_row is not None:

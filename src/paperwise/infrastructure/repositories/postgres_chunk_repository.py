@@ -1,4 +1,4 @@
-from sqlalchemy import select
+from sqlalchemy import func, literal_column, select
 
 from paperwise.application.services.search_text import tokenize_search_query
 from paperwise.domain.models import DocumentChunk, DocumentChunkSearchHit
@@ -66,6 +66,63 @@ class PostgresChunkRepositoryMixin:
         terms = tokenize_search_query(query)
         if not terms:
             return []
+        if self._engine.dialect.name == "postgresql":
+            return self._search_document_chunks_fts(
+                owner_id=owner_id,
+                terms=terms,
+                limit=limit,
+                document_ids=document_ids,
+            )
+        return self._search_document_chunks_fallback(
+            owner_id=owner_id,
+            terms=terms,
+            limit=limit,
+            document_ids=document_ids,
+        )
+
+    def _search_document_chunks_fts(
+        self,
+        *,
+        owner_id: str,
+        terms: list[str],
+        limit: int,
+        document_ids: list[str] | None,
+    ) -> list[DocumentChunkSearchHit]:
+        scoped_ids = sorted(set(document_ids or []))
+        if document_ids is not None and not scoped_ids:
+            return []
+        config = literal_column("'simple'")
+        search_vector = func.to_tsvector(config, DocumentChunkRow.content)
+        search_query = func.to_tsquery(config, " | ".join(terms))
+        rank = func.ts_rank_cd(search_vector, search_query).label("rank")
+        statement = (
+            select(DocumentChunkRow, rank)
+            .where(DocumentChunkRow.owner_id == owner_id)
+            .where(search_vector.op("@@")(search_query))
+        )
+        if document_ids is not None:
+            statement = statement.where(DocumentChunkRow.document_id.in_(scoped_ids))
+        with self._session_factory() as session:
+            rows = session.execute(
+                statement.order_by(rank.desc(), DocumentChunkRow.created_at.desc()).limit(max(1, limit))
+            ).all()
+            return [
+                DocumentChunkSearchHit(
+                    chunk=_chunk_from_row(row),
+                    score=float(score),
+                    matched_terms=[term for term in terms if term in str(row.content or "").lower()],
+                )
+                for row, score in rows
+            ]
+
+    def _search_document_chunks_fallback(
+        self,
+        *,
+        owner_id: str,
+        terms: list[str],
+        limit: int,
+        document_ids: list[str] | None,
+    ) -> list[DocumentChunkSearchHit]:
         scoped_ids = sorted(set(document_ids or []))
         has_scope = document_ids is not None
         with self._session_factory() as session:

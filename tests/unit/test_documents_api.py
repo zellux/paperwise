@@ -38,6 +38,7 @@ from paperwise.infrastructure.storage.local_storage import LocalStorageAdapter
 class FakeDispatcher:
     def __init__(self) -> None:
         self.enqueued: list[str] = []
+        self.reindex_enqueued: list[str] = []
 
     def enqueue(
         self,
@@ -48,6 +49,10 @@ class FakeDispatcher:
     ) -> str:
         self.enqueued.append(document_id)
         return "job-test-1"
+
+    def enqueue_reindex(self, document_id: str) -> str:
+        self.reindex_enqueued.append(document_id)
+        return f"reindex-{document_id}"
 
 
 class FakeLLMProvider:
@@ -1346,6 +1351,52 @@ def test_parse_document_roundtrip() -> None:
         detail_payload = detail_response.json()
         assert "fake-content" in detail_payload["ocr_text_preview"]
         assert detail_payload["ocr_parsed_at"] is not None
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_batch_reindex_skips_current_index_unless_forced() -> None:
+    store_dir = Path("local/test-object-store")
+    repository = InMemoryDocumentRepository()
+    dispatcher = FakeDispatcher()
+    storage = LocalStorageAdapter(str(store_dir))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[ingestion_dispatcher_dependency] = lambda: dispatcher
+    app.dependency_overrides[storage_dependency] = lambda: storage
+
+    try:
+        client = TestClient(app)
+        create_response = client.post(
+            "/documents",
+            data={"owner_id": TEST_USER.id},
+            files={"file": ("index-me.txt", b"alpha beta gamma", "text/plain")},
+        )
+        document_id = create_response.json()["id"]
+        assert client.post(f"/documents/{document_id}/parse").status_code == 200
+
+        state_response = client.get(f"/documents/{document_id}/index")
+        assert state_response.status_code == 200
+        assert state_response.json()["status"] == "ready"
+        assert state_response.json()["chunk_count"] == 1
+
+        skipped = client.post(
+            "/documents/index/batch",
+            json={"document_ids": [document_id], "force": False},
+        )
+        assert skipped.status_code == 200
+        assert skipped.json()["queued_count"] == 0
+        assert skipped.json()["skipped_count"] == 1
+
+        queued = client.post(
+            "/documents/index/batch",
+            json={"document_ids": [document_id], "force": True},
+        )
+        assert queued.status_code == 200
+        assert queued.json()["queued_count"] == 1
+        assert queued.json()["jobs"] == {document_id: f"reindex-{document_id}"}
+        assert dispatcher.reindex_enqueued == [document_id]
+        assert client.get(f"/documents/{document_id}").json()["index_status"] == "pending"
     finally:
         app.dependency_overrides.clear()
 

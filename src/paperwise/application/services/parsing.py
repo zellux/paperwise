@@ -40,6 +40,9 @@ except Exception:  # pragma: no cover - optional runtime dependency
 
 logger = logging.getLogger(__name__)
 
+PARSE_PREVIEW_MAX_CHARS = 8_000
+INDEX_TEXT_MAX_CHARS = 2_000_000
+
 SUPPORTED_IMAGE_MIME_TYPES_BY_SUFFIX = {
     ".gif": "image/gif",
     ".jpeg": "image/jpeg",
@@ -666,6 +669,7 @@ def parse_document_blob(
         auto_switch_enabled=bool(ocr_auto_switch),
     )
     final_text_source = ""
+    index_text = ""
 
     is_pdf = raw.startswith(b"%PDF") or suffix == ".pdf"
     is_supported_image = supported_image_mime_type is not None
@@ -680,8 +684,9 @@ def parse_document_blob(
             text_preview = _extract_with_local_tesseract(
                 blob_path=blob_path,
                 is_pdf=True,
-                max_chars=6000,
+                max_chars=INDEX_TEXT_MAX_CHARS,
             )
+            index_text = text_preview
             _mark_ocr_attempt(
                 ocr_details,
                 "local_tesseract",
@@ -694,11 +699,14 @@ def parse_document_blob(
             # Keep a higher preview limit for LLM-driven OCR mode.
             is_llm_ocr = normalized_ocr in {"llm", "llm_separate"}
             preview_limit = 8000 if is_llm_ocr else 6000
-            text_preview, page_count = _extract_pdf_text(
+            extracted_pdf_text, page_count = _extract_pdf_text(
                 blob_path=blob_path,
                 raw=raw,
-                max_chars=preview_limit,
+                max_chars=INDEX_TEXT_MAX_CHARS,
             )
+            if _is_high_quality_extracted_text(extracted_pdf_text):
+                index_text = extracted_pdf_text
+            text_preview = _fit_preview_text(extracted_pdf_text, max_chars=preview_limit)
             _mark_ocr_attempt(
                 ocr_details,
                 "text_extraction",
@@ -709,7 +717,7 @@ def parse_document_blob(
             )
             final_text_source = "pdf_text_extraction"
     elif suffix in {".txt", ".md", ".markdown"} or normalized_content_type in {"text/markdown", "text/plain"}:
-        text_preview = _extract_plain_text(raw, max_chars=8000)
+        text_preview = _extract_plain_text(raw, max_chars=INDEX_TEXT_MAX_CHARS)
         page_count = 1
         _mark_ocr_attempt(
             ocr_details,
@@ -723,7 +731,7 @@ def parse_document_blob(
         final_text_source = "plain_text_read"
     elif suffix in {".csv", ".tsv"} or normalized_content_type in {"text/csv", "text/tab-separated-values"}:
         delimiter = "\t" if suffix == ".tsv" or normalized_content_type == "text/tab-separated-values" else ","
-        text_preview = _extract_delimited_text(raw, delimiter=delimiter, max_chars=8000)
+        text_preview = _extract_delimited_text(raw, delimiter=delimiter, max_chars=INDEX_TEXT_MAX_CHARS)
         page_count = 1
         _mark_ocr_attempt(
             ocr_details,
@@ -739,7 +747,11 @@ def parse_document_blob(
         suffix == ".docx"
         or normalized_content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
     ):
-        text_preview, page_count = _extract_docx_text(blob_path=blob_path, raw=raw, max_chars=8000)
+        text_preview, page_count = _extract_docx_text(
+            blob_path=blob_path,
+            raw=raw,
+            max_chars=INDEX_TEXT_MAX_CHARS,
+        )
         _mark_ocr_attempt(
             ocr_details,
             "text_extraction",
@@ -754,7 +766,11 @@ def parse_document_blob(
         suffix == ".xlsx"
         or normalized_content_type == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     ):
-        text_preview, page_count = _extract_xlsx_text(blob_path=blob_path, raw=raw, max_chars=8000)
+        text_preview, page_count = _extract_xlsx_text(
+            blob_path=blob_path,
+            raw=raw,
+            max_chars=INDEX_TEXT_MAX_CHARS,
+        )
         _mark_ocr_attempt(
             ocr_details,
             "text_extraction",
@@ -766,7 +782,11 @@ def parse_document_blob(
         )
         final_text_source = "xlsx_text_read"
     elif suffix == ".pptx" or normalized_content_type == PPTX_CONTENT_TYPE:
-        text_preview, page_count = _extract_pptx_text(blob_path=blob_path, raw=raw, max_chars=8000)
+        text_preview, page_count = _extract_pptx_text(
+            blob_path=blob_path,
+            raw=raw,
+            max_chars=INDEX_TEXT_MAX_CHARS,
+        )
         _mark_ocr_attempt(
             ocr_details,
             "text_extraction",
@@ -782,7 +802,11 @@ def parse_document_blob(
         "application/vnd.oasis.opendocument.spreadsheet",
         "application/vnd.oasis.opendocument.text",
     }:
-        text_preview, page_count = _extract_open_document_text(blob_path=blob_path, raw=raw, max_chars=8000)
+        text_preview, page_count = _extract_open_document_text(
+            blob_path=blob_path,
+            raw=raw,
+            max_chars=INDEX_TEXT_MAX_CHARS,
+        )
         _mark_ocr_attempt(
             ocr_details,
             "text_extraction",
@@ -794,7 +818,7 @@ def parse_document_blob(
         )
         final_text_source = f"{suffix.lstrip('.') or 'opendocument'}_text_read"
     elif suffix == ".rtf" or normalized_content_type in {"application/rtf", "application/x-rtf", "text/rtf"}:
-        text_preview = _extract_rtf_text(raw, max_chars=8000)
+        text_preview = _extract_rtf_text(raw, max_chars=INDEX_TEXT_MAX_CHARS)
         page_count = 1
         _mark_ocr_attempt(
             ocr_details,
@@ -807,7 +831,7 @@ def parse_document_blob(
         )
         final_text_source = "rtf_text_read"
     elif suffix == ".doc" or normalized_content_type == "application/msword":
-        text_preview = _extract_doc_text(blob_path=blob_path, raw=raw, max_chars=8000)
+        text_preview = _extract_doc_text(blob_path=blob_path, raw=raw, max_chars=INDEX_TEXT_MAX_CHARS)
         page_count = 1
         _mark_ocr_attempt(
             ocr_details,
@@ -824,7 +848,7 @@ def parse_document_blob(
             blob_path=blob_path,
             raw=raw,
             command_names=("xls2csv",),
-            max_chars=8000,
+            max_chars=INDEX_TEXT_MAX_CHARS,
         )
         page_count = 1
         _mark_ocr_attempt(
@@ -842,7 +866,7 @@ def parse_document_blob(
             blob_path=blob_path,
             raw=raw,
             command_names=("catppt",),
-            max_chars=8000,
+            max_chars=INDEX_TEXT_MAX_CHARS,
         )
         page_count = 1
         _mark_ocr_attempt(
@@ -909,8 +933,11 @@ def parse_document_blob(
                 chars=len(text_preview),
                 quality="heuristic",
             )
-            final_text_source = "binary_text_preview"
+        final_text_source = "binary_text_preview"
         page_count = 1
+
+    if is_text_native_document:
+        index_text = text_preview
 
     if normalized_ocr in {"llm", "llm_separate"} and not is_text_native_document:
         extract_images_method = (
@@ -922,7 +949,7 @@ def parse_document_blob(
                 local_ocr_text = _extract_with_local_tesseract(
                     blob_path=blob_path,
                     is_pdf=is_pdf,
-                    max_chars=8000 if is_pdf else 4000,
+                    max_chars=INDEX_TEXT_MAX_CHARS if is_pdf else 4000,
                 )
                 _mark_ocr_attempt(
                     ocr_details,
@@ -942,7 +969,8 @@ def parse_document_blob(
             if _is_good_local_ocr_text(local_ocr_text, text_preview):
                 parser_name = "auto-local-tesseract"
                 _mark_ocr_attempt(ocr_details, "local_tesseract", selected=True)
-                cleaned_preview = _strip_nul(local_ocr_text)
+                full_text = _strip_nul(local_ocr_text)
+                cleaned_preview = _fit_preview_text(full_text, max_chars=PARSE_PREVIEW_MAX_CHARS)
                 _set_final_ocr_source(
                     ocr_details,
                     source="local_tesseract_auto_switch",
@@ -962,6 +990,7 @@ def parse_document_blob(
                     text_preview=cleaned_preview,
                     created_at=datetime.now(UTC),
                     ocr_details=ocr_details,
+                    full_text=full_text,
                 )
         used_image_ocr = False
         if (is_pdf or is_supported_image) and callable(extract_images_method):
@@ -1094,7 +1123,8 @@ def parse_document_blob(
     elif normalized_ocr == "tesseract":
         parser_name = "local-tesseract-ocr"
 
-    text_preview = _strip_nul(text_preview)
+    full_text = _strip_nul(index_text or text_preview)
+    text_preview = _fit_preview_text(full_text, max_chars=PARSE_PREVIEW_MAX_CHARS)
     _set_final_ocr_source(
         ocr_details,
         source=final_text_source or parser_name,
@@ -1114,4 +1144,5 @@ def parse_document_blob(
         text_preview=text_preview,
         created_at=datetime.now(UTC),
         ocr_details=ocr_details,
+        full_text=full_text,
     )

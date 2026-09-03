@@ -23,6 +23,7 @@
   data-doc-correspondent="{{ row.correspondent_raw }}"
   data-doc-type="{{ row.document_type_raw }}"
   data-doc-starred="{% if row.starred %}true{% else %}false{% endif %}"
+  data-doc-index-status="{{ row.index_status }}"
   data-doc-tags="{{ row.tags_json_attr|safe }}"
 >
   <td class="td td-check" data-label="Select">
@@ -40,6 +41,7 @@
         <a class="title-link" href="/ui/document?id={{ row.document_id_query }}">{{ row.title }}</a>
         {% if row.starred %}<button type="button" class="row-star-indicator" data-doc-star-unstar="{{ row.document_id }}" aria-label="Unstar document" title="Unstar document">★</button>{% endif %}
         {% if row.status %}<span class="status-badge status-{{ row.status.status }}">{{ row.status.label }}</span>{% endif %}
+        {% if row.index_status != "ready" %}<span class="status-badge status-{{ row.index_status }}">Index: {{ row.index_status|replace('_', ' ')|title }}</span>{% endif %}
       </span>
       <span class="title-meta">
         <span class="filename">{{ row.filename }}</span>

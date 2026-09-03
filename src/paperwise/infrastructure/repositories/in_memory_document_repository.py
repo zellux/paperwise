@@ -18,6 +18,7 @@ from paperwise.domain.models import (
     DocumentChunk,
     DocumentChunkSearchHit,
     DocumentHistoryEvent,
+    DocumentIndexState,
     DocumentSearchHit,
     DocumentStatus,
     LLMParseResult,
@@ -41,6 +42,7 @@ class InMemoryDocumentRepository(DocumentRepository):
         self._collections: dict[str, Collection] = {}
         self._collection_documents: dict[str, dict[str, datetime]] = {}
         self._document_chunks: dict[str, list[DocumentChunk]] = {}
+        self._document_index_states: dict[str, DocumentIndexState] = {}
         self._correspondents: set[str] = set()
         self._document_types: set[str] = set()
         self._tags: set[str] = set()
@@ -152,6 +154,7 @@ class InMemoryDocumentRepository(DocumentRepository):
             self._llm_parse_results.pop(document_id, None)
             self._history.pop(document_id, None)
             self._document_chunks.pop(document_id, None)
+            self._document_index_states.pop(document_id, None)
             now = datetime.now(UTC)
             for collection_id, docs in self._collection_documents.items():
                 if docs.pop(document_id, None) is None:
@@ -173,6 +176,7 @@ class InMemoryDocumentRepository(DocumentRepository):
             self._parse_results.pop(document_id, None)
             self._llm_parse_results.pop(document_id, None)
             self._document_chunks.pop(document_id, None)
+            self._document_index_states.pop(document_id, None)
 
     def save_llm_parse_result(self, result: LLMParseResult) -> None:
         with self._lock:
@@ -538,6 +542,34 @@ class InMemoryDocumentRepository(DocumentRepository):
     def list_document_chunks(self, document_id: str) -> list[DocumentChunk]:
         with self._lock:
             return list(self._document_chunks.get(document_id, []))
+
+    def save_document_index_state(self, state: DocumentIndexState) -> None:
+        with self._lock:
+            self._document_index_states[state.document_id] = state
+
+    def get_document_index_state(self, document_id: str) -> DocumentIndexState | None:
+        with self._lock:
+            return self._document_index_states.get(document_id)
+
+    def list_document_index_states(
+        self,
+        *,
+        owner_id: str,
+        document_ids: list[str] | None = None,
+    ) -> list[DocumentIndexState]:
+        allowed_ids = set(document_ids or [])
+        has_scope = document_ids is not None
+        with self._lock:
+            states = [
+                state
+                for state in self._document_index_states.values()
+                if state.owner_id == owner_id and (not has_scope or state.document_id in allowed_ids)
+            ]
+            return sorted(states, key=lambda state: state.updated_at, reverse=True)
+
+    def delete_document_index_state(self, document_id: str) -> None:
+        with self._lock:
+            self._document_index_states.pop(document_id, None)
 
     def search_document_chunks(
         self,

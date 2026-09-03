@@ -2,6 +2,7 @@ from typing import Protocol
 
 from paperwise.application.interfaces import (
     DocumentStore,
+    DocumentIndexStateRepository,
     HistoryRepository,
     ParseResultRepository,
     PreferenceRepository,
@@ -26,7 +27,7 @@ from paperwise.application.services.pending_documents import (
     PENDING_DOCUMENT_STATUSES,
 )
 from paperwise.application.services.user_preferences import load_normalized_user_preferences
-from paperwise.domain.models import DocumentStatus, User
+from paperwise.domain.models import DocumentIndexStatus, DocumentStatus, User
 from paperwise.server.document_access import get_owned_document_or_404
 from paperwise.server.ui.page import DEFAULT_UI_THEME, SUPPORTED_UI_THEMES
 from paperwise.server.ui.payloads import document_list_item, history_event_item
@@ -34,7 +35,13 @@ from paperwise.server.ui.fragments import chat_thread_list_html
 from paperwise.server.ui.tag_colors import TAG_COLOR_SET
 
 
-class DocumentsInitialDataRepository(DocumentStore, TaxonomyRepository, PreferenceRepository, Protocol):
+class DocumentsInitialDataRepository(
+    DocumentStore,
+    DocumentIndexStateRepository,
+    TaxonomyRepository,
+    PreferenceRepository,
+    Protocol,
+):
     pass
 
 
@@ -268,15 +275,16 @@ def documents_initial_data(
                 "documents": [],
                 "documents_page": requested_page,
                 "documents_page_size": normalized_page_size,
-            "documents_total": 0,
-            "documents_processing_count": 0,
-            "documents_all_count": 0,
-            "documents_failed_count": 0,
-            "documents_starred_count": 0,
-            "documents_failed_filter": False,
-            "document_sidebar_tags": [],
-            "document_sidebar_document_types": [],
-            "document_sidebar_correspondents": [],
+                "documents_total": 0,
+                "documents_processing_count": 0,
+                "documents_indexing_count": 0,
+                "documents_all_count": 0,
+                "documents_failed_count": 0,
+                "documents_starred_count": 0,
+                "documents_failed_filter": False,
+                "document_sidebar_tags": [],
+                "document_sidebar_document_types": [],
+                "document_sidebar_correspondents": [],
             }
         )
         if include_filter_options:
@@ -323,10 +331,27 @@ def documents_initial_data(
         statuses=ACTIVE_PROCESSING_DOCUMENT_STATUSES,
     )
     pending_items = active_processing_documents(repository, current_user) if processing_count > 0 else []
+    index_states = {
+        state.document_id: state
+        for state in repository.list_document_index_states(
+            owner_id=current_user.id,
+            document_ids=[document.id for document, _ in listing.rows],
+        )
+    }
+    indexing_count = sum(
+        1
+        for state in repository.list_document_index_states(owner_id=current_user.id)
+        if state.status in {DocumentIndexStatus.PENDING, DocumentIndexStatus.INDEXING}
+    )
     data.update(
         {
             "documents": [
-                document_list_item(document, llm_result, repository.get_parse_result(document.id))
+                document_list_item(
+                    document,
+                    llm_result,
+                    repository.get_parse_result(document.id),
+                    index_states.get(document.id),
+                )
                 for document, llm_result in listing.rows
             ],
             "pending_documents": pending_items,
@@ -334,6 +359,7 @@ def documents_initial_data(
             "documents_page_size": normalized_page_size,
             "documents_total": listing.total,
             "documents_processing_count": processing_count,
+            "documents_indexing_count": indexing_count,
             "documents_failed_filter": normalized_values(status) == {DocumentStatus.FAILED.value},
             "documents_starred_filter": bool(starred),
         }

@@ -309,3 +309,39 @@ def _fake_llm_parse_result(document_id: str) -> LLMParseResult:
         created_tags=[],
         created_at=datetime.now(UTC),
     )
+
+
+def test_reindex_document_task_rebuilds_chunks_and_marks_ready(monkeypatch) -> None:
+    repository = InMemoryDocumentRepository()
+    document = Document(
+        id="doc-reindex",
+        filename="notes.txt",
+        owner_id="user-1",
+        blob_uri="processed/doc-reindex/notes.txt",
+        checksum_sha256="checksum-reindex",
+        content_type="text/plain",
+        size_bytes=32,
+        status=DocumentStatus.READY,
+        created_at=datetime.now(UTC),
+    )
+    repository.save(document)
+    repository.save_parse_result(
+        ParseResult(
+            document_id=document.id,
+            parser="text",
+            status="parsed",
+            size_bytes=32,
+            page_count=1,
+            text_preview="retrieval indexing content",
+            created_at=datetime.now(UTC),
+        )
+    )
+    monkeypatch.setattr(worker_tasks, "build_document_repository", lambda settings: repository)
+
+    result = worker_tasks.reindex_document_task(document.id)
+
+    assert result == {"document_id": document.id, "status": "ready", "chunk_count": 1}
+    assert len(repository.list_document_chunks(document.id)) == 1
+    state = repository.get_document_index_state(document.id)
+    assert state is not None
+    assert state.status.value == "ready"
