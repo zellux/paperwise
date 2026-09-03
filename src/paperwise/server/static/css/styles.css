@@ -244,6 +244,12 @@ body {
   gap: 10px;
 }
 
+.account-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .topbar-search {
   position: relative;
   display: flex;
@@ -291,7 +297,43 @@ body {
   background: var(--paper);
   color: var(--ink-soft);
   font: inherit;
+  text-decoration: none;
   cursor: pointer;
+}
+
+.profile-chip:hover {
+  border-color: var(--stroke);
+  background: var(--row-hover);
+  color: var(--ink);
+}
+
+.profile-chip:focus-visible,
+.sign-out-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sign-out-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--stroke-soft);
+  border-radius: 10px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sign-out-btn:hover {
+  border-color: color-mix(in srgb, var(--danger) 28%, var(--stroke-soft));
+  background: color-mix(in srgb, var(--danger) 8%, var(--paper));
+  color: var(--danger);
 }
 
 .profile-avatar {

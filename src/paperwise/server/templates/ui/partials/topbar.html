@@ -36,9 +36,21 @@
         aria-label="{% if active_nav_href == '/ui/settings' %}Search settings{% else %}Search documents{% endif %}"
       />
     </form>
-    <button id="signOutBtn" type="button" class="profile-chip" title="Log out">
-      <span class="profile-avatar">PW</span>
-      <span id="sessionUserLabel" class="profile-label">Not signed in</span>
-    </button>
+    <div class="account-actions">
+      <a
+        id="profileBtn"
+        class="profile-chip"
+        href="/ui/settings/account"
+        aria-label="Open profile settings"
+        title="Open profile settings"
+      >
+        <span class="profile-avatar">PW</span>
+        <span id="sessionUserLabel" class="profile-label">Not signed in</span>
+      </a>
+      <button id="signOutBtn" type="button" class="sign-out-btn" title="Sign out">
+        <svg class="icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 17l5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/></svg>
+        <span>Sign out</span>
+      </button>
+    </div>
   </div>
 </header>

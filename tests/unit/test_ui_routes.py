@@ -621,6 +621,31 @@ def test_top_nav_links_upload_instead_of_processing() -> None:
     assert 'href="/ui/pending">Processing</a>' not in topnav
 
 
+def test_topbar_separates_profile_navigation_from_sign_out() -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+
+    try:
+        client = TestClient(app)
+        response = client.get("/ui/documents")
+
+        assert response.status_code == 200
+        assert re.search(
+            r'<a\b(?=[^>]*id="profileBtn")(?=[^>]*class="profile-chip")'
+            r'(?=[^>]*href="/ui/settings/account")[^>]*>',
+            response.text,
+        )
+        sign_out = re.search(
+            r'<button\b(?=[^>]*id="signOutBtn")(?=[^>]*class="sign-out-btn")[^>]*>'
+            r'.*?<span>Sign out</span>.*?</button>',
+            response.text,
+            re.S,
+        )
+        assert sign_out is not None
+    finally:
+        app.dependency_overrides.clear()
+
+
 def test_ui_routes_load_page_specific_scripts() -> None:
     client = TestClient(app)
 
