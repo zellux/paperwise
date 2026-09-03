@@ -27,7 +27,6 @@ from paperwise.server.schemas.documents import (
     DocumentHistoryEventResponse,
     DocumentIndexBatchRequest,
     DocumentIndexBatchResponse,
-    DocumentIndexStateResponse,
     DocumentListItemResponse,
     DocumentResponse,
     DocumentStarredRequest,
@@ -70,10 +69,7 @@ from paperwise.application.services.document_file_cleanup import (
 )
 from paperwise.application.services.filenames import sanitize_storage_filename
 from paperwise.application.services.document_listing import count_filtered_documents, list_filtered_documents
-from paperwise.application.services.document_indexing import (
-    effective_document_index_status,
-    queue_document_indexes,
-)
+from paperwise.application.services.document_indexing import queue_document_indexes
 from paperwise.application.services.history import (
     build_processing_restarted_history_event,
 )
@@ -502,32 +498,6 @@ def update_document_starred_endpoint(
         llm_result=repository.get_llm_parse_result(document.id),
         parse_result=repository.get_parse_result(document.id),
         index_state=repository.get_document_index_state(document.id),
-    )
-
-
-@router.get("/{document_id}/index", response_model=DocumentIndexStateResponse)
-def get_document_index_state_endpoint(
-    document_id: str,
-    repository: DocumentRepository = Depends(document_repository_dependency),
-    current_user: User = Depends(current_user_dependency),
-) -> DocumentIndexStateResponse:
-    document = get_owned_document_or_404(
-        document_id=document_id,
-        repository=repository,
-        current_user=current_user,
-    )
-    state = repository.get_document_index_state(document.id)
-    if state is None:
-        return DocumentIndexStateResponse(document_id=document.id, status="not_indexed")
-    return DocumentIndexStateResponse(
-        document_id=state.document_id,
-        status=effective_document_index_status(document=document, state=state),
-        index_version=state.index_version,
-        source_checksum=state.source_checksum,
-        chunk_count=state.chunk_count,
-        updated_at=state.updated_at,
-        indexed_at=state.indexed_at,
-        last_error=state.last_error,
     )
 
 

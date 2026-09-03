@@ -165,6 +165,7 @@ class LocalOCRStatusResponse(BaseModel):
 
 class DocumentDetailResponse(BaseModel):
     document: DocumentResponse
+    index: DocumentIndexStateResponse
     llm_metadata: DocumentListMetadata | None = None
     ocr_text_preview: str | None = None
     ocr_parsed_at: datetime | None = None

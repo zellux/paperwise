@@ -1375,10 +1375,10 @@ def test_batch_reindex_skips_current_index_unless_forced() -> None:
         document_id = create_response.json()["id"]
         assert client.post(f"/documents/{document_id}/parse").status_code == 200
 
-        state_response = client.get(f"/documents/{document_id}/index")
+        state_response = client.get(f"/documents/{document_id}/detail")
         assert state_response.status_code == 200
-        assert state_response.json()["status"] == "ready"
-        assert state_response.json()["chunk_count"] == 1
+        assert state_response.json()["index"]["status"] == "ready"
+        assert state_response.json()["index"]["chunk_count"] == 1
 
         skipped = client.post(
             "/documents/index/batch",

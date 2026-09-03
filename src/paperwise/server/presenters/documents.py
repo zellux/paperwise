@@ -9,6 +9,7 @@ from paperwise.application.services.document_indexing import effective_document_
 from paperwise.server.schemas.documents import (
     DocumentDetailResponse,
     DocumentHistoryEventResponse,
+    DocumentIndexStateResponse,
     DocumentListItemResponse,
     DocumentListMetadata,
     DocumentResponse,
@@ -57,6 +58,25 @@ def present_document_history_event(event: DocumentHistoryEvent) -> DocumentHisto
     return DocumentHistoryEventResponse.model_validate(event)
 
 
+def present_document_index_state(
+    *,
+    document: Document,
+    index_state: DocumentIndexState | None,
+) -> DocumentIndexStateResponse:
+    if index_state is None:
+        return DocumentIndexStateResponse(document_id=document.id, status="not_indexed")
+    return DocumentIndexStateResponse(
+        document_id=index_state.document_id,
+        status=effective_document_index_status(document=document, state=index_state),
+        index_version=index_state.index_version,
+        source_checksum=index_state.source_checksum,
+        chunk_count=index_state.chunk_count,
+        updated_at=index_state.updated_at,
+        indexed_at=index_state.indexed_at,
+        last_error=index_state.last_error,
+    )
+
+
 def present_document_detail(
     *,
     document: Document,
@@ -66,6 +86,7 @@ def present_document_detail(
 ) -> DocumentDetailResponse:
     return DocumentDetailResponse(
         document=present_document(document, index_state),
+        index=present_document_index_state(document=document, index_state=index_state),
         llm_metadata=present_document_list_metadata(llm_result),
         ocr_text_preview=parse_result.text_preview if parse_result is not None else None,
         ocr_parsed_at=parse_result.created_at if parse_result is not None else None,
