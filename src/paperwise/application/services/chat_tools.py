@@ -53,16 +53,14 @@ def execute_chat_tool(
     name: str,
     arguments: dict[str, Any],
 ) -> dict[str, Any]:
-    merged_filters = _merge_tool_filters(scope, arguments)
+    # Resolve the user's boundary first. Model-supplied filters may only narrow it.
+    base_ids = resolve_chat_scope(repository, current_user, scope)
     scoped_ids = resolve_metadata_scoped_document_ids(
-        repository=repository,
-        current_user=current_user,
-        base_document_ids=None,
-        tag_filters=merged_filters["tag"],
-        document_type_filters=merged_filters["document_type"],
-        correspondent_filters=merged_filters["correspondent"],
-        date_from=merged_filters["date_from"],
-        date_to=merged_filters["date_to"],
+        repository=repository, current_user=current_user, base_document_ids=base_ids,
+        tag_filters=arguments.get("tags", []),
+        document_type_filters=arguments.get("document_types", []),
+        correspondent_filters=arguments.get("correspondents", []),
+        date_from=arguments.get("date_from"), date_to=arguments.get("date_to"),
         title_query=str(arguments.get("title_query") or ""),
     )
     if name == "search_document_chunks":
@@ -83,7 +81,14 @@ def execute_chat_tool(
             max_documents=max_documents,
         )
         contexts = compact_chat_search_contexts(contexts, query)
+        selected_ids = scoped_ids if scoped_ids is not None else all_owned_document_ids(repository, current_user)
         return {
+            "coverage": {
+                **chat_scope_readiness(repository, current_user, selected_ids),
+                "retrieved_documents": len({c["document_id"] for c in contexts}),
+                "limited": len(hits) > len(contexts) or len(hits) >= limit * 3 or any(c.get("content_truncated") for c in contexts),
+                "filters": {key: value for key, value in arguments.items() if key not in {"query", "limit"}},
+            },
             "results": contexts,
             "total_results": len(contexts),
             "scope_document_count": len(scoped_ids) if scoped_ids is not None else None,
@@ -96,7 +101,9 @@ def execute_chat_tool(
             item = tool_document_item(repository, document_id)
             if item is not None:
                 items.append(item)
-        return {"documents": items, "total_results": len(document_ids), "returned_results": len(items)}
+        return {"documents": items, "total_results": len(document_ids), "returned_results": len(items),
+                "coverage": {"scope_documents": len(document_ids), "limited": len(items) < len(document_ids),
+                             "filters": {key: value for key, value in arguments.items() if key != "limit"}}}
     if name == "summarize_taxonomy":
         if scoped_ids is None:
             document_ids = all_owned_document_ids(repository, current_user)
@@ -132,10 +139,11 @@ def execute_chat_tool(
     if name == "get_document_context":
         document_id = str(arguments.get("document_id") or "").strip()
         document = repository.get(document_id)
-        if document is None or document.owner_id != current_user.id:
+        if document is None or document.owner_id != current_user.id or (scoped_ids is not None and document_id not in scoped_ids):
             return {"error": "Document not found."}
         max_chunks = max(1, min(20, int(arguments.get("max_chunks") or 8)))
         metadata = tool_document_item(repository, document_id)
+        all_chunks = repository.list_document_chunks(document_id)
         chunks = [
             {
                 "chunk_id": chunk.id,
@@ -143,19 +151,39 @@ def execute_chat_tool(
                 "title": metadata["title"] if metadata else document.filename,
                 "content": chunk.content[:2500],
             }
-            for chunk in repository.list_document_chunks(document_id)[:max_chunks]
+            for chunk in all_chunks[:max_chunks]
         ]
-        return {"document": metadata, "chunks": chunks, "total_results": len(chunks)}
+        return {"document": metadata, "chunks": chunks, "total_results": len(chunks),
+                "coverage": {"scope_documents": 1, "unready_documents": 0,
+                             "limited": len(all_chunks) > len(chunks) or any(len(c.content) > 2500 for c in all_chunks[:max_chunks])}}
     return {"error": f"Unknown tool: {name}"}
 
 
-def _merge_tool_filters(scope: ChatToolScope, arguments: dict[str, Any]) -> dict[str, Any]:
+def resolve_chat_scope(repository: ChatToolRepository, current_user: User, scope: ChatToolScope) -> list[str] | None:
+    return resolve_metadata_scoped_document_ids(
+        repository=repository, current_user=current_user, base_document_ids=None,
+        tag_filters=scope.tag, document_type_filters=scope.document_type,
+        correspondent_filters=scope.correspondent,
+        date_from=scope.date_from, date_to=scope.date_to,
+    )
+
+
+def chat_scope_readiness(repository: ChatToolRepository, current_user: User, ids: list[str]) -> dict[str, int]:
+    states_fn = getattr(repository, "list_document_index_states", None)
+    states = {state.document_id: state.status for state in states_fn(owner_id=current_user.id, document_ids=ids)} if callable(states_fn) and ids else {}
+    unready = 0
+    for document_id in ids:
+        document = repository.get(document_id)
+        if document is None or document.status != "ready" or states.get(document_id, "ready") != "ready" or (document_id not in states and not repository.list_document_chunks(document_id)):
+            unready += 1
+    return {"scope_documents": len(ids), "unready_documents": unready}
+
+
+def chat_library_summary(repository: ChatToolRepository, current_user: User) -> dict[str, Any]:
+    ids = all_owned_document_ids(repository, current_user)
     return {
-        "tag": list(scope.tag or []) + [str(item) for item in arguments.get("tags", []) if str(item).strip()],
-        "document_type": list(scope.document_type or [])
-        + [str(item) for item in arguments.get("document_types", []) if str(item).strip()],
-        "correspondent": list(scope.correspondent or [])
-        + [str(item) for item in arguments.get("correspondents", []) if str(item).strip()],
-        "date_from": arguments.get("date_from") or scope.date_from,
-        "date_to": arguments.get("date_to") or scope.date_to,
+        **chat_scope_readiness(repository, current_user, ids),
+        "tags": taxonomy_stats_payload(repository.list_owner_tag_stats(current_user.id), limit=1000),
+        "document_types": taxonomy_stats_payload(repository.list_owner_document_type_stats(current_user.id), limit=1000),
+        "correspondents": taxonomy_stats_payload(repository.list_owner_correspondent_stats(current_user.id), limit=1000),
     }

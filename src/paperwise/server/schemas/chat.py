@@ -1,6 +1,8 @@
 from typing import Any
 
-from pydantic import BaseModel, Field
+from datetime import date
+
+from pydantic import BaseModel, Field, model_validator
 
 
 class ChatMessageRequest(BaseModel):
@@ -14,6 +16,15 @@ class ChatScopeRequest(BaseModel):
     correspondent: list[str] = Field(default_factory=list)
     date_from: str | None = None
     date_to: str | None = None
+
+
+    @model_validator(mode="after")
+    def valid_date_range(self):
+        start = date.fromisoformat(self.date_from) if self.date_from else None
+        end = date.fromisoformat(self.date_to) if self.date_to else None
+        if start and end and start > end:
+            raise ValueError("Start date must not be after end date.")
+        return self
 
 
 class ChatRequest(BaseModel):
@@ -30,6 +41,7 @@ class ChatCitationResponse(BaseModel):
     document_id: str
     title: str
     quote: str
+    cited: bool = False
 
 
 class ChatToolCallResponse(BaseModel):
@@ -49,6 +61,8 @@ class ChatResponse(BaseModel):
     citations: list[ChatCitationResponse]
     tool_calls: list[ChatToolCallResponse]
     token_usage: ChatTokenUsageResponse = Field(default_factory=ChatTokenUsageResponse)
+    scope: ChatScopeRequest = Field(default_factory=ChatScopeRequest)
+    coverage: dict[str, Any] = Field(default_factory=dict)
     debug: dict[str, Any] | None = None
 
 

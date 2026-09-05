@@ -72,6 +72,25 @@ def save_chat_thread_turn(
         request_messages=request_messages,
         assistant_message=assistant_message,
     )
+    if previous is not None:
+        # The client sends a bounded context window. Keep the earlier saved history
+        # and its trusted evidence when that window matches an existing suffix.
+        best_start, best_length = 0, 0
+        for start in range(len(previous.messages)):
+            length = 0
+            for message, old in zip(messages[:-1], previous.messages[start:]):
+                if old.get("role") != message["role"] or old.get("content") != message["content"]:
+                    break
+                length += 1
+            if length > best_length:
+                best_start, best_length = start, length
+        for index in range(best_length):
+            old = previous.messages[best_start + index]
+            for key in ("citations", "scope", "coverage"):
+                if key in old:
+                    messages[index][key] = old[key]
+        if best_length:
+            messages = [*previous.messages[:best_start], *messages][-MAX_STORED_CHAT_MESSAGES:]
     title = previous.title.strip() if previous is not None else thread_title_from_messages(messages)
     repository.save_chat_thread(
         ChatThread(

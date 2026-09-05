@@ -1242,3 +1242,113 @@ def test_global_ask_timeout_returns_clean_gateway_timeout_message() -> None:
         assert "incomplete" in detail.lower()
     finally:
         app.dependency_overrides.clear()
+
+
+def test_initial_search_citations_and_coverage_survive_followup() -> None:
+    import json
+
+    repository = InMemoryDocumentRepository()
+    _save_document(repository, doc_id="source", owner_id=TEST_USER.id, filename="bill.pdf",
+                   text_preview="Internet bill total $54.99.", title="Internet bill", tags=["Utilities"])
+
+    class DirectAnswer(FakeGroundedLLM):
+        def answer_with_tools(self, *, messages, tools):
+            initial = next(m["content"] for m in messages if "Initial local document search" in m["content"])
+            results = json.loads(initial.split("JSON: ", 1)[1])["result"]["results"]
+            source = results[0]["chunk_id"]
+            return {"content": f"$54.99 [[source:{source}]] [[source:invented]]", "tool_calls": []}
+
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    app.dependency_overrides[llm_provider_dependency] = lambda: DirectAnswer()
+    try:
+        client = TestClient(app)
+        request = {"messages": [{"role": "user", "content": "Internet bill total"}], "scope": {"tag": ["Utilities"]}}
+        answer = client.post("/query/chat", json=request).json()
+        assert "[[citation:1]]" in answer["message"]["content"]
+        assert "[source unavailable]" in answer["message"]["content"]
+        assert answer["citations"][0]["cited"] is True
+        assert answer["coverage"]["retrieved_documents"] == 1
+        assert answer["coverage"]["cited_documents"] == 1
+        assert answer["coverage"]["completeness"] == "not_verified"
+        assert answer["coverage"]["searches"][0]["scope_documents"] == 1
+        request["thread_id"] = answer["thread_id"]
+        request["messages"].extend([answer["message"], {"role": "user", "content": "Internet bill total again"}])
+        response = client.post("/query/chat", json=request)
+        assert response.status_code == 200
+        thread = client.get(f"/query/chat/threads/{answer['thread_id']}").json()
+        assert thread["messages"][1]["citations"] == answer["citations"]
+        assert thread["messages"][1]["coverage"] == answer["coverage"]
+        assert thread["messages"][1]["scope"]["tag"] == ["Utilities"]
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_chat_tool_filters_cannot_escape_explicit_scope() -> None:
+    from paperwise.application.services.chat_tools import ChatToolScope, execute_chat_tool
+
+    repository = InMemoryDocumentRepository()
+    for doc_id, tag, date in [("selected", "Utilities", "2026-03-10"), ("other-tag", "Medical", "2026-03-10"), ("old", "Utilities", "2025-01-01")]:
+        _save_document(repository, doc_id=doc_id, owner_id=TEST_USER.id, filename=f"{doc_id}.pdf",
+                       text_preview="Internet bill total 54.99", title=doc_id, tags=[tag], document_date=date)
+    scope = ChatToolScope(tag=["Utilities"], date_from="2026-01-01")
+    def run(name, arguments):
+        return execute_chat_tool(repository=repository, llm_provider=FakeGroundedLLM(), current_user=TEST_USER,
+                                 scope=scope, top_k_chunks=18, max_documents=12, name=name, arguments=arguments)
+    assert run("query_document_metadata", {"tags": ["Medical"]})["documents"] == []
+    documents = run("query_document_metadata", {"date_from": "2020-01-01"})["documents"]
+    assert [d["document_id"] for d in documents] == ["selected"]
+    assert "error" in run("get_document_context", {"document_id": "old"})
+    assert "error" in run("get_document_context", {"document_id": "other-tag"})
+
+
+def test_chat_evidence_and_library_are_owner_scoped() -> None:
+    repository = InMemoryDocumentRepository()
+    for doc_id, owner in [("owned", TEST_USER.id), ("private", "someone-else")]:
+        _save_document(repository, doc_id=doc_id, owner_id=owner, filename=f"{doc_id}.pdf",
+                       text_preview="Source passage.", title=doc_id)
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[current_user_dependency] = lambda: TEST_USER
+    try:
+        client = TestClient(app)
+        chunk = repository.list_document_chunks("owned")[0]
+        assert client.get(f"/query/chat/evidence/owned/{chunk.id}").json()["content"] == chunk.content
+        assert client.get("/query/chat/evidence/owned/missing").status_code == 404
+        private = repository.list_document_chunks("private")[0]
+        assert client.get(f"/query/chat/evidence/private/{private.id}").status_code == 404
+        summary = client.get("/query/chat/library").json()
+        assert summary["scope_documents"] == 1
+        assert summary["unready_documents"] == 0
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_chat_scope_rejects_invalid_dates() -> None:
+    import pytest
+    from pydantic import ValidationError
+    from paperwise.server.schemas.chat import ChatScopeRequest
+
+    for values in [{"date_from": "yesterday"}, {"date_from": "2026-04-01", "date_to": "2026-03-01"}]:
+        with pytest.raises(ValidationError):
+            ChatScopeRequest(**values)
+
+
+def test_bounded_followup_preserves_earlier_history_and_evidence() -> None:
+    from paperwise.application.services.chat_threads import save_chat_thread_turn
+    from paperwise.domain.models import ChatThread
+
+    repository = InMemoryDocumentRepository()
+    messages = []
+    for index in range(16):
+        messages.extend([{"role":"user", "content":f"Question {index}"},
+                         {"role":"assistant", "content":f"Answer {index}", "citations":[{"document_id":f"doc-{index}"}]}])
+    now = datetime.now(UTC)
+    repository.save_chat_thread(ChatThread(id="long", owner_id=TEST_USER.id, title="Long chat", messages=messages, token_usage={}, created_at=now, updated_at=now))
+    request = [{"role":m["role"], "content":m["content"]} for m in messages[-28:]]
+    request.append({"role":"user", "content":"New question"})
+    save_chat_thread_turn(repository=repository, current_user=TEST_USER, thread_id="long", request_messages=request,
+                          assistant_message={"content":"New answer"}, token_usage={})
+    saved = repository.get_chat_thread(TEST_USER.id, "long")
+    assert len(saved.messages) == 34
+    assert saved.messages[1]["citations"] == messages[1]["citations"]
+    assert saved.messages[31]["citations"] == messages[31]["citations"]

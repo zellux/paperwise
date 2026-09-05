@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any, Protocol
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -12,7 +13,7 @@ from paperwise.application.services.chat_runtime import (
     iter_chat_runtime_events,
     run_chat_runtime,
 )
-from paperwise.application.services.chat_tools import ChatToolRepository, ChatToolScope
+from paperwise.application.services.chat_tools import ChatToolRepository, ChatToolScope, chat_library_summary
 from paperwise.application.services.grounded_qa import is_timeout_error
 from paperwise.application.services.chat_threads import (
     migrate_legacy_chat_threads,
@@ -48,7 +49,10 @@ router = APIRouter(prefix="/query", tags=["query"])
 CHAT_SYSTEM_PROMPT = (
     "You are Paperwise's conversational document assistant. Use the available tools to inspect the user's "
     "documents, tags, metadata, and grounded text chunks. Do not answer from outside knowledge. For document "
-    "content claims, cite returned source titles or chunk IDs in your Markdown answer. Always query across all "
+    "content claims, add [[source:CHUNK_ID]] immediately after each supported claim or table row, using exact "
+    "returned chunk IDs. Never invent source IDs. Summaries and totals are based on retrieved evidence only: "
+    "label them as subtotals unless completeness is verified. State missing or conflicting evidence explicitly. "
+    "Respect the user-selected scope as a hard boundary. Query across all "
     "owner-visible documents unless a metadata filter is needed. If the tools return no useful evidence, say "
     "that the documents do not contain enough evidence. The first request may include preliminary local search "
     "results; use them when sufficient, or call search_document_chunks with a rewritten query when they are not. "
@@ -137,6 +141,8 @@ def _save_chat_thread(
     response: ChatResponse,
 ) -> ChatResponse:
     assistant_message: dict[str, Any] = {"content": response.message.content}
+    assistant_message["scope"] = response.scope.model_dump(mode="json")
+    assistant_message["coverage"] = response.coverage
     if response.citations:
         assistant_message["citations"] = [
             citation.model_dump(mode="json") for citation in response.citations
@@ -206,10 +212,34 @@ def _extract_tool_citations(tool_payloads: list[dict[str, Any]]) -> list[ChatCit
                     chunk_id=chunk_id,
                     document_id=document_id,
                     title=str(item.get("title") or ""),
-                    quote=str(item.get("content") or "")[:240],
+                    quote=str(item.get("content") or "")[:2500],
                 )
             )
-    return citations[:20]
+    return citations
+
+
+@router.get("/chat/library")
+def get_chat_library(
+    repository: ChatQueryRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> dict[str, Any]:
+    return chat_library_summary(repository, current_user)
+
+
+@router.get("/chat/evidence/{document_id}/{chunk_id}")
+def get_chat_evidence(
+    document_id: str,
+    chunk_id: str,
+    repository: ChatQueryRepository = Depends(document_repository_dependency),
+    current_user: User = Depends(current_user_dependency),
+) -> dict[str, Any]:
+    document = repository.get(document_id)
+    if document is None or document.owner_id != current_user.id:
+        raise HTTPException(status_code=404, detail="Source document is no longer available.")
+    chunk = next((c for c in repository.list_document_chunks(document_id) if c.id == chunk_id), None)
+    if chunk is None:
+        raise HTTPException(status_code=404, detail="This source has changed since the answer was saved.")
+    return {"content": chunk.content, "document_id": document_id, "chunk_id": chunk_id}
 
 
 def _build_chat_messages(payload: ChatRequest) -> list[dict[str, Any]]:
@@ -242,9 +272,32 @@ def _chat_response_from_runtime_result(
     payload: ChatRequest,
     result: ChatRuntimeResult,
 ) -> ChatResponse:
+    citations = _extract_tool_citations(result.tool_payloads)
+    by_id = {citation.chunk_id: (index, citation) for index, citation in enumerate(citations, 1)}
+
+    def source_marker(match):
+        source = by_id.get(match.group(1))
+        if source is None:
+            return "[source unavailable]"
+        index, citation = source
+        citation.cited = True
+        return f"[[citation:{index}]]"
+
+    content = re.sub(r"\[\[source:([^\]\n]+)\]\]", source_marker, result.content)
+    retrieved = {citation.document_id for citation in citations}
+    searches = [item["coverage"] for item in result.tool_payloads if "coverage" in item]
     return ChatResponse(
-        message=ChatMessageRequest(role="assistant", content=result.content),
-        citations=_extract_tool_citations(result.tool_payloads),
+        message=ChatMessageRequest(role="assistant", content=content),
+        citations=citations,
+        scope=payload.scope,
+        coverage={
+            "retrieved_documents": len(retrieved),
+            "metadata_documents": len({d["document_id"] for item in result.tool_payloads for d in item.get("documents", [])}),
+            "cited_documents": len({c.document_id for c in citations if c.cited}),
+            "searches": searches,
+            "limited": any(item.get("limited") for item in searches),
+            "completeness": "not_verified",
+        },
         tool_calls=[ChatToolCallResponse(**tool_call) for tool_call in result.tool_calls],
         token_usage=ChatTokenUsageResponse(**result.token_usage),
         debug={"steps": result.debug_steps} if payload.debug else None,

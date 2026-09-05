@@ -97,7 +97,7 @@ def _append_initial_local_search_context(
     scope: ChatToolScope,
     top_k_chunks: int,
     max_documents: int,
-) -> None:
+) -> dict[str, Any] | None:
     query = _latest_user_query(messages)
     if not query:
         return
@@ -138,6 +138,7 @@ def _append_initial_local_search_context(
             ),
         },
     )
+    return result
 
 
 def _debug_chat_timing(*, stage: str, elapsed_ms: float, **fields: Any) -> None:
@@ -196,7 +197,7 @@ def iter_chat_runtime_events(
         "status",
         {"label": "Local search", "detail": "Searching OCR chunks before the first LLM request."},
     )
-    _append_initial_local_search_context(
+    initial_result = _append_initial_local_search_context(
         repository=repository,
         llm_provider=llm_provider,
         current_user=current_user,
@@ -205,6 +206,8 @@ def iter_chat_runtime_events(
         top_k_chunks=top_k_chunks,
         max_documents=max_documents,
     )
+    if initial_result is not None:
+        tool_payloads.append(initial_result)
 
     for round_index in range(max_tool_rounds):
         if tool_calls_for_response:
