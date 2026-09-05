@@ -552,3 +552,60 @@ class OpenAILLMProvider(LLMProvider):
         if isinstance(total_tokens, int) and total_tokens > 0:
             result["llm_total_tokens"] = total_tokens
         return result
+
+    def iter_answer_with_tools(self, *, messages: list[dict[str, Any]], tools: list[dict[str, Any]]):
+        """Stream text and assemble tool-call fragments without replaying partial answers."""
+        request_payload: dict[str, Any] = {
+            "model": self._model, "temperature": 0, "messages": messages,
+            "stream": True, "stream_options": {"include_usage": True},
+        }
+        if tools:
+            request_payload.update(tools=tools, tool_choice="auto")
+        content: list[str] = []
+        calls: dict[int, dict[str, str]] = {}
+        total_tokens = 0
+        finished = False
+        with self._client.stream("POST", "/chat/completions", json=request_payload, timeout=120.0) as response:
+            if response.status_code in {400, 404, 422}:
+                # Some compatible providers do not implement streaming or stream_options.
+                response.read()
+                yield {"type": "final", "response": self.answer_with_tools(messages=messages, tools=tools)}
+                return
+            response.raise_for_status()
+            for line in response.iter_lines():
+                if not line.startswith("data:"):
+                    continue
+                raw = line[5:].strip()
+                if raw == "[DONE]":
+                    break
+                if not raw:
+                    continue
+                payload = json.loads(raw)
+                if payload.get("error"):
+                    raise RuntimeError("The model could not complete the answer. Please retry.")
+                usage = payload.get("usage") or {}
+                total_tokens = int(usage.get("total_tokens") or total_tokens)
+                choices = payload.get("choices") or []
+                if not choices:
+                    continue
+                choice = choices[0]
+                if choice.get("finish_reason") in {"stop", "tool_calls", "function_call"}:
+                    finished = True
+                delta = choice.get("delta") or {}
+                text = delta.get("content") or ""
+                if text:
+                    content.append(text)
+                    yield {"type": "delta", "text": text}
+                for call in delta.get("tool_calls") or []:
+                    item = calls.setdefault(int(call.get("index", 0)), {"id": "", "name": "", "arguments": ""})
+                    if call.get("id"):
+                        item["id"] = call["id"]
+                    function = call.get("function") or {}
+                    item["name"] += function.get("name") or ""
+                    item["arguments"] += function.get("arguments") or ""
+        if not finished:
+            raise RuntimeError("The model stream ended before the answer was complete. Please retry.")
+        yield {"type": "final", "response": {
+            "role": "assistant", "content": "".join(content),
+            "tool_calls": [calls[index] for index in sorted(calls)], "llm_total_tokens": total_tokens,
+        }}

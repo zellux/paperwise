@@ -2,7 +2,8 @@ import json
 import re
 from typing import Any, Protocol
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+from starlette.concurrency import run_in_threadpool
 from fastapi.responses import Response, StreamingResponse
 
 from paperwise.application.interfaces import ChatThreadRepository, LLMProvider
@@ -363,8 +364,9 @@ def _chat_sse_event_from_runtime_event(event: ChatRuntimeEvent) -> str:
     return _sse_event(event.type, event.data)
 
 
-def _iter_chat_events(
+async def _iter_chat_events(
     *,
+    request: Request,
     repository: ChatQueryRepository,
     llm_provider: LLMProvider,
     current_user: User,
@@ -372,7 +374,7 @@ def _iter_chat_events(
 ):
     try:
         messages = _build_chat_messages(payload)
-        for event in iter_chat_runtime_events(
+        runtime = iter_chat_runtime_events(
             repository=repository,
             llm_provider=llm_provider,
             current_user=current_user,
@@ -382,7 +384,11 @@ def _iter_chat_events(
             top_k_chunks=payload.top_k_chunks,
             max_documents=payload.max_documents,
             max_tool_rounds=MAX_CHAT_TOOL_ROUNDS,
-        ):
+        )
+        while not await request.is_disconnected():
+            event = await run_in_threadpool(next, runtime, None)
+            if event is None or await request.is_disconnected():
+                break
             if event.type != "final":
                 yield _chat_sse_event_from_runtime_event(event)
                 continue
@@ -436,6 +442,7 @@ def chat_all_documents_endpoint(
 @router.post("/chat/stream")
 def stream_chat_all_documents_endpoint(
     payload: ChatRequest,
+    request: Request,
     repository: ChatQueryRepository = Depends(document_repository_dependency),
     provider_override: LLMProvider | None = Depends(llm_provider_dependency),
     current_user: User = Depends(current_user_dependency),
@@ -451,6 +458,7 @@ def stream_chat_all_documents_endpoint(
     )
     return StreamingResponse(
         _iter_chat_events(
+            request=request,
             repository=repository,
             llm_provider=llm_provider,
             current_user=current_user,

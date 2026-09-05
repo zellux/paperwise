@@ -167,6 +167,18 @@ def _debug_chat_timing(*, stage: str, elapsed_ms: float, **fields: Any) -> None:
     logger.debug("chat_runtime_timing stage=%s elapsed_ms=%.1f%s", stage, elapsed_ms, suffix)
 
 
+def _iter_model_response(llm_provider, messages, tools):
+    stream = getattr(llm_provider, "iter_answer_with_tools", None)
+    if callable(stream):
+        for event in stream(messages=messages, tools=tools):
+            if event["type"] == "delta":
+                yield ChatRuntimeEvent("answer_delta", {"text": event["text"]})
+            elif event["type"] == "final":
+                return event["response"]
+        raise RuntimeError("The model stream ended before completion.")
+    return llm_provider.answer_with_tools(messages=messages, tools=tools)
+
+
 def iter_chat_runtime_events(
     *,
     repository: ChatToolRepository,
@@ -220,7 +232,7 @@ def iter_chat_runtime_events(
         yield ChatRuntimeEvent("status", {"label": "LLM request", "detail": status_detail})
 
         started_at = time.perf_counter()
-        last_response = answer_with_tools(messages=messages, tools=tools)
+        last_response = yield from _iter_model_response(llm_provider, messages, tools)
         elapsed_ms = (time.perf_counter() - started_at) * 1000
         _record_chat_token_usage(token_usage, last_response)
         tool_calls = last_response.get("tool_calls", []) if isinstance(last_response, dict) else []
@@ -310,7 +322,7 @@ def iter_chat_runtime_events(
             {"label": "LLM request", "detail": "Writing final answer from collected tool results."},
         )
         started_at = time.perf_counter()
-        last_response = answer_with_tools(messages=messages, tools=[])
+        last_response = yield from _iter_model_response(llm_provider, messages, [])
         elapsed_ms = (time.perf_counter() - started_at) * 1000
         _record_chat_token_usage(token_usage, last_response)
         _debug_chat_timing(

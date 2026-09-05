@@ -1333,6 +1333,54 @@ def test_chat_scope_rejects_invalid_dates() -> None:
             ChatScopeRequest(**values)
 
 
+def test_chat_stream_delivers_answer_deltas_before_final() -> None:
+    from paperwise.application.services.chat_runtime import iter_chat_runtime_events
+    from paperwise.application.services.chat_tools import ChatToolScope
+
+    class StreamingAnswer(FakeGroundedLLM):
+        def answer_with_tools(self, **kwargs):
+            raise AssertionError("Expected streaming path")
+
+        def iter_answer_with_tools(self, **kwargs):
+            yield {"type": "delta", "text": "An "}
+            yield {"type": "delta", "text": "answer"}
+            yield {"type": "final", "response": {"content": "An answer", "tool_calls": [], "llm_total_tokens": 3}}
+
+    events = list(iter_chat_runtime_events(repository=InMemoryDocumentRepository(), llm_provider=StreamingAnswer(),
+                  current_user=TEST_USER, messages=[{"role": "system", "content": "Test"}, {"role": "user", "content": "Question"}],
+                  tools=[], scope=ChatToolScope(), top_k_chunks=18, max_documents=12, max_tool_rounds=3))
+    assert [event.data["text"] for event in events if event.type == "answer_delta"] == ["An ", "answer"]
+    assert events[-1].type == "final"
+    assert events[-1].data.content == "An answer"
+    assert events[-1].data.token_usage["total_tokens"] == 3
+
+
+def test_disconnected_chat_does_not_save_final_answer(monkeypatch) -> None:
+    import asyncio
+    from paperwise.application.services.chat_runtime import ChatRuntimeEvent, ChatRuntimeResult
+    from paperwise.server.routes import query
+    from paperwise.server.schemas.chat import ChatRequest
+
+    repository = InMemoryDocumentRepository()
+    final = ChatRuntimeResult(content="Answer", tool_payloads=[], tool_calls=[], token_usage={}, debug_steps=[])
+    monkeypatch.setattr(query, "iter_chat_runtime_events", lambda **kwargs: iter([
+        ChatRuntimeEvent("status", {"label": "Searching"}), ChatRuntimeEvent("final", final),
+    ]))
+    class DisconnectedRequest:
+        checks = 0
+        async def is_disconnected(self):
+            self.checks += 1
+            return self.checks >= 4
+    async def consume():
+        return [event async for event in query._iter_chat_events(
+            request=DisconnectedRequest(), repository=repository, llm_provider=FakeGroundedLLM(),
+            current_user=TEST_USER, payload=ChatRequest(messages=[{"role":"user", "content":"Question"}]))]
+    events = asyncio.run(consume())
+    assert len(events) == 1
+    assert "status" in events[0]
+    assert repository.list_chat_threads(TEST_USER.id, 20) == []
+
+
 def test_bounded_followup_preserves_earlier_history_and_evidence() -> None:
     from paperwise.application.services.chat_threads import save_chat_thread_turn
     from paperwise.domain.models import ChatThread

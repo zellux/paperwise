@@ -627,3 +627,37 @@ def test_openai_provider_retries_rate_limited_tool_chat(monkeypatch) -> None:
     assert sleeps == [1.0]
     assert result["content"] == "Done."
     assert result["llm_total_tokens"] == 7
+
+
+def test_tool_stream_assembles_fragments_and_usage() -> None:
+    import httpx
+    import json
+
+    provider = OpenAILLMProvider(api_key="test", model="test")
+    chunks = [
+        {"choices": [{"delta": {"content": "Reading "}, "finish_reason": None}]},
+        {"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "call-1", "function": {"name": "search_document_chunks", "arguments": '{"query":'}}]}, "finish_reason": None}]},
+        {"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"arguments": '"bills"}'}}]}, "finish_reason": "tool_calls"}]},
+        {"choices": [], "usage": {"total_tokens": 42}},
+    ]
+    body = "".join(f"data: {json.dumps(chunk)}\n\n" for chunk in chunks) + "data: [DONE]\n\n"
+    provider._client.close()
+    provider._client = httpx.Client(base_url="https://example.invalid", transport=httpx.MockTransport(lambda request: httpx.Response(200, text=body)))
+    events = list(provider.iter_answer_with_tools(messages=[], tools=[]))
+    assert events[0] == {"type": "delta", "text": "Reading "}
+    result = events[-1]["response"]
+    assert result["tool_calls"] == [{"id": "call-1", "name": "search_document_chunks", "arguments": '{"query":"bills"}'}]
+    assert result["llm_total_tokens"] == 42
+    provider._client.close()
+
+
+def test_tool_stream_rejects_partial_answer() -> None:
+    import httpx
+    import pytest
+
+    provider = OpenAILLMProvider(api_key="test", model="test")
+    provider._client.close()
+    provider._client = httpx.Client(base_url="https://example.invalid", transport=httpx.MockTransport(lambda request: httpx.Response(200, text='data: {"choices":[{"delta":{"content":"Partial"}}]}\n\n')))
+    with pytest.raises(RuntimeError, match="before the answer was complete"):
+        list(provider.iter_answer_with_tools(messages=[], tools=[]))
+    provider._client.close()
