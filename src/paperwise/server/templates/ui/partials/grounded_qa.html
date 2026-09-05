@@ -1,86 +1,55 @@
 <article id="section-search" class="grounded-qa-workbench view">
   <h1 id="searchSectionHeading" class="visually-hidden">Ask Your Docs</h1>
   <p id="searchResultsMeta" class="visually-hidden">Ready.</p>
-
   <section id="search-section-ask" class="search-subsection">
     <section class="grounded-qa-card">
       <div class="grounded-qa-layout">
-        <aside class="qa-sidebar" aria-label="Ask Your Docs chat controls">
-          <div class="qa-panel-head">
-            <span class="qa-eyebrow">Conversations</span>
-            <h2>Recent chats</h2>
-          </div>
+        <aside id="qaSidebar" class="qa-sidebar" aria-label="Chat history">
+          <button id="chatHistoryClose" type="button" class="btn chat-history-toggle">Close chats</button>
+          <div class="qa-panel-head"><span class="qa-eyebrow">Conversations</span><h2>Recent chats</h2></div>
           <button id="searchAskNewChatBtn" type="button" class="btn btn-primary qa-new-chat-btn">New Chat</button>
-          <div class="threads-search">
-            <span aria-hidden="true">⌕</span>
-            <input id="searchAskThreadSearch" type="search" placeholder="Search chats..." autocomplete="off" />
-          </div>
+          <div class="threads-search"><span aria-hidden="true">⌕</span><input id="searchAskThreadSearch" type="search" aria-label="Search chats" placeholder="Search chats..." autocomplete="off" /></div>
           <div id="searchAskThreadList" class="thread-list-wrap" aria-label="Recent chats">{{ chat_thread_list_html|safe }}</div>
         </aside>
-
         <div class="qa-conversation">
           <header class="chat-header-row">
-            <div>
-              <h2 id="searchAskThreadTitle">Ask Your Docs</h2>
-              <div class="chat-header-meta">
-                <span class="chat-model-dot" aria-hidden="true"></span>
-                <span id="searchAskModelLabel">{{ grounded_qa_model_label }}</span>
-                <span aria-hidden="true">·</span>
-                <span id="searchAskTokenUsage">0 tokens</span>
-              </div>
-            </div>
+            <button id="chatHistoryToggle" class="btn chat-history-toggle" type="button" aria-expanded="false" aria-controls="qaSidebar">Chats</button>
+            <div class="chat-heading"><h2 id="searchAskThreadTitle">Ask Your Docs</h2><p id="chatScopeSummary" class="chat-scope-summary">All documents</p></div>
+            <details class="chat-model-details"><summary>Model &amp; usage</summary><div class="chat-header-meta"><span id="searchAskModelLabel">{{ grounded_qa_model_label }}</span><span id="searchAskTokenUsage">0 tokens</span></div></details>
           </header>
           <div class="qa-conversation-body">
-            <section id="searchAskHints" class="ask-hints" aria-label="Suggested Ask Your Docs prompts">
-              <div class="ask-hints-mark" aria-hidden="true">P</div>
-              <h2>Ask anything that lives in your documents.</h2>
-              <p>Paperwise reads your OCR'd documents, your tags, types, correspondents, and dates — and grounds every answer in citations you can open.</p>
-              <div class="ask-hint-cards">
-                <button type="button" class="ask-hint-card" data-ask-hint="When did I last update my Experian dispute?">
-                  <span class="ask-hint-icon" aria-hidden="true">⌕</span>
-                  <span>
-                    <strong>Find specific evidence</strong>
-                    <small>"When did I last update my Experian dispute?"</small>
-                  </span>
-                  <span class="ask-hint-arrow" aria-hidden="true">›</span>
-                </button>
-                <button type="button" class="ask-hint-card" data-ask-hint="Compare PG&E bills for Jan, Feb, Mar 2026.">
-                  <span class="ask-hint-icon" aria-hidden="true">▦</span>
-                  <span>
-                    <strong>Compare across documents</strong>
-                    <small>"Compare PG&amp;E bills for Jan, Feb, Mar 2026."</small>
-                  </span>
-                  <span class="ask-hint-arrow" aria-hidden="true">›</span>
-                </button>
-                <button type="button" class="ask-hint-card" data-ask-hint="Summarize my medical bills from Q1 by provider and total amount.">
-                  <span class="ask-hint-icon" aria-hidden="true">≡</span>
-                  <span>
-                    <strong>Summarize a topic</strong>
-                    <small>"Summarize my medical bills from Q1 by provider."</small>
-                  </span>
-                  <span class="ask-hint-arrow" aria-hidden="true">›</span>
-                </button>
-              </div>
-              <div class="ask-hint-chips" aria-label="Quick prompts">
-                <button type="button" data-ask-hint="Show the most recent document for each tag.">Most recent doc per tag</button>
-                <button type="button" data-ask-hint="Find PG&E documents from 2026.">PG&amp;E docs · 2026</button>
-                <button type="button" data-ask-hint="Total medical bills for Q1.">Total medical bills · Q1</button>
-              </div>
-            </section>
-            <div id="searchAskMessages" class="chat-messages" aria-live="polite"></div>
+            <div class="chat-reading-pane">
+              <section id="searchAskHints" class="ask-hints" aria-label="Suggested questions">
+                <div class="ask-hints-mark" aria-hidden="true">P</div>
+                <h2>What would you like to find?</h2>
+                <p id="chatLibraryStatus">Ask questions, compare documents, and check the original evidence.</p>
+                <div id="chatLibraryPrompts" class="ask-hint-cards"></div>
+                <a id="chatLibraryUpload" class="btn" href="/ui/upload" hidden>Upload documents</a>
+              </section>
+              <div id="searchAskMessages" class="chat-messages" aria-live="polite" aria-relevant="additions text"></div>
+            </div>
+            <aside id="chatEvidence" class="chat-evidence" aria-label="Source evidence" hidden>
+              <div class="chat-evidence-header"><span class="qa-eyebrow">Evidence</span><button id="chatEvidenceClose" class="btn" type="button" aria-label="Close evidence">Close</button></div>
+              <h3></h3><p data-evidence-status role="status"></p><blockquote></blockquote>
+              <a class="btn" target="_blank" rel="noopener">Open document ↗</a>
+            </aside>
           </div>
           <form id="searchAskForm" class="chat-composer">
-            <textarea
-              id="searchAskQuestion"
-              name="searchAskQuestion"
-              rows="2"
-              placeholder="Ask a follow-up, filter by tag, or ask about document metadata."
-              required
-            ></textarea>
-            <div class="chat-composer-footer">
-              <span class="chat-composer-hint">Enter to send · Shift+Enter for newline</span>
-              <button id="searchAskSubmitBtn" type="submit" class="btn btn-primary">Ask</button>
-            </div>
+            <details id="chatScopeControls" class="chat-scope-controls">
+              <summary>Document scope <span id="chatScopeChips">All documents</span></summary>
+              <fieldset id="chatScopeFields" class="chat-scope-fields">
+                <legend class="visually-hidden">Filter documents for this conversation</legend>
+                <label>Tag<select id="chatScopeTag"><option value="">Any tag</option></select></label>
+                <label>Type<select id="chatScopeType"><option value="">Any type</option></select></label>
+                <label>Correspondent<select id="chatScopeCorrespondent"><option value="">Anyone</option></select></label>
+                <label>From<input id="chatScopeFrom" type="date" /></label>
+                <label>Through<input id="chatScopeTo" type="date" /></label>
+                <button id="chatScopeClear" class="btn" type="button">Clear filters</button>
+              </fieldset>
+            </details>
+            <label class="visually-hidden" for="searchAskQuestion">Question about your documents</label>
+            <textarea id="searchAskQuestion" name="searchAskQuestion" rows="2" maxlength="12000" placeholder="Ask a question about your documents…" required></textarea>
+            <div class="chat-composer-footer"><span id="chatComposerStatus" class="chat-composer-hint" role="status">Enter to send · Shift+Enter for newline</span><div class="chat-send-actions"><button id="searchAskStopBtn" type="button" class="btn" hidden>Stop</button><button id="searchAskSubmitBtn" type="submit" class="btn btn-primary">Ask</button></div></div>
           </form>
         </div>
       </div>

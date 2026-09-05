@@ -21,6 +21,8 @@ import {
   parseChatStreamEvent,
 } from "./chat/streamEvents.js";
 import { renderChatTranscript } from "./chat/transcript.js";
+import { bindEvidence, closeEvidence } from "./chat/evidence.js";
+import { bindScope, readScope, restoreScope, loadLibraryPrompts } from "./chat/scope.js";
 import { renderSearchResultsTable as renderSearchResultsTableInto } from "./search/resultsTable.js";
 
 let searchKeywordForm = null;
@@ -47,6 +49,7 @@ let searchAskTimerId = 0;
 let searchAskThreadId = "";
 let initialChatThreadsConsumed = false;
 let searchEventsBound = false;
+let searchAskAbort = null;
 
 function bindSearchElements() {
   searchKeywordForm = document.getElementById("searchKeywordForm");
@@ -84,6 +87,10 @@ function appendSearchAskMessage(role, content, options = {}) {
     role: normalizedRole,
     content: String(content || "").trim(),
     pending: Boolean(options.pending),
+    scope: options.scope || null,
+    coverage: options.coverage || null,
+    error: Boolean(options.error),
+    stopped: Boolean(options.stopped),
     toolCalls: Array.isArray(options.toolCalls) ? options.toolCalls : [],
     citations: Array.isArray(options.citations) ? options.citations : [],
     statusKind: String(options.statusKind || "").trim(),
@@ -107,6 +114,10 @@ function updatePendingSearchAskMessage(message, content, options = {}) {
   }
   message.content = String(content || "").trim();
   message.pending = false;
+  message.error = Boolean(options.error);
+  message.stopped = Boolean(options.stopped);
+  message.scope = options.scope || message.scope;
+  message.coverage = options.coverage || null;
   message.toolCalls = Array.isArray(options.toolCalls) ? options.toolCalls : [];
   message.citations = Array.isArray(options.citations) ? options.citations : [];
   renderSearchAskMessages();
@@ -302,6 +313,8 @@ function hydrateSearchAskMessages(messages) {
       role,
       content,
       pending: false,
+      scope: item.scope || null,
+      coverage: item.coverage || null,
       toolCalls: [],
       citations: Array.isArray(item?.citations) ? item.citations : [],
       statusKind: "",
@@ -327,7 +340,10 @@ async function loadSearchAskThread(threadId) {
     renderSearchAskThreadSelect();
     return;
   }
+  closeEvidence();
   searchAskThreadId = payload.id || "";
+  restoreScope(payload.messages?.filter((m) => m.scope).at(-1)?.scope);
+  setHistoryOpen(false);
   updateSearchAskTokenUsage(payload.token_usage);
   hydrateSearchAskMessages(payload.messages || []);
   await loadSearchAskThreads();
@@ -377,6 +393,10 @@ function renderSearchAskMessages() {
     messages: searchAskMessagesState,
     currentUser: appState.currentUser,
     navigateToDocument,
+    onEdit: editSearchAskQuestion,
+    onRetry: retrySearchAskQuestion,
+    onBroaden: broadenSearchAskScope,
+    busy: searchAskInFlight,
   });
 }
 
@@ -384,6 +404,9 @@ function resetSearchAskChat() {
   if (searchAskInFlight) {
     return;
   }
+  closeEvidence();
+  restoreScope();
+  setHistoryOpen(false);
   searchAskMessagesState = [];
   searchAskMessageSeq = 0;
   searchAskCurrentTokens = 0;
@@ -501,6 +524,7 @@ function appendSearchAskActivityRound(activityMessage, data) {
   const round = {
     index: activityMessage.activityRounds.length + 1,
     summary: data.detail || data.label || "LLM request",
+    stage: data.label === "Local search" ? "Searching your documents" : "Reviewing evidence and preparing an answer",
     details: [data.detail || data.label || "LLM request"],
     toolCallCount: 0,
     resultCount: 0,
@@ -523,7 +547,13 @@ function appendSearchAskRoundDetail(round, label, detail) {
 }
 
 function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMessage = null) {
+  if (eventType === "answer_delta") {
+    pendingMessage.content = String(pendingMessage.content || "") + String(data.text || "");
+    renderSearchAskMessages();
+    return null;
+  }
   if (eventType === "status") {
+    pendingMessage.content = "";
     appendSearchAskActivityRound(activityMessage, data);
     return null;
   }
@@ -571,7 +601,7 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMes
   if (eventType === "error") {
     finishAllSearchAskRounds(activityMessage);
     const detail = data.detail || "Chat failed.";
-    updatePendingSearchAskMessage(pendingMessage, detail);
+    updatePendingSearchAskMessage(pendingMessage, detail, { error: true });
     return { error: detail };
   }
   if (eventType === "final") {
@@ -580,22 +610,26 @@ function handleSearchAskStreamEvent(eventType, data, pendingMessage, activityMes
     updatePendingSearchAskMessage(
       pendingMessage,
       data?.message?.content || "No answer returned.",
-      { citations: data?.citations || [], toolCalls: data?.tool_calls || [] },
+      { citations: data?.citations || [], toolCalls: data?.tool_calls || [], scope: data?.scope, coverage: data?.coverage },
     );
     return { final: data };
   }
   return null;
 }
 
-async function runSearchAskStream(requestBody, pendingMessage, activityMessage) {
+async function runSearchAskStream(requestBody, pendingMessage, activityMessage, signal) {
   const response = await apiFetch("/query/chat/stream", {
     method: "POST",
     headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
+    signal,
     body: JSON.stringify(requestBody),
   });
-  if (!response.ok || !response.body) {
-    return null;
+  if ([404, 405, 501].includes(response.status)) return null;
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(typeof payload.detail === "string" ? payload.detail : "The request could not be completed. Check the question and try again.");
   }
+  if (!response.body) throw new Error("The connection ended before an answer arrived. Retry your question.");
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -632,6 +666,7 @@ async function runSearchAskStream(requestBody, pendingMessage, activityMessage) 
       finalPayload = handled.final;
     }
   }
+  if (!finalPayload) throw new Error("The connection ended before the answer was complete. Retry your question.");
   return finalPayload;
 }
 
@@ -647,32 +682,39 @@ async function runAsk() {
   }
   const topK = normalizeGroundedQaTopK(appState.groundedQaTopK);
   const maxDocuments = normalizeGroundedQaMaxDocuments(appState.groundedQaMaxDocuments);
-  appendSearchAskMessage("user", question);
+  if (!searchAskForm.reportValidity()) return;
+  closeEvidence();
+  const scope = readScope();
+  document.getElementById("chatScopeControls").open = false;
+  document.getElementById("chatComposerStatus").textContent = "Enter to send · Shift+Enter for newline";
+  appendSearchAskMessage("user", question, { scope });
   const activityMessage = appendSearchAskActivity();
-  const pendingMessage = appendSearchAskMessage("assistant", "", { pending: true });
+  const pendingMessage = appendSearchAskMessage("assistant", "", { pending: true, scope });
   if (searchAskQuestion) {
     searchAskQuestion.value = "";
     autoResizeChatTextarea(searchAskQuestion);
   }
   setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), true, "Asking...");
   searchAskInFlight = true;
+  searchAskAbort = new AbortController();
+  document.getElementById("searchAskStopBtn").hidden = false;
+  document.getElementById("chatScopeFields").disabled = true;
+  searchAskNewChatBtn.disabled = true;
   renderSearchAskThreadSelect();
+  renderSearchAskMessages();
   const requestBody = {
     thread_id: searchAskThreadId || null,
     messages: searchAskMessagesState
-      .filter((message) => !message.pending && ["user", "assistant"].includes(message.role))
+      .filter((message) => !message.pending && !message.error && !message.stopped && ["user", "assistant"].includes(message.role))
+      .slice(-29)
       .map((message) => ({ role: message.role, content: message.content })),
-    scope: {
-      tag: [],
-      document_type: [],
-      correspondent: [],
-    },
+    scope,
     top_k_chunks: topK,
     max_documents: maxDocuments,
     debug: false,
   };
   try {
-    const streamedPayload = await runSearchAskStream(requestBody, pendingMessage, activityMessage);
+    const streamedPayload = await runSearchAskStream(requestBody, pendingMessage, activityMessage, searchAskAbort.signal);
     if (streamedPayload) {
       searchAskThreadId = streamedPayload.thread_id || searchAskThreadId;
       await loadSearchAskThreads();
@@ -683,10 +725,11 @@ async function runAsk() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
+      signal: searchAskAbort.signal,
     });
     const payload = await response.json();
     if (!response.ok) {
-      updatePendingSearchAskMessage(pendingMessage, payload.detail || response.statusText);
+      updatePendingSearchAskMessage(pendingMessage, typeof payload.detail === "string" ? payload.detail : response.statusText, { error: true });
       logActivity(`Ask failed: ${payload.detail || response.statusText}`);
       return;
     }
@@ -695,17 +738,26 @@ async function runAsk() {
     updatePendingSearchAskMessage(
       pendingMessage,
       payload?.message?.content || "No answer returned.",
-      { citations: payload?.citations || [], toolCalls: payload?.tool_calls || [] },
+      { citations: payload?.citations || [], toolCalls: payload?.tool_calls || [], scope: payload?.scope, coverage: payload?.coverage },
     );
     await loadSearchAskThreads();
     logActivity("Ask Your Docs chat completed.");
   } catch (error) {
     finishAllSearchAskRounds(activityMessage);
-    const message = error instanceof Error ? error.message : String(error || "Chat failed.");
-    updatePendingSearchAskMessage(pendingMessage, message);
+    const stopped = searchAskAbort?.signal.aborted;
+    const message = stopped ? "Stopped. You can edit or retry this question." : error instanceof Error ? error.message : String(error || "Chat failed.");
+    updatePendingSearchAskMessage(pendingMessage, message, { error: !stopped, stopped });
+    activityMessage.activityRounds.forEach((round) => { round.stopped = stopped; });
     logActivity(`Ask failed: ${message}`);
   } finally {
     searchAskInFlight = false;
+    searchAskAbort = null;
+    finishAllSearchAskRounds(activityMessage);
+    document.getElementById("searchAskStopBtn").hidden = true;
+    document.getElementById("searchAskStopBtn").disabled = false;
+    document.getElementById("chatScopeFields").disabled = false;
+    searchAskNewChatBtn.disabled = false;
+    renderSearchAskMessages();
     syncSearchAskTimer();
     renderSearchAskThreadSelect();
     setButtonBusy(searchAskForm?.querySelector("button[type='submit']"), false);
@@ -755,7 +807,7 @@ function bindSearchEvents() {
   });
 
   searchAskQuestion?.addEventListener("keydown", async (event) => {
-    if (event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) {
+    if (event.isComposing || event.key !== "Enter" || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) {
       return;
     }
     event.preventDefault();
@@ -772,7 +824,6 @@ function bindSearchEvents() {
     searchAskQuestion.value = hint.dataset.askHint || "";
     autoResizeChatTextarea(searchAskQuestion);
     searchAskQuestion.focus();
-    await runAsk();
   });
 
   searchAskMessages?.addEventListener("click", (event) => {
@@ -801,6 +852,25 @@ function bindSearchEvents() {
     renderSearchAskMessages();
   });
 
+  bindEvidence();
+  bindScope();
+  document.getElementById("searchAskStopBtn")?.addEventListener("click", (event) => {
+    event.currentTarget.disabled = true;
+    searchAskAbort?.abort();
+  });
+  document.getElementById("chatHistoryToggle")?.addEventListener("click", () => {
+    setHistoryOpen(document.getElementById("chatHistoryToggle").getAttribute("aria-expanded") !== "true");
+  });
+  document.getElementById("chatHistoryClose")?.addEventListener("click", () => {
+    setHistoryOpen(false);
+    document.getElementById("chatHistoryToggle").focus();
+  });
+  document.getElementById("qaSidebar")?.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") {
+      setHistoryOpen(false);
+      document.getElementById("chatHistoryToggle").focus();
+    }
+  });
   searchEventsBound = true;
 }
 
@@ -810,10 +880,50 @@ export async function initializePage({ authenticated }) {
   }
   bindSearchElements();
   bindSearchEvents();
-  await loadSearchAskThreads();
+  await Promise.all([loadSearchAskThreads(), loadLibraryPrompts()]);
   const requestedThreadId = new URLSearchParams(window.location.search).get("thread_id");
   if (requestedThreadId) {
     await loadSearchAskThread(requestedThreadId);
   }
   renderSearchResultsMeta("Ready.");
+}
+
+function setHistoryOpen(open) {
+  document.querySelector(".grounded-qa-layout")?.classList.toggle("history-open", open);
+  document.getElementById("chatHistoryToggle")?.setAttribute("aria-expanded", String(open));
+  if (open) document.getElementById("chatHistoryClose")?.focus();
+}
+
+function editSearchAskQuestion(message) {
+  if (searchAskInFlight) return;
+  const index = searchAskMessagesState.indexOf(message);
+  if (index < 0) return;
+  searchAskMessagesState = searchAskMessagesState.slice(0, index);
+  restoreScope(message.scope || readScope());
+  searchAskQuestion.value = message.content;
+  autoResizeChatTextarea(searchAskQuestion);
+  renderSearchAskMessages();
+  searchAskQuestion.focus();
+  document.getElementById("chatComposerStatus").textContent = "Editing the last question. Send to replace the previous answer.";
+}
+
+function retrySearchAskQuestion(message) {
+  if (searchAskInFlight) return;
+  const index = searchAskMessagesState.indexOf(message);
+  const question = searchAskMessagesState.slice(0, index).filter((m) => m.role === "user").at(-1);
+  if (!question) return;
+  editSearchAskQuestion(question);
+  runAsk();
+}
+
+function broadenSearchAskScope(message) {
+  if (searchAskInFlight) return;
+  const index = searchAskMessagesState.indexOf(message);
+  const question = searchAskMessagesState.slice(0, index).filter((m) => m.role === "user").at(-1);
+  restoreScope();
+  searchAskQuestion.value = question?.content || "";
+  autoResizeChatTextarea(searchAskQuestion);
+  document.getElementById("chatScopeControls").open = true;
+  document.getElementById("chatComposerStatus").textContent = "Scope expanded to all documents. Review the question before sending.";
+  searchAskQuestion.focus();
 }

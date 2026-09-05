@@ -894,6 +894,7 @@ export async function initializePage({ authenticated, initialData }) {
     renderTagEditor();
     renderOcrText();
     initializePdfPreview();
+    highlightChatEvidence();
     if (isActiveDocumentStatus(initialData?.document_detail?.document?.status)) {
       startDocumentProcessingWatch({
         completedMessage: `Processing completed for ${appState.currentDocumentId}.`,
@@ -906,5 +907,17 @@ export async function initializePage({ authenticated, initialData }) {
   appState.currentDocumentId = new URLSearchParams(window.location.search).get("id") || "";
   if (appState.currentDocumentId) {
     await openDocumentView(appState.currentDocumentId);
+    highlightChatEvidence();
   }
+}
+
+function highlightChatEvidence() {
+  const quote = new URLSearchParams(window.location.search).get("quote");
+  if (!quote) return;
+  const { detailOcrSearch, detailOcrLines } = getSingleDocumentElements();
+  if (!detailOcrSearch) return;
+  detailOcrSearch.value = quote;
+  document.querySelector('[data-detail-tab="ocr"]')?.click();
+  renderOcrText();
+  detailOcrLines?.querySelector(".hit")?.scrollIntoView({ block: "center" });
 }

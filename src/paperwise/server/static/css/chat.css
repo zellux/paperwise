@@ -915,3 +915,83 @@
     margin: 0 12px 8px;
   }
 }
+
+/* Reading, evidence, and scope share the conversation workspace. */
+.chat-heading { min-width: 0; flex: 1; }
+.chat-scope-summary { margin: 7px 0 0; color: var(--ink-soft); font-size: .8rem; line-height: 1.5; }
+.chat-model-details { position: relative; align-self: flex-start; color: var(--ink-soft); font-size: .75rem; }
+.chat-model-details summary { cursor: pointer; padding: 5px; }
+.chat-model-details .chat-header-meta { position: absolute; right: 0; width: 260px; z-index: 5; padding: 12px; border: 1px solid var(--stroke); border-radius: 8px; background: var(--paper); overflow-wrap: anywhere; box-shadow: var(--shadow); }
+.chat-reading-pane { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; }
+.chat-reading-pane .chat-messages { padding: 24px max(24px, calc((100% - 900px) / 2)) 28px; }
+.chat-message { min-width: 0; overflow-wrap: anywhere; }
+.chat-message-assistant { width: 100%; max-width: 100%; }
+.chat-message-user { max-width: 80%; }
+.chat-message-body { min-width: 0; }
+.markdown-output { line-height: 1.65; }
+.markdown-output table { display: block; max-width: 100%; overflow-x: auto; }
+.chat-inline-citation { display: inline; border: 0; border-radius: 4px; padding: 1px 4px; background: var(--accent-soft); color: var(--accent); font: inherit; font-size: .78em; font-weight: 700; cursor: pointer; vertical-align: baseline; }
+.chat-evidence { flex: 0 0 clamp(280px, 32%, 420px); min-width: 0; overflow-y: auto; padding: 20px; background: var(--paper); border-left: 1px solid var(--stroke); }
+.chat-evidence[hidden] { display: none; }
+.chat-evidence-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.chat-evidence h3 { font-size: 1rem; overflow-wrap: anywhere; }
+.chat-evidence p { font-size: .8rem; color: var(--ink-soft); line-height: 1.5; }
+.chat-evidence blockquote { margin: 20px 0; padding: 12px 14px; border-left: 3px solid var(--accent); background: white; white-space: pre-wrap; overflow-wrap: anywhere; font-size: .88rem; line-height: 1.7; }
+.chat-evidence a { display: inline-flex; text-decoration: none; }
+.chat-answer-scope, .chat-coverage { font-size: .74rem; color: var(--ink-soft); line-height: 1.5; }
+.chat-coverage { margin: 8px 0; padding: 8px 10px; background: color-mix(in srgb, var(--accent) 5%, white); border-radius: 6px; }
+.chat-coverage summary { cursor: pointer; }
+.chat-coverage p { margin: 8px 0 0; }
+.chat-answer-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 6px; font-size: .75rem; color: var(--ink-soft); }
+.chat-answer-actions .btn { padding: 5px 8px; min-height: 32px; font-size: .74rem; box-shadow: none; }
+.chat-message-error .chat-message-body { border-color: #b26d37; background: #fff8ee; }
+.chat-composer { width: calc(100% - 36px); max-width: 1000px; align-self: center; margin-bottom: 14px; box-sizing: border-box; }
+.chat-scope-controls { border-bottom: 1px solid var(--stroke-soft); padding-bottom: 8px; margin-bottom: 4px; font-size: .78rem; }
+.chat-scope-controls summary { cursor: pointer; color: var(--ink); }
+#chatScopeChips { margin-left: 10px; color: var(--ink-soft); }
+.chat-scope-fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 12px 0 0; padding: 0; border: 0; min-width: 0; }
+.chat-scope-fields label { display: grid; gap: 4px; min-width: 0; color: var(--ink-soft); }
+.chat-scope-fields select, .chat-scope-fields input { width: 100%; min-width: 0; min-height: 36px; box-sizing: border-box; font: inherit; color: var(--ink); border: 1px solid var(--stroke); border-radius: 6px; padding: 5px; background: white; }
+.chat-scope-fields .btn { align-self: end; }
+.chat-send-actions { display: flex; gap: 8px; margin-left: auto; }
+.chat-send-actions [hidden], #chatLibraryUpload[hidden] { display: none; }
+.ask-hint-card { grid-template-columns: minmax(0, 1fr); }
+.ask-hint-card small { white-space: normal; font-family: var(--sans); line-height: 1.45; }
+.ask-hints p { font-size: 1rem; max-width: 560px; }
+.ask-hints { padding-top: 24px; }
+.ask-hints h2 { margin-top: 8px; font-size: clamp(1.6rem, 2.5vw, 2.3rem); }
+.ask-hints-mark { width: 52px; height: 52px; font-size: 1.8rem; border-radius: 13px; }
+.chat-history-toggle { display: none; }
+.thread-action:focus-visible, .thread-item:focus-within .thread-action { opacity: 1; }
+.chat-inline-citation:focus-visible, .chat-coverage summary:focus-visible, .chat-scope-controls summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+@media (max-width: 1200px) {
+  .qa-conversation-body:has(.chat-evidence:not([hidden])) .chat-reading-pane { display: none; }
+  .chat-evidence { flex: 1; border-left: 0; }
+}
+@media (max-width: 960px) {
+  .grounded-qa-layout { position: relative; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+  .qa-sidebar { display: none; }
+  .history-open .qa-sidebar { display: flex; position: absolute; inset: 0 auto 0 0; width: min(300px, calc(100% - 48px)); z-index: 10; background: var(--paper); border-right: 1px solid var(--stroke); box-shadow: 12px 0 30px #0002; }
+  .chat-history-toggle { display: inline-flex; }
+  .chat-header-row { align-items: center; flex-direction: row; padding: 14px; gap: 10px; }
+  .chat-header-row h2 { font-size: 1.2rem; max-width: 100%; }
+  .chat-model-details summary { max-width: 85px; }
+  .thread-action { opacity: 1; }
+}
+@media (max-width: 760px) {
+  .chat-reading-pane .chat-messages { padding: 16px 12px; }
+  .chat-composer { width: calc(100% - 20px); margin: 0 10px 10px; }
+  .chat-composer-footer { flex-direction: row; align-items: center; }
+  .chat-scope-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .chat-message-user { max-width: 92%; }
+  .chat-scope-summary { max-height: 3em; overflow: auto; }
+  .ask-hints { padding: 20px 14px; align-content: start; }
+  .ask-hint-cards { margin-top: 8px; }
+  .chat-composer-hint { max-width: 60%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .grounded-qa-workbench *, .grounded-qa-workbench *::before { transition: none !important; }
+}
+.chat-table-scroll { overflow-x: auto; margin-bottom: 10px; }
+.markdown-output .chat-table-scroll table { display: table; width: 100%; margin-bottom: 0; }
+.chat-table-scroll th { white-space: nowrap; }
