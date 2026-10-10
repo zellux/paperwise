@@ -714,6 +714,18 @@ def put_config(
     return patch_config(config_id, payload, current_user)
 
 
+@router.get("/trash/")
+def list_trashed_documents(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1),
+    current_user: User = Depends(_current_user_from_token),
+) -> dict[str, Any]:
+    # Paperwise deletes documents permanently, so there are no retained trash rows.
+    # Paperless clients still request this collection during full synchronization.
+    del current_user
+    return _paginated("/api/trash/", count=0, page=1, page_size=page_size, all_ids=[], results=[])
+
+
 @router.get("/documents/")
 def list_documents(
     page: int = Query(1, ge=1),

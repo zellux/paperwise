@@ -33,6 +33,32 @@ class FakeDispatcher:
         return f"job-{document_id}"
 
 
+def test_paperless_trash_collection_requires_auth_and_returns_empty_pages(tmp_path) -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: Settings(object_store_root=str(tmp_path))
+    try:
+        client = TestClient(app)
+        assert client.get("/api/trash/").status_code == 401
+        owner_id, headers = _create_user_and_token(client)
+        document = Document(
+            id="live-document", filename="invoice.pdf", owner_id=owner_id, blob_uri="file:///invoice.pdf",
+            checksum_sha256="trash-test", content_type="application/pdf", size_bytes=10,
+            status=DocumentStatus.READY, created_at=datetime.now(UTC),
+        )
+        repository.save(document)
+        for suffix in ("", "?page=1&page_size=100", "?page=2&page_size=100"):
+            response = client.get(f"/api/trash/{suffix}", headers=headers)
+            assert response.status_code == 200
+            assert response.json() == {"count": 0, "next": None, "previous": None, "all": [], "results": []}
+        repository.delete_document(document.id)
+        assert client.get("/api/trash/", headers=headers).json()["results"] == []
+        assert client.get("/api/trash/?page=0", headers=headers).status_code == 422
+        assert client.get("/api/trash/?page_size=0", headers=headers).status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+
+
 def _create_user_and_token(
     client: TestClient,
     *,

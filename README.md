@@ -135,6 +135,8 @@ Paperwise exposes a Paperless-compatible API for the open-source [Paperless Mobi
 
 Compatibility currently targets the core mobile workflows rather than the complete Paperless-ngx API surface.
 
+The compatible `GET /api/trash/` endpoint returns an empty paginated collection for clients that request it during full sync. Paperwise currently deletes documents permanently and does not support trash retention or restore.
+
 ## Run From Source
 
 For local development after cloning the repo:
