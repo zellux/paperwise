@@ -24,28 +24,45 @@ let pdfManualScale = 1;
 let pdfResizeObserver = null;
 let documentProcessingWatch = null;
 let documentProcessingWatchId = "";
+let taxonomyTags = [];
+let taxonomyTagsLoaded = false;
+let taxonomyTagsRequest = null;
 const PDFJS_MODULE_URL = "/static/vendor/pdfjs/pdf.min.mjs";
 const PDFJS_WORKER_URL = "/static/vendor/pdfjs/pdf.worker.min.mjs";
 const PDFJS_CMAP_URL = "/static/vendor/pdfjs/cmaps/";
 const PDFJS_ICC_URL = "/static/vendor/pdfjs/iccs/";
 const PDFJS_STANDARD_FONT_URL = "/static/vendor/pdfjs/standard_fonts/";
 const PDFJS_WASM_URL = "/static/vendor/pdfjs/wasm/";
-const TAG_SUGGESTIONS = [
-  "Finance",
-  "Credit Reports",
-  "Identity",
-  "Statements",
-  "Investments",
-  "Tax docs",
-  "Insurance",
-  "Medical records",
-  "Utilities",
-  "Lease & deeds",
-  "Repairs & receipts",
-  "Contracts",
-  "Payslips",
-  "Passport & ID",
-];
+
+async function refreshTagTaxonomy(force = false) {
+  if (taxonomyTagsRequest) {
+    return force ? taxonomyTagsRequest.then(() => refreshTagTaxonomy()) : taxonomyTagsRequest;
+  }
+  taxonomyTagsRequest = (async () => {
+    try {
+      const response = await apiFetch("/documents/metadata/taxonomy");
+      if (!response.ok) {
+        throw new Error("Tag taxonomy request failed.");
+      }
+      const payload = await response.json();
+      taxonomyTags = Array.isArray(payload.tags)
+        ? [...new Set(payload.tags.filter((tag) => typeof tag === "string" && tag.trim()).map((tag) => tag.trim()))]
+        : [];
+      taxonomyTagsLoaded = true;
+    } catch {
+      taxonomyTags = [];
+      taxonomyTagsLoaded = false;
+      logActivity("Could not load tag suggestions. You can still type a tag name to add it.");
+    } finally {
+      taxonomyTagsRequest = null;
+      const { metaTagQuery, metaTagEditor } = getSingleDocumentElements();
+      if (document.activeElement === metaTagQuery || metaTagEditor?.classList.contains("is-open")) {
+        renderTagSuggestions();
+      }
+    }
+  })();
+  return taxonomyTagsRequest;
+}
 
 function getSingleDocumentElements() {
   return {
@@ -251,9 +268,10 @@ function renderTagSuggestions() {
     return;
   }
   const tags = getDetailTags();
+  const selectedTags = new Set(tags.map((tag) => tag.toLowerCase()));
   const query = metaTagQuery.value.trim().toLowerCase();
-  const suggestions = TAG_SUGGESTIONS.filter(
-    (tag) => !tags.includes(tag) && (!query || tag.toLowerCase().includes(query))
+  const suggestions = taxonomyTags.filter(
+    (tag) => !selectedTags.has(tag.toLowerCase()) && (!query || tag.toLowerCase().includes(query))
   ).slice(0, 8);
   metaTagSuggestions.replaceChildren();
   if (!suggestions.length) {
@@ -288,7 +306,12 @@ function bindTagEditorEvents() {
   if (!(metaTagEditor instanceof HTMLElement) || !(metaTagQuery instanceof HTMLInputElement)) {
     return;
   }
-  metaTagQuery.addEventListener("focus", renderTagSuggestions);
+  metaTagQuery.addEventListener("focus", () => {
+    if (!taxonomyTagsLoaded) {
+      void refreshTagTaxonomy();
+    }
+    renderTagSuggestions();
+  });
   metaTagQuery.addEventListener("input", renderTagSuggestions);
   metaTagQuery.addEventListener("keydown", (event) => {
     const query = metaTagQuery.value.trim();
@@ -873,6 +896,7 @@ function bindSingleDocumentEvents() {
   bindPreviewPager();
   bindDocumentDirtyState();
   document.addEventListener("paperwise:document-detail-updated", () => {
+    void refreshTagTaxonomy(true);
     setDocumentMetadataDirty(false);
     renderTagEditor();
     renderOcrText();
@@ -888,6 +912,7 @@ export async function initializePage({ authenticated, initialData }) {
     return;
   }
   bindSingleDocumentEvents();
+  void refreshTagTaxonomy();
   if (hydrateInitialDocumentData(initialData || {})) {
     setDocumentMetadataDirty(false);
     renderDocumentStarButton(Boolean(initialData?.document_detail?.document?.starred));
