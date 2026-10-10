@@ -62,6 +62,26 @@ services:
 
 If the model server runs on a different machine, bind that server to a network-reachable address and use that host name or IP instead.
 
+## Request timeout
+
+Set `PAPERWISE_LLM_REQUEST_TIMEOUT_SECONDS` to a positive, finite number of seconds when local models need longer to respond. This is a deployment-wide option for OpenAI, Gemini, and custom OpenAI-compatible connections; it applies to metadata extraction, OCR, retrieval query rewriting, and Q&A, including streaming requests.
+
+For Docker, set the same value in both services:
+
+```yaml
+services:
+  api:
+    environment:
+      PAPERWISE_LLM_REQUEST_TIMEOUT_SECONDS: "300"
+  worker:
+    environment:
+      PAPERWISE_LLM_REQUEST_TIMEOUT_SECONDS: "300"
+```
+
+For source runs, add `PAPERWISE_LLM_REQUEST_TIMEOUT_SECONDS=300` to `.env.local`. Restart the API and worker after changing it. The repository's compose file also forwards this environment variable to both services.
+
+An explicit value overrides both the ordinary and long-running request timeouts, even if it is below 120 seconds. An unset or empty value preserves the existing defaults: 30 seconds for ordinary requests and 120 seconds for long-running requests. This does not limit the total time spent processing a multi-page document or retrying requests. **Test Connection** uses a separate 10-second connectivity check.
+
 ## Recommended first configuration
 
 If you just want a working setup, start simple:

@@ -148,19 +148,19 @@ class GeminiLLMProvider(LLMProvider):
         api_key: str,
         model: str,
         base_url: str = "https://generativelanguage.googleapis.com/v1beta",
-        timeout_seconds: float = 30.0,
+        timeout_seconds: float | None = None,
     ) -> None:
         self._model = model
         self._api_version = _resolve_api_version(base_url)
         self._client = self._build_client(
             api_key=api_key,
             base_url=base_url,
-            timeout_seconds=timeout_seconds,
+            timeout_seconds=30.0 if timeout_seconds is None else timeout_seconds,
         )
         self._long_running_client = self._build_client(
             api_key=api_key,
             base_url=base_url,
-            timeout_seconds=max(timeout_seconds, _LONG_RUNNING_TIMEOUT_SECONDS),
+            timeout_seconds=_LONG_RUNNING_TIMEOUT_SECONDS if timeout_seconds is None else timeout_seconds,
         )
 
     @staticmethod

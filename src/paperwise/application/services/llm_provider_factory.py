@@ -12,6 +12,7 @@ from paperwise.application.services.llm_preferences import (
     validate_api_key_for_provider,
 )
 from paperwise.application.services.user_preferences import load_user_preferences
+from paperwise.infrastructure.config import get_settings
 from paperwise.infrastructure.llm.gemini_llm_provider import GeminiLLMProvider
 from paperwise.infrastructure.llm.openai_llm_provider import OpenAILLMProvider
 
@@ -144,18 +145,22 @@ def build_provider_from_task_config(
     if api_key_error:
         raise error_factory(api_key_error)
 
+    timeout_seconds = get_settings().llm_request_timeout_seconds
+
     if config.provider == "openai":
         return OpenAILLMProvider(
             api_key=config.api_key,
             model=config.model or default_model_for_task("openai", task),
             base_url=config.base_url or default_base_url_for_provider("openai"),
             vision_image_detail=ocr_image_detail,
+            timeout_seconds=timeout_seconds,
         )
     if config.provider == "gemini":
         return GeminiLLMProvider(
             api_key=config.api_key,
             model=config.model or default_model_for_task("gemini", task),
             base_url=config.base_url or default_base_url_for_provider("gemini"),
+            timeout_seconds=timeout_seconds,
         )
     if config.provider == "custom":
         if not config.base_url:
@@ -166,5 +171,6 @@ def build_provider_from_task_config(
             base_url=config.base_url,
             vision_image_detail=ocr_image_detail,
             response_format_type=custom_response_format_type,
+            timeout_seconds=timeout_seconds,
         )
     raise error_factory(f"Unsupported LLM provider: {config.provider}")

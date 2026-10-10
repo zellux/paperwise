@@ -22,3 +22,18 @@ def test_worker_concurrency_reads_paperwise_env_var(monkeypatch: pytest.MonkeyPa
     monkeypatch.setenv("PAPERWISE_WORKER_CONCURRENCY", "3")
 
     assert Settings(_env_file=None).worker_concurrency == 3
+
+
+def test_llm_timeout_defaults_and_environment(monkeypatch) -> None:
+    monkeypatch.delenv("PAPERWISE_LLM_REQUEST_TIMEOUT_SECONDS", raising=False)
+    assert Settings(_env_file=None).llm_request_timeout_seconds is None
+    monkeypatch.setenv("PAPERWISE_LLM_REQUEST_TIMEOUT_SECONDS", "300.5")
+    assert Settings(_env_file=None).llm_request_timeout_seconds == 300.5
+    monkeypatch.setenv("PAPERWISE_LLM_REQUEST_TIMEOUT_SECONDS", "")
+    assert Settings(_env_file=None).llm_request_timeout_seconds is None
+
+
+@pytest.mark.parametrize("value", [0, -1, "bad", "nan", "inf", "-inf"])
+def test_llm_timeout_rejects_invalid_values(value) -> None:
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, llm_request_timeout_seconds=value)

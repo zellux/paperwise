@@ -125,6 +125,8 @@ Set `PAPERWISE_DISABLE_SIGNUP` to `"true"` on the `api` service to disable publi
 
 Set `PAPERWISE_WORKER_CONCURRENCY` to a positive integer before running `docker compose up -d` if you need to limit worker parallelism for a local or rate-limited model backend, for example `PAPERWISE_WORKER_CONCURRENCY=1`. When unset, Celery keeps its default concurrency behavior.
 
+For slower model backends, set `PAPERWISE_LLM_REQUEST_TIMEOUT_SECONDS` to a positive number of seconds (for example `300`) in both `api` and `worker` environments. It applies to OpenAI, Gemini, and custom OpenAI-compatible model requests, including streaming Q&A. When unset or empty, existing defaults remain: 30 seconds for ordinary requests and 120 seconds for long-running requests. The checked-in compose file forwards this variable to both services. Restart both services after changing it. **Test Connection** keeps its separate 10-second connectivity check.
+
 If the GHCR package is private, make it public in the GitHub package settings before sharing it with other users.
 
 Open Paperwise at [http://localhost:8080](http://localhost:8080).

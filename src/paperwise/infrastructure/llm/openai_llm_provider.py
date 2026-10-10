@@ -65,11 +65,12 @@ class OpenAILLMProvider(LLMProvider):
         api_key: str,
         model: str,
         base_url: str = "https://api.openai.com/v1",
-        timeout_seconds: float = 30.0,
+        timeout_seconds: float | None = None,
         vision_image_detail: str = "auto",
         response_format_type: str = "json_object",
     ) -> None:
         self._model = model
+        self._long_running_timeout_seconds = 120.0 if timeout_seconds is None else timeout_seconds
         normalized_response_format = str(response_format_type).strip().lower()
         self._response_format_type = (
             normalized_response_format if normalized_response_format in {"json_object", "text"} else "json_object"
@@ -78,7 +79,7 @@ class OpenAILLMProvider(LLMProvider):
         self._vision_image_detail = normalized_detail if normalized_detail in {"auto", "low", "high"} else "auto"
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
-            timeout=timeout_seconds,
+            timeout=30.0 if timeout_seconds is None else timeout_seconds,
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json",
@@ -181,7 +182,7 @@ class OpenAILLMProvider(LLMProvider):
             ],
         }
         for attempt in range(2):
-            response, response_payload = self._chat_completions(request_payload, timeout=120.0)
+            response, response_payload = self._chat_completions(request_payload, timeout=self._long_running_timeout_seconds)
             log_llm_exchange(
                 provider="openai",
                 endpoint="/chat/completions",
@@ -338,7 +339,7 @@ class OpenAILLMProvider(LLMProvider):
                         response = self._client.post(
                             "/chat/completions",
                             json=request_payload,
-                            timeout=120.0,
+                            timeout=self._long_running_timeout_seconds,
                         )
                     except TypeError:
                         # Test doubles may not accept per-request timeout kwargs.
@@ -461,7 +462,7 @@ class OpenAILLMProvider(LLMProvider):
             ],
         }
         # Grounded Q&A can send much larger prompts than metadata or rewrite calls.
-        response, response_payload = self._chat_completions(request_payload, timeout=120.0)
+        response, response_payload = self._chat_completions(request_payload, timeout=self._long_running_timeout_seconds)
         log_llm_exchange(
             provider="openai",
             endpoint="/chat/completions",
@@ -523,7 +524,7 @@ class OpenAILLMProvider(LLMProvider):
         if tools:
             request_payload["tools"] = tools
             request_payload["tool_choice"] = "auto"
-        response, response_payload = self._chat_completions(request_payload, timeout=120.0)
+        response, response_payload = self._chat_completions(request_payload, timeout=self._long_running_timeout_seconds)
         log_llm_exchange(
             provider="openai",
             endpoint="/chat/completions",
@@ -567,7 +568,7 @@ class OpenAILLMProvider(LLMProvider):
         calls: dict[int, dict[str, str]] = {}
         total_tokens = 0
         finished = False
-        with self._client.stream("POST", "/chat/completions", json=request_payload, timeout=120.0) as response:
+        with self._client.stream("POST", "/chat/completions", json=request_payload, timeout=self._long_running_timeout_seconds) as response:
             if response.status_code in {400, 404, 422}:
                 # Some compatible providers do not implement streaming or stream_options.
                 response.read()
