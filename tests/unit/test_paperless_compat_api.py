@@ -1,6 +1,10 @@
 from datetime import UTC, datetime
+from urllib.parse import parse_qs, urlsplit
+
+import pytest
 
 from fastapi.testclient import TestClient
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 from paperwise.domain.models import Document, DocumentStatus, LLMParseResult, ParseResult
 from paperwise.infrastructure.config import Settings
@@ -102,6 +106,67 @@ def _paperless_token(client: TestClient, *, email: str = "mobile@example.com") -
     )
     assert token_response.status_code == 200
     return token_response.json()["token"]
+
+
+@pytest.mark.parametrize("prefix", ["", "/paperwise"])
+def test_mobile_pagination_uses_absolute_urls_and_preserves_query(tmp_path, prefix) -> None:
+    repository = InMemoryDocumentRepository()
+    storage = LocalStorageAdapter(str(tmp_path))
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: Settings(object_store_root=str(tmp_path))
+    try:
+        client = TestClient(app, base_url=f"https://paperwise.example{prefix}", root_path=prefix)
+        owner_id, headers = _create_user_and_token(client)
+        for index in range(105):
+            _seed_document(
+                repository, storage, owner_id, document_id=f"invoice-{index}",
+                storage_key=f"incoming/{index}.pdf", checksum=f"invoice-{index}",
+                suggested_title=f"Invoice {index:03d}", tags=[f"Tag {index:03d}"],
+            )
+        _seed_document(repository, storage, owner_id, document_id="excluded", suggested_title="Receipt", tags=["Excluded"])
+        response = client.get(
+            "/api/documents/?page_size=100&title__icontains=Invoice&ordering=title&extra=a&extra=b", headers=headers,
+        )
+        assert response.status_code == 200
+        first = response.json()
+        assert first["count"] == 105
+        assert len(first["results"]) == 100
+        assert first["previous"] is None
+        url = urlsplit(first["next"])
+        assert (url.scheme, url.netloc, url.path) == ("https", "paperwise.example", f"{prefix}/api/documents/")
+        query = parse_qs(url.query)
+        assert query == {"page": ["2"], "page_size": ["100"], "title__icontains": ["Invoice"], "ordering": ["title"], "extra": ["a", "b"]}
+        second = client.get(first["next"], headers=headers).json()
+        assert second["count"] == 105
+        assert second["next"] is None
+        assert [row["title"] for row in second["results"]] == [f"Invoice {index:03d}" for index in range(100, 105)]
+        assert client.get(second["previous"], headers=headers).json()["results"] == first["results"]
+        tags = client.get("/api/tags/?page_size=100&extra=a&extra=b", headers=headers).json()
+        assert urlsplit(tags["next"]).path == f"{prefix}/api/tags/"
+        assert parse_qs(urlsplit(tags["next"]).query)["extra"] == ["a", "b"]
+        assert len(client.get(tags["next"], headers=headers).json()["results"]) == 6
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_mobile_pagination_uses_trusted_proxy_scheme(tmp_path) -> None:
+    repository = InMemoryDocumentRepository()
+    app.dependency_overrides[document_repository_dependency] = lambda: repository
+    app.dependency_overrides[settings_dependency] = lambda: Settings(object_store_root=str(tmp_path))
+    try:
+        proxy_app = ProxyHeadersMiddleware(app, trusted_hosts=["127.0.0.1"])
+        client = TestClient(proxy_app, base_url="http://paperwise.example", client=("127.0.0.1", 1234))
+        owner_id, headers = _create_user_and_token(client)
+        for index in range(2):
+            repository.save(Document(
+                id=f"proxy-{index}", filename=f"{index}.pdf", owner_id=owner_id, blob_uri=f"file:///{index}.pdf",
+                checksum_sha256=f"proxy-{index}", content_type="application/pdf", size_bytes=10,
+                status=DocumentStatus.READY, created_at=datetime.now(UTC),
+            ))
+        response = client.get("/api/documents/?page_size=1", headers={**headers, "X-Forwarded-Proto": "https"})
+        assert response.json()["next"] == "https://paperwise.example/api/documents/?page=2&page_size=1"
+    finally:
+        app.dependency_overrides.clear()
 
 
 def test_paperless_token_is_stable_and_not_session_shaped(tmp_path) -> None:

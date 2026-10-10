@@ -18,9 +18,10 @@ from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
+from urllib.parse import urlencode
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, Request, Response, UploadFile, status
 from fastapi.responses import FileResponse
 
 from paperwise.application.interfaces import DocumentRepository, IngestionDispatcher, StorageProvider, UserRepository
@@ -338,7 +339,7 @@ def _document_payload(
 
 
 def _paginated(
-    request_path: str,
+    request: Request,
     *,
     count: int,
     page: int,
@@ -346,12 +347,14 @@ def _paginated(
     results: list[dict[str, Any]],
     all_ids: list[int] | None = None,
 ) -> dict[str, Any]:
-    next_url = None
-    previous_url = None
-    if page * page_size < count:
-        next_url = f"{request_path}?page={page + 1}&page_size={page_size}"
-    if page > 1:
-        previous_url = f"{request_path}?page={page - 1}&page_size={page_size}"
+    def page_url(number: int) -> str:
+        params = [(key, value) for key, value in request.query_params.multi_items() if key not in {"page", "page_size"}]
+        params.extend([("page", str(number)), ("page_size", str(page_size))])
+        # Request URLs already include the deployment prefix and trusted proxy scheme.
+        return str(request.url.replace(query=urlencode(params)))
+
+    next_url = page_url(page + 1) if page * page_size < count else None
+    previous_url = page_url(page - 1) if page > 1 and count > 0 else None
     return {
         "count": count,
         "next": next_url,
@@ -630,20 +633,22 @@ def deactivate_totp(
 
 @router.get("/users/")
 def list_users(
+    request: Request,
     current_user: User = Depends(_current_user_from_token),
 ) -> dict[str, Any]:
     payload = _user_payload(current_user)
-    return _paginated("/api/users/", count=1, page=1, page_size=1, results=[payload], all_ids=[payload["id"]])
+    return _paginated(request, count=1, page=1, page_size=1, results=[payload], all_ids=[payload["id"]])
 
 
 @router.get("/groups/")
 def list_groups(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(10_000, ge=1),
     current_user: User = Depends(_current_user_from_token),
 ) -> dict[str, Any]:
     del current_user
-    return _paginated("/api/groups/", count=0, page=page, page_size=page_size, all_ids=[], results=[])
+    return _paginated(request, count=0, page=page, page_size=page_size, all_ids=[], results=[])
 
 
 @router.get("/statistics/")
@@ -716,6 +721,7 @@ def put_config(
 
 @router.get("/trash/")
 def list_trashed_documents(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1),
     current_user: User = Depends(_current_user_from_token),
@@ -723,11 +729,12 @@ def list_trashed_documents(
     # Paperwise deletes documents permanently, so there are no retained trash rows.
     # Paperless clients still request this collection during full synchronization.
     del current_user
-    return _paginated("/api/trash/", count=0, page=1, page_size=page_size, all_ids=[], results=[])
+    return _paginated(request, count=0, page=1, page_size=page_size, all_ids=[], results=[])
 
 
 @router.get("/documents/")
 def list_documents(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1),
     ordering: str | None = Query(None),
@@ -782,7 +789,7 @@ def list_documents(
     start = (page - 1) * page_size
     page_rows = rows[start : start + page_size]
     return _paginated(
-        "/api/documents/",
+        request,
         count=len(rows),
         page=page,
         page_size=page_size,
@@ -1260,13 +1267,13 @@ def share_links(document_id: int, current_user: User = Depends(_current_user_fro
 
 
 @router.get("/documents/{document_id}/logs/")
-def document_logs(document_id: int, current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
+def document_logs(request: Request, document_id: int, current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
     del document_id, current_user
-    return _paginated("/api/documents/logs/", count=0, page=1, page_size=DEFAULT_PAGE_SIZE, results=[])
+    return _paginated(request, count=0, page=1, page_size=DEFAULT_PAGE_SIZE, results=[])
 
 
 def _list_labels(
-    request_path: str,
+    request: Request,
     kind: str,
     page: int,
     page_size: int,
@@ -1277,7 +1284,7 @@ def _list_labels(
     rows = [_label_payload(kind, name, count) for name, count in stats.items()]
     start = (page - 1) * page_size
     return _paginated(
-        request_path,
+        request,
         count=len(rows),
         page=page,
         page_size=page_size,
@@ -1327,12 +1334,13 @@ def _upsert_label(
 
 @router.get("/tags/")
 def list_tags(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(10_000, ge=1),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(_current_user_from_token),
 ) -> dict[str, Any]:
-    return _list_labels("/api/tags/", "tag", page, page_size, repository, current_user)
+    return _list_labels(request, "tag", page, page_size, repository, current_user)
 
 
 @router.post("/tags/", status_code=status.HTTP_201_CREATED)
@@ -1362,12 +1370,13 @@ def delete_tag(label_id: int, current_user: User = Depends(_current_user_from_to
 
 @router.get("/correspondents/")
 def list_correspondents(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(10_000, ge=1),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(_current_user_from_token),
 ) -> dict[str, Any]:
-    return _list_labels("/api/correspondents/", "correspondent", page, page_size, repository, current_user)
+    return _list_labels(request, "correspondent", page, page_size, repository, current_user)
 
 
 @router.post("/correspondents/", status_code=status.HTTP_201_CREATED)
@@ -1397,12 +1406,13 @@ def delete_correspondent(label_id: int, current_user: User = Depends(_current_us
 
 @router.get("/document_types/")
 def list_document_types(
+    request: Request,
     page: int = Query(1, ge=1),
     page_size: int = Query(10_000, ge=1),
     repository: DocumentRepository = Depends(document_repository_dependency),
     current_user: User = Depends(_current_user_from_token),
 ) -> dict[str, Any]:
-    return _list_labels("/api/document_types/", "document_type", page, page_size, repository, current_user)
+    return _list_labels(request, "document_type", page, page_size, repository, current_user)
 
 
 @router.post("/document_types/", status_code=status.HTTP_201_CREATED)
@@ -1431,21 +1441,21 @@ def delete_document_type(label_id: int, current_user: User = Depends(_current_us
 
 
 @router.get("/storage_paths/")
-def list_storage_paths(page: int = Query(1, ge=1), page_size: int = Query(10_000, ge=1), current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
+def list_storage_paths(request: Request, page: int = Query(1, ge=1), page_size: int = Query(10_000, ge=1), current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
     del current_user
-    return _paginated("/api/storage_paths/", count=0, page=page, page_size=page_size, all_ids=[], results=[])
+    return _paginated(request, count=0, page=page, page_size=page_size, all_ids=[], results=[])
 
 
 @router.get("/custom_fields/")
-def list_custom_fields(page: int = Query(1, ge=1), page_size: int = Query(10_000, ge=1), current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
+def list_custom_fields(request: Request, page: int = Query(1, ge=1), page_size: int = Query(10_000, ge=1), current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
     del current_user
-    return _paginated("/api/custom_fields/", count=0, page=page, page_size=page_size, all_ids=[], results=[])
+    return _paginated(request, count=0, page=page, page_size=page_size, all_ids=[], results=[])
 
 
 @router.get("/saved_views/")
-def list_saved_views(page: int = Query(1, ge=1), page_size: int = Query(10_000, ge=1), current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
+def list_saved_views(request: Request, page: int = Query(1, ge=1), page_size: int = Query(10_000, ge=1), current_user: User = Depends(_current_user_from_token)) -> dict[str, Any]:
     del current_user
-    return _paginated("/api/saved_views/", count=0, page=page, page_size=page_size, all_ids=[], results=[])
+    return _paginated(request, count=0, page=page, page_size=page_size, all_ids=[], results=[])
 
 
 @router.get("/tasks/")
