@@ -3,8 +3,11 @@ from datetime import UTC, datetime
 import httpx
 
 from paperwise.application.services.llm_parsing import parse_with_llm
+from paperwise.application.services.history import build_processing_completed_history_event
 from paperwise.application.services.metadata_updates import validate_document_date
-from paperwise.domain.models import Document, DocumentStatus, ParseResult
+from paperwise.domain.models import Document, DocumentStatus, HistoryActorType, ParseResult
+from paperwise.infrastructure.llm.json_results import LLMResponseFormatError
+from paperwise.infrastructure.llm.metadata_prompt import extract_metadata_result
 from paperwise.infrastructure.repositories.in_memory_document_repository import (
     InMemoryDocumentRepository,
 )
@@ -435,3 +438,24 @@ def test_parse_with_llm_uses_fallback_metadata_when_classification_times_out() -
     assert result.llm_details["error_type"] == "ReadTimeout"
     assert "classification timed out" in result.llm_details["error_message"]
     assert repository.get_llm_parse_result(document.id) == result
+
+
+def test_invalid_metadata_shape_is_recorded_in_processing_history() -> None:
+    class InvalidShapeProvider:
+        def suggest_metadata(self, **kwargs):
+            return extract_metadata_result([{}, {}])
+
+    repository = InMemoryDocumentRepository()
+    document = _build_document()
+    result = parse_with_llm(
+        document=document, parse_result=_build_parse_result(document.id), repository=repository,
+        llm_provider=InvalidShapeProvider(), source_date_resolver=lambda _document: None,
+    )
+    event = build_processing_completed_history_event(
+        document_id=document.id, actor_type=HistoryActorType.SYSTEM, actor_id=None, source="test",
+        previous_status="processing", current_status="ready", llm_result=result,
+    )
+    details = event.changes["metadata_parse"]
+    assert details["status"] == "fallback"
+    assert details["error_type"] == LLMResponseFormatError.__name__
+    assert "received list" in details["error_message"]

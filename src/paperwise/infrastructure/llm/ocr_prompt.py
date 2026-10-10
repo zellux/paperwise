@@ -1,5 +1,7 @@
 from typing import Any
 
+from paperwise.infrastructure.llm.json_results import require_result_object
+
 OCR_SYSTEM_PROMPT = (
     "You are an OCR transcription engine. "
     "Transcribe document text faithfully from the provided extracted content. "
@@ -29,7 +31,8 @@ def build_ocr_user_prompt(
     }
 
 
-def extract_ocr_text_result(parsed: dict[str, Any]) -> str:
+def extract_ocr_text_result(parsed: Any) -> str:
+    parsed = require_result_object(parsed)
     ocr_text = parsed.get("ocr_text")
     if isinstance(ocr_text, str):
         return ocr_text.strip()

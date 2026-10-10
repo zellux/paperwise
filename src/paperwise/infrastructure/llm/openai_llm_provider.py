@@ -8,6 +8,7 @@ import httpx
 
 from paperwise.application.interfaces import LLMProvider
 from paperwise.infrastructure.llm.debug_log import log_llm_exchange
+from paperwise.infrastructure.llm.json_results import LLMResponseFormatError
 from paperwise.infrastructure.llm.metadata_prompt import (
     SYSTEM_PROMPT,
     build_user_prompt,
@@ -179,22 +180,31 @@ class OpenAILLMProvider(LLMProvider):
                 {"role": "user", "content": json.dumps(user_prompt)},
             ],
         }
-        response, response_payload = self._chat_completions(request_payload, timeout=120.0)
-
-        log_llm_exchange(
-            provider="openai",
-            endpoint="/chat/completions",
-            request_payload=request_payload,
-            response_status=getattr(response, "status_code", None),
-            response_payload=response_payload,
-        )
-        response.raise_for_status()
-        payload = response_payload if isinstance(response_payload, dict) else response.json()
-        content = payload["choices"][0]["message"]["content"]
-        parsed = _parse_json_content(content)
+        for attempt in range(2):
+            response, response_payload = self._chat_completions(request_payload, timeout=120.0)
+            log_llm_exchange(
+                provider="openai",
+                endpoint="/chat/completions",
+                request_payload=request_payload,
+                response_status=getattr(response, "status_code", None),
+                response_payload=response_payload,
+            )
+            response.raise_for_status()
+            payload = response_payload if isinstance(response_payload, dict) else response.json()
+            content = payload["choices"][0]["message"]["content"]
+            try:
+                result = extract_metadata_result(_parse_json_content(content))
+                break
+            except (json.JSONDecodeError, LLMResponseFormatError) as exc:
+                log_llm_exchange(
+                    provider="openai",
+                    endpoint="/chat/completions",
+                    request_payload=request_payload,
+                    error=str(exc),
+                )
+                if attempt == 1:
+                    raise
         usage = payload.get("usage", {})
-
-        result = extract_metadata_result(parsed)
 
         total_tokens = usage.get("total_tokens")
         if isinstance(total_tokens, int) and total_tokens > 0:
@@ -213,8 +223,6 @@ class OpenAILLMProvider(LLMProvider):
         response: httpx.Response | None = None
         response_payload: Any = None
         request_payload: dict[str, Any]
-        last_error: Exception | None = None
-
         for attempt in range(2):
             user_prompt = build_ocr_user_prompt(
                 filename=filename,
@@ -237,43 +245,37 @@ class OpenAILLMProvider(LLMProvider):
                     response_payload = response.json()
                 except ValueError:
                     response_payload = {"raw_text": getattr(response, "text", "")}
-                break
+                log_llm_exchange(
+                    provider="openai",
+                    endpoint="/chat/completions",
+                    request_payload=request_payload,
+                    response_status=getattr(response, "status_code", None),
+                    response_payload=response_payload,
+                )
+                response.raise_for_status()
+                payload = response_payload if isinstance(response_payload, dict) else response.json()
+                content = str(payload["choices"][0]["message"]["content"]).strip()
+                try:
+                    parsed = _parse_json_content(content)
+                except json.JSONDecodeError:
+                    return content
+                extracted = extract_ocr_text_result(parsed)
+                return extracted or content
             except Exception as exc:
-                last_error = exc
                 log_llm_exchange(
                     provider="openai",
                     endpoint="/chat/completions",
                     request_payload=request_payload,
                     error=str(exc),
                 )
+                if isinstance(exc, LLMResponseFormatError) and attempt == 0:
+                    continue
                 if isinstance(exc, httpx.ReadTimeout) and attempt == 0 and len(preview) > 2000:
                     # Retry once with a smaller preview to reduce OCR latency.
                     preview = preview[: min(3000, len(preview) // 2)]
                     continue
                 raise
-
-        if response is None:
-            if last_error is not None:
-                raise last_error
-            raise RuntimeError("OCR request failed without a response.")
-
-        log_llm_exchange(
-            provider="openai",
-            endpoint="/chat/completions",
-            request_payload=request_payload,
-            response_status=getattr(response, "status_code", None),
-            response_payload=response_payload,
-        )
-        response.raise_for_status()
-        payload = response_payload if isinstance(response_payload, dict) else response.json()
-        content = str(payload["choices"][0]["message"]["content"]).strip()
-        try:
-            parsed = _parse_json_content(content)
-        except json.JSONDecodeError:
-            return content
-
-        extracted = extract_ocr_text_result(parsed)
-        return extracted or content
+        raise RuntimeError("OCR request failed without a response.")
 
     def extract_ocr_text_from_images(
         self,
@@ -397,7 +399,7 @@ class OpenAILLMProvider(LLMProvider):
                         attempt + 1,
                         exc,
                     )
-                    if isinstance(exc, httpx.ReadTimeout) and attempt == 0:
+                    if isinstance(exc, (httpx.ReadTimeout, LLMResponseFormatError)) and attempt == 0:
                         continue
                     break
 

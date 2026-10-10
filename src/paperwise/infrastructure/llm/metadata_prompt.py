@@ -1,5 +1,7 @@
 from typing import Any
 
+from paperwise.infrastructure.llm.json_results import require_result_object
+
 MAX_METADATA_TAGS = 5
 
 SYSTEM_PROMPT = (
@@ -86,7 +88,8 @@ def build_user_prompt(
     }
 
 
-def extract_metadata_result(parsed: dict[str, Any]) -> dict[str, Any]:
+def extract_metadata_result(parsed: Any) -> dict[str, Any]:
+    parsed = require_result_object(parsed)
     result: dict[str, Any] = {}
     suggested_title = parsed.get("suggested_title")
     if isinstance(suggested_title, str) and suggested_title.strip():
