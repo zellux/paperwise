@@ -2858,7 +2858,10 @@
 
   .docs-design-table .doc-thead,
   .docs-design-table .doc-row {
-    grid-template-columns: 30px minmax(230px, 1fr) 100px 82px;
+    grid-template-columns: 30px minmax(0, 1fr) 100px;
+    column-gap: 12px;
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   .docs-design-table .th-corr,
@@ -3075,6 +3078,12 @@
   .pagination-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .filter-chip-search,
+  .docs-filter-bar .filter-chip-search {
+    min-width: 0;
+    flex: 0 1 auto;
   }
 
   .pagination-controls {

@@ -224,19 +224,20 @@
 }
 
 @media (max-width: 760px) {
-  .docs-table thead {
+  /* Grid-based document lists have their own compact layout. */
+  .docs-table:not(.docs-design-table) thead {
     display: none;
   }
 
-  .docs-table,
-  .docs-table tbody,
-  .docs-table tr,
-  .docs-table td {
+  .docs-table:not(.docs-design-table),
+  .docs-table:not(.docs-design-table) tbody,
+  .docs-table:not(.docs-design-table) tr,
+  .docs-table:not(.docs-design-table) td {
     display: block;
     width: 100%;
   }
 
-  .docs-table tr {
+  .docs-table:not(.docs-design-table) tr {
     border: 1px solid var(--stroke-soft);
     border-radius: 10px;
     margin: 0 0 10px;
@@ -244,18 +245,18 @@
     overflow: hidden;
   }
 
-  .docs-table td {
+  .docs-table:not(.docs-design-table) td {
     border-bottom: 1px solid var(--stroke-soft);
     padding: 10px 10px 10px 44%;
     position: relative;
     min-height: 38px;
   }
 
-  .docs-table td:last-child {
+  .docs-table:not(.docs-design-table) td:last-child {
     border-bottom: 0;
   }
 
-  .docs-table td::before {
+  .docs-table:not(.docs-design-table) td::before {
     content: attr(data-label);
     position: absolute;
     left: 10px;
@@ -268,23 +269,23 @@
     font-weight: 700;
   }
 
-  .docs-table td[colspan] {
+  .docs-table:not(.docs-design-table) td[colspan] {
     padding: 12px;
   }
 
-  .docs-table td[colspan]::before {
+  .docs-table:not(.docs-design-table) td[colspan]::before {
     content: none;
   }
 
-  .docs-table td[data-label="Action"] {
+  .docs-table:not(.docs-design-table) td[data-label="Action"] {
     padding-left: 10px;
   }
 
-  .docs-table td[data-label="Action"]::before {
+  .docs-table:not(.docs-design-table) td[data-label="Action"]::before {
     content: none;
   }
 
-  .table-actions {
+  .docs-table:not(.docs-design-table) .table-actions {
     width: 100%;
     justify-content: flex-start;
   }
