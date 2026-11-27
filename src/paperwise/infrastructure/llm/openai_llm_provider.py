@@ -174,7 +174,6 @@ class OpenAILLMProvider(LLMProvider):
         )
         request_payload = {
             "model": self._model,
-            "temperature": 0,
             "response_format": self._json_response_format(),
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
@@ -232,7 +231,6 @@ class OpenAILLMProvider(LLMProvider):
             )
             request_payload = {
                 "model": self._model,
-                "temperature": 0,
                 "max_tokens": 3000,
                 "response_format": self._json_response_format(),
                 "messages": [
@@ -299,7 +297,6 @@ class OpenAILLMProvider(LLMProvider):
             logger.info("Submitting vision OCR page %d/%d for %s.", index, total_pages, filename)
             request_payload = {
                 "model": self._model,
-                "temperature": 0,
                 "max_tokens": 3000,
                 "response_format": self._json_response_format(),
                 "messages": [
@@ -454,7 +451,6 @@ class OpenAILLMProvider(LLMProvider):
         user_prompt = build_grounded_qa_user_prompt(question=question, contexts=contexts)
         request_payload = {
             "model": self._model,
-            "temperature": 0,
             "response_format": self._json_response_format(),
             "messages": [
                 {"role": "system", "content": GROUNDED_QA_SYSTEM_PROMPT},
@@ -489,7 +485,6 @@ class OpenAILLMProvider(LLMProvider):
         user_prompt = build_retrieval_query_user_prompt(question=question)
         request_payload = {
             "model": self._model,
-            "temperature": 0,
             "response_format": self._json_response_format(),
             "messages": [
                 {"role": "system", "content": RETRIEVAL_QUERY_SYSTEM_PROMPT},
@@ -518,7 +513,6 @@ class OpenAILLMProvider(LLMProvider):
     ) -> dict[str, Any]:
         request_payload = {
             "model": self._model,
-            "temperature": 0,
             "messages": messages,
         }
         if tools:
@@ -559,7 +553,7 @@ class OpenAILLMProvider(LLMProvider):
     def iter_answer_with_tools(self, *, messages: list[dict[str, Any]], tools: list[dict[str, Any]]):
         """Stream text and assemble tool-call fragments without replaying partial answers."""
         request_payload: dict[str, Any] = {
-            "model": self._model, "temperature": 0, "messages": messages,
+            "model": self._model, "messages": messages,
             "stream": True, "stream_options": {"include_usage": True},
         }
         if tools:

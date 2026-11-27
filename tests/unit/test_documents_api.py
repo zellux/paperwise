@@ -1908,6 +1908,33 @@ def test_llm_connection_test_accepts_payload_overrides_and_calls_provider() -> N
         app.dependency_overrides.clear()
 
 
+def test_openai_connection_test_omits_temperature(monkeypatch) -> None:
+    repository = InMemoryDocumentRepository()
+    monkeypatch.setitem(app.dependency_overrides, document_repository_dependency, lambda: repository)
+    monkeypatch.setitem(app.dependency_overrides, current_user_dependency, lambda: TEST_USER)
+    monkeypatch.setitem(app.dependency_overrides, llm_provider_dependency, lambda: None)
+
+    def handle_request(_transport, request: httpx.Request) -> httpx.Response:
+        assert request.url == "https://api.openai.com/v1/chat/completions"
+        payload = json.loads(request.content)
+        assert payload["model"] == "gpt-6-luna"
+        assert "temperature" not in payload
+        return httpx.Response(
+            200,
+            json={"choices": [{"message": {"content": '{"tags": ["Test"]}'}}]},
+        )
+
+    monkeypatch.setattr(httpx.HTTPTransport, "handle_request", handle_request)
+    with TestClient(app) as client:
+        response = client.post(
+            "/documents/llm/test",
+            json={"provider": "openai", "model": "gpt-6-luna", "api_key": "sk-test"},
+        )
+
+    assert response.status_code == 200, response.text
+    assert response.json()["ok"] is True
+
+
 def test_llm_connection_test_can_probe_grounded_qa_task() -> None:
     repository = InMemoryDocumentRepository()
     fake_provider = FakeLLMProvider()
